@@ -1,0 +1,40 @@
+{
+  "version": "0.1.9-weapons-test10",
+  "compiler": "MinGW-w64 GCC 13-posix, RelWithDebInfo, static runtime",
+  "architecture": "AMD64",
+  "dll_size": 2326030,
+  "dll_sha256": "8e25310c12fae9a2258434ce14d6c2ad4bc8d55a14d0be15205b5afb2fd2ab91",
+  "imports": [
+    "bcrypt.dll",
+    "dbghelp.dll",
+    "gdi32.dll",
+    "kernel32.dll",
+    "msvcrt.dll",
+    "user32.dll"
+  ],
+  "exports": [
+    "D3DPERF_BeginEvent",
+    "D3DPERF_EndEvent",
+    "D3DPERF_GetStatus",
+    "D3DPERF_QueryRepeatFrame",
+    "D3DPERF_SetMarker",
+    "D3DPERF_SetOptions",
+    "D3DPERF_SetRegion",
+    "DebugSetMute",
+    "Direct3DCreate9",
+    "Direct3DCreate9Ex"
+  ],
+  "loader_probe_sha256": "1f3d3fca5fe31a163e5d14b6315d3a53a31b6b59a19a02bb1a81b528061d820b",
+  "loader_probe_provenance": "Unchanged owned probe and toolchain-built bytes from test9.",
+  "checks": {
+    "aslr_and_nx": true,
+    "native_cpp_tests": "8 suites passed; new inventory fixtures cover earlier-bank checkpoints, slot reorder, selective removal with foreign pickups/ammo, retained original loadout, and dual compatibility prerequisites.",
+    "python_tests": "12 passed: extractor, tuning reader and overlapping pattern fixtures.",
+    "exact_profile": "57 overlap-aware unique patterns; all previous references plus handed/normal animation arrays, native triple cache/reset/24-byte stride, and 37-name native build/fallback agree with the supplied hash.",
+    "powershell_scripts": "Four scripts parse with PowerShell 7.6.6. Actual-test9-to-test10 isolated uninstall/install, receipt/hash, diagnostic menu selection, saved FOV collection, removal, and game/log/settings byte preservation pass on Linux.",
+    "retail_runtime": "Test9 owner reports other controls work, with checkpoint/undo/dual/FPS defects. New test10 recovery, animations, OFF behavior and FPS need owner execution.",
+    "original_game_assets_in_distribution": "none"
+  },
+  "change": "Preserve original baseline and introduced IDs across checkpoints/banks; selective OFF removes introduced IDs while retaining foreign pickups. Validate identity without firing-time requirement for equipment. Cache metadata, update only held gun, conditionally loan normal names/arena definitions for generic dual fallback, restore native veto/pointers and log updater time/read counts.",
+  "limits": "No Windows game/probe executed. Generic fallback is not authentic akimbo assets. Undo is in-process; first test requires clean mission restart. FPS/gameplay effects remain unverified."
+}

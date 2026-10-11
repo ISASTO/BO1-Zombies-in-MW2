@@ -1,0 +1,41 @@
+{
+  "version": "0.1.8-weapons-test9",
+  "source_bundle": {
+    "filename": "BO1MW2-startup-results-20261011-171619-2413944b.zip",
+    "bytes": 117528,
+    "sha256": "6ec39c8e90ea328a02d482c7498040e2469ea17af0dcc09ff35fdfcdced1c74f",
+    "entries": 21
+  },
+  "log": {
+    "bytes": 332747,
+    "sha256": "a823544745c15265e7ca0bd06db4dd1f160c6f3ce8d8f954dda492c84c790939",
+    "records": 3535
+  },
+  "installed_dll_sha256": "3b688c08cbd1caf7e71f900e9967b8fb6c86e1cd11b2fca82280ec4c0dfd7382",
+  "owner_report": [
+    "Checkpoint reload leaves one nonadjustable bank; mission restart restores four.",
+    "G18 and some guns fail dual wield; enabling dual reduces FPS substantially.",
+    "Give All OFF leaves added guns.",
+    "Other features appear to work as intended."
+  ],
+  "confirmed_runtime": {
+    "map": "estate",
+    "catalog_last_loaded": 114,
+    "core_inventory_dual_profiles": "Resolved; no signature failure.",
+    "first_bank": "bank1/4, nine grants, 34 eligible at 17:05:42.000; original six entries retained.",
+    "checkpoint_failure": "At 17:06:56.220 the old snapshot was discarded; 17:06:56.269 recaptured a full bank1 inventory: bank1/1, zero grants, 25 eligible. OFF at 17:07:10.681 restored that contaminated baseline. Repeats later.",
+    "mission_restart": "17:08:04.011 command time250; 17:08:06.075 bank1/4 with nine grants again.",
+    "g18": "Loaded asset index33, name glock, class5, clipSize32, noDual=1, hand0. Native global dual bool ON did not override the per-weapon veto.",
+    "rapid_fire": "74 apply and 74 restore records; glock63 ->31 ->63 and other held assets instrumented.",
+    "performance": "Adjacent pre-dual heartbeat intervals roughly327-337 render callbacks/sec; several ON intervals roughly182-318. Scene/weapon/motion changes confound causal attribution; no test9 updater timing existed.",
+    "loader_probes": "Both exit0.",
+    "new_crash_evidence": false,
+    "crash_limit": "Same three historical test1 dump hashes; no new dump identified."
+  },
+  "confirmed_source_cause": {
+    "baseline": "Strict current-bank ID comparison rejects earlier-bank saves; positive firing-time validation is inappropriate for equipment identity. Recovery then captured modded live inventory as original.",
+    "undo": "After contaminated recapture, OFF correctly restored the wrong snapshot, so introduced weapons remained.",
+    "performance": "Enabled dual repeatedly read candidate/model data for all 15 entries and extra full snapshots. Test10 removes this work; final FPS cause/results require owner measurement."
+  },
+  "limits": "Animation/FPS results of test10 are pending; full game files/logs/dumps remain private."
+}

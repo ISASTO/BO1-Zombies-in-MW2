@@ -8,7 +8,7 @@
 #include "fov_preferences.hpp"
 
 namespace mod {
-inline constexpr const char* kVersion = "0.1.8-weapons-test9";
+inline constexpr const char* kVersion = "0.1.9-weapons-test10";
 inline constexpr const char* kExeSha256 = "fb7e8a987c371dea7b666091b0b9e2011c0cd9cd277b191ad453d11d557dd777";
 
 // -1 is a wildcard. Reject malformed patterns rather than matching everything.
@@ -165,6 +165,19 @@ inline constexpr const char* kAlternateChainPattern =
     "E8 ?? ?? ?? ?? 8B 58 58 85 DB 74 ?? 8B D3 48 8B CF E8 ?? ?? ?? ?? 85 C0 75 ??";
 inline constexpr const char* kClipPoolPattern =
     "4C 8D 99 50 03 00 00 45 33 D2 49 8B C3 0F 1F 00 39 10 74 ?? 49 FF C2 48 83 C0 0C 49 83 FA 0F 7C ?? 33 C9 49 8B C3 83 38 00 74 ?? 48 FF C1 48 83 C0 0C 48 83 F9 0F 7C ?? 49 63 C0 41 89 13 45 01 4C 83 04 C3";
+
+inline constexpr const char* kDualAnimSupportPattern =
+    "48 8B 41 18 48 8B 48 08 33 C0 38 01 0F 95 C0 C3";
+inline constexpr const char* kDualAnimSelectPattern =
+    "49 8B 52 18 48 8B 4A 08 80 39 00 74 ?? 45 33 C0 48 8D 0C FD 00 00 00 00 85 F6 75 ?? 48 8B 04 11 44 38 00 EB ?? 49 8B 42 20 48 8B 0C 01 44 38 01 EB ?? 48 8B 40 20 45 33 C0 48 8B 14 F8 44 38 02";
+inline constexpr const char* kDualAnimCacheReadPattern =
+    "48 8D 05 ?? ?? ?? ?? 48 83 3C F0 00 75 ?? 8B CF E8 ?? ?? ?? ?? 4C 8B C0 48 8D 15 ?? ?? ?? ?? B9 01 00 00 00 E8 ?? ?? ?? ??";
+inline constexpr const char* kDualAnimCacheResetPattern =
+    "33 D2 48 8D 0D ?? ?? ?? ?? 41 B8 C0 12 00 00 E8 ?? ?? ?? ?? 49 69 CE C0 2B 00 00";
+inline constexpr const char* kDualAnimCacheStridePattern =
+    "48 8D 04 6D 00 00 00 00 48 03 C5 41 83 7E 1C 00 4D 8D 24 C4 75 ?? 0F 57 C0 33 C0";
+inline constexpr const char* kWeaponAnimBuildPattern =
+    "BB 01 00 00 00 48 8D 7D 08 0F 1F 84 00 00 00 00 00 4C 8B 07 41 80 38 00 75 ?? 4C 8B 45 08 8B D3 48 8B CE E8 ?? ?? ?? ?? FF C3 48 83 C7 08 83 FB 25 7C ??";
 
 inline constexpr int kVisibleMenuRows = 8;
 enum class Page { Home, Player, Weapons, World, AI, Zombies, Diagnostics, ZombieRules, View };

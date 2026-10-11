@@ -68,3 +68,13 @@ before committing that dependency.
   instructions independently establish every offset used here. No complete
   upstream structure, x86 address, T5 structure, or GPL implementation is copied.
   The current link is context; the supplied executable hash is the authority.
+
+## Test10 animation references
+
+The same primary OAT IW4 header supplies naming/format leads for handed arrays
+and animation slots. Every used offset/count is corroborated by this executable:
+86740/86e80 select arrays, c2c70 processes37 names, c4b38 groups three cache
+slots, a6392/a93f2 clear200 groups, and a9730/2689a0 establish arena allocation.
+No OAT/GPL structure or implementation is copied. T5 asset/actor layouts remain
+separate; this generic weapon animation fallback does not implement Zombies
+animation conversion or reproduce authentic akimbo asset authoring.

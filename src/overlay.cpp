@@ -373,7 +373,7 @@ void Overlay::frame() {
             text(40,143,kMuted,line,.7f);
         } else {
             text(40,121,kMuted,StateText(s.state),.7f);
-            text(40,143,kMuted,"WEAPONS test 9 | Reversible weapon modes",.7f);
+            text(40,143,kMuted,"WEAPONS test 10 | Checkpoint + dual repair",.7f);
         }
         const auto preview = menu.page == Page::ZombieRules
             ? bo1::EvaluateNormalSoloRound(menu.previewRound, menu.previewRound == 1) : std::nullopt;
@@ -415,13 +415,14 @@ void Overlay::frame() {
             else if (menu.page==Page::Player && n==7) status="ENTER";
             else if (menu.page==Page::Weapons) {
                 if (n==0) {
-                    if (!ExtraAvailable(s,ExtraFeature::GiveAll)) status="LOCKED";
-                    else { std::snprintf(value,sizeof(value),"%s %d/%d",extraPreferences.wanted(ExtraFeature::GiveAll)?(weaponMode.owned?"ON":"WAIT"):(weaponMode.owned?"UNDO":"OFF"),weaponMode.page+1,weaponMode.pages); status=value; }
+                    if (weaponMode.needsBaseline) status="RESTART";
+                    else if (!ExtraAvailable(s,ExtraFeature::GiveAll)) status="LOCKED";
+                    else { std::snprintf(value,sizeof(value),"%s %d/%d",extraPreferences.wanted(ExtraFeature::GiveAll)?(weaponMode.owned && !weaponMode.reconciling?"ON":"WAIT"):(weaponMode.owned?"UNDO":"OFF"),weaponMode.page+1,weaponMode.pages); status=value; }
                 }
                 else if (n==1) status=!s.grenadeSustainResolved || !FeatureAvailable(s,PlayerFeature::NoReload)?"LOCKED":s.sustain.current?(playerPreferences.wanted(PlayerFeature::NoReload)?"ON":"NATIVE"):(playerPreferences.wanted(PlayerFeature::NoReload)?"WAIT":"OFF");
                 else if (n==2) status=!ExtraAvailable(s,ExtraFeature::RapidFire)?"LOCKED":extraPreferences.wanted(ExtraFeature::RapidFire)?(RapidFireApplied(s.weapon)?"ON":s.weapon.fireTime==20?"AT MIN":"WAIT"):"OFF";
                 else if (n==3) status=!ExtraAvailable(s,ExtraFeature::ExplosiveBullets)?"LOCKED":s.explosive.current?(extraPreferences.wanted(ExtraFeature::ExplosiveBullets)?"ON":"NATIVE"):(extraPreferences.wanted(ExtraFeature::ExplosiveBullets)?"WAIT":"OFF");
-                else if (n==4) status=!ExtraAvailable(s,ExtraFeature::ForceDualWield)?"LOCKED":extraPreferences.wanted(ExtraFeature::ForceDualWield)?(s.dualWield.current?(s.dualCurrentSupported && s.lastWeaponHand==1?"ON":"ON*"):"WAIT"):weaponMode.dualOwned?"UNDO":s.dualWield.current?"NATIVE":"OFF";
+                else if (n==4) status=!ExtraAvailable(s,ExtraFeature::ForceDualWield)?"LOCKED":extraPreferences.wanted(ExtraFeature::ForceDualWield)?(weaponMode.dualReady && s.dualWield.current && s.lastWeaponHand==1?(weaponMode.dualFallback?"COMPAT":"ON"):s.dualCurrentSupported?"WAIT":"ON*"):weaponMode.dualOwned?"UNDO":s.dualWield.current?"NATIVE":"OFF";
                 else status="ENTER";
             }
             else if (menu.page==Page::World) {
@@ -490,11 +491,12 @@ void Overlay::frame() {
                 "Linked to PLAYER No Reload. Frag/flash grenades.",
                 "Halves gun delay (20ms min); AI sharing gun too.",
                 "All bullet weapons, including AI. Try with God ON.",
-                "Native compatible guns. ON* = unsupported current gun.",
+                "COMPAT: normal anim fallback. ON*: unsupported gun.",
                 "Records current weapon and new controls in latest.log.",
                 "Weapon cheats OFF, including linked PLAYER No Reload."
             };
             footer=hints[menu.selected];
+            if (menu.selected==0 && weaponMode.needsBaseline) footer="Restart mission once for a clean inventory baseline.";
         }
         if (menu.page==Page::World) {
             static constexpr const char* hints[]={

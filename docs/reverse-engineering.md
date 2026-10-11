@@ -16,7 +16,8 @@ signature match is not a runtime test.
 | `0.1.5-fov-test6` | Owner confirms FOV behavior; reports protection surviving a return/relaunch while God displays OFF | Matching logs show saved FOV 100, selection/save/reset, entity God OFF during the reported period, and health 2 after an ON/OFF cycle. Separate client guards were not logged; precise God mismatch cause is unconfirmed. Normal CSV values match the unchanged preview calculations. |
 | `0.1.6-player-test7` | God session reconciliation/guard diagnostics; every current PLAYER row; smaller eight-row menu | Owner reports normal behavior. Matching receipt/logs cover native fields, God OFF/death/recovery and FOV; no individual toggle actions or new crash evidence in this log. |
 | `0.1.7-world-weapons-test8` | Owner reports invisible/empty Give All guns and LOCKED Rapid Fire; matching estate log | Runtime correctly rejects three overlapping catalog matches; offline consuming regex missed overlap. Movement/world apply/restore observed. No new crash evidence; see runtime-test8-evidence.json. |
-| `0.1.8-weapons-test9` | Filtered reversible weapon banks/ammo, compatible native Force Dual Wield, corrected Rapid Fire resolution | Eight C++ suites, 12 Python fixtures, 51 overlap-aware exact anchors, clean AMD64 build and actual-test8-to-test9 upgrade pass. New gameplay/undo/model/dual behavior awaits owner. |
+| `0.1.8-weapons-test9` | Owner reports working other controls, but checkpoint bank collapse/failed OFF and G18/dual FPS defects | Matching log confirms contaminated recapture, G18 veto and Rapid Fire; no new dump. |
+| `0.1.9-weapons-test10` | Preserve baseline and introduced IDs; held-gun generic dual compatibility; cached metadata/performance diagnostics | Eight C++ suites, 12 Python tests, 57 signatures, clean AMD64 build and actual-test9 upgrade pass; retail acceptance pending. |
 
 Test 1 initialized its C++ static runtime, then logging/crash handling, engine
 hash/scanning, factory/device shadows, WndProc, and rendering across startup.
@@ -291,7 +292,7 @@ unchanged; native rendering and smaller text readability await the owner.
 
 Static evidence in the same full executable hash. The original offline claim
 of 41 unique anchors was incorrect for the catalog initializer: consuming regex
-missed overlapping matches. Current `docs/profile-checks.json` records 51
+missed overlapping matches. Current `docs/profile-checks.json` records 57
 overlap-aware unique anchors and independent field/slot/reference checks.
 These are exact-build assigned names and partial layouts, not a T5/IW4 cast.
 The test8 log confirms the catalog rejection and several option apply/restore
@@ -426,6 +427,73 @@ This preserves either OFF order and naturally dual original guns. Native eligibi
 does not prove every view model/animation renders correctly; require firing,
 reload, switch/back, OFF and both-order tests. Rapid Fire refreshes held state
 after bank changes before selecting the timing asset to modify.
+
+### Test10 checkpoint provenance, animation compatibility and performance
+
+Test9's returned estate run resolves its profiles and exercises bank cycling
+and Rapid Fire. Checkpoint recovery then discards the baseline and captures a
+full prior bank as original: four banks become one with zero grants, and OFF
+restores those introduced guns. G18/`glock` has native noDualWield=1. See
+[runtime-test9-evidence.json](runtime-test9-evidence.json) for redacted evidence.
+
+Test10 keeps the original snapshot and introduced weapon/reserve/clip IDs for
+the campaign scope, across bank changes and OFF. Earlier-bank checkpoints and
+slot reorder are identified by IDs. If only original/introduced weapons remain,
+restore the original loadout; if foreign pickups exist, remove introduced IDs
+and preserve foreign weapons/pools. Timing-free identity reads allow equipment
+and launcher entries to remain preserved without treating them as bullet guns.
+Unreadable non-grantable equipment identity does not veto all recovery; readable
+original and introduced asset identities remain pinned. Temporary invalid reads
+defer reconciliation instead of replacing the baseline. PLAYER/WORLD gates
+continue independently when inventory reconciliation is pending.
+
+| Native finding / assigned name | RVA / layout | Evidence and use |
+| --- | --- | --- |
+| Right-handed animation support | `0x86740` | Def +0x18, array index1, nonempty string test; reference-only function |
+| Handed/default animation selector | `0x86e80`, anchor `0x86eac` | PS lastHand +0x2d4 selects Def +0x18/+0x20; fallback CompleteDef +0x20; eight-byte name-pointer indexing |
+| Native per-weapon animation definitions | `0x43f470` | Three QWORD slots per weapon: normal/right/left; independent cache read and reset resolve same address |
+| Cache grouping calculation | `0xc4b38` | weapon*2 + weapon, then *8 = stride24 |
+| Cached definition read / playback creation | `0xc66f5`, `0xc675e` | Cached definition passed to `0x1fe600`; returned playback object stored independently; nearby `0x1fe610` handles playback teardown |
+| Native cache reset | `0xa6392` and independent `0xa93f2` | Clears 0x12c0 bytes =200*3*8, after per-hand client playback teardown |
+| Definition creation / name loop | `0xc2c70`, loop anchor `0xc2ccf` | Processes 37 names; missing optional names use idle; canonical normal names must be readable |
+| Animation allocation callback | `0xa9730` -> `0x2689a0` | Callback tail-calls alignment4 arena allocator; native bump/commit counters corroborate arena allocation. No mod allocation/free or function call |
+| Hand-definition registration veto | `0xc4c84` | noDual +0x873 controls paired registration, independently of the native PM veto |
+
+These are **static confirmed** in the supplied hash. Assigned names describe
+observed semantics; no complete XAnim/IW4/T5 structure is assumed. Six new
+central patterns bring the profile to57; the verifier decodes name fields,
+three-slot stride, capacity, selector and 37-name count independently.
+
+The compatibility adapter touches only the held primary gun. If authored paired
+names/definitions are available, keep them. Otherwise require validated normal
+names and a registered normal definition, alias the normal name table and
+arena-owned definition into the two hand slots, then clear the native veto and
+publish dual state. Native code creates independent playback instances from
+the shared definition. It is a generic animation fallback, not imported/authentic
+akimbo assets. An absent/unregistered prerequisite defers the operation.
+
+OFF/switch/readiness loss conditionally restores the veto, name/cache pointers,
+metadata flags, left ammo and natural hand state. Scalar ownership preserves
+competing changes; identity mismatch abandons stale asset writes. Cache entries
+are not allocated or freed by the mod, and the native reset clears the entire
+definition cache. Appearance, firing, reload and lifetime behavior of the loan
+remain **runtime pending**. Extra view models have an actual rendering cost.
+
+Immutable candidate metadata is cached per catalog/lifetime. The recurring dual
+path reads only the held gun and current cache group; repeated all-slot model
+reads and extra full snapshots are removed. WEAPON_PERF records cumulative
+update count, average/peak microseconds, reads/update, cache hits/misses and
+compatibility/baseline state. Test9 heartbeat differences support the owner's
+FPS observation, but scene/weapon changes confound attribution; final FPS must
+be measured at a fixed camera with other weapon effects OFF.
+
+A fresh process cannot reconstruct the original inventory of an already modded
+external save. The first test10 run therefore restarts the mission once. A full
+initial inventory without a known baseline is rejected as RESTART rather than
+silently making a zero-grant one-bank mode. History survives subsequent
+checkpoints in this process; it is not persisted on disk. Saved FOV remains the
+only saved preference. After owner acceptance, prioritize the BO1 normal
+round/spawn controller and verified IW4 actor adapter.
 
 ## Resolution and level gate
 
@@ -580,12 +648,15 @@ IW4 zone uses 64-bit pointer records. Asset conversion is unimplemented.
 
 | 2026-10-11 / test 7 | Session God fix, expanded PLAYER and compact menu | Matching build/logs: valid fields, God OFF/death/recovery, saved FOV and navigation | Owner accepts overall behavior; returned run does not instrument each toggle |
 | 2026-10-11 / test 8 | Adjustable movement; loaded weapons, linked grenades, Rapid Fire, explosive bullets, clock/AI/gravity | Returned log plus owner feedback; old 41-unique claim corrected after overlap discovery | Invisible/empty Give All and LOCKED Rapid; movement/world option paths observed; no new dump |
-| 2026-10-11 / test 9 | Reversible filtered banks/ammo, native Force Dual Wield, catalog/verifier fix | Eight C++ suites, 12 Python fixtures, 51 overlap-aware anchors, clean AMD64 build, actual-test8 upgrade | Owner test pending; both OFF orders, models, ammo and dual animations need confirmation |
+| 2026-10-11 / test 9 | First banks/dual prototype and corrected Rapid Fire | Matching estate run and owner feedback | Checkpoint baseline contamination; failed OFF cleanup; G18 veto/dual FPS loss. Other controls owner-accepted |
+| 2026-10-11 / test 10 | Checkpoint provenance, selective undo, held-gun normal-animation fallback, caching and performance diagnostics | Eight C++ suites, 12 Python fixtures, 57 native anchors, AMD64 PE, actual-test9 upgrade | Owner retail acceptance pending |
 
 Returned owner evidence is redacted into the versioned runtime JSON files; full
 logs/dumps stay private. No retail game is executed in this Linux workspace.
-The next acceptance gate is test9: weapon banks/models/ammo, native dual behavior,
-Rapid Fire switching, both OFF orders and same-process checkpoint behavior.
-Undo snapshots are session-local; saved-checkpoint recovery remains unresolved.
+The next acceptance gate is test10: banks after an earlier-bank checkpoint, actual
+OFF removal, G18/other dual appearance/firing/reload, fixed-camera FPS and both
+OFF orders. History is session-local; cross-process saved-checkpoint cleanup
+requires an original baseline and is not implemented. After acceptance, move
+to the BO1 controller and verified actor adapter.
 Saved FOV remains a regression check. Second-map/reset
 coverage and native BO1 actor/asset compatibility remain separate gates.

@@ -1,5 +1,9 @@
 # WEAPONS test9
 
+Historical prototype. The returned run found checkpoint baseline contamination,
+failed OFF cleanup after recovery, and G18/dual FPS defects. Use
+[test10](weapons-test10.md) for the current repair and acceptance run.
+
 Build **0.1.8-weapons-test9**, for the exact supplied AMD64 `iw4sp.exe`.
 This is a focused repair of test8, with reversible Give All and Force Dual Wield.
 Portable/static checks pass; the new in-game effects require your retail run.

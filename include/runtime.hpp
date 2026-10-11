@@ -80,7 +80,10 @@ ExtraPreferences GetExtraPreferences();
 void ResetWeaponFeatures();
 void ResetWorldFeatures();
 bool RapidFireApplied(const WeaponFields& weapon);
-struct WeaponModeStatus { bool owned=false; int page=0,pages=1,added=0; bool dualOwned=false; };
+struct WeaponModeStatus {
+    bool owned=false; int page=0,pages=1,added=0;
+    bool dualOwned=false,dualReady=false,dualFallback=false,reconciling=false,needsBaseline=false;
+};
 WeaponModeStatus GetWeaponModeStatus();
 bool AdjustWeaponBank(int direction);
 bool SetFov(int value);

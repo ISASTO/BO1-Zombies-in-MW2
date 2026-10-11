@@ -20,18 +20,23 @@ Updated 2026-10-11. Complete one useful, testable change at a time.
    adjustment and several world apply/restore paths. Owner reports invisible,
    empty Give All weapons and LOCKED Rapid Fire. Runtime correctly rejects
    three overlapping catalog matches; offline consuming regex hid ambiguity.
-6. **Current test9: focused reversible WEAPONS repair:** filtered loaded primary
-   inventory banks with native ammo IDs; Force Dual Wield for compatible guns;
-   coordinated OFF restoration; corrected catalog and overlap-aware verifier.
-   Eight C++ suites, 12 Python fixtures, 51 exact anchors, clean AMD64 build and
-   actual-test8-to-test9 upgrade pass. Owner models/firing/undo/both-order checks
-   are next. Undo snapshots are in-process; checkpoint/save recovery requires
-   separate evidence. Kill All Enemies still needs hostile filtering and an
-   engine-thread death path; no health-zero shortcut is enabled.
-7. Audit remaining BO1 configuration overrides and dependency closure, then incrementally test round
+6. **Test9 feedback received:** Rapid Fire and bank cycling work; checkpoint
+   recovery discarded the original snapshot and captured a full bank as the
+   baseline. OFF then restored that contaminated state. G18 has native
+   noDualWield=1; all-slot dual scans were expensive. No new crash evidence.
+7. **Current test10 final weapon gate:** retain original snapshot and introduced
+   IDs across checkpoints/banks; selectively remove introduced guns on OFF;
+   preserve foreign pickups; cache metadata and update only the held gun. A
+   reversible normal-animation/arena-definition fallback provides generic dual
+   compatibility where authored hand assets are unavailable. Eight C++ suites,
+   12 Python fixtures, 57 exact anchors, AMD64 build and actual-test9 upgrade
+   pass. Owner checkpoint/undo/G18/FPS/both-order acceptance is next. Initial
+   testing starts from a clean mission restart; history is in-process.
+8. After that acceptance, prioritize the BO1 normal round/spawn controller and
+   verified IW4 actor adapter. BO1 configuration overrides and dependency closure, then incrementally test round
    controller scheduling and an IW4 actor adapter. Identify required native
    targeting, pursuit, damage/notetrack and death semantics before enabling AI.
-8. Audit/import one local asset type at a time with versioned conversion tools.
+9. Audit/import one local asset type at a time with versioned conversion tools.
    Validate zombie behavior against BO1 observations before expanding gameplay,
    special rounds, weapon features, or a native IW4 menu.
 

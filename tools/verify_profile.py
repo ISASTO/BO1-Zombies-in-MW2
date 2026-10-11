@@ -38,6 +38,12 @@ EXTRA_REFERENCES = {
     'kPlayableWeaponPattern': [],
     'kAlternateChainPattern': [],
     'kClipPoolPattern': [],
+    'kDualAnimSupportPattern': [],
+    'kDualAnimSelectPattern': [],
+    'kDualAnimCacheReadPattern': [[0,3,7]],
+    'kDualAnimCacheResetPattern': [[2,3,7]],
+    'kDualAnimCacheStridePattern': [],
+    'kWeaponAnimBuildPattern': [],
 }
 EXTRA_NAMES = {
     'kGiveAllRegistrationPattern': [15, 'g_giveAll'],
@@ -203,7 +209,7 @@ def verify(path, header):
     result['player']={'partial_fields':decoded,'reserve_entries':15,'reserve_stride':8,
         'sustain_slot_rva':result['signatures']['kSustainConsumerPattern']['rip_targets']['0'],
         'sustain_type':0,'speed_slot_rva':result['signatures']['kSpeedConsumerPattern']['rip_targets']['0'],
-        'speed_type':5,'limits':'Static exact-build evidence. Owner accepts PLAYER test7 and adjustable movement test8; new weapon behavior awaits test9 retail run.'}
+        'speed_type':5,'limits':'Static exact-build evidence. Owner accepts PLAYER test7 and adjustable movement test8; test9 weapon feedback is recorded; new checkpoint/dual behavior awaits test10 retail run.'}
     def scalar_target(signature,offset):
         at,code=match_data(signature)
         return at+offset+8+struct.unpack_from('<i',code,offset+4)[0]
@@ -291,6 +297,10 @@ def verify(path, header):
         ('kClipIndex','kClipIndexPattern',13,4),
         ('kClipSize','kClipSizePattern',13,1),
         ('kAlternateWeapon','kAlternateChainPattern',7,1),
+        ('kRightWeaponAnims','kDualAnimSupportPattern',3,1),
+        ('kRightWeaponAnims','kDualAnimSelectPattern',3,1),
+        ('kLeftWeaponAnims','kDualAnimSelectPattern',40,1),
+        ('kNormalWeaponAnims','kDualAnimSelectPattern',53,1),
     ):
         at,code=match_data(signature)
         actual=int.from_bytes(code[offset:offset+width],'little')
@@ -305,7 +315,17 @@ def verify(path, header):
         if call_target(signature,offset)!=int(result['signatures']['kWeaponPointersPattern']['match_rva'],16)+delta:
             raise ValueError(f'{signature}: native getter disagrees with complete/definition tables')
     result['weapon_inventory']={'partial_fields':inventory_fields,'owned_entries':15,'metadata_stride':5,'clip_entries':15,'clip_stride':12,
-        'limits':'Own filtered inventory/ammo compatibility; native grant/allocation routines are reference-only. Undo snapshots are in-process, validated against player/map/inventory and asset identity.'}
+        'limits':'Own filtered inventory/ammo compatibility; native grant/allocation routines are reference-only. Original baseline and introduced weapon/pool ID history survive same-process checkpoints; readable asset identities are validated without positive firing-time requirements for equipment.'}
+    cache=target('kDualAnimCacheReadPattern',0)
+    if cache!=target('kDualAnimCacheResetPattern',2): raise ValueError('Animation cache read/reset addresses differ')
+    _,reset=match_data('kDualAnimCacheResetPattern');_,stride=match_data('kDualAnimCacheStridePattern');_,build=match_data('kWeaponAnimBuildPattern')
+    if struct.unpack_from('<I',reset,11)[0]!=capacity*24 or stride[:20]!=bytes.fromhex('48 8D 04 6D 00 00 00 00 48 03 C5 41 83 7E 1C 00 4D 8D 24 C4') or build[48]!=37:
+        raise ValueError('Native animation cache triple stride/capacity or animation count disagree')
+    if int(re.search(r'kWeaponAnimCacheStride=(\d+)',inventory_header)[1])!=24 or int(re.search(r'kWeaponAnimCount=(\d+)',inventory_header)[1])!=37:
+        raise ValueError('Animation partial layout differs from native evidence')
+    result['weapon_inventory']['dual_animations']={'cache_rva':cache,'stride':24,'slots_per_weapon':3,'animation_names':37,
+        'normal_array_offset':'0x20','right_array_offset':'0x18','left_array_offset':'0x20',
+        'compatibility':'For missing/unregistered paired animations, alias validated normal names and arena-owned normal definition into the two cached hand slots; native engine constructs independent playback trees. Native veto is temporarily cleared and all owned fields conditionally restored.'}
     literal=scalar_target('kPlayerGravityPattern',0)
     native_literal=struct.unpack('<f',pe.get_data(literal,4))[0]
     default_gravity=scalar_target('kGravityRegistrationPattern',0)
@@ -340,7 +360,7 @@ def verify(path, header):
             'compatibility':'Selected gravity + 0.5 in the sole player constant; native g_gravity float covers trajectories.'},
         'grenade_sustain':{'aliases':['fraggrenade','flash_grenade'],'bypass_target_rva':hex(grenade_targets[0]),
             'compatibility':'Infinite Grenades is explicitly linked to No Reload; both use player_sustainAmmo.'},
-        'limits':'Static evidence. Test8 runtime confirms the ambiguous old catalog pattern; corrected overlap-aware catalog and new filtered bank/dual behavior require test9 owner validation. Kill All Enemies remains unimplemented.'}
+        'limits':'Static evidence. Test8 runtime confirms the ambiguous old catalog pattern; test9 confirms catalog resolution and Rapid Fire; new checkpoint/undo/animation/FPS behavior requires test10 owner validation. Kill All Enemies remains unimplemented.'}
     return result
 
 

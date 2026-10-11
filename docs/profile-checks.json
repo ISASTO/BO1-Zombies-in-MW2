@@ -363,6 +363,40 @@
       "match_count": 1,
       "match_rva": "0x84210",
       "rip_targets": {}
+    },
+    "kDualAnimSupportPattern": {
+      "match_count": 1,
+      "match_rva": "0x86740",
+      "rip_targets": {}
+    },
+    "kDualAnimSelectPattern": {
+      "match_count": 1,
+      "match_rva": "0x86eac",
+      "rip_targets": {}
+    },
+    "kDualAnimCacheReadPattern": {
+      "match_count": 1,
+      "match_rva": "0xc66f5",
+      "rip_targets": {
+        "0": "0x43f470"
+      }
+    },
+    "kDualAnimCacheResetPattern": {
+      "match_count": 1,
+      "match_rva": "0xa6392",
+      "rip_targets": {
+        "2": "0x43f470"
+      }
+    },
+    "kDualAnimCacheStridePattern": {
+      "match_count": 1,
+      "match_rva": "0xc4b38",
+      "rip_targets": {}
+    },
+    "kWeaponAnimBuildPattern": {
+      "match_count": 1,
+      "match_rva": "0xc2ccf",
+      "rip_targets": {}
     }
   },
   "fov": {
@@ -490,7 +524,7 @@
     "sustain_type": 0,
     "speed_slot_rva": "0xd9c040",
     "speed_type": 5,
-    "limits": "Static exact-build evidence. Owner accepts PLAYER test7 and adjustable movement test8; new weapon behavior awaits test9 retail run.",
+    "limits": "Static exact-build evidence. Owner accepts PLAYER test7 and adjustable movement test8; test9 weapon feedback is recorded; new checkpoint/dual behavior awaits test10 retail run.",
     "jump": {
       "height_constant_rva": "0x31f8cc",
       "twice_height_constant_rva": "0x31f8d0",
@@ -608,13 +642,49 @@
           "encoded_member_rva": "0x1a1e3b",
           "offset": "0x58"
         }
+      ],
+      "kRightWeaponAnims": [
+        {
+          "signature": "kDualAnimSupportPattern",
+          "encoded_member_rva": "0x86743",
+          "offset": "0x18"
+        },
+        {
+          "signature": "kDualAnimSelectPattern",
+          "encoded_member_rva": "0x86eaf",
+          "offset": "0x18"
+        }
+      ],
+      "kLeftWeaponAnims": [
+        {
+          "signature": "kDualAnimSelectPattern",
+          "encoded_member_rva": "0x86ed4",
+          "offset": "0x20"
+        }
+      ],
+      "kNormalWeaponAnims": [
+        {
+          "signature": "kDualAnimSelectPattern",
+          "encoded_member_rva": "0x86ee1",
+          "offset": "0x20"
+        }
       ]
     },
     "owned_entries": 15,
     "metadata_stride": 5,
     "clip_entries": 15,
     "clip_stride": 12,
-    "limits": "Own filtered inventory/ammo compatibility; native grant/allocation routines are reference-only. Undo snapshots are in-process, validated against player/map/inventory and asset identity."
+    "limits": "Own filtered inventory/ammo compatibility; native grant/allocation routines are reference-only. Original baseline and introduced weapon/pool ID history survive same-process checkpoints; readable asset identities are validated without positive firing-time requirements for equipment.",
+    "dual_animations": {
+      "cache_rva": "0x43f470",
+      "stride": 24,
+      "slots_per_weapon": 3,
+      "animation_names": 37,
+      "normal_array_offset": "0x20",
+      "right_array_offset": "0x18",
+      "left_array_offset": "0x20",
+      "compatibility": "For missing/unregistered paired animations, alias validated normal names and arena-owned normal definition into the two cached hand slots; native engine constructs independent playback trees. Native veto is temporarily cleared and all owned fields conditionally restored."
+    }
   },
   "weapon_world": {
     "dvars": {
@@ -716,6 +786,6 @@
       "bypass_target_rva": "0x84fff",
       "compatibility": "Infinite Grenades is explicitly linked to No Reload; both use player_sustainAmmo."
     },
-    "limits": "Static evidence. Test8 runtime confirms the ambiguous old catalog pattern; corrected overlap-aware catalog and new filtered bank/dual behavior require test9 owner validation. Kill All Enemies remains unimplemented."
+    "limits": "Static evidence. Test8 runtime confirms the ambiguous old catalog pattern; test9 confirms catalog resolution and Rapid Fire; new checkpoint/undo/animation/FPS behavior requires test10 owner validation. Kill All Enemies remains unimplemented."
   }
 }

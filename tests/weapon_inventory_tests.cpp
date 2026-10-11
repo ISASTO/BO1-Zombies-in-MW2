@@ -39,11 +39,37 @@ int main() {
     Check(owner.sameLifetime(0x1000,200,"estate") && owner.sameWeapons(live),"normal firing/switching allows reversible mode");
     Check(!owner.sameLifetime(0x1000,50,"estate") && !owner.sameLifetime(0x1000,200,"cliffhanger"),"checkpoint rewind/map transition blocks stale snapshot");
     Check(!owner.sameLifetime(0x2000,200,"estate"),"reused player slot must not inherit old inventory");
+    Check(owner.sameScope(0x1000,"estate"),"checkpoint rewind keeps the same validated campaign scope");
     live.weapons[1]=6; Check(!owner.sameWeapons(live),"mission/pickup inventory changes prevent blind restoration");
     std::vector<WeaponCandidate> guns;
     for (unsigned n=0;n<30;++n) { auto w=gun; w.weapon.index=20+n; w.ammoId=10; w.clipId=11; guns.push_back(w); }
     auto second=BuildWeaponBank(base,guns,1);
     Check(second.pages==3 && second.added==14 && second.data.weapons[1]==34,"native fifteen-slot limit uses bounded banks");
+    InventoryOwnership session; session.capture(0x1000,100,"estate",base);
+    auto first=BuildWeaponBank(base,guns,0); session.recordApplied(first.data);
+    session.recordApplied(second.data);
+    auto checkpoint=first.data; checkpoint.current=20;
+    auto recovered=BuildInventoryRestore(session,checkpoint);
+    Check(recovered.weapons==base.weapons && recovered.current==base.current,
+        "previous-bank checkpoint restores the original loadout, not a full modded baseline");
+    Check(BuildWeaponBank(recovered,guns,1).pages==3,
+        "checkpoint recovery retains free slots and all bank pages");
+    std::swap(checkpoint.weapons[0],checkpoint.weapons[1]);
+    Check(BuildInventoryRestore(session,checkpoint).weapons==base.weapons,
+        "slot reorder does not defeat ID-based bank undo");
+    checkpoint.weapons[14]=99; checkpoint.metadata[14][2]=3;
+    checkpoint.reserve[14]={99,17}; checkpoint.clips[14]={99,{2,0}};
+    auto mixed=BuildInventoryRestore(session,checkpoint);
+    Check(OwnsWeapon(mixed,99) && !OwnsWeapon(mixed,20) && !OwnsWeapon(mixed,21),
+        "foreign pickup is retained while introduced bank weapons are removed");
+    Check(mixed.reserve[14].id==99 && mixed.reserve[14].count==17 && mixed.clips[14].id==99,
+        "foreign ammo identities survive selective undo");
+    Check(DualPlan(true,true,true,false,false).fallback && DualPlan(true,true,true,false,false).ready,
+        "campaign veto with available normal animations uses compatible fallback");
+    Check(!DualPlan(true,false,true,false,false).ready && !DualPlan(true,true,false,false,false).ready,
+        "missing animation names or unregistered native definition cannot force dual");
+    Check(DualPlan(true,true,true,true,true).ready && !DualPlan(true,true,true,true,true).fallback,
+        "authored paired animations remain the preferred path");
     InventoryData full=base;
     for (int n=0;n<15;++n) { full.reserve[n]={unsigned(60+n),1}; full.clips[n]={unsigned(80+n),{1,0}}; }
     Check(BuildWeaponBank(full,{gun},0).added==0,"full ammo tables never overwrite slot zero");

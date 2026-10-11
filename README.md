@@ -2,10 +2,10 @@
 
 Incremental mod framework for **retail Modern Warfare 2 (2009), single player**.
 The first deliverable is an AMD64 D3D9 DLL that renders a keyboard menu in the
-game. BO1 Zombies gameplay is a future mode. The current test9 build repairs
-Rapid Fire resolution and replaces Give All with reversible, filtered weapon
-banks with ammo. It adds reversible Force Dual Wield. The compact menu, PLAYER
-and WORLD controls, saved FOV and read-only BO1 round preview remain available.
+game. BO1 Zombies gameplay is a future mode. The current test10 build repairs
+checkpoint bank recovery and inventory OFF restoration, adds held-gun dual
+animation compatibility, and removes repeated weapon scans. The compact menu,
+PLAYER/WORLD controls, saved FOV and BO1 round preview remain available.
 
 **Status: Phase 1 core passed in the owner's test4 estate run.** The owner
 confirms correct health, working God ON/OFF and retained God state through
@@ -45,7 +45,15 @@ See [test8 evidence](docs/runtime-test8-evidence.json).
 `0.1.8-weapons-test9` corrects the unique catalog signature and verifier, grants
 only eligible loaded primary guns with initialized native ammo pools, and adds
 Force Dual Wield for verified compatible guns. Both toggles capture undo state
-and coordinate OFF order. The new gameplay requires the owner test9 run.
+and coordinate OFF order. The returned estate run confirms Rapid Fire and bank
+switching, but reports checkpoint bank collapse, ineffective OFF after recovery,
+G18 dual failure and reduced FPS. See [test9 evidence](docs/runtime-test9-evidence.json).
+
+`0.1.9-weapons-test10` retains original inventory plus introduced IDs across
+checkpoints/banks, removes introduced guns by identity, validates equipment
+without firing-time assumptions, caches metadata and updates only the held gun.
+A reversible normal-animation fallback bypasses the verified campaign veto
+where assets are available. New retail animation/undo/FPS results are pending.
 
 The supplied BO1 `common_zombie.ff` resolves the normal tuning CSV. Recovered
 values match the preview, so its numbers are unchanged. Special rounds and
@@ -65,18 +73,20 @@ An executable hash mismatch disables game-state access and memory writes.
 The installer rejects a mismatched build. A manually installed proxy can still
 show its diagnostic menu in an unknown AMD64 `iw4sp.exe`.
 
-## Current WEAPONS test9
+## Current WEAPONS test10
 
-1. Close MW2 and extract the entire `BO1MW2-weapons-test9.zip` outside the game folder.
+1. Close MW2 and extract the entire `BO1MW2-weapons-test10.zip` outside the game folder.
 2. Run `Uninstall.cmd` to remove the earlier project build, then `Install.cmd`
    and select the folder containing `iw4sp.exe`. Find it through Steam:
    MW2 Single Player > Properties > Installed Files > Browse.
-3. Launch normally through Steam, enter a mission, wait for player control,
+3. Launch normally through Steam and **restart the mission once** for this
+   first test, so an older modified save is not captured as the baseline. Wait for player control,
    then press **F4**. Up/Down selects, Enter toggles/opens, Left/Right changes
    the Give All bank or speed/jump/time/gravity, Backspace/Esc goes back.
    F4 closes the menu.
-4. Test Give All models/ammo/banks/OFF, Dual Wield ON/OFF, both OFF orders,
-   and Rapid Fire switching/OFF. Follow [weapons-test9.md](docs/weapons-test9.md)
+4. Test bank selection after checkpoint reload, actual weapon removal on OFF,
+   G18 Dual ON/OFF, fixed-camera FPS and both OFF orders. Follow
+   [weapons-test10.md](docs/weapons-test10.md)
    for the sequence and exact scopes. Keep Infinite Ammo and No Reload OFF
    for initial ammo checks. Turn Give All and Dual Wield OFF before saving or
    quitting: their undo snapshots are in-process, with lifetime/identity guards.
@@ -114,7 +124,7 @@ Copy the log immediately after a failing run: `latest.log` is replaced on launch
 | Status HUD toggle and state-log action | Implemented |
 | BO1 round-rules preview | Owner test5 front-end navigation passed; normal CSV values now recovered locally and match the preview |
 | FOV selector and saved preference | Owner confirms test6 behavior; matching logs show load/selection/save/reset |
-| WEAPONS | Test9 filtered reversible banks/ammo, reversible native Force Dual Wield, corrected Rapid Fire; linked Infinite Grenades, Explosive Bullets, info/reset retained; new retail test pending |
+| WEAPONS | Test10 checkpoint/provenance-based undo, held-gun dual animation fallback, cached metadata/performance diagnostics; Rapid Fire and previous controls retained; new retail test pending |
 | WORLD | Adjustable time/gravity, actor-think freeze, reset; test8 logs confirm several apply/restore paths; broader gameplay coverage pending |
 | Kill All Enemies, AI spawning, Zombies gameplay | Planned; no action |
 
@@ -156,14 +166,18 @@ a nonempty map name, a valid slot-zero entity, and positive player health.
 Two optional FOV signatures additionally corroborate its registration constants,
 name and camera pointer slot. Sixteen optional player signatures validate
 partial client/ammo fields, native dvar consumers, noclip and fixed jump data.
-Twenty-eight optional weapon/world/inventory signatures corroborate native dvar
+Thirty-four optional weapon/world/inventory/animation signatures corroborate native dvar
 consumers, weapon tables/timing, owned slots/model/ammo/dual fields, grenade
 bypasses and the sole player gravity literal. The offline verifier and runtime
 scanner both count overlapping matches. The corrected catalog pattern includes
 the initializer prologue instead of matching repeated adjacent memset blocks.
 Weapon banks use bounded data writes and conditional rollback; no native
 grant/allocation routine is called. OFF uses the captured original inventory
-only when live player/map/owned IDs agree; changed identities discard stale state.
+only with a validated player/map/asset scope. Introduced weapon/pool IDs persist
+through bank changes and same-process checkpoints; slot reorder and older banks
+do not replace the original baseline. Invalid reads defer recovery. Native
+normal animation names/arena definitions can be loaned to the two hand slots,
+with conditional restoration; no native allocator or actor method is called.
 Each new feature fails closed independently of the core patterns. Reserve
 edits compare ID/count together; speed restores its captured baseline. The
 verified 39/78 jump float pair uses bounded selected heights only in this process; its data
@@ -241,7 +255,8 @@ Original games remain user-supplied inputs and must never be added to this repo.
 - [FOV test6](docs/fov-test6.md): selector, persistence and owner checks.
 - [PLAYER test7](docs/player-test7.md): God regression, every player row and compact menu checks.
 - [WEAPONS/WORLD test8](docs/world-weapons-test8.md): adjustable controls, precise scopes and owner checks.
-- [WEAPONS test9](docs/weapons-test9.md): reversible weapon banks, dual wield, Rapid Fire repair and focused owner checks.
+- [WEAPONS test9](docs/weapons-test9.md): historical first bank/dual prototype.
+- [WEAPONS test10](docs/weapons-test10.md): checkpoint/undo repair, animation compatibility, performance and final owner checks.
 - [BO1 tuning evidence](docs/bo1-normal-tuning-evidence.json): selected local CSV values and pointer-resolution limits.
 - [Roadmap](docs/roadmap.md): incremental gates and persistent FOV request.
 - [Reference projects](docs/references.md): upstream sources and limits of reuse.
@@ -249,7 +264,8 @@ Original games remain user-supplied inputs and must never be added to this repo.
 
 The core foundation and test5 front-end preview are accepted in their observed
 sessions. PLAYER test7 is owner-accepted following the God-state fix. Next test
-the test9 weapon models/ammo/undo and native dual behavior, then audit remaining
+test10 checkpoint/undo/dual/FPS acceptance, then prioritize the BO1 round/spawn
+controller and IW4 actor adapter while auditing remaining
 BO1 overrides/dependencies and broaden campaign-map/reset coverage.
 AI and asset injection need separate compatibility and behavior tests; shared
 engine ancestry does not imply compatible binary layouts or actor behavior.
