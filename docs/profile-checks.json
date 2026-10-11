@@ -37,5 +37,21 @@
       "match_rva": "0x1656de",
       "rip_targets": {}
     }
+  },
+  "entity_number": {
+    "offset": "0x7e",
+    "width_bytes": 2,
+    "evidence": {
+      "allocator_word_store": {
+        "match_count": 1,
+        "instruction_rva": "0x1a0953",
+        "decoded_member_offset": "0x7e"
+      },
+      "native_word_read": {
+        "match_count": 1,
+        "instruction_rva": "0x19afb4",
+        "decoded_member_offset": "0x7e"
+      }
+    }
   }
 }

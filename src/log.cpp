@@ -85,7 +85,7 @@ void InitializeLog() {
         }
     }
     Log("BO1MW2 %s | AMD64 | log=%ls", kVersion, file);
-    Log("Menu test 3: native vptr/private slots preserved. Retail menu verification pending.");
+    Log("Player test 4: corrected WORD entity-number gate at +0x7e. Test 3 menu hooks preserved.");
 }
 void Log(const char* format, ...) {
     char body[4096]{};

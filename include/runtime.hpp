@@ -1,5 +1,6 @@
 #pragma once
 #include "core.hpp"
+#include "player_fields.hpp"
 #include <windows.h>
 #include <d3d9.h>
 #include <atomic>
@@ -20,6 +21,8 @@ struct Snapshot {
     bool serverRunning = false;
     bool god = false;
     int health = 0;
+    int entityNumber = -1;
+    PlayerReadStatus playerRead = PlayerReadStatus::NotRead;
     unsigned flags = 0;
     std::uintptr_t entity = 0;
     char map[96]{};

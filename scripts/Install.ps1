@@ -16,7 +16,7 @@ try {
         $source = Join-Path (Split-Path $PSScriptRoot -Parent) $relative
     }
     if (-not (Test-Path -LiteralPath $source)) { throw 'd3d9.dll was not found. Extract the full test ZIP first.' }
-    $version = if ($Build -eq 'startup') { '0.1.1-startup-test2' } else { '0.1.2-menu-test3' }
+    $version = if ($Build -eq 'startup') { '0.1.1-startup-test2' } else { '0.1.3-player-test4' }
     $payloadPath = Join-Path $PSScriptRoot 'payload.json'
     if (Test-Path -LiteralPath $payloadPath) {
         $payload = Get-Content -LiteralPath $payloadPath -Raw | ConvertFrom-Json

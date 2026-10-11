@@ -40,6 +40,28 @@ def verify(path, header):
         result['signatures'][name] = record
     if len(result['signatures']) != 5:
         raise ValueError('Expected all five profile signatures')
+    # Independent native WORD store/read evidence for the field that blocked test 3.
+    # The member displacement is decoded from the file, then compared to our layout.
+    layout = header.with_name('player_fields.hpp').read_text()
+    number_offset = int(re.search(r'kEntityNumber = (0x[0-9a-f]+)', layout)[1], 16)
+    evidence = {
+        'allocator_word_store': ('48 8B C3 66 89 53 ?? 40 88 BB AF 00 00 00 89 BB 04 01 00 00', 6, 3),
+        'native_word_read': ('48 85 C9 74 0B 0F B7 49 ?? 33 D2 E8 ?? ?? ?? ?? 4C 8B 74 24 28', 8, 5),
+    }
+    result['entity_number'] = {'offset': hex(number_offset), 'width_bytes': 2, 'evidence': {}}
+    for name, (pat, displacement, instruction) in evidence.items():
+        expr = b''.join(b'.' if t == '??' else re.escape(bytes.fromhex(t)) for t in pat.split())
+        matches = list(re.finditer(expr, text, re.S))
+        if len(matches) != 1:
+            raise ValueError(f'{name}: {len(matches)} native field matches, expected one')
+        start = matches[0].start()
+        actual_offset = text[start + displacement]
+        if actual_offset != number_offset:
+            raise ValueError(f'{name}: native entity-number offset {actual_offset:#x} differs from our {number_offset:#x}')
+        result['entity_number']['evidence'][name] = {
+            'match_count': 1, 'instruction_rva': hex(section.VirtualAddress + start + instruction),
+            'decoded_member_offset': hex(actual_offset),
+        }
     return result
 
 

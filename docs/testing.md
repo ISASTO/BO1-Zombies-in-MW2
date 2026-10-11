@@ -1,17 +1,18 @@
-# Test 3: F4 menu after the startup-hook correction
+# Test 4: player identity, health, and God Mode
 
-The owner confirmed that unmodified launch and startup control test 2 both work.
-Three test 1 dumps identified a truncated native device-vtable crash before the
-first frame. Test 3 patches selected public entries in the original table.
-Menu/navigation/God acceptance remains pending until the owner runs this build.
+The owner reports that menu test 3 works. Its log confirms rendering, 82 keyboard
+actions, all categories, and server/map transitions without new crash evidence.
+It also kept God Mode locked because the identity guard read the wrong field.
+Test 4 corrects that guard to the native 16-bit entity number at `+0x7e` and
+retains the working graphics/input hooks. Health and God behavior are pending.
 
-Build: `0.1.2-menu-test3`, exact September 16, 2026 AMD64 executable. This is a
-initial diagnostic build, not an accepted or proven retail mod yet.
+Build: `0.1.3-player-test4`, exact supplied September 16, 2026 AMD64 executable.
+This is a focused Phase 1 test, with no Zombies gameplay implemented.
 
 ## Installation
 
 1. Exit both MW2 executables.
-2. Extract the whole test ZIP to an ordinary folder, such as Desktop\BO1MW2-test3.
+2. Extract the whole test ZIP to an ordinary folder, such as Desktop\BO1MW2-test4.
 3. Find the installed Single Player game folder through Steam's Browse button.
 4. Run Uninstall.cmd for an earlier project build, then Install.cmd and paste
    that folder. It checks the executable SHA256 and
@@ -25,9 +26,10 @@ game directory. Manual DLL copying also works, with the limits in the README.
 
 ## Test sequence
 
-For this iteration, complete steps 1-7 and then collect diagnostics (step 13).
-Confirm launch/render/navigation first. Steps 8-12 are the subsequent Phase 1
-checks once the menu is stable. Collect immediately after any failure.
+For this iteration, focus on steps 3-5 and 8-11, then collect diagnostics
+(step 13). Briefly confirm the working menu after replacing the DLL. Step 12
+is optional. If the HUD still reports loading or UNKNOWN health after you can
+move/fire normally, leave God Mode locked and collect that log immediately.
 
 | Step | Do this | Observe |
 | --- | --- | --- |
@@ -50,6 +52,9 @@ God Mode is tested against ordinary damage. Scripted mission failure, a kill
 volume, or a cutscene may use a different path and does not prove the flag failed.
 The flag is changed once per selection and is not reapplied continuously. The
 display reads the actual current entity flag, including changes caused by reloads.
+UNKNOWN health means field validation did not complete; it is not a reported
+health value of zero. The log records the entity number and precise field-read
+status so an identity failure differs from a dead player.
 
 ## Return these observations
 
@@ -88,9 +93,9 @@ return the last log and Windows Application Error's faulting module/offset.
 
 ## Acceptance gates
 
-The first milestone is accepted only after retail testing confirms normal launch,
-in-game menu rendering, working navigation, continuous gameplay, and correct
-controls after closing. Phase 1 additionally requires correct level gating,
+The owner reports a working test 3 menu; its log confirms normal launch, in-game
+rendering, and navigation. Continuous gameplay and correct controls after closing
+still need explicit observations. Phase 1 additionally requires correct level gating,
 God-on/God-off damage observations, a checkpoint reload, and a second mission.
 Further code changes should address observed failures, then repeat the affected
 checks. BO1 AI and asset injection wait until this foundation passes.

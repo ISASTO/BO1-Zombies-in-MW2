@@ -1,0 +1,80 @@
+{
+  "received_date": "2026-10-11",
+  "owner_report": "It works!!! this is so cool!!!",
+  "bundle": {
+    "file": "BO1MW2-startup-results-20261011-082724-ec10a78c.zip",
+    "sha256": "96da517b619b524e105b471e4adba20bcad0a4888608badfb66977afc4b7e2ee",
+    "collected_utc": "2026-10-11T13:27:24.0269981Z",
+    "installed_version": "0.1.2-menu-test3",
+    "installed_dll_sha256": "42604edef679a36e7946071b8365b2dc77b901d7cd11c1b6eb44467226dcc41a",
+    "executable_sha256": "fb7e8a987c371dea7b666091b0b9e2011c0cd9cd277b191ad453d11d557dd777",
+    "log_sha256": "4a99306076b4a8c33dea275203ed17766438db58b148b771175e49d5ce834ac0"
+  },
+  "observed": {
+    "native_vptr_unchanged": true,
+    "end_scene_reached": true,
+    "font_creation_hresult": "0x00000000",
+    "first_draw_size": [
+      3440,
+      1440
+    ],
+    "input_events": 82,
+    "visited_pages": [
+      "Home",
+      "Player",
+      "Weapons",
+      "World",
+      "AI",
+      "Zombies",
+      "Diagnostics"
+    ],
+    "menu_open_and_close_logged": true,
+    "last_heartbeat_end_scenes": 75465,
+    "last_heartbeat_draws": 75464,
+    "last_heartbeat_resets": 0,
+    "present_hook_reached": false,
+    "server_map_observed": "estate",
+    "server_transition_back_to_no_level": true,
+    "entity_rva": "0xd9e070",
+    "player_gate_status": "Transition in every mission snapshot",
+    "god_selections_blocked": 3,
+    "god_writes_observed": 0,
+    "validated_player_health_observed": false,
+    "new_crash_files": 0,
+    "included_dumps_are_unchanged_test1_files": true,
+    "new_crash_events_since_install": 0,
+    "factory_probes": [
+      {
+        "exit_code": 0,
+        "name": "windows-system-d3d9"
+      },
+      {
+        "exit_code": 0,
+        "name": "installed-project-dll"
+      }
+    ]
+  },
+  "static_layout_correction": {
+    "old_identity_offset": "0x00",
+    "old_identity_width": 4,
+    "correct_identity_offset": "0x7e",
+    "correct_identity_width": 2,
+    "allocator_word_store_rva": "0x1a0953",
+    "independent_word_read_rva": "0x19afb4",
+    "health_offset": "0x164",
+    "flags_offset": "0x150",
+    "god_bit": "0x1",
+    "reason": "Native entity type occupies +0x00; the old identity check could return before reading health/flags. The test3 defaults were not validated health values."
+  },
+  "not_separately_confirmed": [
+    "NPC movement / continuous gameplay",
+    "WASD/mouse/fire while menu open",
+    "normal controls after closing",
+    "God-on/God-off damage",
+    "checkpoint reload / second mission",
+    "device reset",
+    "Steam-overlay interoperability"
+  ],
+  "next_build": "0.1.3-player-test4",
+  "next_runtime": "pending"
+}

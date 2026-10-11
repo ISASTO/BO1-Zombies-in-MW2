@@ -15,9 +15,6 @@ struct Profile {
     std::uintptr_t mapDvarSlot = 0;
     std::uintptr_t entitySlot = 0;
 } profile;
-constexpr std::size_t kFlags = 0x150;
-constexpr std::size_t kHealth = 0x164;
-constexpr std::size_t kEntityStride = 0x2a0;
 
 bool Read(std::uintptr_t address, void* output, std::size_t size) {
     SIZE_T read = 0;
@@ -178,9 +175,12 @@ Snapshot ReadSnapshot() {
     if (!NamedDvar(profile.mapDvarSlot, "mapname", 7, map) || !ReadValue(map + 0x10, mapString) ||
         !ReadString(mapString, s.map, sizeof(s.map)) || !s.map[0]) return s;
     if (!ReadValue(profile.entitySlot, s.entity) || !InImage(s.entity, kEntityStride)) return s;
-    int number = -1;
-    if (!ReadValue(s.entity, number) || number != 0 || !ReadValue(s.entity + kHealth, s.health) ||
-        !ReadValue(s.entity + kFlags, s.flags) || s.health < -100000 || s.health > 100000) return s;
+    const auto fields = ReadPlayerFields(s.entity, Read);
+    s.entityNumber = fields.number;
+    s.playerRead = fields.status;
+    s.health = fields.health;
+    s.flags = fields.flags;
+    if (s.playerRead != PlayerReadStatus::Complete) return s;
     s.god = (s.flags & 1) != 0;
     s.state = s.health > 0 ? LevelState::Ready : LevelState::PlayerDead;
     return s;
@@ -188,19 +188,20 @@ Snapshot ReadSnapshot() {
 bool ToggleGod() {
     // Single explicit atomic bit change. No freeze loop, patch, engine call, or copied player struct.
     const auto s = ReadSnapshot();
-    if (s.state != LevelState::Ready || ((s.entity + kFlags) & 3) || !Writable(s.entity + kFlags)) {
-        Log("GOD blocked: %s health=%d map=%s entity=%p", StateText(s.state), s.health, s.map, reinterpret_cast<void*>(s.entity));
+    if (s.state != LevelState::Ready || ((s.entity + kEntityFlags) & 3) || !Writable(s.entity + kEntityFlags)) {
+        Log("GOD blocked: %s health=%d map=%s entity=%p entity_number=%d player_read=%s", StateText(s.state), s.health, s.map,
+            reinterpret_cast<void*>(s.entity), s.entityNumber, PlayerReadText(s.playerRead));
         return false;
     }
-    const LONG old = InterlockedXor(reinterpret_cast<volatile LONG*>(s.entity + kFlags), 1);
+    const LONG old = InterlockedXor(reinterpret_cast<volatile LONG*>(s.entity + kEntityFlags), 1);
     Log("GOD %s flags_before=0x%08lx flags_after=0x%08lx map=%s health=%d", (old & 1) ? "OFF" : "ON",
         static_cast<unsigned long>(old), static_cast<unsigned long>(old ^ 1), s.map, s.health);
     return true;
 }
 void LogSnapshot() {
     const auto s = ReadSnapshot();
-    Log("STATE %s supported=%d resolved=%d sv_running=%d map=%s entity=%p health=%d flags=0x%08x god=%d",
+    Log("STATE %s supported=%d resolved=%d sv_running=%d map=%s entity=%p health=%d flags=0x%08x god=%d entity_number=%d player_read=%s",
         StateText(s.state), s.supported, s.resolved, s.serverRunning, s.map,
-        reinterpret_cast<void*>(s.entity), s.health, s.flags, s.god);
+        reinterpret_cast<void*>(s.entity), s.health, s.flags, s.god, s.entityNumber, PlayerReadText(s.playerRead));
 }
 } // namespace mod

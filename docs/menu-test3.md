@@ -78,8 +78,19 @@ check once launch/render/input are stable. The full checklist remains in
 [testing.md](testing.md). If launch fails, collect diagnostics before removing
 this project's DLL with Uninstall.cmd; the copied logs and dumps remain.
 
-The correction is supported by the dumps and regression test, but retail
-execution of this new build is **pending**. Shader/state restoration, font
-creation, keyboard behavior, Steam-overlay interaction, reset/shutdown, and
-active-level gating still require actual observations. BO1 AI/asset work remains
-behind the menu acceptance gate.
+## Owner result, 2026-10-11
+
+The owner returned a diagnostic bundle and reported: "It works!!! this is so
+cool!!!" Its installed receipt/hash matches the delivered test 3 DLL. The log
+reaches EndScene, successfully creates the font atlas, draws at 3440x1440,
+processes 82 menu key actions, visits all six categories, closes the menu, and
+returns from `estate` to no active server. The last heartbeat reports 75,464 draws.
+No new crash files/events are present; all three included dumps are unchanged
+test 1 files. Both independent DLL/factory probes return exit code zero.
+
+This confirms the launch/render/input correction in the observed run. The log
+does not establish NPC movement, normal controls after closing, reset behavior,
+or God Mode. Its player state remains Transition, with three blocked God actions.
+The next correction is the entity-number guard, described in
+[player-test4.md](player-test4.md). Redacted results are in
+[runtime-test3-evidence.json](runtime-test3-evidence.json).
