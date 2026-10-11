@@ -1,19 +1,20 @@
-# Test 1: F4 menu foundation
+# Test 3: F4 menu after the startup-hook correction
 
-**Observed result: the owner reports that the game does not launch.** No log or
-specific error has been supplied. Pause this sequence and follow
-[startup test 2](startup-test2.md) first. Menu/navigation/God acceptance remains
-pending; compilation did not prove retail startup compatibility.
+The owner confirmed that unmodified launch and startup control test 2 both work.
+Three test 1 dumps identified a truncated native device-vtable crash before the
+first frame. Test 3 patches selected public entries in the original table.
+Menu/navigation/God acceptance remains pending until the owner runs this build.
 
-Build: `0.1.0-menu-test1`, exact September 16, 2026 AMD64 executable. This is an
+Build: `0.1.2-menu-test3`, exact September 16, 2026 AMD64 executable. This is a
 initial diagnostic build, not an accepted or proven retail mod yet.
 
 ## Installation
 
 1. Exit both MW2 executables.
-2. Extract the whole test ZIP to an ordinary folder, such as Desktop\BO1MW2-test1.
+2. Extract the whole test ZIP to an ordinary folder, such as Desktop\BO1MW2-test3.
 3. Find the installed Single Player game folder through Steam's Browse button.
-4. Run Install.cmd and paste that folder. It checks the executable SHA256 and
+4. Run Uninstall.cmd for an earlier project build, then Install.cmd and paste
+   that folder. It checks the executable SHA256 and
    refuses to replace an existing D3D9 wrapper.
 5. Launch Single Player normally through Steam; no command-line switches,
    alternate client, injector, Bink replacement, or executable replacement.
@@ -23,6 +24,10 @@ receipt and the diagnostics directory. Keep the `.ps1`/`.cmd` tools outside the
 game directory. Manual DLL copying also works, with the limits in the README.
 
 ## Test sequence
+
+For this iteration, complete steps 1-7 and then collect diagnostics (step 13).
+Confirm launch/render/navigation first. Steps 8-12 are the subsequent Phase 1
+checks once the menu is stable. Collect immediately after any failure.
 
 | Step | Do this | Observe |
 | --- | --- | --- |
@@ -38,7 +43,7 @@ game directory. Manual DLL copying also works, with the limits in the README.
 | 10 | Let the player die normally or reload a checkpoint | No crash; state/health refresh; do not assume God persists across reloads |
 | 11 | Return to main menu, then load another mission | No crash; God is locked in main menu and correct map returns in mission |
 | 12 | Optionally Alt-Tab once and change game resolution | Renderer recovers; text and controls still work |
-| 13 | Exit and run CollectLogs.cmd | A ZIP contains the run log, receipt, and any crash files |
+| 13 | Exit and run Diagnose.cmd | A ZIP contains the run log, receipt, crash files, Windows events, and loader-probe results |
 
 Step 12 tests device-reset handling; it is not required to operate the mod menu.
 God Mode is tested against ordinary damage. Scripted mission failure, a kill

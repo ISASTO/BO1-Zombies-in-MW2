@@ -1,5 +1,11 @@
 # Test 2: isolate the launch failure
 
+**Completed: the owner reports successful launch both without our DLL and with
+this control.** Both uploaded bundles have passing factory probes. Three old
+game dumps identify a native private-vtable call beyond test 1's copied table;
+continue with [menu test 3](menu-test3.md). The following is the archived test 2
+procedure and the evidence available when it was created.
+
 The owner reports that menu test 1 prevents a successful game launch. No log,
 Windows error, or failure stage has been supplied yet. The cause is **unknown**;
 the F4 milestone has not passed. This is a diagnostic control, not a confirmed

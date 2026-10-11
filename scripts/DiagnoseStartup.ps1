@@ -89,5 +89,5 @@ try {
     Compress-Archive -Path (Join-Path $stage '*') -DestinationPath $output
     Remove-Item -LiteralPath $stage -Recurse -Force
     Write-Host "Attach this ZIP: $output"
-    Write-Host 'Also report whether normal Steam launch works after uninstalling our DLL, and with the startup control installed.'
+    Write-Host 'Also report the installed build, launch result, last action, and any exact error text.'
 } catch { Write-Host $_.Exception.Message -ForegroundColor Red; exit 1 }

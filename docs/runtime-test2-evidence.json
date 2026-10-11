@@ -1,0 +1,78 @@
+{
+  "received_date": "2026-10-11",
+  "owner_report": "Launch worked both without the mod and with startup control test 2.",
+  "bundles": [
+    {
+      "file": "BO1MW2-startup-results-20261011-075807-7344adb2.zip",
+      "sha256": "e87be362055a2efff2812d8f0e918d0848474e123fbc76bee72b5244e98ecd6a",
+      "installed_version": "0.1.0-menu-test1",
+      "installed_dll_sha256": "662695d7112452fc58a4da23a1a682b537e601dd55eedd6b42ca118d774a92a9",
+      "executable_sha256": "fb7e8a987c371dea7b666091b0b9e2011c0cd9cd277b191ad453d11d557dd777",
+      "all_probes_exit_zero": true
+    },
+    {
+      "file": "BO1MW2-startup-results-20261011-080013-a51af293.zip",
+      "sha256": "e3cf0a11149e6a69d3dcdb8c3b6c6390d895e91443b7fd9762f27674871e147f",
+      "installed_version": "0.1.1-startup-test2",
+      "installed_dll_sha256": "73d7d53306a66a0031857dc835d2f8064628b85a26a3a0cce1e0c67e415b7cab",
+      "executable_sha256": "fb7e8a987c371dea7b666091b0b9e2011c0cd9cd277b191ad453d11d557dd777",
+      "all_probes_exit_zero": true
+    }
+  ],
+  "crashes": [
+    {
+      "file": "crash-20261011-073022.dmp",
+      "sha256": "304b8d8d2790892cbc5de0655fea41df6363e50cd010fb667ff25ec58ed4cbc8",
+      "exception": "0xc0000005",
+      "operation": "execute (parameter 0 = 8)",
+      "caller_module": "d3d9.dll",
+      "caller_rva": "0x11fc03",
+      "render_state": "0xce",
+      "fault_target": "outside loaded modules; heap data",
+      "first_frame_hook_reached": false
+    },
+    {
+      "file": "crash-20261011-073044.dmp",
+      "sha256": "676344752b68ae631287fe555308b491f527829077c553855cc9ffefc021a34d",
+      "exception": "0xc0000005",
+      "operation": "execute (parameter 0 = 8)",
+      "caller_module": "d3d9.dll",
+      "caller_rva": "0x11fc03",
+      "render_state": "0xce",
+      "fault_target": "outside loaded modules; heap data",
+      "first_frame_hook_reached": false
+    },
+    {
+      "file": "crash-20261011-073111.dmp",
+      "sha256": "148decc3d315ec693207d9bff1db6573e8384120aa9ad2f1df9fcf4680910b77",
+      "exception": "0xc0000005",
+      "operation": "execute (parameter 0 = 8)",
+      "caller_module": "d3d9.dll",
+      "caller_rva": "0x11fc03",
+      "render_state": "0xce",
+      "fault_target": "outside loaded modules; heap data",
+      "first_frame_hook_reached": false
+    }
+  ],
+  "matching_system_d3d9": {
+    "source": "Microsoft symbol server, exact module identity from dump",
+    "sha256": "374fbaf5320373d4bc3370ba113ad4d9c0597ea34ad5bc1b78c2686978b0cada",
+    "pe_timestamp": "0x492c61a9",
+    "image_size": "0x1d1000",
+    "file_version": "6.2.19041.7725",
+    "pdb_rsds_header_matches_dump": true,
+    "set_render_state_rva": "0x11fb00",
+    "private_dispatch_load_rva": "0x11fbf6",
+    "vtable_byte_offset": "0x430",
+    "private_slot": 134
+  },
+  "cause": {
+    "engine_call_rva": "0x1087f",
+    "public_slot": 57,
+    "old_shadow_device_entries": 119,
+    "native_private_slot": 134,
+    "finding": "The old device vptr pointed to a public-only copy; native SetRenderState read a function pointer beyond that copy and attempted to execute heap data.",
+    "correction": "Preserve native object vptr and full table; compare-and-swap only Release[2], Reset[16], Present[17], EndScene[42]. Factory CreateDevice[16] is also patched in its original table.",
+    "test3_runtime": "pending"
+  }
+}

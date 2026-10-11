@@ -285,7 +285,7 @@ void Overlay::frame() {
         if (s.map[0]) {
             std::snprintf(line,sizeof(line),"Map: %.32s   Health: %d",s.map,s.health);
             text(61,180,kMuted,line,.88f);
-        } else text(61,180,kMuted,"Menu test 1 | Zombies under development",.88f);
+        } else text(61,180,kMuted,"Menu test 3 | Zombies under development",.88f);
         for (int n=0; n<menu.count(); ++n) {
             const float y=216.f+n*42.f;
             const bool selected=menu.selected==n;

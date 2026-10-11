@@ -1,4 +1,5 @@
 #include "runtime.hpp"
+#include "vtable_patch.hpp"
 #include <array>
 #include <cwchar>
 #include <memory>
@@ -41,25 +42,33 @@ template<class T> T SystemFunction(const char* name) {
 
 namespace mod {
 namespace {
-struct FactoryRecord {
-    IDirect3D9* object;
-    void** original;
-    std::array<void*, 17> table;
+struct FactoryTable {
+    void** table;
+    std::array<SlotPatch, 1> slots;
+    bool installed = false;
+};
+struct DeviceTable {
+    void** table;
+    // Release, Reset, Present, EndScene. Preserve every other public/private slot.
+    std::array<SlotPatch, 4> slots;
+    bool installed = false;
 };
 struct DeviceRecord {
     IDirect3DDevice9* object;
-    void** original;
-    std::array<void*, 119> table;
+    DeviceTable* hooks;
     Overlay overlay;
     std::atomic<bool> retired{false};
 };
 std::mutex recordsMutex;
-// Records and their shadow vtables live until process exit. Hot-unload is unsupported.
-std::vector<std::unique_ptr<FactoryRecord>> factories;
+// Records live until process exit. The real objects keep their original vptrs.
+// Tables are shared by native objects, so untracked objects must forward too.
+std::vector<std::unique_ptr<FactoryTable>> factories;
+std::vector<std::unique_ptr<DeviceTable>> deviceTables;
 std::vector<std::unique_ptr<DeviceRecord>> devices;
-FactoryRecord* Factory(IDirect3D9* object) {
+FactoryTable* Factory(IDirect3D9* object) {
+    void** table = *reinterpret_cast<void***>(object);
     std::lock_guard<std::mutex> lock(recordsMutex);
-    for (auto i = factories.rbegin(); i != factories.rend(); ++i) if ((*i)->object == object) return i->get();
+    for (const auto& record : factories) if (record->table == table) return record.get();
     return nullptr;
 }
 DeviceRecord* Device(IDirect3DDevice9* object) {
@@ -68,12 +77,19 @@ DeviceRecord* Device(IDirect3DDevice9* object) {
         if ((*i)->object == object && !(*i)->retired) return i->get();
     return nullptr;
 }
-bool ReplaceVtable(void* object, void** table) {
+DeviceTable* Table(IDirect3DDevice9* object) {
+    void** table = *reinterpret_cast<void***>(object);
+    std::lock_guard<std::mutex> lock(recordsMutex);
+    for (const auto& record : deviceTables) if (record->table == table) return record.get();
+    return nullptr;
+}
+bool ExchangeSlot(void** slot, void* replacement, void* expected) {
     DWORD protection = 0;
-    if (!VirtualProtect(object, sizeof(void*), PAGE_READWRITE, &protection)) return false;
-    InterlockedExchangePointer(reinterpret_cast<void* volatile*>(object), table);
+    if (!VirtualProtect(slot, sizeof(void*), PAGE_READWRITE, &protection)) return false;
+    void* observed = InterlockedCompareExchangePointer(reinterpret_cast<void* volatile*>(slot), replacement, expected);
     DWORD ignored = 0;
-    VirtualProtect(object, sizeof(void*), protection, &ignored);
+    if (!VirtualProtect(slot, sizeof(void*), protection, &ignored)) Log("HOOK slot protection restore failed slot=%p error=%lu", slot, GetLastError());
+    if (observed != expected) { SetLastError(ERROR_RETRY); return false; }
     return true;
 }
 using CreateDeviceFn = HRESULT (STDMETHODCALLTYPE*)(IDirect3D9*, UINT, D3DDEVTYPE, HWND, DWORD, D3DPRESENT_PARAMETERS*, IDirect3DDevice9**);
@@ -86,11 +102,11 @@ HRESULT STDMETHODCALLTYPE OnCreateDevice(IDirect3D9* self, UINT adapter, D3DDEVT
                                          D3DPRESENT_PARAMETERS* params, IDirect3DDevice9** output) {
     auto* r = Factory(self);
     if (!r) return D3DERR_INVALIDCALL;
-    auto original = reinterpret_cast<CreateDeviceFn>(r->original[16]);
+    auto original = reinterpret_cast<CreateDeviceFn>(r->slots[0].original);
     HRESULT result = original(self, adapter, type, window, behavior, params, output);
     Log("D3D CreateDevice hr=0x%08lx adapter=%u flags=0x%08lx window=%p device=%p", result, adapter, behavior,
         window, SUCCEEDED(result) && output ? *output : nullptr);
-    if (SUCCEEDED(result) && output && *output) HookDevice(*output, params && params->hDeviceWindow ? params->hDeviceWindow : window);
+    if (r->installed && SUCCEEDED(result) && output && *output) HookDevice(*output, params && params->hDeviceWindow ? params->hDeviceWindow : window);
     return result;
 }
 bool BackbufferBound(IDirect3DDevice9* device) {
@@ -104,8 +120,10 @@ bool BackbufferBound(IDirect3DDevice9* device) {
 }
 HRESULT STDMETHODCALLTYPE OnEndScene(IDirect3DDevice9* self) {
     auto* r = Device(self);
-    if (!r) return D3DERR_INVALIDCALL;
-    auto original = reinterpret_cast<EndSceneFn>(r->original[42]);
+    auto* hooks = r ? r->hooks : Table(self);
+    if (!hooks || !hooks->slots[3].original) return D3DERR_INVALIDCALL;
+    auto original = reinterpret_cast<EndSceneFn>(hooks->slots[3].original);
+    if (!r) return original(self);
     ++r->overlay.endScenes;
     if (r->overlay.endScenes == 1) Log("HOOK EndScene reached device=%p thread=%lu", self, GetCurrentThreadId());
     if (BackbufferBound(self)) {
@@ -116,8 +134,10 @@ HRESULT STDMETHODCALLTYPE OnEndScene(IDirect3DDevice9* self) {
 }
 HRESULT STDMETHODCALLTYPE OnPresent(IDirect3DDevice9* self, const RECT* source, const RECT* destination, HWND window, const RGNDATA* dirty) {
     auto* r = Device(self);
-    if (!r) return D3DERR_INVALIDCALL;
-    auto original = reinterpret_cast<PresentFn>(r->original[17]);
+    auto* hooks = r ? r->hooks : Table(self);
+    if (!hooks || !hooks->slots[2].original) return D3DERR_INVALIDCALL;
+    auto original = reinterpret_cast<PresentFn>(hooks->slots[2].original);
+    if (!r) return original(self, source, destination, window, dirty);
     ++r->overlay.presents;
     if (r->overlay.presents == 1) Log("HOOK Present reached device=%p thread=%lu", self, GetCurrentThreadId());
     // Fallback if the engine's last EndScene was on an offscreen target, or it skipped EndScene.
@@ -134,7 +154,7 @@ HRESULT STDMETHODCALLTYPE OnPresent(IDirect3DDevice9* self, const RECT* source, 
             self->SetDepthStencilSurface(nullptr);
             if (SUCCEEDED(self->SetRenderTarget(0, back)) && SUCCEEDED(self->BeginScene())) {
                 r->overlay.frame();
-                reinterpret_cast<EndSceneFn>(r->original[42])(self);
+                reinterpret_cast<EndSceneFn>(hooks->slots[3].original)(self);
             }
             self->SetRenderTarget(0, savedTarget);
             if (SUCCEEDED(depthResult)) self->SetDepthStencilSurface(savedDepth);
@@ -149,8 +169,10 @@ HRESULT STDMETHODCALLTYPE OnPresent(IDirect3DDevice9* self, const RECT* source, 
 }
 HRESULT STDMETHODCALLTYPE OnReset(IDirect3DDevice9* self, D3DPRESENT_PARAMETERS* params) {
     auto* r = Device(self);
-    if (!r) return D3DERR_INVALIDCALL;
-    auto original = reinterpret_cast<ResetFn>(r->original[16]);
+    auto* hooks = r ? r->hooks : Table(self);
+    if (!hooks || !hooks->slots[1].original) return D3DERR_INVALIDCALL;
+    auto original = reinterpret_cast<ResetFn>(hooks->slots[1].original);
+    if (!r) return original(self, params);
     r->overlay.invalidate();
     ++r->overlay.resets;
     Log("D3D Reset begin count=%u", r->overlay.resets);
@@ -163,10 +185,11 @@ HRESULT STDMETHODCALLTYPE OnReset(IDirect3DDevice9* self, D3DPRESENT_PARAMETERS*
 }
 ULONG STDMETHODCALLTYPE OnRelease(IDirect3DDevice9* self) {
     auto* r = Device(self);
-    if (!r) return 0;
-    auto original = reinterpret_cast<ReleaseFn>(r->original[2]);
+    auto* hooks = r ? r->hooks : Table(self);
+    if (!hooks || !hooks->slots[0].original) return 0;
+    auto original = reinterpret_cast<ReleaseFn>(hooks->slots[0].original);
     ULONG count = original(self);
-    if (!count) {
+    if (r && !count) {
         r->retired = true;
         r->overlay.detach();
         // Do not access a COM object after final Release. Process-lifetime record owns no AddRef.
@@ -177,31 +200,51 @@ ULONG STDMETHODCALLTYPE OnRelease(IDirect3DDevice9* self) {
 }
 }
 void HookDirect3D(IDirect3D9* object) {
-    if (auto* existing = Factory(object); existing && *reinterpret_cast<void***>(object) == existing->table.data()) return;
-    auto r = std::make_unique<FactoryRecord>();
-    r->object = object;
-    r->original = *reinterpret_cast<void***>(object);
-    std::memcpy(r->table.data(), r->original, sizeof(r->table));
-    r->table[16] = reinterpret_cast<void*>(OnCreateDevice);
-    FactoryRecord* raw = r.get();
-    { std::lock_guard<std::mutex> lock(recordsMutex); factories.push_back(std::move(r)); }
-    Log("HOOK IDirect3D9 shadow vtable installed=%d object=%p", ReplaceVtable(object, raw->table.data()), object);
+    void** table = *reinterpret_cast<void***>(object);
+    std::lock_guard<std::mutex> lock(recordsMutex);
+    for (const auto& record : factories) if (record->table == table) return;
+    auto record = std::make_unique<FactoryTable>();
+    record->table = table;
+    record->slots[0] = {16, reinterpret_cast<void*>(OnCreateDevice), nullptr};
+    FactoryTable* raw = record.get();
+    factories.push_back(std::move(record));
+    const auto result = InstallVtableSlots(table, raw->slots.data(), raw->slots.size(), ExchangeSlot);
+    raw->installed = result.installed;
+    Log("HOOK factory public slot installed=%d rollback=%d object=%p table=%p vptr_unchanged=%d",
+        result.installed, result.rollbackComplete, object, table, *reinterpret_cast<void***>(object) == table);
 }
 void HookDevice(IDirect3DDevice9* object, HWND window) {
-    if (Device(object)) return;
-    auto r = std::make_unique<DeviceRecord>();
-    r->object = object;
-    r->original = *reinterpret_cast<void***>(object);
-    std::memcpy(r->table.data(), r->original, sizeof(r->table));
-    r->table[2] = reinterpret_cast<void*>(OnRelease);
-    r->table[16] = reinterpret_cast<void*>(OnReset);
-    r->table[17] = reinterpret_cast<void*>(OnPresent);
-    r->table[42] = reinterpret_cast<void*>(OnEndScene);
-    DeviceRecord* raw = r.get();
-    { std::lock_guard<std::mutex> lock(recordsMutex); devices.push_back(std::move(r)); }
-    if (!ReplaceVtable(object, raw->table.data())) { Log("HOOK device failed error=%lu", GetLastError()); return; }
-    Log("HOOK device shadow vtable installed object=%p Reset[16] Present[17] EndScene[42]", object);
-    raw->overlay.attach(object, window);
+    DeviceRecord* instance = nullptr;
+    void** table = *reinterpret_cast<void***>(object);
+    {
+        std::lock_guard<std::mutex> lock(recordsMutex);
+        for (const auto& record : devices) if (record->object == object && !record->retired) return;
+        DeviceTable* hooks = nullptr;
+        for (const auto& record : deviceTables) if (record->table == table) { hooks = record.get(); break; }
+        if (!hooks) {
+            auto record = std::make_unique<DeviceTable>();
+            record->table = table;
+            record->slots = {{{2, reinterpret_cast<void*>(OnRelease), nullptr},
+                              {16, reinterpret_cast<void*>(OnReset), nullptr},
+                              {17, reinterpret_cast<void*>(OnPresent), nullptr},
+                              {42, reinterpret_cast<void*>(OnEndScene), nullptr}}};
+            hooks = record.get();
+            deviceTables.push_back(std::move(record));
+            const auto result = InstallVtableSlots(table, hooks->slots.data(), hooks->slots.size(), ExchangeSlot);
+            hooks->installed = result.installed;
+            Log("HOOK device public slots installed=%d rollback=%d object=%p table=%p vptr_unchanged=%d error=%lu",
+                result.installed, result.rollbackComplete, object, table, *reinterpret_cast<void***>(object) == table,
+                result.installed ? 0 : GetLastError());
+        }
+        if (!hooks->installed) return;
+        auto record = std::make_unique<DeviceRecord>();
+        record->object = object;
+        record->hooks = hooks;
+        instance = record.get();
+        devices.push_back(std::move(record));
+    }
+    Log("HOOK device tracked=%p Reset[16] Present[17] EndScene[42]; native private table preserved", object);
+    instance->overlay.attach(object, window);
 }
 } // namespace mod
 

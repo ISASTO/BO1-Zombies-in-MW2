@@ -85,7 +85,7 @@ void InitializeLog() {
         }
     }
     Log("BO1MW2 %s | AMD64 | log=%ls", kVersion, file);
-    Log("Initial test build. Local MW2 SP runtime verification pending.");
+    Log("Menu test 3: native vptr/private slots preserved. Retail menu verification pending.");
 }
 void Log(const char* format, ...) {
     char body[4096]{};

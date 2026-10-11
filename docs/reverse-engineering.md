@@ -8,22 +8,42 @@ signature match is not a runtime test.
 
 | Iteration | Observation | Confirmed scope / unresolved work |
 | --- | --- | --- |
-| `0.1.0-menu-test1`, 2026-10-11 | Owner: "the game does not launch" | Failed launch reported. No error, log, module, fault offset, or unmodified-launch comparison yet. No successful menu/level/God runtime behavior confirmed. |
-| `0.1.1-startup-test2` | Freestanding forwarding control + separate loader probe built | Static PE/import/export checks pass. Owner Windows execution pending. Root cause not assigned. |
+| `0.1.0-menu-test1`, 2026-10-11 | Owner: "the game does not launch"; later supplied three dumps | All fail during native SetRenderState private slot 134 after a 119-entry shadow was installed. Exact host/profile resolution and successful device/input setup confirmed; first frame not reached. |
+| `0.1.1-startup-test2` | Owner: "launch worked both times" (unmodified and forwarding control) | Retail forwarding baseline passed. System/old-DLL/control probes all exit zero in both result bundles. Windows collector and installer executed successfully. |
+| `0.1.2-menu-test3` | Selected public slots patched in their existing tables; no vptr replacement | Two portable tests pass, including observed private dispatch and competing-edit rollback. AMD64 DLL built; owner menu/mission test pending. |
 
 Test 1 initialized its C++ static runtime, then logging/crash handling, engine
 hash/scanning, factory/device shadows, WndProc, and rendering across startup.
 Potential failure stages include DLL dependency/runtime loading, System32
 forwarding, scan initialization, hook interoperability, and the first draw.
-These are hypotheses, not diagnoses. Test 2 isolates the dependency/forwarding
-path and preserves the original failed-run evidence before any re-test.
+These were initial hypotheses. The returned dumps now identify the device-table
+truncation as the startup cause. Loader, hash resolution, and device creation
+completed before that fault. Other menu/runtime behavior still needs testing.
 
 The separate startup DLL has only Kernel32 imports and no CRT/TLS/hooks. Its
 entry point does minimal bookkeeping; first-export initialization records host,
 proxy, System32 module, and factory call completion. The loader probe verifies
 the old DLL without its iw4sp-specific paths. Windows event evidence and the
 no-DLL/forwarding-control launch comparison determine the next small change.
-See [startup-test2.md](startup-test2.md) for exact tests and interpretation.
+See [menu-test3.md](menu-test3.md) and
+[runtime-test2-evidence.json](runtime-test2-evidence.json) for the confirmed call
+chain, redacted input identities, correction, and next test.
+
+### Graphics-runtime address ledger (owner crash environment)
+
+| Finding | Module / RVA | Evidence / use |
+| --- | --- | --- |
+| Engine SetRenderState call | iw4sp.exe `0x1087f` | Public table byte offset `0x1c8` / slot 57, state `0xce`, value 1; static bytes and dump stack agree |
+| Native SetRenderState | System32 d3d9.dll `0x11fb00` | Matching PE timestamp/image/PDB; x64 RCX=device, EDX=state, R8D=value |
+| Private dispatch load | System32 d3d9.dll `0x11fbf6` | Reads native vtable byte offset `0x430` / slot 134; beyond the substituted 119 public entries |
+| Saved return address at all three faults | System32 d3d9.dll `0x11fc03` | Execute AV in heap data, not a module instruction; confirms the dispatch location |
+
+System DLL file version `6.2.19041.7725`, SHA256
+`374fbaf5320373d4bc3370ba113ad4d9c0597ea34ad5bc1b78c2686978b0cada`.
+These system RVAs are forensic observations, not addresses used by the mod.
+The correction uses documented COM slots and preserves all unknown native tail
+entries without resolving or calling a private method itself. This is separate
+from IW4/T5 actor/player data layouts.
 
 ## Executable identity
 
@@ -120,19 +140,21 @@ Use the next test log to resolve these before adding recurring or AI operations.
 
 ## Render/input and loading
 
-Regular D3D9 factory vtable has 17 entries; CreateDevice is entry 16. Regular
-device vtable has 119 entries; Reset 16, Present 17, EndScene 42, Release 2.
-These are Windows COM interfaces, not inferred IW4 engine-function offsets.
-Other methods forward through their original entries. The device object is not
-wrapped in a replacement game-facing pointer. Shadow tables and records have
-process lifetime. Failed hooks log and leave the underlying object usable.
+The regular public D3D9 factory interface describes 17 entries, CreateDevice 16;
+the device interface describes 119, Reset 16, Present 17, EndScene 42, Release 2.
+Those public counts do **not** bound a native implementation's full vtable.
+Test 3 patches only those selected public entries in place and preserves each
+native object vptr and every private entry. Originals are recorded per shared
+table, including fallback for untracked instances. Failed compare-and-swap
+transactions conditionally roll back without overwriting competing changes.
+Records have process lifetime; hot-unload remains unsupported.
 
 The proxy performs expensive initialization when its exported factory/performance
 function is called, outside our DllMain. DllMain only requests notification
 suppression. System D3D9 is loaded from its absolute Windows system path.
 The exact executable statically imports only Direct3DCreate9 from D3D9. Ten
 documented/common exports are supplied, including unhooked Ex forwarding;
-arbitrary undocumented D3D9 exports and other wrappers are outside test 1 scope.
+arbitrary undocumented D3D9 exports and other wrappers are outside current scope.
 
 WndProc is subclassed for F4 and menu navigation. Alt-F4 retains the system path.
 Navigation is consumed while the menu is open; releases reach the game to clear
@@ -162,8 +184,11 @@ IW4 zone uses 64-bit pointer records. Asset conversion is unimplemented.
 
 | Iteration | Change | Verification | Retail result |
 | --- | --- | --- | --- |
-| 2026-10-11 / test 1 | Exact-build identity, D3D9 proxy/menu, level reads, single God-bit action, logs/crash dump attempt | AMD64 cross-build; portable signature/menu tests; extractor fixtures; five unique supplied-binary signature matches; export/import inspection | Pending owner test |
+| 2026-10-11 / test 1 | Exact-build identity, D3D9 proxy/menu, level reads, single God-bit action, logs/crash dump attempt | AMD64 cross-build; portable signature/menu tests; extractor fixtures; five live signature matches | Failed before first frame: three execute AVs from truncated native device table |
+| 2026-10-11 / test 2 | Forwarding-only startup control and loader/event collector | Import/export/TLS checks; PowerShell parsing/filesystem checks; owner probes all exit zero | Owner confirms normal launch with DLL removed and with forwarding control |
+| 2026-10-11 / test 3 | Keep native vptr/table; patch selected public slots with conditional rollback | AMD64 cross-build; two native tests including private slot 134 and shared-table regression; PowerShell menu-upgrade/collector checks | Pending owner F4/mission test |
 
-Crash results: none collected yet. No game execution has been performed in this
-Linux workspace. The first local run is the next acceptance gate. Update this
-ledger with observed behavior, log/crash module RVAs, changes, and rerun results.
+The three owner dumps and two results ZIPs have been analyzed and their redacted
+findings recorded above. No retail game is executed in this Linux workspace.
+The next acceptance gate is the owner's actual menu test 3, followed by mission,
+level/health, and God observations. Continue recording failures and successes.

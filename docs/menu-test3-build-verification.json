@@ -1,0 +1,35 @@
+{
+  "version": "0.1.2-menu-test3",
+  "compiler": "MinGW-w64 GCC 13-posix, RelWithDebInfo, static runtime",
+  "architecture": "AMD64",
+  "dll_size": 1510359,
+  "dll_sha256": "42604edef679a36e7946071b8365b2dc77b901d7cd11c1b6eb44467226dcc41a",
+  "imports": [
+    "bcrypt.dll",
+    "dbghelp.dll",
+    "GDI32.dll",
+    "KERNEL32.dll",
+    "msvcrt.dll",
+    "USER32.dll"
+  ],
+  "exports": [
+    "D3DPERF_BeginEvent",
+    "D3DPERF_EndEvent",
+    "D3DPERF_GetStatus",
+    "D3DPERF_QueryRepeatFrame",
+    "D3DPERF_SetMarker",
+    "D3DPERF_SetOptions",
+    "D3DPERF_SetRegion",
+    "DebugSetMute",
+    "Direct3DCreate9",
+    "Direct3DCreate9Ex"
+  ],
+  "checks": {
+    "native_cpp_core_and_private_vtable_tests": "2 passed",
+    "exact_executable_profile": "Previously resolved all five patterns in owner test 1, unchanged in test 3",
+    "original_game_assets_in_distribution": "none",
+    "retail_mw2_runtime": "Test 2 forwarding launch passed per owner; menu test 3 pending",
+    "powershell_scripts": "All four scripts parsed in PowerShell 7.6.6; isolated startup-to-menu upgrade, diagnostics target selection, hashes/receipt, uninstall, and input/log preservation passed on Linux. Windows CMD/probe/game execution of test 3 pending."
+  },
+  "change": "Preserve native COM vptr/private table; patch selected public slots in place with CAS and rollback."
+}
