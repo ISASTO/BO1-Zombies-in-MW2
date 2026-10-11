@@ -1,0 +1,42 @@
+{
+  "version": "0.1.0-menu-test1",
+  "compiler": "MinGW-w64 GCC 13-posix, RelWithDebInfo, static runtime",
+  "architecture": "AMD64",
+  "dll_size": 1466155,
+  "dll_sha256": "662695d7112452fc58a4da23a1a682b537e601dd55eedd6b42ca118d774a92a9",
+  "imports": [
+    "bcrypt.dll",
+    "dbghelp.dll",
+    "GDI32.dll",
+    "KERNEL32.dll",
+    "msvcrt.dll",
+    "USER32.dll"
+  ],
+  "exports": [
+    "D3DPERF_BeginEvent",
+    "D3DPERF_EndEvent",
+    "D3DPERF_GetStatus",
+    "D3DPERF_QueryRepeatFrame",
+    "D3DPERF_SetMarker",
+    "D3DPERF_SetOptions",
+    "D3DPERF_SetRegion",
+    "DebugSetMute",
+    "Direct3DCreate9",
+    "Direct3DCreate9Ex"
+  ],
+  "checks": {
+    "native_cpp_signature_and_menu_tests": "passed",
+    "python_extractor_fixture_tests": "4 passed",
+    "exact_executable_signatures": "5 unique matches with dvar name anchors",
+    "original_game_assets_in_distribution": "none",
+    "retail_mw2_runtime": "pending owner test",
+    "powershell_scripts": "reviewed, not executed on Windows"
+  },
+  "bo1_extraction": {
+    "zombie_theater.ff": 41,
+    "common_zombie_patch.ff": 72,
+    "zombie_theater_patch.ff": 8,
+    "en_common_zombie.ff": 0,
+    "en_zombie_theater.ff": 0
+  }
+}

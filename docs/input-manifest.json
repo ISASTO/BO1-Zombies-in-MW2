@@ -1,0 +1,350 @@
+[
+  {
+    "name": "iw4sp(1).exe",
+    "size": 4480056,
+    "sha256": "fb7e8a987c371dea7b666091b0b9e2011c0cd9cd277b191ad453d11d557dd777",
+    "pe": {
+      "machine": "0x8664",
+      "architecture": "AMD64",
+      "timestamp_utc": "2026-09-16T14:06:15+00:00",
+      "image_base": "0x140000000",
+      "entry_rva": "0x4908310",
+      "image_size": "0x4942000",
+      "sections": [
+        {
+          "name": ".text",
+          "rva": "0x1000",
+          "virtual_size": 3252660,
+          "raw_size": 3252736,
+          "raw_offset": 1024
+        },
+        {
+          "name": ".rdata",
+          "rva": "0x31c000",
+          "virtual_size": 654334,
+          "raw_size": 654336,
+          "raw_offset": 3253760
+        },
+        {
+          "name": ".data",
+          "rva": "0x3bc000",
+          "virtual_size": 72381036,
+          "raw_size": 57856,
+          "raw_offset": 3908096
+        },
+        {
+          "name": ".pdata",
+          "rva": "0x48c4000",
+          "virtual_size": 158712,
+          "raw_size": 158720,
+          "raw_offset": 3965952
+        },
+        {
+          "name": "_RDATA",
+          "rva": "0x48eb000",
+          "virtual_size": 244,
+          "raw_size": 512,
+          "raw_offset": 4124672
+        },
+        {
+          "name": ".rsrc",
+          "rva": "0x48ec000",
+          "virtual_size": 94600,
+          "raw_size": 94720,
+          "raw_offset": 4125184
+        },
+        {
+          "name": ".reloc",
+          "rva": "0x4904000",
+          "virtual_size": 15244,
+          "raw_size": 15360,
+          "raw_offset": 4219904
+        },
+        {
+          "name": ".bind",
+          "rva": "0x4908000",
+          "virtual_size": 234056,
+          "raw_size": 234056,
+          "raw_offset": 4235264
+        }
+      ]
+    }
+  },
+  {
+    "name": "BlackOps.exe",
+    "size": 8099608,
+    "sha256": "2ba4a04e81de2b60582da0e4489efde21e6cb07904a223bae633b6ccaebbf759",
+    "pe": {
+      "machine": "0x14c",
+      "architecture": "I386",
+      "timestamp_utc": "2011-09-01T23:06:57+00:00",
+      "image_base": "0x400000",
+      "entry_rva": "0x56da57",
+      "image_size": "0x4277000",
+      "sections": [
+        {
+          "name": ".text",
+          "rva": "0x1000",
+          "virtual_size": 5904912,
+          "raw_size": 5905408,
+          "raw_offset": 1024
+        },
+        {
+          "name": ".rdata",
+          "rva": "0x5a3000",
+          "virtual_size": 1869498,
+          "raw_size": 1869824,
+          "raw_offset": 5906432
+        },
+        {
+          "name": ".data",
+          "rva": "0x76c000",
+          "virtual_size": 61814468,
+          "raw_size": 238592,
+          "raw_offset": 7776256
+        },
+        {
+          "name": ".tls",
+          "rva": "0x4260000",
+          "virtual_size": 109,
+          "raw_size": 512,
+          "raw_offset": 8014848
+        },
+        {
+          "name": ".rodata",
+          "rva": "0x4261000",
+          "virtual_size": 1904,
+          "raw_size": 2048,
+          "raw_offset": 8015360
+        },
+        {
+          "name": ".version",
+          "rva": "0x4262000",
+          "virtual_size": 4,
+          "raw_size": 512,
+          "raw_offset": 8017408
+        },
+        {
+          "name": ".rsrc",
+          "rva": "0x4263000",
+          "virtual_size": 78020,
+          "raw_size": 78336,
+          "raw_offset": 8017920
+        }
+      ]
+    }
+  },
+  {
+    "name": "bink2w64.dll",
+    "size": 431616,
+    "sha256": "a2f189a03fd667c11e824a8525ee14832f857cd10ca7aa03d19b1c29a4971f63",
+    "pe": {
+      "machine": "0x8664",
+      "architecture": "AMD64",
+      "timestamp_utc": "2013-07-30T21:13:10+00:00",
+      "image_base": "0x180000000",
+      "entry_rva": "0x3ab8",
+      "image_size": "0x8d000",
+      "sections": [
+        {
+          "name": ".text",
+          "rva": "0x1000",
+          "virtual_size": 52729,
+          "raw_size": 52736,
+          "raw_offset": 1536
+        },
+        {
+          "name": "BINK16",
+          "rva": "0xe000",
+          "virtual_size": 2351,
+          "raw_size": 2560,
+          "raw_offset": 54272
+        },
+        {
+          "name": "BINK32",
+          "rva": "0xf000",
+          "virtual_size": 2949,
+          "raw_size": 3072,
+          "raw_offset": 56832
+        },
+        {
+          "name": "BINKP8",
+          "rva": "0x10000",
+          "virtual_size": 2663,
+          "raw_size": 3072,
+          "raw_offset": 59904
+        },
+        {
+          "name": "RADCODE",
+          "rva": "0x11000",
+          "virtual_size": 2483,
+          "raw_size": 2560,
+          "raw_offset": 62976
+        },
+        {
+          "name": "BINK",
+          "rva": "0x12000",
+          "virtual_size": 231959,
+          "raw_size": 232448,
+          "raw_offset": 65536
+        },
+        {
+          "name": "BINKBSS",
+          "rva": "0x4b000",
+          "virtual_size": 107472,
+          "raw_size": 0,
+          "raw_offset": 0
+        },
+        {
+          "name": ".rdata",
+          "rva": "0x66000",
+          "virtual_size": 27775,
+          "raw_size": 28160,
+          "raw_offset": 297984
+        },
+        {
+          "name": ".data",
+          "rva": "0x6d000",
+          "virtual_size": 26004,
+          "raw_size": 22016,
+          "raw_offset": 326144
+        },
+        {
+          "name": ".pdata",
+          "rva": "0x74000",
+          "virtual_size": 9660,
+          "raw_size": 9728,
+          "raw_offset": 348160
+        },
+        {
+          "name": "BINKDATA",
+          "rva": "0x77000",
+          "virtual_size": 11968,
+          "raw_size": 12288,
+          "raw_offset": 357888
+        },
+        {
+          "name": "BINKCONS",
+          "rva": "0x7a000",
+          "virtual_size": 30401,
+          "raw_size": 30720,
+          "raw_offset": 370176
+        },
+        {
+          "name": "RADDATA",
+          "rva": "0x82000",
+          "virtual_size": 80,
+          "raw_size": 512,
+          "raw_offset": 400896
+        },
+        {
+          "name": "RADCONST",
+          "rva": "0x83000",
+          "virtual_size": 167,
+          "raw_size": 512,
+          "raw_offset": 401408
+        },
+        {
+          "name": "text",
+          "rva": "0x84000",
+          "virtual_size": 4645,
+          "raw_size": 5120,
+          "raw_offset": 401920
+        },
+        {
+          "name": "data",
+          "rva": "0x86000",
+          "virtual_size": 2116,
+          "raw_size": 2560,
+          "raw_offset": 407040
+        },
+        {
+          "name": ".rsrc",
+          "rva": "0x87000",
+          "virtual_size": 19464,
+          "raw_size": 19968,
+          "raw_offset": 409600
+        },
+        {
+          "name": ".reloc",
+          "rva": "0x8c000",
+          "virtual_size": 2010,
+          "raw_size": 2048,
+          "raw_offset": 429568
+        }
+      ]
+    }
+  },
+  {
+    "name": "estate.ff",
+    "size": 131963320,
+    "sha256": "7f2f6bf6e3ce3ff74b8004d6e91b3a7e70cdf07d69d6f9061be8d741a59535f2",
+    "fastfile": {
+      "magic": "IWffu100",
+      "version": 276
+    }
+  },
+  {
+    "name": "code_pre_gfx.ff",
+    "size": 3799,
+    "sha256": "0addccfd41fdd4bb4638e305d8d9b9972143995c03e3afdcc09b3d24f3b8f8aa",
+    "fastfile": {
+      "magic": "IWffu100",
+      "version": 276
+    }
+  },
+  {
+    "name": "code_post_gfx.ff",
+    "size": 1015669,
+    "sha256": "3df01060bdcbfb08880c5a698bcf8619bcda916a94d29bd42f61d4f9a98e289b",
+    "fastfile": {
+      "magic": "IWffu100",
+      "version": 276
+    }
+  },
+  {
+    "name": "common_zombie_patch.ff",
+    "size": 784000,
+    "sha256": "3311182f5cb9af07d69d628b8223ab43e47992e4951b46e761d4f0152f33787e",
+    "fastfile": {
+      "magic": "IWffu100",
+      "version": 473
+    }
+  },
+  {
+    "name": "zombie_theater.ff",
+    "size": 48841888,
+    "sha256": "970db88bb5ae9aa1d3875cdbd55d43212f22ee55096ce251f596d4a38a776786",
+    "fastfile": {
+      "magic": "IWffu100",
+      "version": 473
+    }
+  },
+  {
+    "name": "zombie_theater_patch.ff",
+    "size": 285952,
+    "sha256": "694c29e4e25af78b658de822ac16ea044b78768495624062cecff1c353f9d2fc",
+    "fastfile": {
+      "magic": "IWffu100",
+      "version": 473
+    }
+  },
+  {
+    "name": "en_common_zombie.ff",
+    "size": 12448,
+    "sha256": "d5dd554025ddaf60d670714b216fa2ef801d89ace970630fdefa6504ff25777d",
+    "fastfile": {
+      "magic": "IWffu100",
+      "version": 473
+    }
+  },
+  {
+    "name": "en_zombie_theater.ff",
+    "size": 778176,
+    "sha256": "d26cbc49349ff971ca12cb8cace8cc147bd64564974ece106d6ce08ae4e75756",
+    "fastfile": {
+      "magic": "IWffu100",
+      "version": 473
+    }
+  }
+]
