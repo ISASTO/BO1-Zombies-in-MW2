@@ -1,5 +1,10 @@
 # FOV test6: selector and saved preference
 
+**Owner result, 2026-10-11:** FOV behavior worked as expected. Matching logs
+show saved 100 loaded/applied, clear/default 65, selection and save. A separate
+God protection/menu mismatch was reported; test7 addresses that regression.
+See [test6 evidence](runtime-test6-evidence.json) and [current PLAYER test7](player-test7.md).
+
 Build `0.1.5-fov-test6`. This is the next small runtime test after accepted
 health/God and preview work. Retail FOV behavior has not yet been observed.
 

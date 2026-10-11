@@ -1,0 +1,46 @@
+{
+  "version": "0.1.6-player-test7",
+  "compiler": "MinGW-w64 GCC 13-posix, RelWithDebInfo, static runtime",
+  "architecture": "AMD64",
+  "dll_size": 1915150,
+  "dll_sha256": "d58485e7a568281061f63908624bfbd73356356163fb5ffe9ff62a35c34e44d4",
+  "imports": [
+    "bcrypt.dll",
+    "dbghelp.dll",
+    "gdi32.dll",
+    "kernel32.dll",
+    "msvcrt.dll",
+    "user32.dll"
+  ],
+  "exports": [
+    "D3DPERF_BeginEvent",
+    "D3DPERF_EndEvent",
+    "D3DPERF_GetStatus",
+    "D3DPERF_QueryRepeatFrame",
+    "D3DPERF_SetMarker",
+    "D3DPERF_SetOptions",
+    "D3DPERF_SetRegion",
+    "DebugSetMute",
+    "Direct3DCreate9",
+    "Direct3DCreate9Ex"
+  ],
+  "loader_probe_sha256": "ba50775b11499f90214e5eb2c3160bf1e08e1a8ea2c71725514574cb408212ba",
+  "loader_probe_provenance": "Unchanged owned probe used in the delivered test6 package.",
+  "checks": {
+    "aslr_and_nx": true,
+    "native_cpp_tests": "6 passed: core navigation/pattern; private vtable; entity fields; BO1 round fixtures; FOV preferences; player session/God restored-flag regression/client read guards/lifetime/ammo ownership and identity.",
+    "python_tests": "9 passed: existing extractor and synthetic tuning-reader fixtures.",
+    "exact_profile": "23 unique patterns: five core, two FOV, sixteen new player. Typed/named slot corroboration, independently decoded member offsets, reserve count/stride and all scalar jump references checked against exact supplied hash.",
+    "preserved_sources": {
+      "src/proxy.cpp": "7f794cdd99c355b4dce2609726164d80e7695e62",
+      "include/player_fields.hpp": "6826725ad49d6f6b4203e832638d1acdc763dc20",
+      "include/fov_preferences.hpp": "f39c2afa00b88222695c3ff4c39a096a58e6f745",
+      "src/settings.cpp": "579dc58357ab274f84176d4417611a4d3766cfc3"
+    },
+    "powershell_scripts": "All four scripts parse with PowerShell 7.6.6. Isolated actual-test6-to-test7 removal/install, version/receipt/hash, diagnostic probe selection and saved-FOV collection, removal and game/log/settings preservation pass on Linux. Windows probe execution unavailable.",
+    "retail_runtime": "Test6 FOV owner-confirmed, God regression reported. New test7 player fields/actions, one-time invulnerability cleanup, jump compatibility, and compact layout await owner run.",
+    "original_game_assets_in_distribution": "none"
+  },
+  "change": "God desired session state starts OFF and reconciles checkpoint-restored bits. Verified independent invulnerability cleanup at lifetime/OFF/reset with guard reporting. All PLAYER rows implemented: reserve ammo, native sustain clips, noclip, base speed, data-only jump pair, and reset. Compact eight-row menu; saved FOV unchanged.",
+  "limits": "No retail game or Windows binary is executed in this Linux workspace. Static verification is not a runtime acceptance claim."
+}

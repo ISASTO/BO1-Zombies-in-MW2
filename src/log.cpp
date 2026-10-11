@@ -85,7 +85,7 @@ void InitializeLog() {
         }
     }
     Log("BO1MW2 %s | AMD64 | log=%ls", kVersion, file);
-    Log("FOV test 6: bounded base-FOV selector and own saved preference. BO1 normal tuning recovered from local CSV.");
+    Log("PLAYER test 7: session God reconciliation, reserve ammo, no reload, noclip, speed, compatible jump and compact menu. Saved FOV retained.");
 }
 void Log(const char* format, ...) {
     char body[4096]{};

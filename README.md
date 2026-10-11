@@ -2,8 +2,9 @@
 
 Incremental mod framework for **retail Modern Warfare 2 (2009), single player**.
 The first deliverable is an AMD64 D3D9 DLL that renders a keyboard menu in the
-game. BO1 Zombies gameplay is a future mode. The current build adds a base-FOV
-selector with an explicit saved preference. The BO1 round preview remains read-only.
+game. BO1 Zombies gameplay is a future mode. The current build fills out the
+PLAYER controls, fixes God-state reconciliation and shrinks the menu. The saved
+FOV selector remains available; the BO1 round preview remains read-only.
 
 **Status: Phase 1 core passed in the owner's test4 estate run.** The owner
 confirms correct health, working God ON/OFF and retained God state through
@@ -16,11 +17,20 @@ The owner also confirms test5 works. Its matching front-end diagnostics cover
 all 100 preview rounds and navigation, with no new crash evidence. That run did
 not enter a mission. See [test5 evidence](docs/runtime-test5-evidence.json).
 
-`0.1.5-fov-test6` adds **PLAYER > FOV settings**: 60-120 in steps of 5, Save for
-next launch, and Restore default / clear saved. FOV runtime/restart/ADS checks
-are pending. The supplied BO1 `common_zombie.ff` now resolves the normal tuning
-CSV; recovered values match the preview, so its numbers are unchanged. Special
-rounds and final map/runtime overrides remain outside that preview.
+The owner confirms test6 FOV behavior, but reports God protection surviving a
+return/restart while its menu said OFF. Matching logs show health 2 after an
+ON/OFF cycle; the old diagnostics did not record other protection flags. See
+[test6 evidence](docs/runtime-test6-evidence.json).
+
+`0.1.6-player-test7` adds explicit session God state and checkpoint reconciliation,
+independent protection diagnostics/cleanup, Infinite Ammo, No Reload, native
+Noclip, Super Speed, Super Jump, and Reset player toggles. The smaller menu shows
+all eight PLAYER rows at once. New retail behavior awaits the owner test.
+Player cheats start OFF on a full restart; explicitly saved FOV persists.
+
+The supplied BO1 `common_zombie.ff` resolves the normal tuning CSV. Recovered
+values match the preview, so its numbers are unchanged. Special rounds and
+final map/runtime overrides remain outside that preview.
 
 ## Exact supported executable
 
@@ -36,9 +46,9 @@ An executable hash mismatch disables game-state access and memory writes.
 The installer rejects a mismatched build. A manually installed proxy can still
 show its diagnostic menu in an unknown AMD64 `iw4sp.exe`.
 
-## Current FOV test6
+## Current PLAYER test7
 
-1. Close MW2 and extract the entire `BO1MW2-fov-test6.zip` outside the game folder.
+1. Close MW2 and extract the entire `BO1MW2-player-test7.zip` outside the game folder.
 2. Run `Uninstall.cmd` to remove an installed earlier project build, then run
    `Install.cmd` and paste the folder containing the installed `iw4sp.exe`.
    Find it through Steam: MW2 Single Player > Properties > Installed Files > Browse.
@@ -46,13 +56,14 @@ show its diagnostic menu in an unknown AMD64 `iw4sp.exe`.
    wait until you can move the player.
 4. Press **F4**. Use **Up/Down**, **Enter**, and **Backspace/Esc**. F4 closes the menu.
    WASD, mouse look, and firing remain available; opening the menu does not pause.
-5. Open PLAYER > FOV settings. With Base FOV selected, use Left/Right to choose
-   90. Confirm Live base FOV becomes 90 and the view widens. Select Save for next
-   launch and press Enter. Saved base FOV should become 90.
-6. Exit and relaunch through Steam, enter a mission, and confirm 90 is restored
-   without reselecting it. Check ADS/zoom, a checkpoint reload and existing God
-   behavior. Restore default clears the preference and queues the native 65
-   once. Follow the focused sequence in [fov-test6.md](docs/fov-test6.md).
+5. First resume the checkpoint that stayed protected. With God and Noclip OFF,
+   ordinary enemy gunfire should reduce health without cycling God ON/OFF.
+   Check God ON/OFF, checkpoint loads with each choice, and a full restart with
+   God left ON before quitting. A new process starts God OFF.
+6. Test the remaining PLAYER controls one at a time and then Reset player
+   toggles. Check that all eight rows fit and the text is smaller. Saved FOV
+   should still restore. Follow [player-test7.md](docs/player-test7.md) for the
+   exact sequence, native ammo exceptions, and GUARDED/LOCKED labels.
 7. Close the game and run `Diagnose.cmd`. Return its ZIP and the observations
    requested in [testing.md](docs/testing.md).
 
@@ -76,11 +87,17 @@ Copy the log immediately after a failing run: `latest.log` is replaced on launch
 | In-game F4 menu and category navigation | Owner-confirmed working; matching logs confirm render/input |
 | Render-state preservation and reset handling | Basic rendering observed; reset and overlay interoperability pending |
 | Active-level / player-health display | Test4 complete player reads and owner-confirmed correct health |
-| God Mode | Test4 owner confirms ON/OFF and tested checkpoint persistence; no continuous reapplication |
+| God Mode | Test4 accepted; test6 desync reported. Test7 reconciles session state and exposes other protection; owner regression test pending |
+| Infinite Ammo | Test7 replenishes existing reserve pools to 999, with guarded cleanup; owner test pending |
+| No Reload | Test7 uses native clip-sustain bool and native weapon exceptions; owner test pending |
+| Noclip | Test7 uses native movement flags/type; owner flight/collision test pending |
+| Super Speed | Test7 preset 380 vs native default 190, with baseline restore; owner test pending |
+| Super Jump | Test7 native fixed-height data compatibility, 39 to 117; owner test pending |
+| Reset player toggles | Requests every player cheat OFF and keeps saved FOV |
 | Status HUD toggle and state-log action | Implemented |
 | BO1 round-rules preview | Owner test5 front-end navigation passed; normal CSV values now recovered locally and match the preview |
-| FOV selector and saved preference | Implemented in test6; exact-build static evidence and portable tests pass; retail FOV/restart/ADS pending |
-| Ammo, weapons, world, spawning, Zombies | Visible placeholders with no action |
+| FOV selector and saved preference | Owner confirms test6 behavior; matching logs show load/selection/save/reset |
+| Weapons, world, spawning, Zombies gameplay | Visible placeholders with no action |
 
 ## Architecture
 
@@ -104,7 +121,11 @@ engine ended on an offscreen target. A state block and explicit transform/viewpo
 restoration protect the engine's rendering state. A local Windows font becomes
 a managed texture atlas; no game fonts or third-party UI library are bundled.
 The window procedure queues input; menu actions and rendering run on the frame
-callback. God Mode uses a single explicit atomic flag-bit toggle. FOV uses an
+callback. Player preferences are process-wide and session-only. God/native
+noclip flags are reconciled with compare/exchange every 16ms while ready.
+God OFF clears God/demigod bits; independent invulnerability is cleared once
+at a verified new lifetime or OFF/reset request, with later guards reported
+separately. No health freeze loop runs. FOV uses an
 atomic four-byte compare-and-exchange on the verified float current field,
 only with a living player in a supported active level. The desired value is
 checked at most every 250ms to recover level/checkpoint resets. No FOV override
@@ -114,10 +135,16 @@ Engine resolution requires the full executable SHA256, five unique `.text`
 patterns, name anchors, in-image pointer slots, typed/named dvars, a running server,
 a nonempty map name, a valid slot-zero entity, and positive player health.
 Two optional FOV signatures additionally corroborate its registration constants,
-name and camera pointer slot. Failure of those checks disables FOV independently
-of the five core patterns. Settings use the mod's own versioned text file; the
+name and camera pointer slot. Sixteen optional player signatures validate
+partial client/ammo fields, native dvar consumers, noclip and fixed jump data.
+Each new feature fails closed independently of the core patterns. Reserve
+edits compare ID/count together; speed restores its captured baseline. The
+verified 39/78 jump float pair becomes 117/234 only in this process; its data
+page protection is restored after the edit, and the pair is restored on OFF
+or loss of player readiness. Instructions and the disk executable are unchanged.
+Settings use the mod's own versioned text file; the
 DLL does not call a native dvar API or change archive/latched values. The native
-camera applies ADS and scaling separately; owner zoom/cutscene tests remain.
+camera applies ADS and scaling separately; broader cutscene/map coverage remains.
 The owner logs resolved all five core signatures and name anchors in the live process.
 Test 3 observed server/map transitions, but our incorrect `+0x00` integer identity
 guard rejected the player. The exact executable's allocator assigns the entity
@@ -184,14 +211,16 @@ Original games remain user-supplied inputs and must never be added to this repo.
 - [Menu test 3](docs/menu-test3.md) and [test 2 evidence](docs/runtime-test2-evidence.json): diagnosed launch failure and correction.
 - [Test4 evidence](docs/runtime-test4-evidence.json) and [player test4](docs/player-test4.md): accepted health/God foundation.
 - [Round test5](docs/round-test5.md) and [numeric evidence](docs/bo1-round-rules-evidence.json): current preview and provenance.
-- [FOV test6](docs/fov-test6.md): selector, persistence and exact owner checks.
+- [FOV test6](docs/fov-test6.md): selector, persistence and owner checks.
+- [PLAYER test7](docs/player-test7.md): God regression, every player row and compact menu checks.
 - [BO1 tuning evidence](docs/bo1-normal-tuning-evidence.json): selected local CSV values and pointer-resolution limits.
 - [Roadmap](docs/roadmap.md): incremental gates and persistent FOV request.
 - [Reference projects](docs/references.md): upstream sources and limits of reuse.
 - [Input hashes](docs/input-manifest.json) and [profile checks](docs/profile-checks.json).
 
 The core foundation and test5 front-end preview are accepted in their observed
-sessions. Next test the FOV selector/restart behavior, audit remaining BO1
+sessions. FOV test6 is owner-confirmed, with a God-state regression. Next test
+the expanded PLAYER controls and restart/checkpoint fix, audit remaining BO1
 overrides/dependencies, and broaden campaign-map/reset coverage.
 AI and asset injection need separate compatibility and behavior tests; shared
 engine ancestry does not imply compatible binary layouts or actor behavior.

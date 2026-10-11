@@ -13,7 +13,8 @@ signature match is not a runtime test.
 | `0.1.2-menu-test3` | Owner: "It works!!! this is so cool!!!"; returned matching diagnostic bundle | EndScene/font/3440x1440 draw, 82 key actions, all six categories, close/back, and estate-to-no-server transition observed. No new crash evidence. Player readiness failed and three God actions were blocked. |
 | `0.1.3-player-test4` | Owner confirms correct health, working God ON/OFF and retained God state through checkpoint reloads | Matching log shows complete slot-zero reads, five toggles preserving other flags, health 2/70/100, and God blocked back at main menu. No new crash evidence. Phase 1 core accepted in estate on the exact build. |
 | `0.1.4-round-test5` | Owner: "Seems to be working fine." | Matching front-end log covers all 100 rounds, 344 inputs, 290 preview records and 3440x1440 rendering. No active mission or new crash evidence in this run. |
-| `0.1.5-fov-test6` | Base-FOV selector, explicit saved preference/reset; recover normal BO1 CSV tuning | Seven unique exact-build patterns and five native suites pass. FOV/ADS/restart/checkpoint runtime pending. Normal CSV values match the unchanged preview calculations. |
+| `0.1.5-fov-test6` | Owner confirms FOV behavior; reports protection surviving a return/relaunch while God displays OFF | Matching logs show saved FOV 100, selection/save/reset, entity God OFF during the reported period, and health 2 after an ON/OFF cycle. Separate client guards were not logged; precise God mismatch cause is unconfirmed. Normal CSV values match the unchanged preview calculations. |
+| `0.1.6-player-test7` | God session reconciliation/guard diagnostics; every current PLAYER row; smaller eight-row menu | Six native suites, nine Python fixtures, 23 exact-build patterns, AMD64 build and isolated upgrade/removal checks pass. New PLAYER behavior and God restart/checkpoint regression await the owner. |
 
 Test 1 initialized its C++ static runtime, then logging/crash handling, engine
 hash/scanning, factory/device shadows, WndProc, and rendering across startup.
@@ -121,9 +122,13 @@ Native function names are assigned from semantics, not recovered symbols. None
 of the listed engine functions are called by our DLL. RCX/RDX/ECX observations
 are Microsoft x64 ABI evidence; they do not authorize using an old x86 typedef.
 
-The God command toggles bit 0 and writes it to player entities. The mod changes
-only that bit on slot zero through an aligned atomic XOR. The damage check
-independently corroborates its meaning. It leaves other entity flags intact.
+The native God command toggles bit zero and writes player entity flags. Tests
+4-6 used an explicit aligned XOR of that bit. Test7 replaces that operation
+with an idempotent desired session state: ON sets bit zero and clears demigod;
+OFF clears both bits. Compare/exchange preserves every unrelated flag. The
+request starts OFF on a new process and is reapplied after checkpoint restores.
+Independent protection is now recorded instead of inferring vulnerability from
+that entity bit alone.
 
 ## Partial layouts used
 
@@ -135,17 +140,20 @@ independently corroborates its meaning. It leaves other entity flags intact.
 | Entity flags | `+0x150`, 32-bit | Native XOR/store and damage test |
 | God bit | `0x1` | Native command and damage branch |
 | Entity health | `+0x164`, signed 32-bit | Native cheat-alive guard |
-| Client pointer candidate | `+0x108`, 64-bit | Native give/health path accesses client health via this pointer; not relied upon or declared as a complete client structure |
+| Client pointer | `+0x108`, 64-bit | Independent native noclip/client-think/damage/script-guard paths; test7 reads only corroborated fields and validates connected state, movement type and health |
 | Non-client damage pointer | `+0x110`, 64-bit | Native damage path uses this pointer; former client assignment was incorrect. Exact pointed-to type unresolved and unused. |
 | Dvar name pointer | `+0x0`, 64-bit | Registration/getter conventions; validated against exact string at runtime |
 | Dvar type | `+0xc`, 8-bit | Getter type comparisons |
 | Dvar current | `+0x10` | Bool byte, four-byte float or string pointer, depending on type |
 | Dvar bool type | `0` | Getter treats type zero as bool |
 | Dvar float type | `1` | Native float registration wrapper and MOVSS camera read |
+| Dvar integer type | `5` | Native registration wrapper sets DL=5; g_speed consumer reads a DWORD |
 | Dvar string type | `7` | String registration/getter family; runtime name/type validation required |
 
 Only individual fields are read; no complete `gentity_s`, `gclient_s`,
-`playerState_s`, or `actor_s` is assumed. Ammo and weapon layouts remain unknown.
+`playerState_s`, or `actor_s` is assumed. Test7 uses the partial client/reserve
+fields below; complete inventory, weapon-definition and actor layouts remain
+unresolved.
 Player identification by slot zero is supported by the dispatcher; mission and
 checkpoint behavior are still local tests, not a claim of universal reliability.
 Test 3 established the slot-zero pointer; test4 confirmed identity/health reads.
@@ -174,12 +182,109 @@ success. `bo1mw2/settings.ini` contains version=1 and fov=<integer>, with strict
 128-byte bounded parsing. Save flushes an own temp file then replaces the own
 settings file; only successful disk operations change the saved indication.
 Uninstall preserves it; clear/reset deletes only that own file. Diagnostics
-include that file when present. Native ADS/scale and alternate/cutscene paths
-still need owner tests; a static read is not proof of final camera behavior.
+include that file when present. The owner confirms test6 FOV behavior; matching
+logs show load/selection/save/reset. Broader alternate/cutscene/second-map
+coverage remains; a static read is not proof of every final camera path.
+
+### Test7 native PLAYER evidence and ABI
+
+These rows are static findings in the exact supplied hash; new live reads and
+behavior await the owner. Function names are assigned from command branches,
+method tables and behavior. None is invoked from the render callback.
+
+| Finding / assigned function | RVA | Evidence |
+| --- | --- | --- |
+| G_Damage start | `0x167d30` | Entity take-damage gate, then client and entity protection checks |
+| Take-damage gate | `0x167d53` | Byte at entity +0x139; zero bypasses ordinary damage |
+| Client damage guard | `0x167e89` | Client +0x10 bit 1 skips damage independently of entity God bit |
+| Noclip/UFO damage guard | `0x167e93` | Client +0xad54 mask 3 skips damage |
+| EnableInvulnerability method | `0x164f70` | Method-table name at 0x33a4f8 points to this function; OR client +0x10 with 1 |
+| DisableInvulnerability method | `0x164fd0` | Method-table name at 0x33a510; AND client +0x10 with ~1 |
+| Cmd_Noclip | `0x165d60` | ClientCommand noclip branch; toggles client +0xad54 bit 1 |
+| ClientThink readiness/read | `0x15be45` | Entity +0x108 pointer, connected value 2 at client +0xaca4, movement flags +0xad54 |
+| Native movement type selection | `0x15beb2` | Noclip bit 1 chooses movement type 2; UFO bit 2 chooses type 3; native store at 0x15bf20 uses client +4 |
+| Native client health zero | `0x165c7d` | Kill command writes client +0x14c; corroborates a signed health field |
+| Reserve lookup | `0x7f190` | From PS +0x2d8, fifteen entries, stride eight; ID DWORD then count DWORD |
+| Reserve set | `0x86b20` | Same table, ID/count stores, empty ID zero handling; used as layout evidence only |
+| Clip consumption / BG_UseAmmo candidate | `0x84e80` | Reads player_sustainAmmo, normal guns bypass consumption; otherwise +0x350 table, fifteen twelve-byte ID/two-hand-count entries |
+| player_sustainAmmo registration | `0x75414` | Default false, bool wrapper 0x26c930; registration/consumer agree on slot 0x3dd718 |
+| g_speed registration | `0x172b8f` | Default integer 190, raw flags 0xc0; slot 0xd9c040; wrapper 0x26cc10 sets type 5 |
+| g_speed player consumer | `0x15bf60` | Reads current DWORD +0x10, stores PS speed +0x5c; observed direct consumer is player movement |
+| jump_height registration | `0x70833` | Float default 39, domain 0..1000, raw flags 0x84; slot 0x3d9658 |
+| Native jump impulse | `0x703b0` | Multiplies gravity by fixed 78, then slowdown adjustment, sqrt and velocity-Z store at 0x70447 |
+| Native velocity cap | `0x706a6` | Fixed 39 above jump origin; gravity calculation limits Z velocity |
+| Native step/ceiling checks | `0x70738`, `0x70798` | Same fixed 39 reference in jump height checks |
+| Shared height / twice-height data | `0x31f8cc`, `0x31f8d0` | Adjacent aligned floats 39/78; four scalar references to height (including registration) and one to impulse; no observed jump-height dvar consumer |
+
+The command noclip routine takes RCX=entity under Microsoft x64 ABI. The
+script invulnerability methods take an ECX packed entity reference: upper
+16 bits checked as class/type, lower WORD indexed with entity stride 0x2a0.
+BG_UseAmmo candidate receives RCX=PS, EDX=weapon selector, R8D=amount, R9D=hand;
+this is inferred from the lookup/subtraction path, not an exposed API binding.
+The mod never calls these functions or runs game script from a render thread.
+
+| Partial field | Offset / width | Runtime use / limit |
+| --- | --- | --- |
+| Entity native damage enable | +0x139 / byte | Read only; accepts 0/1, never forced on |
+| Client/PS command time | +0 / signed DWORD | Compared in native ClientThink; a rewind invalidates ammo ownership |
+| Client/PS movement type | +4 / signed DWORD | Read only, accepted range 0..7; dead types 6/7 gate new actions |
+| Client/PS other flags | +0x10 / DWORD | Independent invulnerability bit 1; one-time masked OFF/lifetime/reset cleanup |
+| Client/PS health | +0x14c / signed DWORD | Additional living-player gate; not a health freeze |
+| Client connection state | +0xaca4 / signed DWORD | Requires native connected value 2 |
+| Client native cheat flags | +0xad54 / DWORD | Noclip bit 1 and UFO bit 2; masked reconciliation preserves other flags |
+| Client/PS reserve ammo | +0x2d8 / 15 entries of 8 bytes | ID +0, signed count +4; occupied entries validated; pool IDs are never invented |
+| Client/PS clip ammo | +0x350 / 15 entries of 12 bytes | Identified, not directly edited; No Reload uses the native dvar instead |
+
+A rejected hypothesis treated PS +0x34 as a client number. Native kinematic
+operations contradict that interpretation; it is not an identity guard. Entity
+WORD slot zero remains the identity check. No BO1/x86 client layout was reused.
+
+Session state and God fix: every 16ms while ready, reconcile entity mask 3 to
+1 for ON or 0 for OFF. This prevents a checkpoint restoring a stale native
+flag after the UI request became OFF. Native noclip/UFO mask 3 is reconciled
+separately. At a new ready lifetime, OFF selection or Reset, the verified
+independent invulnerability bit is cleared once if native take-damage is on
+and normal movement type is 0/1. Later scripted protection is reported as
+GUARDED; no continuous script-guard or take-damage override runs. Cleanup may
+remove protection at that spawn/checkpoint, so mission sequencing needs tests.
+A full restart resets requests OFF; checkpoint reloads retain session choices.
+Only the explicit FOV preference is serialized.
+
+The precise test6 mismatch cause remains **unconfirmed**. Its entity God bit
+was zero during the sampled protected period. After a user ON/OFF cycle,
+health 2 was logged. The log did not capture client guards, attempted damage,
+or the exact return/restart boundary. Test7 records native guards and lifetime
+changes. The new cleanup addresses a verified independent protection path;
+it is not evidence that this path caused the earlier run.
+
+Ammo writes use an aligned eight-byte compare/exchange of the ID/count pair,
+keeping the ID identical. Only occupied, validated existing entries are
+replenished. OFF restores a captured count only if the same pool still holds
+the exact injected 999. Engine changes are preserved. Server gaps, map/client
+changes and command-time rewinds discard ownership. No Reload preserves native
+frag/flash, Javelin/Stinger, AC130 and scripted-support exceptions. Its bool
+current byte is edited with a byte atomic CAS; speed uses a DWORD CAS and
+restores its captured pre-override value. Named/type checks run at each read.
+
+Jump compatibility differs from the generic dvar approach. The verified native
+jump code consumes pooled literals, so changing only jump_height would not
+change these paths. Test7 edits only the adjacent data pair to 117/234 while
+ready and requested; OFF or loss of readiness restores 39/78. A temporary data
+page permission change is restored. Raise the cap before the impulse, lower
+the impulse before the cap; conditional rollback handles a conflicting edit.
+No instruction or disk executable patch occurs. Unexpected references,
+non-default initial data or inconsistent values disable the jump feature.
+This exact-build compatibility path still needs retail jump/landing evidence.
+
+Menu: cap scale at 1.1, 500x410 logical panel, row text factor 0.8 and 26-pixel
+row spacing, eight visible rows. At the owner's 3440x1440 it is 550x451 instead
+of 912x810. Hook/vtable/font-atlas generation/render-state preservation remain
+unchanged; native rendering and smaller text readability await the owner.
 
 ## Resolution and level gate
 
-The five core plus two optional FOV patterns are centralized in `include/core.hpp`, with the static check
+The five core, two optional FOV and sixteen optional player patterns are
+centralized in `include/core.hpp`, with the static check
 report in `profile-checks.json`. Each final pattern has exactly one match in the
 uploaded `.text`. Registration name anchors and RIP-relative stores resolve
 slots. Addresses are not copied from another client, platform, or build.
@@ -204,7 +309,9 @@ confirms writes are blocked after the estate-to-main-menu transition.
 Remaining level-gate questions: initialization/unload ordering; whether any
 front-end map can leave a running server and a live slot-zero entity; effects of
 cutscene/player-entity swaps; and invalid/dead states during checkpoint reloads.
-Broaden the mission checks before adding recurring or AI operations. Test5's
+Test7 adds bounded recurring player-state reconciliation with additional
+exact-build gates; broad mission coverage is still pending. AI operations need
+separate scheduling/actor evidence. Test5's
 preview uses only local mathematical constants and does not require a live actor.
 
 ## T5 round-rule numeric evidence: exact uploaded BlackOps.exe
@@ -323,10 +430,13 @@ IW4 zone uses 64-bit pointer records. Asset conversion is unimplemented.
 | 2026-10-11 / test 3 | Keep native vptr/table; patch selected public slots with conditional rollback | AMD64 cross-build; two native tests including private slot 134 and shared-table regression; PowerShell menu-upgrade/collector checks | Owner reports working menu; render/input/categories/estate-to-no-server observed, no new crash evidence; player guard failed |
 | 2026-10-11 / test 4 | Correct WORD entity number; distinguish failed health reads; log read status | Regression reproduced former rejection and passes after fix; three native tests; exact-byte layout verification; AMD64 build | Owner confirms health/God/checkpoint behavior in estate with matching log |
 | 2026-10-11 / test 5 | Read-only source-derived normal-solo BO1 round preview | Four native suites, T5 numeric evidence, Windows build and script checks | Owner confirms working; front-end run covers rounds 1-100, no new crash evidence |
-| 2026-10-11 / test 6 | FOV selector/save/reset and derived normal CSV recovery | Five native suites, nine Python fixtures, seven static patterns; Windows/package checks recorded separately | Pending owner FOV/ADS/restart/checkpoint observations |
+| 2026-10-11 / test 6 | FOV selector/save/reset and derived normal CSV recovery | Five native suites, nine Python fixtures, seven static patterns; Windows/package checks recorded separately | Owner confirms FOV behavior; matching load/save/reset log. God OFF/protection mismatch reported; precise cause unconfirmed |
+
+| 2026-10-11 / test 7 | Session God reconciliation/guard diagnostics; reserve ammo, clip sustain, native noclip, speed, fixed-jump compatibility, reset; compact eight-row menu | Six native suites, nine Python fixtures, 23 exact-build patterns, AMD64 Windows build and isolated test6-to-test7 script checks | Awaiting owner God restart/checkpoint and individual PLAYER tests |
 
 Returned owner evidence is redacted into the versioned runtime JSON files; full
 logs/dumps stay private. No retail game is executed in this Linux workspace.
-The next acceptance gate is FOV test6: selector, saved-value restart, ADS,
-checkpoint reapplication and existing gameplay regression. Second-map/reset
+The next acceptance gate is PLAYER test7: fresh-launch God OFF with damage,
+ON/OFF checkpoint behavior, each new player action, reset and compact layout.
+Saved FOV remains a regression check. Second-map/reset
 coverage and native BO1 actor/asset compatibility remain separate gates.

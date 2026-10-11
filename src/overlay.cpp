@@ -148,7 +148,7 @@ const char* PageName(Page page) {
 }
 const char* Row(Page page, int n) {
     static constexpr const char* home[] = {"PLAYER", "WEAPONS", "WORLD", "AI", "ZOMBIE MODE", "DIAGNOSTICS"};
-    static constexpr const char* player[] = {"God Mode", "FOV settings", "Infinite Ammo", "No Reload", "Noclip", "Super Speed", "Super Jump"};
+    static constexpr const char* player[] = {"God Mode", "FOV settings", "Infinite Ammo", "No Reload", "Noclip", "Super Speed", "Super Jump", "Reset player toggles"};
     static constexpr const char* weapons[] = {"Give All", "Infinite Grenades", "Rapid Fire", "Explosive Bullets", "Debug Features"};
     static constexpr const char* world[] = {"Slow Motion", "Freeze AI", "Gravity", "Kill All Enemies"};
     static constexpr const char* ai[] = {"Spawn Enemy", "Spawn Friendly", "AI Controls"};
@@ -249,7 +249,13 @@ void Overlay::frame() {
         const Action action = menu.input(event);
         Log("INPUT key=%d visible=%d page=%d selected=%d", static_cast<int>(event), menu.visible,
             static_cast<int>(menu.page), menu.selected);
-        if (action == Action::ToggleGod) ToggleGod();
+        if (action == Action::ToggleGod) TogglePlayerFeature(PlayerFeature::God);
+        else if (action == Action::ToggleInfiniteAmmo) TogglePlayerFeature(PlayerFeature::InfiniteAmmo);
+        else if (action == Action::ToggleNoReload) TogglePlayerFeature(PlayerFeature::NoReload);
+        else if (action == Action::ToggleNoclip) TogglePlayerFeature(PlayerFeature::Noclip);
+        else if (action == Action::ToggleSuperSpeed) TogglePlayerFeature(PlayerFeature::SuperSpeed);
+        else if (action == Action::ToggleSuperJump) TogglePlayerFeature(PlayerFeature::SuperJump);
+        else if (action == Action::ResetPlayer) ResetPlayerFeatures();
         else if (action == Action::WriteSnapshot) LogSnapshot();
         else if (action == Action::WriteRoundPreview) LogRoundPreview(menu.previewRound);
         else if (action == Action::ChangeFov) {
@@ -271,8 +277,10 @@ void Overlay::frame() {
         for (const auto event : inputQueue) predicted.input(event);
         visible = predicted.visible;
     }
-    Snapshot s = ReadSnapshot();
     const ULONGLONG now = GetTickCount64();
+    UpdatePlayerFeatures(now);
+    Snapshot s = ReadSnapshot();
+    const auto playerPreferences=GetPlayerPreferences();
     if (menu.fov.desired && s.state==LevelState::Ready && s.fov.valid && now>=nextFovAttempt) {
         nextFovAttempt=now+250;
         if (SetFov(*menu.fov.desired)) { menu.fov.applied(); s=ReadSnapshot(); }
@@ -284,6 +292,10 @@ void Overlay::frame() {
         LogSnapshot();
         Log("FOV_PREF selected=%d saved=%d active=%d reset_pending=%d",
             menu.fov.selected,menu.fov.saved.value_or(0),menu.fov.desired.has_value(),menu.fov.releaseAfterDefault);
+        Log("PLAYER_PREF god=%d infinite_ammo=%d no_reload=%d noclip=%d super_speed=%d super_jump=%d session_only=1",
+            playerPreferences.wanted(PlayerFeature::God),playerPreferences.wanted(PlayerFeature::InfiniteAmmo),
+            playerPreferences.wanted(PlayerFeature::NoReload),playerPreferences.wanted(PlayerFeature::Noclip),
+            playerPreferences.wanted(PlayerFeature::SuperSpeed),playerPreferences.wanted(PlayerFeature::SuperJump));
     }
     if (!menu.visible && !menu.hud) return;
     IDirect3DStateBlock9* state = nullptr;
@@ -303,52 +315,71 @@ void Overlay::frame() {
     D3DVIEWPORT9 full{0,0,size.Width,size.Height,0,1}; device->SetViewport(&full);
     if (!font && !fontAttempted) BuildFont(*this);
     Configure(device);
-    const float scale = std::max(.5f, std::min(1.6f, std::min(size.Width/1280.f, size.Height/720.f)));
+    const float scale = std::max(.5f, std::min(1.1f, std::min(size.Width/1280.f, size.Height/720.f)));
     auto rect = [&](float x,float y,float w,float h,D3DCOLOR c) { Rect(device,x*scale,y*scale,w*scale,h*scale,c); };
-    auto text = [&](float x,float y,D3DCOLOR c,const char* value,float factor=1.f) { Text(*this,x*scale,y*scale,scale*factor,c,value); };
+    auto text = [&](float x,float y,D3DCOLOR c,const char* value,float factor=.8f) { Text(*this,x*scale,y*scale,scale*factor,c,value); };
     char line[128]{};
     if (menu.hud) {
-        rect(18,18,540,31,D3DCOLOR_ARGB(205,7,10,6));
+        rect(12,12,446,25,D3DCOLOR_ARGB(205,7,10,6));
         std::snprintf(line,sizeof(line),"BO1MW2 | F4 | %s",StateText(s.state));
-        text(27,21,kAccent,line,.85f);
+        text(20,13,kAccent,line,.7f);
     }
     if (menu.visible) {
-        rect(40,74,570,506,D3DCOLOR_ARGB(240,10,13,9));
-        rect(40,74,570,4,kAccent);
-        text(61,92,kAccent,"MW2 / BO1 ZOMBIES",1.15f);
-        text(61,125,kText,PageName(menu.page));
+        rect(24,54,500,410,D3DCOLOR_ARGB(240,10,13,9));
+        rect(24,54,500,3,kAccent);
+        text(40,66,kAccent,"MW2 / BO1 ZOMBIES",.95f);
+        text(40,96,kText,PageName(menu.page));
         if (menu.page == Page::ZombieRules) {
-            text(61,156,kMuted,"Local BO1 CSV + script fallbacks",.88f);
+            text(40,121,kMuted,"Local BO1 CSV + script fallbacks",.7f);
             std::snprintf(line,sizeof(line),"Normal solo rounds | Preview %d / %d", menu.previewRound, bo1::kPreviewMaxRound);
-            text(61,180,kMuted,line,.88f);
+            text(40,143,kMuted,line,.7f);
         } else if (menu.page==Page::View) {
-            text(61,156,kMuted,StateText(s.state),.88f);
-            text(61,180,kMuted,"Game default: 65 | Selector: 60-120",.88f);
+            text(40,121,kMuted,StateText(s.state),.7f);
+            text(40,143,kMuted,"Game default: 65 | Selector: 60-120",.7f);
         } else if (s.map[0]) {
-            text(61,156,kMuted,StateText(s.state),.88f);
+            text(40,121,kMuted,StateText(s.state),.7f);
             if (s.playerRead == PlayerReadStatus::Complete)
                 std::snprintf(line,sizeof(line),"Map: %.32s   Health: %d",s.map,s.health);
             else std::snprintf(line,sizeof(line),"Map: %.32s   Health: UNKNOWN",s.map);
-            text(61,180,kMuted,line,.88f);
+            text(40,143,kMuted,line,.7f);
         } else {
-            text(61,156,kMuted,StateText(s.state),.88f);
-            text(61,180,kMuted,"FOV test 6 | Zombies under development",.88f);
+            text(40,121,kMuted,StateText(s.state),.7f);
+            text(40,143,kMuted,"PLAYER test 7 | Zombies under development",.7f);
         }
         const auto preview = menu.page == Page::ZombieRules
             ? bo1::EvaluateNormalSoloRound(menu.previewRound, menu.previewRound == 1) : std::nullopt;
         const int first=menu.firstVisibleRow();
-        for (int n=first; n<menu.count() && n<first+6; ++n) {
-            const float y=216.f+(n-first)*42.f;
+        for (int n=first; n<menu.count() && n<first+kVisibleMenuRows; ++n) {
+            const float y=170.f+(n-first)*26.f;
             const bool selected=menu.selected==n;
-            if (selected) { rect(52,y-2,546,37,D3DCOLOR_ARGB(255,49,57,32)); rect(52,y-2,3,37,kAccent); }
-            text(67,y+3,selected?kAccent:kText,Row(menu.page,n));
+            if (selected) { rect(34,y-1,480,24,D3DCOLOR_ARGB(255,49,57,32)); rect(34,y-1,3,24,kAccent); }
+            text(45,y+1,selected?kAccent:kText,Row(menu.page,n));
             const char* status="PLANNED";
             char value[32]{};
             if (menu.page==Page::Home) status=">";
-            else if (menu.page==Page::Player && n==0) status=s.state==LevelState::Ready?(s.god?"ON":"OFF"):"LOCKED";
+            else if (menu.page==Page::Player && n==0) {
+                if (s.state!=LevelState::Ready) status="LOCKED";
+                else if (s.god) status=playerPreferences.wanted(PlayerFeature::God)?"ON":"RESETTING";
+                else if ((s.flags&2) || (s.client.valid && ((s.client.otherFlags&1) || (s.client.cheatFlags&3)))
+                    || (s.damageRead && !s.takesDamage)) status="GUARDED";
+                else if (playerPreferences.wanted(PlayerFeature::God)) status="WAIT";
+                else status=s.client.valid && s.damageRead?"OFF":"OFF*";
+            }
             else if (menu.page==Page::Diagnostics) status=n==0?(menu.hud?"ON":"OFF"):"ENTER";
             else if (menu.page==Page::Zombies && n==0) status="ENTER";
             else if (menu.page==Page::Player && n==1) status=">";
+            else if (menu.page==Page::Player && n>=2 && n<=6) {
+                const auto feature=static_cast<PlayerFeature>(n-1);
+                const bool wanted=playerPreferences.wanted(feature);
+                if (!FeatureAvailable(s,feature)) status="LOCKED";
+                else if (feature==PlayerFeature::InfiniteAmmo) status=wanted?"ON":"OFF";
+                else if (feature==PlayerFeature::NoReload) status=s.sustain.current?(wanted?"ON":"NATIVE"):(wanted?"WAIT":"OFF");
+                else if (feature==PlayerFeature::Noclip) status=(s.client.cheatFlags&1)?"ON":(wanted?"WAIT":"OFF");
+                else if (feature==PlayerFeature::SuperSpeed) {
+                    std::snprintf(value,sizeof(value),"%s %d",wanted?"ON":"OFF",s.speed.current); status=value;
+                } else if (feature==PlayerFeature::SuperJump) status=s.jump.height==kSuperJump?(wanted?"ON 3x":"RESETTING"):(wanted?"WAIT":"OFF");
+            }
+            else if (menu.page==Page::Player && n==7) status="ENTER";
             else if (menu.page==Page::View) {
                 if (n==0) std::snprintf(value,sizeof(value),"%d",menu.fov.selected);
                 else if (n==1 || n==2) std::snprintf(value,sizeof(value),"ENTER");
@@ -370,22 +401,37 @@ void Overlay::frame() {
                 }
                 status=value;
             }
-            text(503,y+5,kMuted,status,.85f);
+            text(422,y+3,kMuted,status,.7f);
         }
-        rect(52,483,546,1,D3DCOLOR_ARGB(255,57,63,47));
-        text(61,497,kMuted,menu.page==Page::ZombieRules
+        rect(34,383,480,1,D3DCOLOR_ARGB(255,57,63,47));
+        text(40,390,kMuted,menu.page==Page::ZombieRules
             ? "LEFT/RIGHT: Round  ENTER: Next  UP/DOWN: Row" : menu.page==Page::View
-            ? "LEFT/RIGHT: FOV  UP/DOWN: Row  ENTER: Act" : "UP/DOWN: Select  ENTER: Activate",.88f);
-        text(61,522,kMuted,"BACKSPACE/ESC: Back   F4: Close",.88f);
+            ? "LEFT/RIGHT: FOV  UP/DOWN: Row  ENTER: Act" : "UP/DOWN: Select  ENTER: Toggle / Open",.7f);
+        text(40,412,kMuted,"BACKSPACE/ESC: Back   F4: Close",.7f);
         const char* footer="Game keeps running. WASD and mouse work.";
         if (menu.page==Page::ZombieRules) footer="Read-only preview. No zombies spawned.";
+        if (menu.page==Page::Player) {
+            static constexpr const char* hints[]={
+                "GUARDED = other native protection, including noclip.",
+                "FOV can be saved. Player toggles start OFF on launch.",
+                "Maintains reserve ammo; magazines still reload.",
+                "Stops normal gun clip consumption; reload key works.",
+                "WASD + mouse to fly; SPACE up, crouch key down.",
+                "Base speed 190 -> 380; restores previous speed.",
+                "Native jump height 39 -> 117; land before OFF.",
+                "Turns player cheats OFF; keeps the saved FOV."
+            };
+            footer=hints[menu.selected];
+            if (menu.selected==0 && !s.client.valid && s.state==LevelState::Ready)
+                footer="OFF* = additional protection fields unavailable.";
+        }
         if (menu.page==Page::View) {
             if (!s.fov.resolved || !s.fov.valid) footer="FOV unavailable; see log.";
             else if (menu.fov.desired && s.state!=LevelState::Ready) footer="FOV queued until player is alive.";
             else if (settingsResult[0]) footer=settingsResult;
             else footer="Save keeps this FOV for future launches.";
         }
-        text(61,551,kAccent,footer,.85f);
+        text(40,438,kAccent,footer,.7f);
     }
     state->Apply();
     if (SUCCEEDED(worldResult)) device->SetTransform(D3DTS_WORLD,&world);
@@ -394,6 +440,7 @@ void Overlay::frame() {
     if (SUCCEEDED(viewportResult)) device->SetViewport(&savedViewport);
     state->Release();
     ++draws;
-    if (draws==1) Log("DRAW first overlay frame backbuffer=%ux%u font=%d",size.Width,size.Height,font!=nullptr);
+    if (draws==1) Log("DRAW first overlay frame backbuffer=%ux%u font=%d menu_scale=%.2f panel=%.0fx%.0f visible_rows=%d",size.Width,size.Height,font!=nullptr,
+        scale,500*scale,410*scale,kVisibleMenuRows);
 }
 } // namespace mod

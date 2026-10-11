@@ -52,6 +52,102 @@
       "rip_targets": {
         "0": "0x51e1a8"
       }
+    },
+    "kClientReadinessPattern": {
+      "match_count": 1,
+      "match_rva": "0x15be45",
+      "rip_targets": {}
+    },
+    "kClientDamageGuardPattern": {
+      "match_count": 1,
+      "match_rva": "0x167e89",
+      "rip_targets": {}
+    },
+    "kClientInvulnerabilityClearPattern": {
+      "match_count": 1,
+      "match_rva": "0x164ffe",
+      "rip_targets": {}
+    },
+    "kNoclipCommandPattern": {
+      "match_count": 1,
+      "match_rva": "0x165d76",
+      "rip_targets": {}
+    },
+    "kNoclipMovementPattern": {
+      "match_count": 1,
+      "match_rva": "0x15beb2",
+      "rip_targets": {}
+    },
+    "kReserveReadPattern": {
+      "match_count": 1,
+      "match_rva": "0x7f1a4",
+      "rip_targets": {}
+    },
+    "kReserveWritePattern": {
+      "match_count": 1,
+      "match_rva": "0x86b99",
+      "rip_targets": {}
+    },
+    "kSustainRegistrationPattern": {
+      "match_count": 1,
+      "match_rva": "0x75414",
+      "rip_targets": {
+        "2": "0x322b60",
+        "20": "0x3dd718"
+      },
+      "name_anchor": "player_sustainAmmo"
+    },
+    "kSustainConsumerPattern": {
+      "match_count": 1,
+      "match_rva": "0x84e98",
+      "rip_targets": {
+        "0": "0x3dd718"
+      }
+    },
+    "kSpeedRegistrationPattern": {
+      "match_count": 1,
+      "match_rva": "0x172b8f",
+      "rip_targets": {
+        "0": "0x33c188",
+        "64": "0xd9c040"
+      },
+      "name_anchor": "g_speed"
+    },
+    "kSpeedConsumerPattern": {
+      "match_count": 1,
+      "match_rva": "0x15bf60",
+      "rip_targets": {
+        "0": "0xd9c040"
+      }
+    },
+    "kJumpRegistrationPattern": {
+      "match_count": 1,
+      "match_rva": "0x70833",
+      "rip_targets": {
+        "8": "0x31f7a0",
+        "62": "0x3d9658"
+      },
+      "name_anchor": "jump_height"
+    },
+    "kJumpImpulsePattern": {
+      "match_count": 1,
+      "match_rva": "0x703a8",
+      "rip_targets": {}
+    },
+    "kJumpClampPattern": {
+      "match_count": 1,
+      "match_rva": "0x7069e",
+      "rip_targets": {}
+    },
+    "kJumpStepPattern": {
+      "match_count": 1,
+      "match_rva": "0x70730",
+      "rip_targets": {}
+    },
+    "kJumpCeilingPattern": {
+      "match_count": 1,
+      "match_rva": "0x70790",
+      "rip_targets": {}
     }
   },
   "fov": {
@@ -74,7 +170,7 @@
         "rva": "0x32ae10"
       }
     },
-    "limits": "Static exact-build evidence; retail FOV/ADS/restart tests pending."
+    "limits": "Static exact-build evidence; owner confirms test6 FOV behavior. See runtime-test6-evidence.json for recorded coverage."
   },
   "entity_number": {
     "offset": "0x7e",
@@ -90,6 +186,111 @@
         "instruction_rva": "0x19afb4",
         "decoded_member_offset": "0x7e"
       }
+    }
+  },
+  "player": {
+    "partial_fields": {
+      "kEntityClient": [
+        {
+          "signature": "kClientReadinessPattern",
+          "encoded_member_rva": "0x15be48",
+          "offset": "0x108"
+        },
+        {
+          "signature": "kNoclipCommandPattern",
+          "encoded_member_rva": "0x165d79",
+          "offset": "0x108"
+        },
+        {
+          "signature": "kClientInvulnerabilityClearPattern",
+          "encoded_member_rva": "0x165006",
+          "offset": "0x108"
+        }
+      ],
+      "kClientConnected": [
+        {
+          "signature": "kClientReadinessPattern",
+          "encoded_member_rva": "0x15be59",
+          "offset": "0xaca4"
+        }
+      ],
+      "kClientCheatFlags": [
+        {
+          "signature": "kClientReadinessPattern",
+          "encoded_member_rva": "0x15be6b",
+          "offset": "0xad54"
+        },
+        {
+          "signature": "kNoclipCommandPattern",
+          "encoded_member_rva": "0x165d95",
+          "offset": "0xad54"
+        }
+      ],
+      "kClientOtherFlags": [
+        {
+          "signature": "kClientDamageGuardPattern",
+          "encoded_member_rva": "0x167e8b",
+          "offset": "0x10"
+        },
+        {
+          "signature": "kClientInvulnerabilityClearPattern",
+          "encoded_member_rva": "0x16500c",
+          "offset": "0x10"
+        }
+      ],
+      "kReserveAmmo": [
+        {
+          "signature": "kReserveReadPattern",
+          "encoded_member_rva": "0x7f1a7",
+          "offset": "0x2d8"
+        },
+        {
+          "signature": "kReserveWritePattern",
+          "encoded_member_rva": "0x86b9f",
+          "offset": "0x2d8"
+        }
+      ],
+      "kEntityTakeDamage": [
+        {
+          "instruction_rva": "0x167d53",
+          "offset": "0x139"
+        }
+      ],
+      "kClientHealth": [
+        {
+          "instruction_rva": "0x165c7d",
+          "offset": "0x14c"
+        }
+      ],
+      "kClientMoveType": [
+        {
+          "instruction_rva": "0x15bf20",
+          "offset": "0x4"
+        }
+      ]
+    },
+    "reserve_entries": 15,
+    "reserve_stride": 8,
+    "sustain_slot_rva": "0x3dd718",
+    "sustain_type": 0,
+    "speed_slot_rva": "0xd9c040",
+    "speed_type": 5,
+    "limits": "Static exact-build evidence; new player behavior and God regression await test7 owner run.",
+    "jump": {
+      "height_constant_rva": "0x31f8cc",
+      "twice_height_constant_rva": "0x31f8d0",
+      "height_references": [
+        "0x706a6",
+        "0x70738",
+        "0x70798",
+        "0x70833"
+      ],
+      "twice_height_references": [
+        "0x703b0"
+      ],
+      "native_height": 39,
+      "enabled_height": 117,
+      "compatibility": "Runtime data-only float pair; jump_height dvar is not consumed by the observed jump paths."
     }
   }
 }

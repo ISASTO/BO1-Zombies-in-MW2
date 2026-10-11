@@ -36,9 +36,12 @@ int main() {
     m.input(Input::Down); Check(m.input(Input::Select)==Action::None,"live FOV output is read-only");
     m.input(Input::Down); Check(m.input(Input::Select)==Action::None,"saved FOV output is read-only");
     m.input(Input::Back); Check(m.page==Page::Player && m.selected==1,"FOV back remembers parent row");
-    for(int i=0;i<5;++i) { m.input(Input::Down); Check(m.input(Input::Select)==Action::None, "unimplemented features have no action"); }
-    Check(m.selected==6 && m.firstVisibleRow()==1,"seventh player row scrolls into viewport");
-    m.input(Input::Down); Check(m.selected==0 && m.firstVisibleRow()==0,"player menu wraps after seven rows");
+    const std::array<Action,6> playerActions={Action::ToggleInfiniteAmmo,Action::ToggleNoReload,Action::ToggleNoclip,
+        Action::ToggleSuperSpeed,Action::ToggleSuperJump,Action::ResetPlayer};
+    for(const auto action:playerActions) { m.input(Input::Down); Check(m.input(Input::Select)==action,"player control action routing");
+        Check(m.firstVisibleRow()==0,"all eight player rows fit without scrolling"); }
+    Check(m.selected==7 && m.count()==8 && kVisibleMenuRows==8,"reset row and compact player viewport");
+    m.input(Input::Down); Check(m.selected==0 && m.firstVisibleRow()==0,"player menu wraps after eight rows");
     m.input(Input::Back); m.input(Input::Back);
     Check(!m.visible, "back from home closes menu");
     m.input(Input::Toggle); m.input(Input::Toggle); Check(!m.visible, "two toggle events cancel");

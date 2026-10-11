@@ -9,15 +9,19 @@ Updated 2026-10-11. Complete one useful, testable change at a time.
 2. **Test5 preview accepted in the front end:** matching diagnostics cover all
    100 rounds, bounds and navigation. No mission/regression run was included.
    The new common_zombie.ff normal tuning recovery matches existing numbers.
-3. **Current test6: FOV selector with saved preference:** static exact-build
-   registration/domain and camera reads verified; portable selector/persistence
-   tests and Windows build pass. Test 60-120 selection, explicit Save/reset,
-   full restart persistence, ADS and checkpoint/mission reapplication in retail.
-   This implements the owner's request using the mod's own settings file.
-4. Audit remaining BO1 configuration overrides and dependency closure, then incrementally test round
+3. **Test6 FOV accepted by owner:** matching logs show saved 100 loaded/applied,
+   default 65/clear, selection and save. God protection/menu state disagreed
+   after a return/restart; the exact cause is unconfirmed by its old fields.
+4. **Current test7: complete PLAYER prototype and smaller menu:** God desired
+   state/reload reconciliation and independent protection handling; reserve
+   ammo, native clip sustain, noclip, speed, fixed-jump compatibility, reset,
+   and eight visible rows. Six portable suites, nine Python fixtures, 23
+   exact-build patterns, Windows build and isolated script checks pass.
+   Owner God restart/checkpoint regression and per-feature tests are next.
+5. Audit remaining BO1 configuration overrides and dependency closure, then incrementally test round
    controller scheduling and an IW4 actor adapter. Identify required native
    targeting, pursuit, damage/notetrack and death semantics before enabling AI.
-5. Audit/import one local asset type at a time with versioned conversion tools.
+6. Audit/import one local asset type at a time with versioned conversion tools.
    Validate zombie behavior against BO1 observations before expanding gameplay,
    special rounds, weapon features, or a native IW4 menu.
 

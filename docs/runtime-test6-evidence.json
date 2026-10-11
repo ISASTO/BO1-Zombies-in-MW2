@@ -1,0 +1,102 @@
+{
+  "version": "0.1.5-fov-test6",
+  "evidence_source": {
+    "file": "BO1MW2-startup-results-20261011-121715-09e5bf45.zip",
+    "bytes": 91227,
+    "sha256": "7e25fbe6f1484f780da50658b3da07aee246f7446cf8a44aadd6855bba5f0d85",
+    "collected_utc": "2026-10-11T17:17:15.6989461Z",
+    "latest_log_sha256": "0d694782f1a039abd50738a85caff67fa78763636f79c0b0e0c5a2a4ce084177"
+  },
+  "installed_build": {
+    "version": "0.1.5-fov-test6",
+    "dll_sha256": "e287ad42e34a20e2107a43b79a4ed71118dea2e623ae65f79fa07b73682dbb44",
+    "installed_utc": "2026-10-11T17:10:34.6405073Z"
+  },
+  "owner_observation": {
+    "fov": "Everything worked as expected. This is owner-reported overall FOV behavior, not a separate instrumented ADS assertion.",
+    "god_regression": "After enabling God, leaving and returning, the menu said OFF while the player remained protected; ON then OFF restored damage."
+  },
+  "log_observations": {
+    "map": "estate",
+    "saved_fov_loaded": 100,
+    "fov_first_apply": "65 -> 100 at 12:14:28.768 local log time",
+    "god_before_cycle": {
+      "entity_flags": [
+        "0x00000c00",
+        "0x00010c00"
+      ],
+      "entity_god_bit": 0,
+      "sampled_health": 100,
+      "limit": "No record of attempted damage or independent client protection flags."
+    },
+    "god_cycle_local_times": [
+      "12:15:33.775 ON",
+      "12:15:34.525 OFF"
+    ],
+    "health_after_cycle": {
+      "local_time": "12:15:40.538",
+      "health": 2,
+      "entity_flags": "0x00010c00",
+      "entity_god_bit": 0
+    },
+    "fov_reset": {
+      "local_time": "12:15:51.525",
+      "saved_preference_cleared": true,
+      "live_after": 65
+    },
+    "fov_selections": [
+      70,
+      75,
+      80,
+      85,
+      90,
+      95,
+      100
+    ],
+    "saved_fov_at_end": 100,
+    "menu_inputs": 28,
+    "end_scenes": 78232,
+    "draws": 78231,
+    "resets": 0,
+    "backbuffer": [
+      3440,
+      1440
+    ],
+    "left_level": "NO ACTIVE LEVEL at 12:16:10.547"
+  },
+  "probes": [
+    {
+      "exit_code": 0,
+      "name": "windows-system-d3d9"
+    },
+    {
+      "exit_code": 0,
+      "name": "installed-project-dll"
+    }
+  ],
+  "crash_evidence": {
+    "new_crash_evidence": false,
+    "dumps": [
+      {
+        "file": "crash-20261011-073022.dmp",
+        "sha256": "304b8d8d2790892cbc5de0655fea41df6363e50cd010fb667ff25ec58ed4cbc8"
+      },
+      {
+        "file": "crash-20261011-073044.dmp",
+        "sha256": "676344752b68ae631287fe555308b491f527829077c553855cc9ffefc021a34d"
+      },
+      {
+        "file": "crash-20261011-073111.dmp",
+        "sha256": "148decc3d315ec693207d9bff1db6573e8384120aa9ad2f1df9fcf4680910b77"
+      }
+    ],
+    "classification": "Identical historical test1 dumps previously seen in test5. Windows events are the same three early Application Error records.",
+    "event_utc_times": [
+      "2026-10-11T12:31:12.069000+00:00",
+      "2026-10-11T12:30:45.033000+00:00",
+      "2026-10-11T12:30:23.075000+00:00"
+    ]
+  },
+  "conclusion": "FOV behavior accepted by owner and matching selection/save/reset/load logs. God mismatch is a real owner-reported regression. Precise native cause is unconfirmed because test6 did not record other protection fields. Test7 adds authoritative session reconciliation, one-time independent-guard cleanup and expanded diagnostics.",
+  "privacy": "Only redacted facts/hashes are committed. Original executable, complete logs and crash dumps remain local."
+}

@@ -1,57 +1,56 @@
-# Current test6 owner checks
+# Current test7 owner checks
 
-Build `0.1.5-fov-test6`, exact supplied AMD64 MW2 executable. Phase 1 health/God
-passed in the owner's test4 estate session. Test5 preview navigation passed in
-the front end; that diagnostic run contains no active mission. Test6 adds the
-requested FOV selector and saved preference. No playable Zombies mode is added.
+Build `0.1.6-player-test7` for the exact supplied AMD64 MW2 executable. Test6
+FOV behavior is owner-confirmed; its God OFF/protection mismatch is recorded in
+[redacted evidence](runtime-test6-evidence.json). Test7 adds session God
+reconciliation, every current PLAYER action, reset, and an eight-row compact
+menu. No playable Zombies mode is added.
 
-Follow [fov-test6.md](fov-test6.md) for installation, controls and expected values.
-Extract all tools outside the game folder, run Uninstall.cmd then Install.cmd,
-and launch SP through Steam normally. Only d3d9.dll runs beside iw4sp.exe.
+Follow [player-test7.md](player-test7.md) for the exact sequence. Extract outside
+the game folder, fully close MW2, run **Uninstall.cmd**, then **Install.cmd**,
+and launch Single Player through Steam normally. Saved FOV is preserved.
 
 ## Return these observations
 
+```text
+Build / campaign map / resolution:
+Fresh launch, old protected checkpoint, God OFF + Noclip OFF: health drops without cycling God:
+God ON protects, then OFF allows ordinary damage:
+God ON checkpoint reload; God OFF checkpoint reload:
+Full quit with God ON, relaunch: starts OFF and ordinary damage works:
+Any GUARDED, OFF*, WAIT or LOCKED label, and when:
+All eight PLAYER rows visible; text size/readability:
+Infinite Ammo: reserves replenish, magazines reload; OFF stops replenishment:
+No Reload: clip stable while firing; OFF consumes clip ammo:
+Noclip: fly/vertical movement/pass through wall; OFF restores walking/collision:
+Super Speed: faster while ON; normal/captured speed after OFF:
+Super Jump: higher jump while ON; normal jump after landing and OFF:
+Reset player toggles: all OFF and normal behavior returns:
+Saved FOV/ADS behavior still works:
+Any crash, exact error and last action:
 ```
-Launch and campaign mission:
-F4 > PLAYER > FOV settings opens:
-Base 65 to 90 changes the view; Live base FOV shows 90:
-Save acknowledgement and Saved base FOV = 90:
-Full exit/relaunch restores 90 without reselecting it:
-ADS and scoped-weapon zoom still work; any jitter:
-Checkpoint reload restores/keeps the selected FOV:
-Health and God ON/OFF still work:
-Restore default clears Saved and returns Live to 65:
-Any clipping, input problem, crash or last action:
-```
 
-Exit MW2, run Diagnose.cmd and attach its results ZIP. It now includes the mod's
-settings.ini if present, along with the existing logs/receipt/events/probes.
-A screenshot helps if text clips. Latest.log is replaced each launch; collect
-it after the restart/checkpoint/reset checks, before launching again.
+Close MW2 and run **Diagnose.cmd**. Attach the resulting ZIP. Collect after the
+relevant run before launching again, because `latest.log` is replaced each
+launch. The collector includes settings, receipt, logs, events and probe
+results. A screenshot helps if the smaller text clips or is difficult to read.
 
-## Remaining robustness checks
+God and noclip start OFF on a fresh process and reconcile their native bits
+while alive. The additional client invulnerability guard is cleared once at
+a verified lifetime/OFF/reset, under the normal-movement/native-damage gate;
+later scripted protection is reported as GUARDED. Noclip independently blocks
+damage. Test them separately. Other new fields and the fixed-jump compatibility
+edit have static/portable coverage, but require this retail run for acceptance.
+No tests here claim that Windows or MW2 ran in the Linux build environment.
 
-A different campaign map from estate is useful. Device reset, resolution changes,
-cutscene camera overrides and Steam-overlay interoperability remain separate
-coverage. F4 does not pause gameplay. Navigation keys are consumed while open;
-releases reach the game, and WASD/mouse/fire pass through.
+For rollback, close MW2 and run **Uninstall.cmd**. It removes the owned DLL and
+keeps logs/settings. If a crash happens, preserve
+`<MW2>\bo1mw2\logs\latest.log` immediately. Logging can fall back to
+`%LOCALAPPDATA%\BO1MW2`. Return any generated crash text/minidump, or the
+Application Error's faulting module/offset if no dump exists. The unhandled
+exception handler may not see loader errors or faults handled by the game.
 
-The preview has no engine writes. God flips only its native entity bit on an
-explicit selection and reads the actual flag after reloads. Test4 checkpoint
-persistence is not a universal mission guarantee. FOV writes require a verified
-named float dvar and living player; selections made at the main menu are queued.
-The stored value is base FOV, not the final ADS/aspect-scaled camera angle.
-
-## Diagnostics after a fault
-
-Copy `<MW2>\bo1mw2\logs\latest.log` before launching again. Logging can fall back
-to `%LOCALAPPDATA%\BO1MW2`; saved FOV uses only the game folder's bo1mw2 directory.
-Describe the last action and whether the badge/menu appeared before the fault.
-Close MW2 and use Uninstall.cmd if rollback is needed. It keeps logs/settings.
-
-The exception handler attempts a text crash report and minidump for unhandled
-faults reaching it. Earlier loader errors or game handlers can prevent capture.
-If no dump exists, return the last log and Application Error's faulting module
-and offset. Full returned logs/dumps and original assets are not committed.
-
-Historical steps/evidence remain in the versioned test2-5 documents and JSON.
+Second-map, cutscene, resolution/device-reset and Steam-overlay coverage remain
+useful. F4 does not pause; WASD/mouse/fire pass through. Historical test2-6
+instructions and JSON evidence remain in the repository. Complete returned
+logs/dumps and original game assets are never committed or distributed.
