@@ -149,8 +149,8 @@ const char* PageName(Page page) {
 const char* Row(Page page, int n) {
     static constexpr const char* home[] = {"PLAYER", "WEAPONS", "WORLD", "AI", "ZOMBIE MODE", "DIAGNOSTICS"};
     static constexpr const char* player[] = {"God Mode", "FOV settings", "Infinite Ammo", "No Reload", "Noclip", "Super Speed", "Super Jump", "Reset player toggles"};
-    static constexpr const char* weapons[] = {"Give All", "Infinite Grenades", "Rapid Fire", "Explosive Bullets", "Debug Features"};
-    static constexpr const char* world[] = {"Slow Motion", "Freeze AI", "Gravity", "Kill All Enemies"};
+    static constexpr const char* weapons[] = {"Give All (loaded)", "Infinite Grenades (linked)", "Rapid Fire", "Explosive Bullets", "Weapon info to log", "Reset weapon toggles"};
+    static constexpr const char* world[] = {"Slow Motion", "Freeze AI", "Gravity", "Kill All Enemies", "Reset world toggles"};
     static constexpr const char* ai[] = {"Spawn Enemy", "Spawn Friendly", "AI Controls"};
     static constexpr const char* zombies[] = {"Round rules preview", "Enable Zombies", "Start Game", "Round / Population Controls"};
     static constexpr const char* diag[] = {"Status HUD", "Write State to Log"};
@@ -251,11 +251,30 @@ void Overlay::frame() {
             static_cast<int>(menu.page), menu.selected);
         if (action == Action::ToggleGod) TogglePlayerFeature(PlayerFeature::God);
         else if (action == Action::ToggleInfiniteAmmo) TogglePlayerFeature(PlayerFeature::InfiniteAmmo);
-        else if (action == Action::ToggleNoReload) TogglePlayerFeature(PlayerFeature::NoReload);
+        else if (action == Action::ToggleNoReload) {
+            if (menu.page!=Page::Weapons || ReadSnapshot().grenadeSustainResolved) TogglePlayerFeature(PlayerFeature::NoReload);
+            else Log("GRENADE_REQUEST blocked: native frag/flash branches unresolved");
+        }
         else if (action == Action::ToggleNoclip) TogglePlayerFeature(PlayerFeature::Noclip);
         else if (action == Action::ToggleSuperSpeed) TogglePlayerFeature(PlayerFeature::SuperSpeed);
         else if (action == Action::ToggleSuperJump) TogglePlayerFeature(PlayerFeature::SuperJump);
         else if (action == Action::ResetPlayer) ResetPlayerFeatures();
+        else if (action == Action::DecreaseSpeed || action == Action::IncreaseSpeed)
+            AdjustPlayerFeature(PlayerFeature::SuperSpeed,action==Action::IncreaseSpeed?1:-1);
+        else if (action == Action::DecreaseJump || action == Action::IncreaseJump)
+            AdjustPlayerFeature(PlayerFeature::SuperJump,action==Action::IncreaseJump?1:-1);
+        else if (action == Action::ToggleGiveAll) ToggleExtraFeature(ExtraFeature::GiveAll);
+        else if (action == Action::ToggleRapidFire) ToggleExtraFeature(ExtraFeature::RapidFire);
+        else if (action == Action::ToggleExplosiveBullets) ToggleExtraFeature(ExtraFeature::ExplosiveBullets);
+        else if (action == Action::ResetWeapons) ResetWeaponFeatures();
+        else if (action == Action::ToggleSlowMotion) ToggleExtraFeature(ExtraFeature::SlowMotion);
+        else if (action == Action::ToggleFreezeAI) ToggleExtraFeature(ExtraFeature::FreezeAI);
+        else if (action == Action::ToggleGravity) ToggleExtraFeature(ExtraFeature::Gravity);
+        else if (action == Action::ResetWorld) ResetWorldFeatures();
+        else if (action == Action::DecreaseTimeScale || action == Action::IncreaseTimeScale)
+            AdjustExtraFeature(ExtraFeature::SlowMotion,action==Action::IncreaseTimeScale?1:-1);
+        else if (action == Action::DecreaseGravity || action == Action::IncreaseGravity)
+            AdjustExtraFeature(ExtraFeature::Gravity,action==Action::IncreaseGravity?1:-1);
         else if (action == Action::WriteSnapshot) LogSnapshot();
         else if (action == Action::WriteRoundPreview) LogRoundPreview(menu.previewRound);
         else if (action == Action::ChangeFov) {
@@ -281,6 +300,7 @@ void Overlay::frame() {
     UpdatePlayerFeatures(now);
     Snapshot s = ReadSnapshot();
     const auto playerPreferences=GetPlayerPreferences();
+    const auto extraPreferences=GetExtraPreferences();
     if (menu.fov.desired && s.state==LevelState::Ready && s.fov.valid && now>=nextFovAttempt) {
         nextFovAttempt=now+250;
         if (SetFov(*menu.fov.desired)) { menu.fov.applied(); s=ReadSnapshot(); }
@@ -296,6 +316,10 @@ void Overlay::frame() {
             playerPreferences.wanted(PlayerFeature::God),playerPreferences.wanted(PlayerFeature::InfiniteAmmo),
             playerPreferences.wanted(PlayerFeature::NoReload),playerPreferences.wanted(PlayerFeature::Noclip),
             playerPreferences.wanted(PlayerFeature::SuperSpeed),playerPreferences.wanted(PlayerFeature::SuperJump));
+        Log("EXTRA_PREF speed_selected=%d jump_selected=%d give_all=%d rapid_fire=%d explosive=%d slow_motion=%d time_selected=%.2f freeze_ai=%d gravity=%d gravity_selected=%d session_only=1",
+            playerPreferences.speed,playerPreferences.jump,extraPreferences.wanted(ExtraFeature::GiveAll),extraPreferences.wanted(ExtraFeature::RapidFire),
+            extraPreferences.wanted(ExtraFeature::ExplosiveBullets),extraPreferences.wanted(ExtraFeature::SlowMotion),extraPreferences.timeScale,
+            extraPreferences.wanted(ExtraFeature::FreezeAI),extraPreferences.wanted(ExtraFeature::Gravity),extraPreferences.gravity);
     }
     if (!menu.visible && !menu.hud) return;
     IDirect3DStateBlock9* state = nullptr;
@@ -344,7 +368,7 @@ void Overlay::frame() {
             text(40,143,kMuted,line,.7f);
         } else {
             text(40,121,kMuted,StateText(s.state),.7f);
-            text(40,143,kMuted,"PLAYER test 7 | Zombies under development",.7f);
+            text(40,143,kMuted,"WEAPONS / WORLD test 8 | Zombies in progress",.7f);
         }
         const auto preview = menu.page == Page::ZombieRules
             ? bo1::EvaluateNormalSoloRound(menu.previewRound, menu.previewRound == 1) : std::nullopt;
@@ -376,10 +400,34 @@ void Overlay::frame() {
                 else if (feature==PlayerFeature::NoReload) status=s.sustain.current?(wanted?"ON":"NATIVE"):(wanted?"WAIT":"OFF");
                 else if (feature==PlayerFeature::Noclip) status=(s.client.cheatFlags&1)?"ON":(wanted?"WAIT":"OFF");
                 else if (feature==PlayerFeature::SuperSpeed) {
-                    std::snprintf(value,sizeof(value),"%s %d",wanted?"ON":"OFF",s.speed.current); status=value;
-                } else if (feature==PlayerFeature::SuperJump) status=s.jump.height==kSuperJump?(wanted?"ON 3x":"RESETTING"):(wanted?"WAIT":"OFF");
+                    const char* state=wanted?(s.speed.current==playerPreferences.speed?"ON":"WAIT"):"OFF";
+                    std::snprintf(value,sizeof(value),"%s %.1fx",state,playerPreferences.speed/static_cast<float>(kDefaultSpeed)); status=value;
+                } else if (feature==PlayerFeature::SuperJump) {
+                    const char* state=wanted?(s.jump.height==playerPreferences.jump?"ON":"WAIT"):(s.jump.height==kDefaultJump?"OFF":"WAIT");
+                    std::snprintf(value,sizeof(value),"%s %dx",state,playerPreferences.jump/static_cast<int>(kDefaultJump)); status=value;
+                }
             }
             else if (menu.page==Page::Player && n==7) status="ENTER";
+            else if (menu.page==Page::Weapons) {
+                if (n==0) status=!ExtraAvailable(s,ExtraFeature::GiveAll)?"LOCKED":s.giveAll.current?(extraPreferences.wanted(ExtraFeature::GiveAll)?"ON":"NATIVE"):(extraPreferences.wanted(ExtraFeature::GiveAll)?"WAIT":"OFF");
+                else if (n==1) status=!s.grenadeSustainResolved || !FeatureAvailable(s,PlayerFeature::NoReload)?"LOCKED":s.sustain.current?(playerPreferences.wanted(PlayerFeature::NoReload)?"ON":"NATIVE"):(playerPreferences.wanted(PlayerFeature::NoReload)?"WAIT":"OFF");
+                else if (n==2) status=!ExtraAvailable(s,ExtraFeature::RapidFire)?"LOCKED":extraPreferences.wanted(ExtraFeature::RapidFire)?(RapidFireApplied(s.weapon)?"ON":s.weapon.fireTime==20?"AT MIN":"WAIT"):"OFF";
+                else if (n==3) status=!ExtraAvailable(s,ExtraFeature::ExplosiveBullets)?"LOCKED":s.explosive.current?(extraPreferences.wanted(ExtraFeature::ExplosiveBullets)?"ON":"NATIVE"):(extraPreferences.wanted(ExtraFeature::ExplosiveBullets)?"WAIT":"OFF");
+                else status="ENTER";
+            }
+            else if (menu.page==Page::World) {
+                if (n==0) {
+                    const bool wanted=extraPreferences.wanted(ExtraFeature::SlowMotion);
+                    if (!ExtraAvailable(s,ExtraFeature::SlowMotion)) status="LOCKED";
+                    else { std::snprintf(value,sizeof(value),"%s %.2fx",wanted?(s.timeScale.current==extraPreferences.timeScale?"ON":"WAIT"):"OFF",extraPreferences.timeScale); status=value; }
+                } else if (n==1) status=!ExtraAvailable(s,ExtraFeature::FreezeAI)?"LOCKED":!s.ai.current?(extraPreferences.wanted(ExtraFeature::FreezeAI)?"ON":"NATIVE"):(extraPreferences.wanted(ExtraFeature::FreezeAI)?"WAIT":"OFF");
+                else if (n==2) {
+                    const bool wanted=extraPreferences.wanted(ExtraFeature::Gravity);
+                    if (!ExtraAvailable(s,ExtraFeature::Gravity)) status="LOCKED";
+                    else { std::snprintf(value,sizeof(value),"%s %d",wanted?(s.gravityLiteral==extraPreferences.gravity+.5f && s.gravity.current==extraPreferences.gravity?"ON":"WAIT"):"OFF",extraPreferences.gravity); status=value; }
+                } else if (n==3) status="PLANNED";
+                else status="ENTER";
+            }
             else if (menu.page==Page::View) {
                 if (n==0) std::snprintf(value,sizeof(value),"%d",menu.fov.selected);
                 else if (n==1 || n==2) std::snprintf(value,sizeof(value),"ENTER");
@@ -406,7 +454,8 @@ void Overlay::frame() {
         rect(34,383,480,1,D3DCOLOR_ARGB(255,57,63,47));
         text(40,390,kMuted,menu.page==Page::ZombieRules
             ? "LEFT/RIGHT: Round  ENTER: Next  UP/DOWN: Row" : menu.page==Page::View
-            ? "LEFT/RIGHT: FOV  UP/DOWN: Row  ENTER: Act" : "UP/DOWN: Select  ENTER: Toggle / Open",.7f);
+            ? "LEFT/RIGHT: FOV  UP/DOWN: Row  ENTER: Act" : (menu.page==Page::Player || menu.page==Page::World)
+            ? "LEFT/RIGHT: Value  ENTER: Toggle  UP/DOWN: Row" : "UP/DOWN: Select  ENTER: Toggle / Open",.7f);
         text(40,412,kMuted,"BACKSPACE/ESC: Back   F4: Close",.7f);
         const char* footer="Game keeps running. WASD and mouse work.";
         if (menu.page==Page::ZombieRules) footer="Read-only preview. No zombies spawned.";
@@ -417,13 +466,34 @@ void Overlay::frame() {
                 "Maintains reserve ammo; magazines still reload.",
                 "Stops normal gun clip consumption; reload key works.",
                 "WASD + mouse to fly; SPACE up, crouch key down.",
-                "Base speed 190 -> 380; restores previous speed.",
-                "Native jump height 39 -> 117; land before OFF.",
+                "LEFT/RIGHT: 1x-5x. ENTER: speed ON/OFF.",
+                "LEFT/RIGHT: 1x-8x. Land before reducing jump.",
                 "Turns player cheats OFF; keeps the saved FOV."
             };
             footer=hints[menu.selected];
             if (menu.selected==0 && !s.client.valid && s.state==LevelState::Ready)
                 footer="OFF* = additional protection fields unavailable.";
+        }
+        if (menu.page==Page::Weapons) {
+            static constexpr const char* hints[]={
+                "Access weapons loaded by this map; use weapon cycle.",
+                "Linked to PLAYER No Reload. Frag/flash grenades.",
+                "Halves gun delay (20ms min); AI sharing gun too.",
+                "All bullet weapons, including AI. Try with God ON.",
+                "Records current weapon and new controls in latest.log.",
+                "Weapon cheats OFF, including linked PLAYER No Reload."
+            };
+            footer=hints[menu.selected];
+        }
+        if (menu.page==Page::World) {
+            static constexpr const char* hints[]={
+                "LEFT/RIGHT: 0.25x-1x. ENTER: ON/OFF; whole game.",
+                "Pauses all actor thinking. Player and scripts continue.",
+                "LEFT/RIGHT: 100-1600. Player + projectile gravity.",
+                "Pending verified enemy filter and engine-thread death.",
+                "Restores world overrides; player/FOV choices remain."
+            };
+            footer=hints[menu.selected];
         }
         if (menu.page==Page::View) {
             if (!s.fov.resolved || !s.fov.valid) footer="FOV unavailable; see log.";

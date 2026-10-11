@@ -14,7 +14,8 @@ signature match is not a runtime test.
 | `0.1.3-player-test4` | Owner confirms correct health, working God ON/OFF and retained God state through checkpoint reloads | Matching log shows complete slot-zero reads, five toggles preserving other flags, health 2/70/100, and God blocked back at main menu. No new crash evidence. Phase 1 core accepted in estate on the exact build. |
 | `0.1.4-round-test5` | Owner: "Seems to be working fine." | Matching front-end log covers all 100 rounds, 344 inputs, 290 preview records and 3440x1440 rendering. No active mission or new crash evidence in this run. |
 | `0.1.5-fov-test6` | Owner confirms FOV behavior; reports protection surviving a return/relaunch while God displays OFF | Matching logs show saved FOV 100, selection/save/reset, entity God OFF during the reported period, and health 2 after an ON/OFF cycle. Separate client guards were not logged; precise God mismatch cause is unconfirmed. Normal CSV values match the unchanged preview calculations. |
-| `0.1.6-player-test7` | God session reconciliation/guard diagnostics; every current PLAYER row; smaller eight-row menu | Six native suites, nine Python fixtures, 23 exact-build patterns, AMD64 build and isolated upgrade/removal checks pass. New PLAYER behavior and God restart/checkpoint regression await the owner. |
+| `0.1.6-player-test7` | God session reconciliation/guard diagnostics; every current PLAYER row; smaller eight-row menu | Owner reports normal behavior. Matching receipt/logs cover native fields, God OFF/death/recovery and FOV; no individual toggle actions or new crash evidence in this log. |
+| `0.1.7-world-weapons-test8` | Adjustable speed/jump; bounded WEAPONS/WORLD native controls | Seven C++ suites, nine Python fixtures, 41 patterns, AMD64 build and actual test7-to-test8 isolated upgrade pass. New gameplay awaits owner. Kill All Enemies remains planned. |
 
 Test 1 initialized its C++ static runtime, then logging/crash handling, engine
 hash/scanning, factory/device shadows, WndProc, and rendering across startup.
@@ -188,8 +189,10 @@ coverage remains; a static read is not proof of every final camera path.
 
 ### Test7 native PLAYER evidence and ABI
 
-These rows are static findings in the exact supplied hash; new live reads and
-behavior await the owner. Function names are assigned from command branches,
+These rows were static findings at test7 publication; the owner now reports
+normal behavior. Matching test7 diagnostics confirm valid native reads and
+God OFF/death/recovery, without individual toggle actions in that run.
+Function names are assigned from command branches,
 method tables and behavior. None is invoked from the render callback.
 
 | Finding / assigned function | RVA | Evidence |
@@ -261,8 +264,10 @@ Ammo writes use an aligned eight-byte compare/exchange of the ID/count pair,
 keeping the ID identical. Only occupied, validated existing entries are
 replenished. OFF restores a captured count only if the same pool still holds
 the exact injected 999. Engine changes are preserved. Server gaps, map/client
-changes and command-time rewinds discard ownership. No Reload preserves native
-frag/flash, Javelin/Stinger, AC130 and scripted-support exceptions. Its bool
+changes and command-time rewinds discard ownership. Test8 corrects the former
+frag/flash interpretation: equal-name branches bypass consumption to return,
+so normal frag/flash share the sustain control. Other native special-weapon
+branches remain unchanged. Its bool
 current byte is edited with a byte atomic CAS; speed uses a DWORD CAS and
 restores its captured pre-override value. Named/type checks run at each read.
 
@@ -280,6 +285,74 @@ Menu: cap scale at 1.1, 500x410 logical panel, row text factor 0.8 and 26-pixel
 row spacing, eight visible rows. At the owner's 3440x1440 it is 550x451 instead
 of 912x810. Hook/vtable/font-atlas generation/render-state preservation remain
 unchanged; native rendering and smaller text readability await the owner.
+
+### Test8 WEAPONS / WORLD findings
+
+Static evidence in the same full executable hash; `docs/profile-checks.json`
+records all 41 unique anchors and independent field/slot/reference checks.
+These are exact-build assigned names and partial layouts, not a T5/IW4 cast.
+Test8 retail gameplay remains pending. No new engine function is invoked.
+
+| Finding / assigned name | RVA / slot RVA | Evidence / scope |
+| --- | --- | --- |
+| g_giveAll registration / bool current | `0x173df4` / `0xd9e068` | Default false, flags 0x2084; named native registration and inventory consumer agree |
+| Loaded weapon access consumer | `0x8389a` | Bool bypasses owned-slot search; PS current weapon +0x2b4; command at 0x1657d0 enables this same bool for all/weapons |
+| bg_forceExplosiveBullets | `0x750bb` / `0x3dd690` | Bool; consumer 0x86f30 uses native explosive-weapon flag OR global option; includes AI bullet weapons |
+| g_ai registration / actor gate | `0x172bf7`, `0x12a699` / `0xd9c0b8` | Default true, flags 0x84; false schedules next think at level time +50 and returns before actor body; both teams |
+| timescale registration / clock read | `0x1fc917`, `0x1fc269` / `0x13260b0` | Float current +0x10; distinguish com_timescale slot 0x13260b8 stored earlier in the same registration block; clock also consumes other factors |
+| g_gravity registration / trajectory read | `0x75fbe`, `0x736f7` / `0x3dd5e8` | Float, native default 800 at 0x324340; changing this alone misses player gravity |
+| Player gravity source / constant | `0x15bf24` / `0x338b0c` | Sole scalar consumer of float 800.5; calls positive floor helper 0x2f20a0, converts result and writes PS +0x54 at 0x15bf5c |
+| Weapon catalog initialize | `0x85224` | Two 0x640-byte pointer tables: CompleteDef 0x3edce0; Def 0x3ee320; capacity 200, stride eight |
+| Native table getters | `0x85840`, `0x85850` | ECX index, RAX pointer, Microsoft x64 ABI; no mod call; independent initializer/binding agree |
+| Last loaded weapon index | `0x3edae4` | DWORD loaded in 0x8589d lookup; it is not adjacent cache index 0x3edae0 |
+| CompleteDef to Def binding | `0x852a8` | CompleteDef +8 pointer copied into matching Def table entry |
+| weaponfiretime script method | `0x18b4b0`, field read `0x18b4ed` | Name 0x3426c0 and method pointer 0x3c1ef8; native getter, int CompleteDef +0x3c, milliseconds multiplied by 0.001 |
+| Native fire delay consumer | `0x83b68` | CompleteDef +0x3c added to PS weaponTime +0x1ec; offhand path also consumes field; no reload/equip edits |
+| Frag/flash sustain branches | `0x84edc` | fraggrenade and flash_grenade equal-name branches both jump to 0x84fff epilogue, bypassing subtraction; corrects earlier exception interpretation |
+
+| Partial member | Width | Guard / use |
+| --- | --- | --- |
+| Client/PS current weapon +0x2b4 | DWORD | Index 1..last-loaded, last-loaded <200; index zero invalid for actions |
+| Client/PS gravity +0x54 | signed DWORD | Read only; source result corroborates literal compatibility |
+| CompleteDef name +0 | pointer | Readable, nonempty bounded ASCII identifier |
+| CompleteDef definition +8 | pointer | Must equal the Def table entry for this index |
+| CompleteDef fireTime +0x3c | signed DWORD | Read 1..10000; Rapid Fire only bullet gun type 0 and timing 20..4000 |
+| WeaponDef weapon type +0x54 | signed DWORD | Native ammo consumer corroborates; accepted 0..6, never a whole structure assumption |
+
+Rapid Fire halves the current gun's captured delay with a 20ms floor. It edits
+one aligned data DWORD with CAS. Restoration requires index, CompleteDef/Def
+pointers, type, name and exact injected timing to agree. Restore the previous
+asset on weapon switch, OFF/reset, death, lifetime rewind or server gap; skip
+unloaded/reused assets. A shared asset can affect AI using that gun. A native
+20ms gun needs no edit and shows AT MIN. This does not turn semi-auto into auto.
+
+Other new native controls use named/type-checked current values, atomics and
+captured baselines. Strength changes retain the original baseline while the
+current value is ours; an intervening engine value becomes a new baseline.
+OFF/loss of readiness restores only a matching last write. Selected speed
+190..950 uses increments of 95; selected jump height 39..312 uses increments
+of 39, with its twice-height partner. Session requests and selections reset
+on process launch; saved FOV is the only serialized mod preference.
+
+Gravity compatibility changes only the sole verified player literal to
+selected gravity +0.5, alongside native projectile g_gravity. The positive
+floor helper makes PS gravity equal the selected 100..1600 value. OFF restores
+800.5 plus the captured native dvar baseline. Jump/gravity edits temporarily
+change data-page permissions and restore them; instructions and disk bytes
+are unchanged. Unexpected references/defaults/values fail closed. Zero time
+and gravity are unavailable. T5 movement/actor structures are not involved.
+
+Give All means access to assets already loaded by this campaign map; no new
+weapon assets, arbitrary inventory allocation or cross-map import occurs.
+Infinite Grenades is an explicitly linked UI entry for existing No Reload.
+Only normal frag/flash bypasses are corroborated; it is not an independent
+grenade-pool implementation. Explosive bullets and actor thinking are global
+native options. Scripts, animation and physics may continue when AI is frozen.
+
+Unresolved: hostile team filtering and a safe engine-thread native damage/death
+call for Kill All Enemies. Actor iteration, size guesses and health-zero writes
+are not enabled. BO1 actor state, targeting, animations and death remain future
+compatibility work in the separate A/B/C research document.
 
 ## Resolution and level gate
 
@@ -432,11 +505,12 @@ IW4 zone uses 64-bit pointer records. Asset conversion is unimplemented.
 | 2026-10-11 / test 5 | Read-only source-derived normal-solo BO1 round preview | Four native suites, T5 numeric evidence, Windows build and script checks | Owner confirms working; front-end run covers rounds 1-100, no new crash evidence |
 | 2026-10-11 / test 6 | FOV selector/save/reset and derived normal CSV recovery | Five native suites, nine Python fixtures, seven static patterns; Windows/package checks recorded separately | Owner confirms FOV behavior; matching load/save/reset log. God OFF/protection mismatch reported; precise cause unconfirmed |
 
-| 2026-10-11 / test 7 | Session God reconciliation/guard diagnostics; reserve ammo, clip sustain, native noclip, speed, fixed-jump compatibility, reset; compact eight-row menu | Six native suites, nine Python fixtures, 23 exact-build patterns, AMD64 Windows build and isolated test6-to-test7 script checks | Awaiting owner God restart/checkpoint and individual PLAYER tests |
+| 2026-10-11 / test 7 | Session God fix, expanded PLAYER and compact menu | Matching build/logs: valid fields, God OFF/death/recovery, saved FOV and navigation | Owner accepts overall behavior; returned run does not instrument each toggle |
+| 2026-10-11 / test 8 | Adjustable movement; loaded weapons, linked grenades, Rapid Fire, explosive bullets, clock/AI/gravity | Seven C++ suites, nine Python fixtures, 41 exact patterns, Windows build and isolated upgrade | Retail behavior pending; hostile death path remains unresolved |
 
 Returned owner evidence is redacted into the versioned runtime JSON files; full
 logs/dumps stay private. No retail game is executed in this Linux workspace.
-The next acceptance gate is PLAYER test7: fresh-launch God OFF with damage,
-ON/OFF checkpoint behavior, each new player action, reset and compact layout.
+The next acceptance gate is test8: adjustable movement, each new weapon/world
+control, ownership restoration, checkpoint and full-restart behavior.
 Saved FOV remains a regression check. Second-map/reset
 coverage and native BO1 actor/asset compatibility remain separate gates.

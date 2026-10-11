@@ -2,6 +2,7 @@
 #include "core.hpp"
 #include "player_fields.hpp"
 #include "player_controls.hpp"
+#include "control_extensions.hpp"
 #include <windows.h>
 #include <d3d9.h>
 #include <atomic>
@@ -15,7 +16,8 @@ void InstallCrashHandler();
 const wchar_t* LogDirectory();
 
 enum class LevelState { Unsupported, Unresolved, NoLevel, Transition, PlayerDead, Ready };
-struct FovSnapshot { bool resolved=false; bool valid=false; float current=0.f; std::uintptr_t dvar=0; };
+struct FloatDvarSnapshot { bool resolved=false; bool valid=false; float current=0.f; std::uintptr_t dvar=0; };
+using FovSnapshot = FloatDvarSnapshot;
 struct BoolDvarSnapshot { bool resolved=false; bool valid=false; std::uint8_t current=0; std::uintptr_t dvar=0; };
 struct IntDvarSnapshot { bool resolved=false; bool valid=false; int current=0; std::uintptr_t dvar=0; };
 struct JumpSnapshot { bool resolved=false; bool valid=false; float height=0.f; float twiceHeight=0.f; };
@@ -42,15 +44,36 @@ struct Snapshot {
     BoolDvarSnapshot sustain;
     IntDvarSnapshot speed;
     JumpSnapshot jump;
+    BoolDvarSnapshot giveAll;
+    BoolDvarSnapshot explosive;
+    BoolDvarSnapshot ai;
+    FloatDvarSnapshot timeScale;
+    FloatDvarSnapshot gravity;
+    bool gravityLiteralValid=false;
+    float gravityLiteral=0.f;
+    bool playerGravityRead=false;
+    int playerGravity=0;
+    bool grenadeSustainResolved=false;
+    bool weaponResolved=false;
+    unsigned weaponCount=0;
+    WeaponFields weapon;
 };
 const char* StateText(LevelState state);
 void InitializeEngine();
 Snapshot ReadSnapshot();
 bool FeatureAvailable(const Snapshot& snapshot, PlayerFeature feature);
 bool TogglePlayerFeature(PlayerFeature feature);
+bool AdjustPlayerFeature(PlayerFeature feature,int direction);
 void ResetPlayerFeatures();
 void UpdatePlayerFeatures(ULONGLONG now);
 PlayerPreferences GetPlayerPreferences();
+bool ExtraAvailable(const Snapshot& snapshot,ExtraFeature feature);
+bool ToggleExtraFeature(ExtraFeature feature);
+bool AdjustExtraFeature(ExtraFeature feature,int direction);
+ExtraPreferences GetExtraPreferences();
+void ResetWeaponFeatures();
+void ResetWorldFeatures();
+bool RapidFireApplied(const WeaponFields& weapon);
 bool SetFov(int value);
 void LogSnapshot();
 void LoadFovPreference(FovPreference& preference);

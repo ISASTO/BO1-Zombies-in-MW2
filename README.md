@@ -2,9 +2,9 @@
 
 Incremental mod framework for **retail Modern Warfare 2 (2009), single player**.
 The first deliverable is an AMD64 D3D9 DLL that renders a keyboard menu in the
-game. BO1 Zombies gameplay is a future mode. The current build fills out the
-PLAYER controls, fixes God-state reconciliation and shrinks the menu. The saved
-FOV selector remains available; the BO1 round preview remains read-only.
+game. BO1 Zombies gameplay is a future mode. The current test8 build adds
+adjustable speed/jump, verified weapon controls and world controls. The compact
+menu, God-state fix, saved FOV and read-only BO1 round preview remain available.
 
 **Status: Phase 1 core passed in the owner's test4 estate run.** The owner
 confirms correct health, working God ON/OFF and retained God state through
@@ -25,8 +25,17 @@ ON/OFF cycle; the old diagnostics did not record other protection flags. See
 `0.1.6-player-test7` adds explicit session God state and checkpoint reconciliation,
 independent protection diagnostics/cleanup, Infinite Ammo, No Reload, native
 Noclip, Super Speed, Super Jump, and Reset player toggles. The smaller menu shows
-all eight PLAYER rows at once. New retail behavior awaits the owner test.
+all eight PLAYER rows at once. The owner now reports normal behavior; matching
+test7 logs show death/recovery with God OFF, valid player reads and saved FOV.
+Those logs contain no per-feature toggle actions, so detailed test coverage
+is owner-reported. See [test7 evidence](docs/runtime-test7-evidence.json).
 Player cheats start OFF on a full restart; explicitly saved FOV persists.
+
+`0.1.7-world-weapons-test8` adds Left/Right strengths for speed and jump, loaded
+weapon access, linked frag/flash sustain, current-gun Rapid Fire, native global
+Explosive Bullets, Slow Motion, actor-think Freeze AI and player/projectile
+Gravity. Kill All Enemies remains planned. See [test8 checks](docs/world-weapons-test8.md).
+New test8 gameplay needs the owner retail run.
 
 The supplied BO1 `common_zombie.ff` resolves the normal tuning CSV. Recovered
 values match the preview, so its numbers are unchanged. Special rounds and
@@ -46,26 +55,23 @@ An executable hash mismatch disables game-state access and memory writes.
 The installer rejects a mismatched build. A manually installed proxy can still
 show its diagnostic menu in an unknown AMD64 `iw4sp.exe`.
 
-## Current PLAYER test7
+## Current WEAPONS / WORLD test8
 
-1. Close MW2 and extract the entire `BO1MW2-player-test7.zip` outside the game folder.
-2. Run `Uninstall.cmd` to remove an installed earlier project build, then run
-   `Install.cmd` and paste the folder containing the installed `iw4sp.exe`.
-   Find it through Steam: MW2 Single Player > Properties > Installed Files > Browse.
-3. Launch MW2 Single Player normally through Steam. Load a campaign mission and
-   wait until you can move the player.
-4. Press **F4**. Use **Up/Down**, **Enter**, and **Backspace/Esc**. F4 closes the menu.
-   WASD, mouse look, and firing remain available; opening the menu does not pause.
-5. First resume the checkpoint that stayed protected. With God and Noclip OFF,
-   ordinary enemy gunfire should reduce health without cycling God ON/OFF.
-   Check God ON/OFF, checkpoint loads with each choice, and a full restart with
-   God left ON before quitting. A new process starts God OFF.
-6. Test the remaining PLAYER controls one at a time and then Reset player
-   toggles. Check that all eight rows fit and the text is smaller. Saved FOV
-   should still restore. Follow [player-test7.md](docs/player-test7.md) for the
-   exact sequence, native ammo exceptions, and GUARDED/LOCKED labels.
-7. Close the game and run `Diagnose.cmd`. Return its ZIP and the observations
-   requested in [testing.md](docs/testing.md).
+1. Close MW2 and extract the entire `BO1MW2-world-weapons-test8.zip` outside the game folder.
+2. Run `Uninstall.cmd` to remove the earlier project build, then `Install.cmd`
+   and select the folder containing `iw4sp.exe`. Find it through Steam:
+   MW2 Single Player > Properties > Installed Files > Browse.
+3. Launch normally through Steam, enter a mission, wait for player control,
+   then press **F4**. Up/Down selects, Enter toggles/opens, Left/Right changes
+   speed/jump/time/gravity, Backspace/Esc goes back. F4 closes the menu.
+4. Test each new control separately, then OFF/reset, weapon switching,
+   checkpoint/re-entry and full restart. Land before reducing jump/gravity.
+   Follow [world-weapons-test8.md](docs/world-weapons-test8.md) for the exact
+   scopes and sequence. Give All is limited to loaded weapons; grenades share
+   No Reload; some native options affect AI. Kill All Enemies stays planned.
+5. Close MW2 and run `Diagnose.cmd` before another launch replaces the log.
+   Return its ZIP and [testing.md](docs/testing.md) observations. Saved FOV
+   should persist; other requests/selections reset on a full process restart.
 
 For manual installation, copy only the package's `d3d9.dll` beside `iw4sp.exe`.
 Never overwrite an existing `d3d9.dll`; temporarily move a previous wrapper out
@@ -87,17 +93,19 @@ Copy the log immediately after a failing run: `latest.log` is replaced on launch
 | In-game F4 menu and category navigation | Owner-confirmed working; matching logs confirm render/input |
 | Render-state preservation and reset handling | Basic rendering observed; reset and overlay interoperability pending |
 | Active-level / player-health display | Test4 complete player reads and owner-confirmed correct health |
-| God Mode | Test4 accepted; test6 desync reported. Test7 reconciles session state and exposes other protection; owner regression test pending |
-| Infinite Ammo | Test7 replenishes existing reserve pools to 999, with guarded cleanup; owner test pending |
-| No Reload | Test7 uses native clip-sustain bool and native weapon exceptions; owner test pending |
-| Noclip | Test7 uses native movement flags/type; owner flight/collision test pending |
-| Super Speed | Test7 preset 380 vs native default 190, with baseline restore; owner test pending |
-| Super Jump | Test7 native fixed-height data compatibility, 39 to 117; owner test pending |
+| God Mode | Test7 owner-accepted after session reconciliation/guard handling; matching OFF/death/recovery evidence |
+| Infinite Ammo | Existing reserve pools to 999 with guarded cleanup; test7 owner-accepted |
+| No Reload | Native ammo sustain; normal gun clips and frag/flash grenades are linked; test7 owner-accepted |
+| Noclip | Native movement flags/type; test7 owner-accepted |
+| Super Speed | Test8 Left/Right 1x–5x in 0.5x steps; Enter toggles; retail adjustment test pending |
+| Super Jump | Test8 Left/Right 1x–8x height in 1x steps; Enter toggles; retail adjustment test pending |
 | Reset player toggles | Requests every player cheat OFF and keeps saved FOV |
 | Status HUD toggle and state-log action | Implemented |
 | BO1 round-rules preview | Owner test5 front-end navigation passed; normal CSV values now recovered locally and match the preview |
 | FOV selector and saved preference | Owner confirms test6 behavior; matching logs show load/selection/save/reset |
-| Weapons, world, spawning, Zombies gameplay | Visible placeholders with no action |
+| WEAPONS | Loaded weapon access, linked Infinite Grenades, Rapid Fire, Explosive Bullets, info/reset; test8 retail pending |
+| WORLD | Adjustable time/gravity, actor-think freeze, reset; test8 retail pending |
+| Kill All Enemies, AI spawning, Zombies gameplay | Planned; no action |
 
 ## Architecture
 
@@ -137,9 +145,11 @@ a nonempty map name, a valid slot-zero entity, and positive player health.
 Two optional FOV signatures additionally corroborate its registration constants,
 name and camera pointer slot. Sixteen optional player signatures validate
 partial client/ammo fields, native dvar consumers, noclip and fixed jump data.
+Eighteen optional weapon/world signatures corroborate native dvar consumers,
+weapon tables/timing, grenade bypasses and the sole player gravity literal.
 Each new feature fails closed independently of the core patterns. Reserve
 edits compare ID/count together; speed restores its captured baseline. The
-verified 39/78 jump float pair becomes 117/234 only in this process; its data
+verified 39/78 jump float pair uses bounded selected heights only in this process; its data
 page protection is restored after the edit, and the pair is restored on OFF
 or loss of player readiness. Instructions and the disk executable are unchanged.
 Settings use the mod's own versioned text file; the
@@ -213,14 +223,15 @@ Original games remain user-supplied inputs and must never be added to this repo.
 - [Round test5](docs/round-test5.md) and [numeric evidence](docs/bo1-round-rules-evidence.json): current preview and provenance.
 - [FOV test6](docs/fov-test6.md): selector, persistence and owner checks.
 - [PLAYER test7](docs/player-test7.md): God regression, every player row and compact menu checks.
+- [WEAPONS/WORLD test8](docs/world-weapons-test8.md): adjustable controls, precise scopes and owner checks.
 - [BO1 tuning evidence](docs/bo1-normal-tuning-evidence.json): selected local CSV values and pointer-resolution limits.
 - [Roadmap](docs/roadmap.md): incremental gates and persistent FOV request.
 - [Reference projects](docs/references.md): upstream sources and limits of reuse.
 - [Input hashes](docs/input-manifest.json) and [profile checks](docs/profile-checks.json).
 
 The core foundation and test5 front-end preview are accepted in their observed
-sessions. FOV test6 is owner-confirmed, with a God-state regression. Next test
-the expanded PLAYER controls and restart/checkpoint fix, audit remaining BO1
-overrides/dependencies, and broaden campaign-map/reset coverage.
+sessions. PLAYER test7 is owner-accepted following the God-state fix. Next test
+the test8 movement adjustments and weapon/world controls, then audit remaining
+BO1 overrides/dependencies and broaden campaign-map/reset coverage.
 AI and asset injection need separate compatibility and behavior tests; shared
 engine ancestry does not imply compatible binary layouts or actor behavior.

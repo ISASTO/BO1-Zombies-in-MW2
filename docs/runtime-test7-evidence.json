@@ -1,0 +1,79 @@
+{
+  "version": "0.1.6-player-test7",
+  "evidence_source": {
+    "file": "BO1MW2-startup-results-20261011-140740-2f91c1b7.zip",
+    "bytes": 91927,
+    "sha256": "1a9ed44f52a652e53190d77a6b74c60deed2453420865605ae19a519c6f14f15",
+    "latest_log_sha256": "88937087d299e0b701a19260bb536cc678f5b6c33bb366dc883dc60e6b9e476d"
+  },
+  "installed_build": {
+    "version": "0.1.6-player-test7",
+    "dll_sha256": "d58485e7a568281061f63908624bfbd73356356163fb5ffe9ff62a35c34e44d4",
+    "installed_utc": "2026-10-11T18:58:06.9224963Z"
+  },
+  "owner_observation": "seems to all work normally! though you should make super jump and super speed increasable/decreasable with right/left arrows. Now move on to weapons and world",
+  "log_observations": {
+    "map": "estate",
+    "resolved_signatures": 23,
+    "client_valid": true,
+    "connected": 2,
+    "normal_native_values": {
+      "speed": 190,
+      "jump_height": 39,
+      "jump_twice": 78,
+      "sustain": 0
+    },
+    "saved_fov_loaded": 100,
+    "fov_first_apply": "65 -> 100 at 14:06:35.982 local time",
+    "death": "health 0, movement type 6, entity God bit 0 at 14:06:53.411",
+    "new_lifetime": "command time rewind to 1800 at 14:06:53.918",
+    "recovered_ready_health": 100,
+    "menu_inputs": 31,
+    "backbuffer": [
+      3440,
+      1440
+    ],
+    "menu_panel_pixels": [
+      550,
+      451
+    ],
+    "visible_rows": 8,
+    "last_heartbeat": {
+      "end_scenes": 34261,
+      "draws": 34260,
+      "resets": 0
+    },
+    "per_feature_toggle_actions_in_this_log": 0,
+    "limits": "Owner reports normal behavior overall. This returned run directly covers startup, rendering/navigation, valid fields, God OFF/death/recovery and saved FOV. It does not independently instrument every PLAYER toggle or a full ON/restart/OFF cycle."
+  },
+  "probes": [
+    {
+      "exit_code": 0,
+      "name": "windows-system-d3d9"
+    },
+    {
+      "exit_code": 0,
+      "name": "installed-project-dll"
+    }
+  ],
+  "crash_evidence": {
+    "new_crash_evidence": false,
+    "dumps": [
+      {
+        "file": "crash-20261011-073022.dmp",
+        "sha256": "304b8d8d2790892cbc5de0655fea41df6363e50cd010fb667ff25ec58ed4cbc8"
+      },
+      {
+        "file": "crash-20261011-073044.dmp",
+        "sha256": "676344752b68ae631287fe555308b491f527829077c553855cc9ffefc021a34d"
+      },
+      {
+        "file": "crash-20261011-073111.dmp",
+        "sha256": "148decc3d315ec693207d9bff1db6573e8384120aa9ad2f1df9fcf4680910b77"
+      }
+    ],
+    "classification": "Identical historical test1 dumps, unchanged from the previous collection."
+  },
+  "conclusion": "Test7 accepted on owner observation with matching build/logs. Proceed with movement adjustments and bounded WEAPONS/WORLD controls; do not infer complete per-feature coverage from this log.",
+  "privacy": "Only selected facts/hashes committed. Complete logs, dumps and original game files remain private."
+}

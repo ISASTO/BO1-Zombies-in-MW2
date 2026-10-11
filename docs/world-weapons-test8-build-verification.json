@@ -1,0 +1,40 @@
+{
+  "version": "0.1.7-world-weapons-test8",
+  "compiler": "MinGW-w64 GCC 13-posix, RelWithDebInfo, static runtime",
+  "architecture": "AMD64",
+  "dll_size": 2000877,
+  "dll_sha256": "a681510a86c0700add5e513125d30ecff7e7d6c8186b7b876114032ead6cd0fc",
+  "imports": [
+    "bcrypt.dll",
+    "dbghelp.dll",
+    "gdi32.dll",
+    "kernel32.dll",
+    "msvcrt.dll",
+    "user32.dll"
+  ],
+  "exports": [
+    "D3DPERF_BeginEvent",
+    "D3DPERF_EndEvent",
+    "D3DPERF_GetStatus",
+    "D3DPERF_QueryRepeatFrame",
+    "D3DPERF_SetMarker",
+    "D3DPERF_SetOptions",
+    "D3DPERF_SetRegion",
+    "DebugSetMute",
+    "Direct3DCreate9",
+    "Direct3DCreate9Ex"
+  ],
+  "loader_probe_sha256": "1f3d3fca5fe31a163e5d14b6315d3a53a31b6b59a19a02bb1a81b528061d820b",
+  "loader_probe_provenance": "Rebuilt from the unchanged owned probe source with the restored MinGW toolchain.",
+  "checks": {
+    "aslr_and_nx": true,
+    "native_cpp_tests": "7 passed: core, vtable, entity fields, BO1 round fixtures, FOV, PLAYER controls, adjustment bounds/scoped resets/scalar and weapon identity ownership.",
+    "python_tests": "9 passed: existing extractor and synthetic tuning-reader fixtures.",
+    "exact_profile": "41 unique patterns. Registration/consumer slot pairs, named anchors, independently decoded fields, bounded 200-entry weapon catalog, script/native fire-time references, gravity defaults/sole scalar consumer/positive-floor helper, frag and flash bypass targets agree with the exact supplied hash.",
+    "powershell_scripts": "All four parse with PowerShell 7.6.6. Isolated actual-test7-to-test8 removal/install, receipt/hash, diagnostic selection and FOV collection, removal and preservation of original game bytes/logs/settings pass on Linux. Windows probe execution unavailable.",
+    "retail_runtime": "Test7 owner-accepted. New adjustable movement and weapon/world behavior require the owner test8 run.",
+    "original_game_assets_in_distribution": "none"
+  },
+  "change": "Left/Right movement strengths; loaded weapon access; explicitly linked frag/flash sustain; current-gun Rapid Fire with restore on switch; global native explosive bullets; adjustable time/gravity; native actor-think gate. Kill All Enemies remains planned.",
+  "limits": "No Windows game or probe executed in this Linux workspace. Static/portable checks are not gameplay acceptance."
+}

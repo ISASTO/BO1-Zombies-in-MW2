@@ -1,56 +1,63 @@
-# Current test7 owner checks
+# Current test8 owner checks
 
-Build `0.1.6-player-test7` for the exact supplied AMD64 MW2 executable. Test6
-FOV behavior is owner-confirmed; its God OFF/protection mismatch is recorded in
-[redacted evidence](runtime-test6-evidence.json). Test7 adds session God
-reconciliation, every current PLAYER action, reset, and an eight-row compact
-menu. No playable Zombies mode is added.
+Build `0.1.7-world-weapons-test8` for the exact supplied AMD64 MW2 executable.
+The owner accepts test7's expanded PLAYER behavior. Its matching diagnostics
+confirm valid fields, God OFF/death/recovery, compact rendering/navigation and
+saved FOV, but contain no individual cheat toggle actions. See
+[redacted evidence](runtime-test7-evidence.json).
 
-Follow [player-test7.md](player-test7.md) for the exact sequence. Extract outside
-the game folder, fully close MW2, run **Uninstall.cmd**, then **Install.cmd**,
-and launch Single Player through Steam normally. Saved FOV is preserved.
+Test8 adds adjustable movement and bounded WEAPONS/WORLD controls. Follow
+[world-weapons-test8.md](world-weapons-test8.md) for installation, exact scopes
+and the sequence. Fully close MW2, extract outside the game folder, run
+**Uninstall.cmd**, then **Install.cmd**, and launch Single Player through Steam.
+Saved FOV is preserved. No playable Zombies mode is added.
 
 ## Return these observations
 
 ```text
 Build / campaign map / resolution:
-Fresh launch, old protected checkpoint, God OFF + Noclip OFF: health drops without cycling God:
-God ON protects, then OFF allows ordinary damage:
-God ON checkpoint reload; God OFF checkpoint reload:
-Full quit with God ON, relaunch: starts OFF and ordinary damage works:
-Any GUARDED, OFF*, WAIT or LOCKED label, and when:
-All eight PLAYER rows visible; text size/readability:
-Infinite Ammo: reserves replenish, magazines reload; OFF stops replenishment:
-No Reload: clip stable while firing; OFF consumes clip ammo:
-Noclip: fly/vertical movement/pass through wall; OFF restores walking/collision:
-Super Speed: faster while ON; normal/captured speed after OFF:
-Super Jump: higher jump while ON; normal jump after landing and OFF:
-Reset player toggles: all OFF and normal behavior returns:
-Saved FOV/ADS behavior still works:
-Any crash, exact error and last action:
+God OFF + Noclip OFF: ordinary damage still works:
+Speed: Left/Right while OFF; two strengths while ON; OFF returns base speed:
+Jump: Left/Right while OFF; two heights while ON; land then OFF returns normal:
+Give All loaded: available weapons cycle; OFF returns ordinary access:
+Infinite Grenades: frag/flash counts stable; linked No Reload row/gun clips; OFF consumes:
+Rapid Fire: weapon names/timings from info log; faster; switch/back/OFF restores:
+Semi-auto still needs presses; reload/equip behavior:
+Explosive Bullets: player and AI effects; OFF returns ordinary bullets:
+Slow Motion: 0.5x/0.25x; OFF returns captured speed:
+Freeze AI: friendly/enemy thinking; OFF resumes; any animation/scripts continuing:
+Gravity: 400/1200 with Super Jump OFF; subsequent jumps after OFF normal:
+Weapon reset clears linked No Reload; world reset restores its controls:
+Checkpoint and mission exit/re-entry while one control enabled:
+Full quit with controls ON, relaunch: menu OFF and ordinary gameplay:
+Saved FOV still persists:
+Any LOCKED, WAIT, NATIVE, AT MIN or GUARDED label, and when:
+Any clipping, crash, exact error and last action:
 ```
 
-Close MW2 and run **Diagnose.cmd**. Attach the resulting ZIP. Collect after the
-relevant run before launching again, because `latest.log` is replaced each
-launch. The collector includes settings, receipt, logs, events and probe
-results. A screenshot helps if the smaller text clips or is difficult to read.
+Test new controls separately. For the linked grenade test, keep Infinite Ammo
+OFF. Use God ON only for the initial isolated explosive-bullet test, and turn
+Noclip OFF when assessing damage. Kill All Enemies is a PLANNED row with no
+handler. Give All only exposes the current map's loaded catalog. Native global
+explosive bullets, shared Rapid Fire weapon timing and the actor-think gate can
+affect AI/friendlies as described in the focused test document.
 
-God and noclip start OFF on a fresh process and reconcile their native bits
-while alive. The additional client invulnerability guard is cleared once at
-a verified lifetime/OFF/reset, under the normal-movement/native-damage gate;
-later scripted protection is reported as GUARDED. Noclip independently blocks
-damage. Test them separately. Other new fields and the fixed-jump compatibility
-edit have static/portable coverage, but require this retail run for acceptance.
-No tests here claim that Windows or MW2 ran in the Linux build environment.
+Close MW2 and run **Diagnose.cmd** before another launch replaces `latest.log`.
+Attach the resulting ZIP. The collector includes settings, receipt, logs,
+events and probe results. Record before/after weapon info with its menu action.
+A screenshot helps if text clips. Stop at an unexpected result and preserve
+`<MW2>\bo1mw2\logs\latest.log`; fallback is `%LOCALAPPDATA%\BO1MW2`.
 
-For rollback, close MW2 and run **Uninstall.cmd**. It removes the owned DLL and
-keeps logs/settings. If a crash happens, preserve
-`<MW2>\bo1mw2\logs\latest.log` immediately. Logging can fall back to
-`%LOCALAPPDATA%\BO1MW2`. Return any generated crash text/minidump, or the
-Application Error's faulting module/offset if no dump exists. The unhandled
-exception handler may not see loader errors or faults handled by the game.
+For rollback, close MW2 and run **Uninstall.cmd**. It removes the owned DLL,
+keeps logs/settings and leaves original game files intact. Return any generated
+crash text/minidump, or Application Error faulting module/offset if no dump
+exists. The unhandled exception handler may not see loader errors or faults
+handled by the game.
 
-Second-map, cutscene, resolution/device-reset and Steam-overlay coverage remain
-useful. F4 does not pause; WASD/mouse/fire pass through. Historical test2-6
-instructions and JSON evidence remain in the repository. Complete returned
-logs/dumps and original game assets are never committed or distributed.
+The Windows build, portable ownership/adjustment tests, exact-file verifier and
+isolated PowerShell upgrade checks passed here. No retail game or Windows
+probe is executed in this Linux environment. New test8 gameplay requires the
+owner run. Second-map, cutscene, resolution/device-reset and Steam-overlay
+coverage remain useful. F4 does not pause; WASD/mouse/fire pass through.
+Historical test2–7 instructions and evidence remain available. Complete user
+logs/dumps and original assets are never committed or distributed.

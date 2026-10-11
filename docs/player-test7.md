@@ -2,7 +2,7 @@
 
 Build `0.1.6-player-test7`, for the same exact supplied AMD64 executable.
 This iteration fixes session/native God-state reconciliation, implements every
-current PLAYER row, and makes the menu smaller. New retail behavior is pending
+current PLAYER row, and makes the menu smaller. At publication retail behavior was pending
 the owner's test. No Zombies AI, asset import, or weapon/world actions are added.
 
 ## Install
@@ -55,8 +55,8 @@ Scripted mission failures are separate from ordinary damage.
 | Super Jump | Native jump height increases from 39 to 117 | Land before disabling; subsequent jumps return to normal |
 | Reset player toggles | Requests all six cheats OFF | Check damage, ammo consumption, collision, speed and jump again; saved FOV is preserved |
 
-Use a normal campaign gun for ammo checks. Native No Reload deliberately
-keeps the game's exceptions for frag/flash grenades, Javelin/Stinger, AC130 and
+Use a normal campaign gun for ammo checks. Native No Reload
+has special-weapon branches for Javelin/Stinger, AC130 and
 certain scripted/support weapons. Infinite Ammo changes reserve pools only;
 it does not give weapons or refill every offhand clip. Use God while comparing
 jump height, then turn it OFF again for the final damage test. Noclip itself
@@ -118,3 +118,12 @@ D3D9 vtable hooks, and rendering-state restoration are retained. Six portable
 C++ suites, nine Python fixtures, 23 unique patterns and the Windows build
 pass. PowerShell installation/diagnostic/removal checks run in an isolated
 filesystem; this Linux workspace cannot execute retail MW2 or Windows probes.
+
+## Test8 correction and acceptance
+
+The owner accepts test7; see [redacted evidence](runtime-test7-evidence.json).
+The earlier frag/flash interpretation was incorrect: their equal-name branches
+bypass consumption to the native return when player_sustainAmmo is enabled.
+Normal frag/flash grenades therefore share No Reload. Test8 explicitly labels
+Infinite Grenades as linked and adds independent branch verification. Other
+special-weapon paths are unchanged. See [test8](world-weapons-test8.md).

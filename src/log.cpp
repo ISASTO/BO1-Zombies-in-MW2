@@ -85,7 +85,7 @@ void InitializeLog() {
         }
     }
     Log("BO1MW2 %s | AMD64 | log=%ls", kVersion, file);
-    Log("PLAYER test 7: session God reconciliation, reserve ammo, no reload, noclip, speed, compatible jump and compact menu. Saved FOV retained.");
+    Log("WEAPONS/WORLD test 8: adjustable speed/jump, loaded weapon access, linked frag/flash sustain, current-gun rapid fire, explosive bullets, time scale, AI think gate and gravity compatibility. Saved FOV retained.");
 }
 void Log(const char* format, ...) {
     char body[4096]{};

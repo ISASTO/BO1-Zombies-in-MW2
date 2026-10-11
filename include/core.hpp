@@ -8,7 +8,7 @@
 #include "fov_preferences.hpp"
 
 namespace mod {
-inline constexpr const char* kVersion = "0.1.6-player-test7";
+inline constexpr const char* kVersion = "0.1.7-world-weapons-test8";
 inline constexpr const char* kExeSha256 = "fb7e8a987c371dea7b666091b0b9e2011c0cd9cd277b191ad453d11d557dd777";
 
 // -1 is a wildcard. Reject malformed patterns rather than matching everything.
@@ -108,11 +108,52 @@ inline constexpr const char* kJumpStepPattern =
 inline constexpr const char* kJumpCeilingPattern =
     "F3 0F 10 89 80 00 00 00 F3 0F 58 0D ?? ?? ?? ?? F3 0F 10 41 24 0F 2F C1 0F 93 C0 C3";
 
+inline constexpr const char* kGiveAllRegistrationPattern =
+    "4C 8D 0D ?? ?? ?? ?? 33 D2 41 B8 84 20 00 00 48 8D 0D ?? ?? ?? ?? E8 ?? ?? ?? ?? 4C 8D 0D ?? ?? ?? ?? 48 89 05 ?? ?? ?? ??";
+inline constexpr const char* kGiveAllConsumerPattern =
+    "48 8B 05 ?? ?? ?? ?? 48 8B D9 48 63 F2 48 85 C0 74 ?? 80 78 10 00 74 ?? B8 0E 00 00 00 EB ?? 44 8B 81 B4 02 00 00";
+inline constexpr const char* kExplosiveRegistrationPattern =
+    "33 D2 44 8D 47 0C 48 8D 0D ?? ?? ?? ?? E8 ?? ?? ?? ?? F3 44 0F 10 0D ?? ?? ?? ?? 48 8D 0D ?? ?? ?? ?? 48 89 05 ?? ?? ?? ??";
+inline constexpr const char* kExplosiveConsumerPattern =
+    "80 B9 69 08 00 00 00 75 ?? 48 8B 05 ?? ?? ?? ?? 80 78 10 00 75 ?? 32 C0 C3 B0 01 C3";
+inline constexpr const char* kTimeRegistrationPattern =
+    "48 8D 0D ?? ?? ?? ?? F3 0F 10 15 ?? ?? ?? ?? F3 0F 10 0D ?? ?? ?? ?? 48 89 5C 24 28 48 89 05 ?? ?? ?? ?? C7 44 24 20 0C 00 00 00 E8 ?? ?? ?? ?? 48 89 05 ?? ?? ?? ??";
+inline constexpr const char* kTimeConsumerPattern =
+    "48 8B 05 ?? ?? ?? ?? 7A ?? 75 ?? 0F 2E DA 7A ?? 75 ?? F3 0F 10 40 10 0F 2E C2 7A ?? 75 ?? C7 05 ?? ?? ?? ?? 00 00 80 3F EB ?? F3 0F 59 CB 66 0F 6E F7 0F 5B F6 F3 0F 59 48 10";
+inline constexpr const char* kAiRegistrationPattern =
+    "4C 8D 0D ?? ?? ?? ?? 48 89 05 ?? ?? ?? ?? 41 B8 84 00 00 00 48 8D 0D ?? ?? ?? ?? B2 01 E8 ?? ?? ?? ?? 4C 8D 0D ?? ?? ?? ?? 48 89 05 ?? ?? ?? ??";
+inline constexpr const char* kAiConsumerPattern =
+    "48 8B 05 ?? ?? ?? ?? 48 8B E9 80 78 10 00 75 ?? 8B 05 ?? ?? ?? ?? 83 C0 32 89 81 60 01 00 00 48 81 C4 A0 00 00 00 5D C3";
+inline constexpr const char* kGravityRegistrationPattern =
+    "F3 0F 10 35 ?? ?? ?? ?? 48 8D 0D ?? ?? ?? ?? 48 89 05 ?? ?? ?? ?? 0F 28 DF 48 8D 05 ?? ?? ?? ?? 41 0F 28 D4 48 89 44 24 28 0F 28 CE C7 44 24 20 80 00 00 00 E8 ?? ?? ?? ?? 48 89 05 ?? ?? ?? ??";
+inline constexpr const char* kGravityTrajectoryPattern =
+    "48 8B 05 ?? ?? ?? ?? F3 0F 10 40 10 F3 0F 59 05 ?? ?? ?? ?? F3 0F 59 C3 F3 0F 59 C3 F3 0F 5C D0 F3 0F 11 57 08";
+inline constexpr const char* kPlayerGravityPattern =
+    "F3 0F 10 05 ?? ?? ?? ?? E8 ?? ?? ?? ?? F3 0F 10 3D ?? ?? ?? ?? 33 D2 45 8B BE B0 00 00 00 41 B8 B4 00 00 00 F3 0F 2C C0 44 89 BD E0 00 00 00 F3 41 0F 10 86 C4 02 00 00 41 89 46 54 48 8B 05 ?? ?? ?? ??";
+inline constexpr const char* kWeaponCatalogPattern =
+    "33 D2 48 8D 0D ?? ?? ?? ?? 41 B8 40 06 00 00 E8 ?? ?? ?? ?? 33 D2 48 8D 0D ?? ?? ?? ?? 41 B8 40 06 00 00 E8 ?? ?? ?? ?? 33 D2";
+inline constexpr const char* kWeaponCountPattern =
+    "8B 1D ?? ?? ?? ?? 4C 8D 35 ?? ?? ?? ?? 85 DB 74 ?? 8B 05 ?? ?? ?? ?? 3B D8 77 1D 49 8B 04 DE";
+inline constexpr const char* kWeaponPointersPattern =
+    "8B C1 48 8D 0D ?? ?? ?? ?? 48 8B 04 C1 C3 CC CC 48 8D 05 ?? ?? ?? ?? 48 8B 04 C8 C3";
+inline constexpr const char* kWeaponBindingPattern =
+    "48 8B 48 08 48 89 0D ?? ?? ?? ?? 48 89 0D ?? ?? ?? ??";
+inline constexpr const char* kWeaponFireScriptPattern =
+    "8B CF E8 ?? ?? ?? ?? 66 0F 6E 40 3C 0F 5B C0 F3 0F 59 05 ?? ?? ?? ??";
+inline constexpr const char* kWeaponFireConsumerPattern =
+    "49 6B EE 1C 89 84 2F F0 01 00 00 41 8B 47 3C 89 84 2F EC 01 00 00 80 BE 6D 08 00 00 00";
+inline constexpr const char* kGrenadeSustainPattern =
+    "48 8B D3 48 8D 0D ?? ?? ?? ?? E8 ?? ?? ?? ?? 85 C0 0F 84 ?? ?? ?? ?? 48 8B D3 48 8D 0D ?? ?? ?? ?? E8 ?? ?? ?? ?? 85 C0 0F 84 ?? ?? ?? ??";
+
 inline constexpr int kVisibleMenuRows = 8;
 enum class Page { Home, Player, Weapons, World, AI, Zombies, Diagnostics, ZombieRules, View };
 enum class Input { Toggle, Up, Down, Select, Back, Left, Right };
 enum class Action { None, ToggleGod, ToggleHud, WriteSnapshot, WriteRoundPreview, ChangeFov, SaveFov, ResetFov,
-    ToggleInfiniteAmmo, ToggleNoReload, ToggleNoclip, ToggleSuperSpeed, ToggleSuperJump, ResetPlayer };
+    ToggleInfiniteAmmo, ToggleNoReload, ToggleNoclip, ToggleSuperSpeed, ToggleSuperJump, ResetPlayer,
+    DecreaseSpeed, IncreaseSpeed, DecreaseJump, IncreaseJump,
+    ToggleGiveAll, ToggleRapidFire, ToggleExplosiveBullets, ResetWeapons,
+    ToggleSlowMotion, ToggleFreezeAI, ToggleGravity, ResetWorld,
+    DecreaseTimeScale, IncreaseTimeScale, DecreaseGravity, IncreaseGravity };
 struct MenuState {
     bool visible = false;
     bool hud = true;
@@ -125,8 +166,8 @@ struct MenuState {
         switch (page) {
             case Page::Home: return 6;
             case Page::Player: return 8;
-            case Page::Weapons: return 5;
-            case Page::World: return 4;
+            case Page::Weapons: return 6;
+            case Page::World: return 5;
             case Page::AI: return 3;
             case Page::Zombies: return 4;
             case Page::Diagnostics: return 2;
@@ -139,6 +180,13 @@ struct MenuState {
     Action input(Input key) {
         if (key == Input::Toggle) { visible = !visible; return Action::None; }
         if (!visible) return Action::None;
+        if (key==Input::Left || key==Input::Right) {
+            const bool right=key==Input::Right;
+            if (page==Page::Player && selected==5) return right?Action::IncreaseSpeed:Action::DecreaseSpeed;
+            if (page==Page::Player && selected==6) return right?Action::IncreaseJump:Action::DecreaseJump;
+            if (page==Page::World && selected==0) return right?Action::IncreaseTimeScale:Action::DecreaseTimeScale;
+            if (page==Page::World && selected==2) return right?Action::IncreaseGravity:Action::DecreaseGravity;
+        }
         if (page == Page::View && selected == 0
             && (key == Input::Left || key == Input::Right || key == Input::Select))
             return fov.step(key==Input::Left?-1:1) ? Action::ChangeFov : Action::None;
@@ -170,6 +218,16 @@ struct MenuState {
             else if (page == Page::Player && selected == 5) return Action::ToggleSuperSpeed;
             else if (page == Page::Player && selected == 6) return Action::ToggleSuperJump;
             else if (page == Page::Player && selected == 7) return Action::ResetPlayer;
+            else if (page == Page::Weapons && selected == 0) return Action::ToggleGiveAll;
+            else if (page == Page::Weapons && selected == 1) return Action::ToggleNoReload;
+            else if (page == Page::Weapons && selected == 2) return Action::ToggleRapidFire;
+            else if (page == Page::Weapons && selected == 3) return Action::ToggleExplosiveBullets;
+            else if (page == Page::Weapons && selected == 4) return Action::WriteSnapshot;
+            else if (page == Page::Weapons && selected == 5) return Action::ResetWeapons;
+            else if (page == Page::World && selected == 0) return Action::ToggleSlowMotion;
+            else if (page == Page::World && selected == 1) return Action::ToggleFreezeAI;
+            else if (page == Page::World && selected == 2) return Action::ToggleGravity;
+            else if (page == Page::World && selected == 4) return Action::ResetWorld;
             else if (page == Page::View && selected == 1) return Action::SaveFov;
             else if (page == Page::View && selected == 2) return Action::ResetFov;
             else if (page == Page::Zombies && selected == 0) {

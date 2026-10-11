@@ -27,6 +27,10 @@ struct Profile {
     std::uintptr_t jumpHeight = 0;
     std::uintptr_t jumpTwiceHeight = 0;
     bool jumpResolved = false;
+    std::uintptr_t giveAllSlot=0, explosiveSlot=0, aiSlot=0, timeSlot=0, gravitySlot=0;
+    std::uintptr_t gravityLiteral=0, weaponTable=0, weaponDefTable=0, weaponCount=0;
+    bool giveAllResolved=false, explosiveResolved=false, aiResolved=false, timeResolved=false;
+    bool gravityResolved=false, weaponResolved=false, grenadeSustainResolved=false;
 } profile;
 
 struct FeatureRuntime {
@@ -37,9 +41,14 @@ struct FeatureRuntime {
     bool clearSustain = true;
     bool clearSpeed = true;
     ULONGLONG nextUpdate = 0;
-    struct { bool owned=false; std::uintptr_t dvar=0; std::uint8_t original=0; } sustain;
-    struct { bool owned=false; std::uintptr_t dvar=0; int original=kDefaultSpeed; } speed;
+    ScalarOwnership<std::uint8_t> sustain;
+    ScalarOwnership<int> speed;
     bool jumpOwned=false;
+    ExtraPreferences extra;
+    ScalarOwnership<std::uint8_t> giveAll, explosive, ai;
+    ScalarOwnership<float> time, gravity;
+    ScalarOwnership<float> gravityLiteral;
+    RapidOwnership rapid;
 } features;
 std::mutex featuresMutex;
 
@@ -124,6 +133,14 @@ std::uintptr_t ResolveScalarRip(std::uintptr_t at, unsigned offset) {
     std::uint8_t bytes[8]{};
     return at && Read(at+offset,bytes,sizeof(bytes)) ? RipTarget(at+offset,bytes,4,8) : 0;
 }
+std::uintptr_t ResolveDwordRip(std::uintptr_t at,unsigned offset) {
+    std::uint8_t bytes[6]{};
+    return at && Read(at+offset,bytes,sizeof(bytes)) ? RipTarget(at+offset,bytes,2,6) : 0;
+}
+std::uintptr_t ResolveCall(std::uintptr_t at,unsigned offset) {
+    std::uint8_t bytes[5]{};
+    return at && Read(at+offset,bytes,sizeof(bytes)) && bytes[0]==0xe8 ? RipTarget(at+offset,bytes,1,5) : 0;
+}
 bool Anchor(std::uintptr_t at, unsigned offset, const char* wanted) {
     char name[64]{};
     return ReadString(ResolveRip(at, offset), name, sizeof(name)) && std::strcmp(name, wanted) == 0;
@@ -158,8 +175,34 @@ IntDvarSnapshot ReadSpeed() {
 JumpSnapshot ReadJump() {
     JumpSnapshot s; s.resolved=profile.supported && profile.resolved && profile.jumpResolved;
     s.valid=s.resolved && ReadValue(profile.jumpHeight,s.height) && ReadValue(profile.jumpTwiceHeight,s.twiceHeight)
-        && (s.height==kDefaultJump || s.height==kSuperJump) && s.twiceHeight==s.height*2.f;
+        && ValidJumpPair(s.height,s.twiceHeight);
     return s;
+}
+BoolDvarSnapshot ReadBoolDvar(std::uintptr_t slot,bool resolved,const char* name) {
+    BoolDvarSnapshot s; s.resolved=profile.supported && profile.resolved && resolved;
+    s.valid=s.resolved && NamedDvar(slot,name,0,s.dvar) && ReadValue(s.dvar+0x10,s.current) && s.current<=1;
+    return s;
+}
+FloatDvarSnapshot ReadFloatDvar(std::uintptr_t slot,bool resolved,const char* name,float low,float high) {
+    FloatDvarSnapshot s; s.resolved=profile.supported && profile.resolved && resolved;
+    s.valid=s.resolved && NamedDvar(slot,name,1,s.dvar) && ReadValue(s.dvar+0x10,s.current)
+        && s.current>=low && s.current<=high;
+    return s;
+}
+WeaponFields ReadWeapon(unsigned index) {
+    WeaponFields w; w.index=index;
+    unsigned count=0; std::uintptr_t linked=0,name=0;
+    if (!profile.supported || !profile.resolved || !profile.weaponResolved
+        || !ReadValue(profile.weaponCount,count) || !count || count>=kWeaponCapacity || !index || index>count
+        || !ReadValue(profile.weaponTable+index*8,w.complete) || !w.complete || (w.complete&7)
+        || !ReadValue(profile.weaponDefTable+index*8,w.definition) || !w.definition || (w.definition&7)
+        || !ReadValue(w.complete+kCompleteDefinition,linked) || linked!=w.definition
+        || !ReadValue(w.complete,name) || !ReadString(name,w.name,sizeof(w.name)) || !w.name[0]
+        || !ReadValue(w.complete+kWeaponFireTime,w.fireTime) || w.fireTime<1 || w.fireTime>10000
+        || !ReadValue(w.definition+kWeaponType,w.type) || w.type<0 || w.type>6) return w;
+    for (const unsigned char* c=reinterpret_cast<const unsigned char*>(w.name);*c;++c)
+        if (*c<32 || *c>126) return w;
+    w.valid=true; return w;
 }
 bool SetMasked(std::uintptr_t at, std::uint32_t mask, std::uint32_t wanted, const char* name) {
     if ((at&3) || !Writable(at)) return false;
@@ -198,12 +241,41 @@ bool SetReserve(std::uintptr_t at, const AmmoPool& before, int target) {
     return static_cast<std::uint64_t>(InterlockedCompareExchange64(reinterpret_cast<volatile LONGLONG*>(at),
         static_cast<LONGLONG>(next),static_cast<LONGLONG>(old)))==old;
 }
+bool SetFloat(std::uintptr_t at,float old,float target) {
+    LONG before=0,after=0; std::memcpy(&before,&old,4); std::memcpy(&after,&target,4);
+    return !(at&3) && Writable(at) && (old==target
+        || InterlockedCompareExchange(reinterpret_cast<volatile LONG*>(at),after,before)==before);
+}
+bool SetGravityLiteral(float target) {
+    float old=0.f;
+    if (!profile.gravityResolved || !ReadValue(profile.gravityLiteral,old) || !ValidGravityLiteral(old)
+        || !ValidGravityLiteral(target) || (profile.gravityLiteral&3)) return false;
+    if (old==target) return true;
+    DWORD protection=0,unused=0;
+    if (!VirtualProtect(reinterpret_cast<void*>(profile.gravityLiteral),4,PAGE_READWRITE,&protection)) return false;
+    const bool applied=SetFloat(profile.gravityLiteral,old,target);
+    const bool restored=VirtualProtect(reinterpret_cast<void*>(profile.gravityLiteral),4,protection,&unused)!=0;
+    if (applied) {
+        features.gravityLiteral.applied(profile.gravityLiteral,old,target);
+        Log("WORLD_APPLY PLAYER_GRAVITY literal_before=%.1f literal_after=%.1f protection_restored=%d",old,target,restored);
+    }
+    if (!applied || !restored) Log("WORLD_APPLY PLAYER_GRAVITY failed exchange=%d protection_restored=%d",applied,restored);
+    return applied && restored;
+}
+void RestoreGravityLiteral() {
+    auto& owned=features.gravityLiteral;
+    if (!owned.owned) return;
+    float current=0.f;
+    if (!ReadValue(profile.gravityLiteral,current) || !owned.canRestore(profile.gravityLiteral,current)) owned.clear();
+    else if (SetGravityLiteral(owned.original)) owned.clear();
+}
 // These two immutable floats are pooled only by the verified jump consumers.
 // Change data in this process; never patch instructions or the disk executable.
-bool SetJump(bool enabled) {
+bool SetJump(float height) {
     const auto s=ReadJump();
-    if (!s.valid) return false;
-    const float height=enabled?kSuperJump:kDefaultJump, twice=height*2.f;
+    const float twice=height*2.f;
+    if (!s.valid || !ValidJumpPair(height,twice)) return false;
+    const bool increasing=height>s.height;
     if (s.height==height) return true;
     MEMORY_BASIC_INFORMATION memory{};
     if ((profile.jumpHeight&3) || profile.jumpTwiceHeight!=profile.jumpHeight+4
@@ -216,11 +288,11 @@ bool SetJump(bool enabled) {
         return InterlockedCompareExchange(reinterpret_cast<volatile LONG*>(at),next,old)==old;
     };
     // Raise the cap before the impulse; lower the impulse before the cap.
-    bool ok=enabled?exchange(profile.jumpHeight,s.height,height):exchange(profile.jumpTwiceHeight,s.twiceHeight,twice);
+    bool ok=increasing?exchange(profile.jumpHeight,s.height,height):exchange(profile.jumpTwiceHeight,s.twiceHeight,twice);
     if (ok) {
-        ok=enabled?exchange(profile.jumpTwiceHeight,s.twiceHeight,twice):exchange(profile.jumpHeight,s.height,height);
+        ok=increasing?exchange(profile.jumpTwiceHeight,s.twiceHeight,twice):exchange(profile.jumpHeight,s.height,height);
         if (!ok) {
-            if (enabled) exchange(profile.jumpHeight,height,s.height);
+            if (increasing) exchange(profile.jumpHeight,height,s.height);
             else exchange(profile.jumpTwiceHeight,twice,s.twiceHeight);
         }
     }
@@ -228,7 +300,7 @@ bool SetJump(bool enabled) {
     const bool restored=VirtualProtect(reinterpret_cast<void*>(profile.jumpHeight),8,oldProtection,&unused)!=0;
     if (!ok || !restored) Log("PLAYER_APPLY SUPER_JUMP failed exchange=%d protection_restored=%d",ok,restored);
     if (ok) {
-        features.jumpOwned=enabled;
+        features.jumpOwned=height!=kDefaultJump;
         Log("PLAYER_APPLY SUPER_JUMP height_before=%.1f height_after=%.1f twice_after=%.1f protection_restored=%d",s.height,height,twice,restored);
     }
     return ok && restored;
@@ -243,12 +315,58 @@ void RestoreDvars() {
     }
     const auto speed=ReadSpeed();
     if (features.speed.owned) {
-        if (!speed.valid || speed.dvar!=features.speed.dvar || speed.current!=kSuperSpeed) features.speed.owned=false;
+        if (!speed.valid || !features.speed.canRestore(speed.dvar,speed.current)) features.speed.clear();
         else if (SetInt(speed.dvar+0x10,speed.current,features.speed.original)) {
             Log("PLAYER_RESTORE SUPER_SPEED value=%d",features.speed.original); features.speed.owned=false;
         }
     }
-    if (features.jumpOwned) SetJump(false);
+    if (features.jumpOwned) SetJump(kDefaultJump);
+}
+void RestoreRapid() {
+    if (!features.rapid.owned) return;
+    const auto w=ReadWeapon(features.rapid.identity.index);
+    if (!features.rapid.canRestore(w)) features.rapid.clear();
+    else if (SetInt(w.complete+kWeaponFireTime,w.fireTime,features.rapid.original)) {
+        Log("WEAPON_RESTORE RAPID_FIRE index=%u name=%s fire_time=%d",w.index,w.name,features.rapid.original);
+        features.rapid.clear();
+    }
+}
+void ApplyBool(ScalarOwnership<std::uint8_t>& owned,const BoolDvarSnapshot& s,bool enabled,std::uint8_t target,const char* name) {
+    if (!s.valid) return;
+    if (enabled) {
+        if (s.current!=target && SetBool(s.dvar+0x10,s.current,target)) {
+            owned.applied(s.dvar,s.current,target);
+            Log("EXTRA_APPLY %s before=%u after=%u",name,s.current,target);
+        }
+    } else if (owned.owned) {
+        if (!owned.canRestore(s.dvar,s.current)) owned.clear();
+        else if (SetBool(s.dvar+0x10,s.current,owned.original)) {
+            Log("EXTRA_RESTORE %s value=%u",name,owned.original); owned.clear();
+        }
+    }
+}
+void ApplyFloat(ScalarOwnership<float>& owned,const FloatDvarSnapshot& s,bool enabled,float target,const char* name) {
+    if (!s.valid) return;
+    if (enabled) {
+        if (s.current!=target && SetFloat(s.dvar+0x10,s.current,target)) {
+            owned.applied(s.dvar,s.current,target);
+            Log("EXTRA_APPLY %s before=%.3f after=%.3f",name,s.current,target);
+        }
+    } else if (owned.owned) {
+        if (!owned.canRestore(s.dvar,s.current)) owned.clear();
+        else if (SetFloat(s.dvar+0x10,s.current,owned.original)) {
+            Log("EXTRA_RESTORE %s value=%.3f",name,owned.original); owned.clear();
+        }
+    }
+}
+void RestoreExtras() {
+    ApplyBool(features.giveAll,ReadBoolDvar(profile.giveAllSlot,profile.giveAllResolved,"g_giveAll"),false,1,"GIVE_ALL_LOADED");
+    ApplyBool(features.explosive,ReadBoolDvar(profile.explosiveSlot,profile.explosiveResolved,"bg_forceExplosiveBullets"),false,1,"EXPLOSIVE_BULLETS");
+    ApplyBool(features.ai,ReadBoolDvar(profile.aiSlot,profile.aiResolved,"g_ai"),false,0,"FREEZE_AI");
+    ApplyFloat(features.time,ReadFloatDvar(profile.timeSlot,profile.timeResolved,"timescale",.001f,1000.f),false,1.f,"SLOW_MOTION");
+    ApplyFloat(features.gravity,ReadFloatDvar(profile.gravitySlot,profile.gravityResolved,"g_gravity",0.f,10000.f),false,800.f,"GRAVITY");
+    RestoreGravityLiteral();
+    RestoreRapid();
 }
 }
 const char* StateText(LevelState state) {
@@ -369,6 +487,67 @@ void InitializeEngine() {
             profile.speedResolved,static_cast<unsigned long long>(profile.speedSlot?profile.speedSlot-profile.base:0),
             profile.jumpResolved,static_cast<unsigned long long>(profile.jumpHeight?profile.jumpHeight-profile.base:0),
             static_cast<unsigned long long>(profile.jumpTwiceHeight?profile.jumpTwiceHeight-profile.base:0));
+        const auto give=Unique(text,start,"g_giveAll registration",kGiveAllRegistrationPattern);
+        const auto giveRead=Unique(text,start,"g_giveAll inventory consumer",kGiveAllConsumerPattern);
+        if (give && giveRead && Anchor(give,15,"g_giveAll")) {
+            profile.giveAllSlot=ResolveRip(give,34);
+            profile.giveAllResolved=InImage(profile.giveAllSlot,8) && profile.giveAllSlot==ResolveRip(giveRead,0);
+        }
+        const auto explosive=Unique(text,start,"explosive bullet registration",kExplosiveRegistrationPattern);
+        const auto explosiveRead=Unique(text,start,"explosive bullet native consumer",kExplosiveConsumerPattern);
+        if (explosive && explosiveRead && Anchor(explosive,6,"bg_forceExplosiveBullets")) {
+            profile.explosiveSlot=ResolveRip(explosive,34);
+            profile.explosiveResolved=InImage(profile.explosiveSlot,8) && profile.explosiveSlot==ResolveRip(explosiveRead,9);
+        }
+        const auto ai=Unique(text,start,"g_ai registration",kAiRegistrationPattern);
+        const auto aiRead=Unique(text,start,"g_ai actor think gate",kAiConsumerPattern);
+        if (ai && aiRead && Anchor(ai,20,"g_ai")) {
+            profile.aiSlot=ResolveRip(ai,41);
+            profile.aiResolved=InImage(profile.aiSlot,8) && profile.aiSlot==ResolveRip(aiRead,0);
+        }
+        const auto time=Unique(text,start,"timescale registration",kTimeRegistrationPattern);
+        const auto timeRead=Unique(text,start,"timescale clock consumer",kTimeConsumerPattern);
+        if (time && timeRead && Anchor(time,0,"timescale")) {
+            profile.timeSlot=ResolveRip(time,48);
+            profile.timeResolved=InImage(profile.timeSlot,8) && profile.timeSlot==ResolveRip(timeRead,0);
+        }
+        const auto gravity=Unique(text,start,"g_gravity registration",kGravityRegistrationPattern);
+        const auto trajectory=Unique(text,start,"g_gravity trajectory consumer",kGravityTrajectoryPattern);
+        const auto playerGravity=Unique(text,start,"fixed player gravity source",kPlayerGravityPattern);
+        if (gravity && trajectory && playerGravity && Anchor(gravity,8,"g_gravity")) {
+            profile.gravitySlot=ResolveRip(gravity,57);
+            profile.gravityLiteral=ResolveScalarRip(playerGravity,0);
+            int references=0; float defaultGravity=0.f,playerDefault=0.f;
+            for (std::size_t i=0;i+8<=text.size();++i)
+                if (text[i]==0xf3 && text[i+1]==0x0f && (text[i+3]&0xc7)==5
+                    && RipTarget(start+i,text.data()+i,4,8)==profile.gravityLiteral) ++references;
+            profile.gravityResolved=InImage(profile.gravitySlot,8) && profile.gravitySlot==ResolveRip(trajectory,0)
+                && InImage(profile.gravityLiteral,4) && references==1
+                && ReadValue(ResolveScalarRip(gravity,0),defaultGravity) && defaultGravity==800.f
+                && ReadValue(profile.gravityLiteral,playerDefault) && playerDefault==kDefaultGravityLiteral;
+        }
+        const auto catalog=Unique(text,start,"weapon catalog capacity",kWeaponCatalogPattern);
+        const auto count=Unique(text,start,"weapon catalog last index",kWeaponCountPattern);
+        const auto pointers=Unique(text,start,"complete/definition table lookups",kWeaponPointersPattern);
+        const auto binding=Unique(text,start,"complete to definition binding",kWeaponBindingPattern);
+        const auto scriptFire=Unique(text,start,"weaponfiretime script field",kWeaponFireScriptPattern);
+        const auto fireRead=Unique(text,start,"native fire-time consumer",kWeaponFireConsumerPattern);
+        if (catalog && count && pointers && binding && scriptFire && fireRead) {
+            profile.weaponTable=ResolveRip(pointers,2); profile.weaponDefTable=ResolveRip(pointers,16);
+            profile.weaponCount=ResolveDwordRip(count,17);
+            profile.weaponResolved=InImage(profile.weaponTable,kWeaponCapacity*8) && InImage(profile.weaponDefTable,kWeaponCapacity*8)
+                && InImage(profile.weaponCount,4) && profile.weaponTable==ResolveRip(catalog,2)
+                && profile.weaponTable==ResolveRip(count,6) && profile.weaponDefTable==ResolveRip(catalog,22)
+                && profile.weaponDefTable==ResolveRip(binding,4) && ResolveCall(scriptFire,2)==pointers;
+        }
+        const auto grenades=Unique(text,start,"frag/flash native ammo-sustain branches",kGrenadeSustainPattern);
+        profile.grenadeSustainResolved=grenades && Anchor(grenades,3,"fraggrenade") && Anchor(grenades,26,"flash_grenade");
+        Log("EXTRA_PROFILE give_all=%d explosive=%d ai=%d timescale=%d gravity=%d weapons=%d grenade_sustain=%d gravity_literal_rva=0x%llx weapon_table_rva=0x%llx count_rva=0x%llx",
+            profile.giveAllResolved,profile.explosiveResolved,profile.aiResolved,profile.timeResolved,profile.gravityResolved,
+            profile.weaponResolved,profile.grenadeSustainResolved,
+            static_cast<unsigned long long>(profile.gravityLiteral?profile.gravityLiteral-profile.base:0),
+            static_cast<unsigned long long>(profile.weaponTable?profile.weaponTable-profile.base:0),
+            static_cast<unsigned long long>(profile.weaponCount?profile.weaponCount-profile.base:0));
         return;
     }
 }
@@ -380,6 +559,14 @@ Snapshot ReadSnapshot() {
     if (!s.resolved) { s.state = LevelState::Unresolved; return s; }
     s.fov=ReadFov();
     s.sustain=ReadSustain(); s.speed=ReadSpeed(); s.jump=ReadJump();
+    s.giveAll=ReadBoolDvar(profile.giveAllSlot,profile.giveAllResolved,"g_giveAll");
+    s.explosive=ReadBoolDvar(profile.explosiveSlot,profile.explosiveResolved,"bg_forceExplosiveBullets");
+    s.ai=ReadBoolDvar(profile.aiSlot,profile.aiResolved,"g_ai");
+    s.timeScale=ReadFloatDvar(profile.timeSlot,profile.timeResolved,"timescale",.001f,1000.f);
+    s.gravity=ReadFloatDvar(profile.gravitySlot,profile.gravityResolved,"g_gravity",0.f,10000.f);
+    s.gravityLiteralValid=profile.gravityResolved && ReadValue(profile.gravityLiteral,s.gravityLiteral) && ValidGravityLiteral(s.gravityLiteral);
+    s.weaponResolved=profile.weaponResolved; s.grenadeSustainResolved=profile.grenadeSustainResolved;
+    if (s.weaponResolved) ReadValue(profile.weaponCount,s.weaponCount);
     s.clientResolved=profile.clientResolved; s.ammoResolved=profile.ammoResolved;
     s.state = LevelState::Transition;
     std::uintptr_t server = 0, map = 0, mapString = 0;
@@ -401,6 +588,11 @@ Snapshot ReadSnapshot() {
     s.damageRead=ReadValue(s.entity+kEntityTakeDamage,damage) && damage<=1;
     s.takesDamage=s.damageRead && damage!=0;
     if (s.clientResolved) s.client=ReadClientFields(s.entity,Read);
+    if (s.client.valid) {
+        unsigned current=0;
+        if (ReadValue(s.client.address+kCurrentWeapon,current)) s.weapon=ReadWeapon(current);
+        s.playerGravityRead=ReadValue(s.client.address+kPlayerGravity,s.playerGravity) && s.playerGravity>=0 && s.playerGravity<=10000;
+    }
     s.ammoValid=s.ammoResolved && s.client.valid
         && Read(s.client.address+kReserveAmmo,s.ammo.data(),sizeof(s.ammo)) && ValidReserveTable(s.ammo);
     s.state = s.health > 0 ? LevelState::Ready : LevelState::PlayerDead;
@@ -438,6 +630,52 @@ bool TogglePlayerFeature(PlayerFeature feature) {
         FeatureName(feature),enabled?"ON":"OFF",s.map,s.health,s.flags,s.client.otherFlags,s.client.cheatFlags);
     return true;
 }
+bool AdjustPlayerFeature(PlayerFeature feature,int direction) {
+    std::lock_guard<std::mutex> lock(featuresMutex);
+    if (!FeatureAvailable(ReadSnapshot(),feature) || !features.preferences.adjust(feature,direction)) return false;
+    features.nextUpdate=0;
+    Log("PLAYER_ADJUST %s speed=%d jump=%d requested=%d",FeatureName(feature),features.preferences.speed,features.preferences.jump,
+        features.preferences.wanted(feature));
+    return true;
+}
+ExtraPreferences GetExtraPreferences() { std::lock_guard<std::mutex> lock(featuresMutex); return features.extra; }
+bool RapidFireApplied(const WeaponFields& weapon) { std::lock_guard<std::mutex> lock(featuresMutex); return features.rapid.canRestore(weapon); }
+bool ExtraAvailable(const Snapshot& s,ExtraFeature feature) {
+    if (s.state!=LevelState::Ready || !s.client.valid || s.client.health<=0 || s.client.moveType>=6) return false;
+    switch (feature) {
+        case ExtraFeature::GiveAll: return s.giveAll.valid;
+        case ExtraFeature::RapidFire: return s.weapon.valid && s.weapon.type==0 && s.weapon.fireTime>=20 && s.weapon.fireTime<=4000;
+        case ExtraFeature::ExplosiveBullets: return s.explosive.valid;
+        case ExtraFeature::SlowMotion: return s.timeScale.valid;
+        case ExtraFeature::FreezeAI: return s.ai.valid;
+        case ExtraFeature::Gravity: return s.gravity.valid && s.gravityLiteralValid && s.playerGravityRead;
+        default: return false;
+    }
+}
+bool ToggleExtraFeature(ExtraFeature feature) {
+    std::lock_guard<std::mutex> lock(featuresMutex);
+    if (!ExtraAvailable(ReadSnapshot(),feature)) { Log("EXTRA_REQUEST %s blocked",ExtraName(feature)); return false; }
+    features.extra.toggle(feature); features.nextUpdate=0;
+    Log("EXTRA_REQUEST %s %s",ExtraName(feature),features.extra.wanted(feature)?"ON":"OFF"); return true;
+}
+bool AdjustExtraFeature(ExtraFeature feature,int direction) {
+    std::lock_guard<std::mutex> lock(featuresMutex);
+    if (!ExtraAvailable(ReadSnapshot(),feature) || !features.extra.adjust(feature,direction)) return false;
+    features.nextUpdate=0;
+    Log("EXTRA_ADJUST %s timescale=%.2f gravity=%d requested=%d",ExtraName(feature),features.extra.timeScale,features.extra.gravity,
+        features.extra.wanted(feature)); return true;
+}
+void ResetWeaponFeatures() {
+    std::lock_guard<std::mutex> lock(featuresMutex);
+    features.extra.resetWeapons(); features.preferences.enabled[static_cast<std::size_t>(PlayerFeature::NoReload)]=false;
+    features.clearSustain=true; features.nextUpdate=0; RestoreRapid();
+    Log("EXTRA_REQUEST RESET_WEAPONS linked_no_reload=OFF saved_fov_unchanged=1");
+}
+void ResetWorldFeatures() {
+    std::lock_guard<std::mutex> lock(featuresMutex);
+    features.extra.resetWorld(); features.nextUpdate=0;
+    Log("EXTRA_REQUEST RESET_WORLD saved_fov_unchanged=1");
+}
 void ResetPlayerFeatures() {
     std::lock_guard<std::mutex> lock(featuresMutex);
     features.preferences.reset(); features.clearInvulnerability=true; features.clearSustain=true; features.clearSpeed=true; features.nextUpdate=0;
@@ -449,10 +687,11 @@ void UpdatePlayerFeatures(ULONGLONG now) {
     features.nextUpdate=now+16;
     const auto s=ReadSnapshot();
     if (s.state!=LevelState::Ready) {
-        features.lifetime.observe(false,0,0,""); features.ammo.clear(); RestoreDvars(); return;
+        features.lifetime.observe(false,0,0,""); features.ammo.clear(); RestoreDvars(); RestoreExtras(); return;
     }
     const bool newLifetime=features.lifetime.observe(true,s.client.address,s.client.commandTime,s.map);
     if (newLifetime) {
+        RestoreRapid();
         features.ammo.clear();
         features.clearInvulnerability=true;
         Log("PLAYER_LIFETIME map=%s client=%p command_time=%d god_requested=%d flags=0x%08x client_valid=%d other_flags=0x%08x move_flags=0x%08x takes_damage=%d",
@@ -463,7 +702,7 @@ void UpdatePlayerFeatures(ULONGLONG now) {
     // It starts OFF on every process launch; no cheat preferences are serialized.
     SetMasked(s.entity+kEntityFlags,3,features.preferences.wanted(PlayerFeature::God)?1:0,"GOD_FLAGS");
     if (!s.client.valid || s.client.health<=0 || s.client.moveType>=6) {
-        features.ammo.clear(); RestoreDvars(); return;
+        features.ammo.clear(); RestoreDvars(); RestoreExtras(); return;
     }
     if (s.client.valid && s.client.health>0 && s.client.moveType<6) {
         SetMasked(s.client.address+kClientCheatFlags,3,features.preferences.wanted(PlayerFeature::Noclip)?1:0,"NOCLIP_FLAGS");
@@ -494,10 +733,10 @@ void UpdatePlayerFeatures(ULONGLONG now) {
     }
     if (s.sustain.valid) {
         auto& owned=features.sustain;
-        if (owned.dvar!=s.sustain.dvar) owned={false,s.sustain.dvar,0};
+        if (owned.dvar!=s.sustain.dvar) owned.clear();
         if (features.preferences.wanted(PlayerFeature::NoReload)) {
             if (s.sustain.current!=1 && SetBool(s.sustain.dvar+0x10,s.sustain.current,1)) {
-                owned={true,s.sustain.dvar,s.sustain.current};
+                owned.applied(s.sustain.dvar,s.sustain.current,1);
                 Log("PLAYER_APPLY NO_RELOAD before=%u after=1",s.sustain.current);
             }
         } else if (features.clearSustain || owned.owned) {
@@ -510,14 +749,16 @@ void UpdatePlayerFeatures(ULONGLONG now) {
     }
     if (s.speed.valid) {
         auto& owned=features.speed;
-        if (owned.dvar!=s.speed.dvar) owned={false,s.speed.dvar,kDefaultSpeed};
+        if (owned.dvar!=s.speed.dvar) owned.clear();
         if (features.preferences.wanted(PlayerFeature::SuperSpeed)) {
-            if (s.speed.current!=kSuperSpeed && SetInt(s.speed.dvar+0x10,s.speed.current,kSuperSpeed)) {
-                owned={true,s.speed.dvar,s.speed.current};
-                Log("PLAYER_APPLY SUPER_SPEED before=%d after=%d",s.speed.current,kSuperSpeed);
+            const int target=features.preferences.speed;
+            if (s.speed.current!=target && SetInt(s.speed.dvar+0x10,s.speed.current,target)) {
+                owned.applied(s.speed.dvar,s.speed.current,target);
+                Log("PLAYER_APPLY SUPER_SPEED before=%d after=%d",s.speed.current,target);
             }
         } else if (owned.owned || features.clearSpeed) {
-            if (s.speed.current!=kSuperSpeed) { owned.owned=false; features.clearSpeed=false; }
+            if (owned.owned && !owned.canRestore(s.speed.dvar,s.speed.current)) { owned.clear(); features.clearSpeed=false; }
+            else if (!owned.owned && s.speed.current!=kSuperSpeed) features.clearSpeed=false;
             else if (SetInt(s.speed.dvar+0x10,s.speed.current,owned.owned?owned.original:kDefaultSpeed)) {
                 Log("PLAYER_RESTORE SUPER_SPEED value=%d",owned.owned?owned.original:kDefaultSpeed);
                 owned.owned=false; features.clearSpeed=false;
@@ -525,7 +766,30 @@ void UpdatePlayerFeatures(ULONGLONG now) {
         }
     }
     if (s.jump.valid && FeatureAvailable(s,PlayerFeature::SuperJump))
-        SetJump(features.preferences.wanted(PlayerFeature::SuperJump));
+        SetJump(features.preferences.wanted(PlayerFeature::SuperJump)?static_cast<float>(features.preferences.jump):kDefaultJump);
+    ApplyBool(features.giveAll,s.giveAll,features.extra.wanted(ExtraFeature::GiveAll),1,"GIVE_ALL_LOADED");
+    ApplyBool(features.explosive,s.explosive,features.extra.wanted(ExtraFeature::ExplosiveBullets),1,"EXPLOSIVE_BULLETS");
+    ApplyBool(features.ai,s.ai,features.extra.wanted(ExtraFeature::FreezeAI),0,"FREEZE_AI");
+    ApplyFloat(features.time,s.timeScale,features.extra.wanted(ExtraFeature::SlowMotion),features.extra.timeScale,"SLOW_MOTION");
+    if (ExtraAvailable(s,ExtraFeature::Gravity)) {
+        const bool enabled=features.extra.wanted(ExtraFeature::Gravity);
+        ApplyFloat(features.gravity,s.gravity,enabled,static_cast<float>(features.extra.gravity),"GRAVITY");
+        if (enabled) SetGravityLiteral(static_cast<float>(features.extra.gravity)+.5f);
+        else RestoreGravityLiteral();
+    }
+    const bool rapid=features.extra.wanted(ExtraFeature::RapidFire);
+    if (!rapid || !ExtraAvailable(s,ExtraFeature::RapidFire) || (features.rapid.owned && !features.rapid.sameIdentity(s.weapon))) RestoreRapid();
+    // If restoring the previous asset must retry, keep its ownership record
+    // instead of replacing it with the newly held gun.
+    if (rapid && ExtraAvailable(s,ExtraFeature::RapidFire)
+        && (!features.rapid.owned || features.rapid.sameIdentity(s.weapon))) {
+        const int baseline=features.rapid.canRestore(s.weapon)?features.rapid.original:s.weapon.fireTime;
+        const int target=RapidFireTime(baseline);
+        if (s.weapon.fireTime!=target && SetInt(s.weapon.complete+kWeaponFireTime,s.weapon.fireTime,target)) {
+            features.rapid.applied(s.weapon,target);
+            Log("WEAPON_APPLY RAPID_FIRE index=%u name=%s fire_before=%d fire_after=%d",s.weapon.index,s.weapon.name,s.weapon.fireTime,target);
+        }
+    }
 }
 bool SetFov(int value) {
     const auto s=ReadSnapshot();
@@ -561,5 +825,11 @@ void LogSnapshot() {
         for (int n=0;n<kAmmoPoolCount;++n) if (s.ammo[n].id)
             Log("PLAYER_AMMO slot=%d pool=%u reserve=%d",n,s.ammo[n].id,s.ammo[n].count);
     }
+    Log("EXTRA_STATE give_valid=%d give=%u explosive_valid=%d explosive=%u ai_valid=%d ai=%u time_valid=%d timescale=%.3f gravity_valid=%d gravity=%.1f literal_valid=%d gravity_literal=%.1f ps_gravity_read=%d ps_gravity=%d grenade_sustain_resolved=%d",
+        s.giveAll.valid,s.giveAll.current,s.explosive.valid,s.explosive.current,s.ai.valid,s.ai.current,
+        s.timeScale.valid,s.timeScale.current,s.gravity.valid,s.gravity.current,s.gravityLiteralValid,s.gravityLiteral,
+        s.playerGravityRead,s.playerGravity,s.grenadeSustainResolved);
+    Log("WEAPON_STATE resolved=%d last_loaded_index=%u valid=%d index=%u name=%s type=%d fire_time_ms=%d",
+        s.weaponResolved,s.weaponCount,s.weapon.valid,s.weapon.index,s.weapon.name,s.weapon.type,s.weapon.fireTime);
 }
 } // namespace mod

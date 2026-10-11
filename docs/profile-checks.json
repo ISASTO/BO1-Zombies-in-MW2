@@ -148,6 +148,164 @@
       "match_count": 1,
       "match_rva": "0x70790",
       "rip_targets": {}
+    },
+    "kGiveAllRegistrationPattern": {
+      "match_count": 1,
+      "match_rva": "0x173df4",
+      "rip_targets": {
+        "0": "0x33def8",
+        "15": "0x33df10",
+        "27": "0x37e023",
+        "34": "0xd9e068"
+      },
+      "name_anchor": "g_giveAll"
+    },
+    "kGiveAllConsumerPattern": {
+      "match_count": 1,
+      "match_rva": "0x8389a",
+      "rip_targets": {
+        "0": "0xd9e068"
+      }
+    },
+    "kExplosiveRegistrationPattern": {
+      "match_count": 1,
+      "match_rva": "0x750bb",
+      "rip_targets": {
+        "6": "0x322500",
+        "18": "0x385b14",
+        "27": "0x322578",
+        "34": "0x3dd690"
+      },
+      "name_anchor": "bg_forceExplosiveBullets"
+    },
+    "kExplosiveConsumerPattern": {
+      "match_count": 1,
+      "match_rva": "0x86f30",
+      "rip_targets": {
+        "9": "0x3dd690"
+      }
+    },
+    "kTimeRegistrationPattern": {
+      "match_count": 1,
+      "match_rva": "0x1fc917",
+      "rip_targets": {
+        "0": "0x34b458",
+        "7": "0x3859cc",
+        "15": "0x385a54",
+        "28": "0x13260b8",
+        "48": "0x13260b0"
+      },
+      "name_anchor": "timescale"
+    },
+    "kTimeConsumerPattern": {
+      "match_count": 1,
+      "match_rva": "0x1fc269",
+      "rip_targets": {
+        "0": "0x13260b0",
+        "30": "0x3c3960"
+      }
+    },
+    "kAiRegistrationPattern": {
+      "match_count": 1,
+      "match_rva": "0x172bf7",
+      "rip_targets": {
+        "0": "0x33c1c0",
+        "7": "0xd9c048",
+        "20": "0x33c1cc",
+        "34": "0x33c1d8",
+        "41": "0xd9c0b8"
+      },
+      "name_anchor": "g_ai"
+    },
+    "kAiConsumerPattern": {
+      "match_count": 1,
+      "match_rva": "0x12a699",
+      "rip_targets": {
+        "0": "0xd9c0b8",
+        "16": "0xd96ec8"
+      }
+    },
+    "kGravityRegistrationPattern": {
+      "match_count": 1,
+      "match_rva": "0x75fbe",
+      "rip_targets": {
+        "0": "0x324340",
+        "8": "0x323b88",
+        "15": "0x3dd780",
+        "25": "0x323b60",
+        "57": "0x3dd5e8"
+      },
+      "name_anchor": "g_gravity"
+    },
+    "kGravityTrajectoryPattern": {
+      "match_count": 1,
+      "match_rva": "0x736f7",
+      "rip_targets": {
+        "0": "0x3dd5e8",
+        "12": "0x385a24"
+      }
+    },
+    "kPlayerGravityPattern": {
+      "match_count": 1,
+      "match_rva": "0x15bf24",
+      "rip_targets": {
+        "0": "0x338b0c",
+        "13": "0x385b2c",
+        "60": "0xd9c040"
+      }
+    },
+    "kWeaponCatalogPattern": {
+      "match_count": 1,
+      "match_rva": "0x85224",
+      "rip_targets": {
+        "2": "0x3edce0",
+        "22": "0x3ee320"
+      }
+    },
+    "kWeaponCountPattern": {
+      "match_count": 1,
+      "match_rva": "0x8589d",
+      "rip_targets": {
+        "0": "0x3edae0",
+        "6": "0x3edce0",
+        "17": "0x3edae4"
+      }
+    },
+    "kWeaponPointersPattern": {
+      "match_count": 1,
+      "match_rva": "0x85840",
+      "rip_targets": {
+        "2": "0x3edce0",
+        "16": "0x3ee320"
+      }
+    },
+    "kWeaponBindingPattern": {
+      "match_count": 1,
+      "match_rva": "0x852a8",
+      "rip_targets": {
+        "4": "0x3ee320",
+        "11": "0x3ee970"
+      }
+    },
+    "kWeaponFireScriptPattern": {
+      "match_count": 1,
+      "match_rva": "0x18b4e6",
+      "rip_targets": {
+        "15": "0x3859cc"
+      }
+    },
+    "kWeaponFireConsumerPattern": {
+      "match_count": 1,
+      "match_rva": "0x83b68",
+      "rip_targets": {}
+    },
+    "kGrenadeSustainPattern": {
+      "match_count": 1,
+      "match_rva": "0x84edc",
+      "rip_targets": {
+        "3": "0x3246f8",
+        "26": "0x324708"
+      }
     }
   },
   "fov": {
@@ -275,7 +433,7 @@
     "sustain_type": 0,
     "speed_slot_rva": "0xd9c040",
     "speed_type": 5,
-    "limits": "Static exact-build evidence; new player behavior and God regression await test7 owner run.",
+    "limits": "Static exact-build evidence; owner accepts test7. Adjustable movement and new weapon/world actions await test8 retail run.",
     "jump": {
       "height_constant_rva": "0x31f8cc",
       "twice_height_constant_rva": "0x31f8d0",
@@ -289,8 +447,115 @@
         "0x703b0"
       ],
       "native_height": 39,
-      "enabled_height": 117,
+      "default_selected_height": 117,
+      "selectable_heights": [
+        39,
+        78,
+        117,
+        156,
+        195,
+        234,
+        273,
+        312
+      ],
       "compatibility": "Runtime data-only float pair; jump_height dvar is not consumed by the observed jump paths."
     }
+  },
+  "weapon_world": {
+    "dvars": {
+      "g_giveAll": {
+        "slot_rva": "0xd9e068",
+        "type": 0,
+        "current_offset": "0x10"
+      },
+      "bg_forceExplosiveBullets": {
+        "slot_rva": "0x3dd690",
+        "type": 0,
+        "current_offset": "0x10"
+      },
+      "g_ai": {
+        "slot_rva": "0xd9c0b8",
+        "type": 0,
+        "current_offset": "0x10"
+      },
+      "timescale": {
+        "slot_rva": "0x13260b0",
+        "type": 1,
+        "current_offset": "0x10"
+      },
+      "g_gravity": {
+        "slot_rva": "0x3dd5e8",
+        "type": 1,
+        "current_offset": "0x10"
+      }
+    },
+    "partial_fields": {
+      "kCurrentWeapon": [
+        {
+          "signature": "kGiveAllConsumerPattern",
+          "encoded_member_rva": "0x838bc",
+          "offset": "0x2b4"
+        }
+      ],
+      "kPlayerGravity": [
+        {
+          "signature": "kPlayerGravityPattern",
+          "encoded_member_rva": "0x15bf5f",
+          "offset": "0x54"
+        }
+      ],
+      "kCompleteDefinition": [
+        {
+          "signature": "kWeaponBindingPattern",
+          "encoded_member_rva": "0x852ab",
+          "offset": "0x8"
+        }
+      ],
+      "kWeaponFireTime": [
+        {
+          "signature": "kWeaponFireScriptPattern",
+          "encoded_member_rva": "0x18b4f1",
+          "offset": "0x3c"
+        },
+        {
+          "signature": "kWeaponFireConsumerPattern",
+          "encoded_member_rva": "0x83b76",
+          "offset": "0x3c"
+        }
+      ],
+      "kWeaponType": [
+        {
+          "signature": "kSustainConsumerPattern",
+          "encoded_member_rva": "0x84ec2",
+          "offset": "0x54"
+        }
+      ]
+    },
+    "weapon_catalog": {
+      "complete_table_rva": "0x3edce0",
+      "definition_table_rva": "0x3ee320",
+      "last_loaded_index_rva": "0x3edae4",
+      "capacity": 200,
+      "stride": 8
+    },
+    "player_gravity": {
+      "native_literal": 800.5,
+      "literal_rva": "0x338b0c",
+      "scalar_references": [
+        "0x15bf24"
+      ],
+      "positive_floor_helper_rva": "0x2f20a0",
+      "native_dvar_default": 800,
+      "compatibility": "Selected gravity + 0.5 in the sole player constant; native g_gravity float covers trajectories."
+    },
+    "grenade_sustain": {
+      "aliases": [
+        "fraggrenade",
+        "flash_grenade"
+      ],
+      "bypass_target_rva": "0x84fff",
+      "compatibility": "Infinite Grenades is explicitly linked to No Reload; both use player_sustainAmmo."
+    },
+    "limits": "Static evidence; test8 writes and gameplay effects require owner retail execution. Kill All Enemies remains unimplemented."
   }
 }

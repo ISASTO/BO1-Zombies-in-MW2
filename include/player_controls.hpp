@@ -2,6 +2,7 @@
 #include <array>
 #include <cstdint>
 #include <cstring>
+#include <algorithm>
 #include "player_fields.hpp"
 
 namespace mod {
@@ -19,8 +20,15 @@ inline constexpr int kAmmoPoolCount = 15;
 inline constexpr int kInfiniteReserve = 999;
 inline constexpr int kDefaultSpeed = 190;
 inline constexpr int kSuperSpeed = 380;
+inline constexpr int kSpeedStep = 95;
+inline constexpr int kMaximumSpeed = 950;
 inline constexpr float kDefaultJump = 39.f;
 inline constexpr float kSuperJump = 117.f;
+inline constexpr float kMaximumJump = 312.f;
+inline bool ValidJumpPair(float height, float twiceHeight) {
+    return height>=kDefaultJump && height<=kMaximumJump
+        && height==kDefaultJump*static_cast<int>(height/kDefaultJump) && twiceHeight==height*2.f;
+}
 
 enum class PlayerFeature { God, InfiniteAmmo, NoReload, Noclip, SuperSpeed, SuperJump, Count };
 inline const char* FeatureName(PlayerFeature feature) {
@@ -37,9 +45,24 @@ inline const char* FeatureName(PlayerFeature feature) {
 }
 struct PlayerPreferences {
     std::array<bool, static_cast<std::size_t>(PlayerFeature::Count)> enabled{};
+    int speed=kSuperSpeed;
+    int jump=static_cast<int>(kSuperJump);
     bool wanted(PlayerFeature feature) const { return enabled[static_cast<std::size_t>(feature)]; }
     void toggle(PlayerFeature feature) { const auto n=static_cast<std::size_t>(feature); enabled[n]=!enabled[n]; }
-    void reset() { enabled.fill(false); }
+    bool adjust(PlayerFeature feature,int direction) {
+        if (!direction) return false;
+        if (feature==PlayerFeature::SuperSpeed) {
+            const int next=std::clamp(speed+(direction>0?kSpeedStep:-kSpeedStep),kDefaultSpeed,kMaximumSpeed);
+            const bool changed=next!=speed; speed=next; return changed;
+        }
+        if (feature==PlayerFeature::SuperJump) {
+            const int step=static_cast<int>(kDefaultJump);
+            const int next=std::clamp(jump+(direction>0?step:-step),step,static_cast<int>(kMaximumJump));
+            const bool changed=next!=jump; jump=next; return changed;
+        }
+        return false;
+    }
+    void reset() { enabled.fill(false); speed=kSuperSpeed; jump=static_cast<int>(kSuperJump); }
 };
 // Absolute state reconciliation, unlike XOR: a checkpoint can restore a flag
 // after the UI has already selected OFF. Preserve every bit outside our mask.

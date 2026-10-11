@@ -12,16 +12,22 @@ Updated 2026-10-11. Complete one useful, testable change at a time.
 3. **Test6 FOV accepted by owner:** matching logs show saved 100 loaded/applied,
    default 65/clear, selection and save. God protection/menu state disagreed
    after a return/restart; the exact cause is unconfirmed by its old fields.
-4. **Current test7: complete PLAYER prototype and smaller menu:** God desired
-   state/reload reconciliation and independent protection handling; reserve
-   ammo, native clip sustain, noclip, speed, fixed-jump compatibility, reset,
-   and eight visible rows. Six portable suites, nine Python fixtures, 23
-   exact-build patterns, Windows build and isolated script checks pass.
-   Owner God restart/checkpoint regression and per-feature tests are next.
-5. Audit remaining BO1 configuration overrides and dependency closure, then incrementally test round
+4. **Test7 PLAYER accepted by owner:** God session reconciliation/guard handling,
+   reserve ammo, native clip sustain, noclip, speed, fixed-jump compatibility,
+   reset and the compact eight-row menu. The returned run confirms God
+   OFF/death/recovery and valid fields but has no per-feature toggle actions.
+5. **Current test8: adjustable movement and WEAPONS/WORLD prototype:** Left/Right
+   strengths for speed/jump; native loaded weapon access; explicitly linked
+   frag/flash sustain; current-gun Rapid Fire; global explosive bullets;
+   adjustable clock/gravity; native actor-think freeze; scoped resets. Seven
+   C++ suites, nine Python fixtures, 41 exact patterns, Windows build and
+   isolated test7-to-test8 upgrade pass. Owner gameplay/restore/restart checks
+   are next. Kill All Enemies awaits hostile filtering and an engine-thread
+   death path; no health-zero shortcut is enabled.
+6. Audit remaining BO1 configuration overrides and dependency closure, then incrementally test round
    controller scheduling and an IW4 actor adapter. Identify required native
    targeting, pursuit, damage/notetrack and death semantics before enabling AI.
-6. Audit/import one local asset type at a time with versioned conversion tools.
+7. Audit/import one local asset type at a time with versioned conversion tools.
    Validate zombie behavior against BO1 observations before expanding gameplay,
    special rounds, weapon features, or a native IW4 menu.
 

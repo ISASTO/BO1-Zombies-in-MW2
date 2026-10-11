@@ -47,3 +47,12 @@ before committing that dependency.
 - [Pinned T5 StringTable loader](https://github.com/Laupetin/OpenAssetTools/blob/068d4cd9f513ff0509b757498712b2ec3dee9463/src/ObjLoading/Game/T5/StringTable/LoaderStringTableT5.cpp):
   string/hash and cell-index concepts. Our reader validates hashes/permutations,
   but does not claim to reproduce all native sorting/fixup behavior.
+
+## Test8 native weapon access reference
+
+- [IW4x ClientCommand implementation](https://github.com/iw4x/iw4x-client/blob/main/src/Components/Modules/ClientCommand.cpp):
+  current primary upstream reference inspected for native g_giveAll semantics.
+  Its stock global access behavior was a lead; exact retail AMD64 registration,
+  inventory consumer, command branch and loaded catalogs were independently
+  checked. No GPL implementation was copied and no upstream x86 address/layout
+  was used. The current unpinned link is context, not executable evidence.
