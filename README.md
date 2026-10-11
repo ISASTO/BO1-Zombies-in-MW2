@@ -4,8 +4,10 @@ Incremental mod framework for **retail Modern Warfare 2 (2009), single player**.
 The first deliverable is an AMD64 D3D9 DLL that renders a keyboard menu in the
 game. BO1 Zombies is a future mode, not implemented in this first test.
 
-**Status: `0.1.0-menu-test1` builds successfully; retail game execution awaits
-the owner's local test.** No runtime success is claimed yet.
+**Status: the owner reports that `0.1.0-menu-test1` does not launch the game.
+The cause is unknown.** Use [startup test 2](docs/startup-test2.md) to collect the
+failing-run evidence, verify launch after removal, and test a tiny forwarding-only
+DLL. The F4 milestone remains unaccepted. Test 2 deliberately has no menu.
 
 ## Exact supported executable
 
@@ -21,7 +23,7 @@ An executable hash mismatch disables game-state access and memory writes.
 The installer rejects a mismatched build. A manually installed proxy can still
 show its diagnostic menu in an unknown AMD64 `iw4sp.exe`.
 
-## First test
+## Menu test 1 (launch failure under investigation)
 
 1. Close MW2 and extract the entire `BO1MW2-menu-test1.zip` outside the game folder.
 2. Run `Install.cmd` and paste the folder containing the installed `iw4sp.exe`.
@@ -49,7 +51,7 @@ Copy the log immediately after a failing run: `latest.log` is replaced on launch
 
 | Feature | State |
 | --- | --- |
-| Normal Steam launch; no external trainer | D3D9 proxy built, runtime test pending |
+| Normal Steam launch; no external trainer | Test 1 failed owner launch; test 2 isolates loader/forwarding |
 | In-game F4 menu and category navigation | Implemented, portable navigation tests pass |
 | Render-state preservation and reset handling | Implemented, runtime test pending |
 | Active-level / player-health display | Exact-build read-only signatures, runtime test pending |
@@ -92,6 +94,8 @@ ctest --test-dir build -C RelWithDebInfo --output-on-failure
 
 The DLL is `build\RelWithDebInfo\d3d9.dll`. Copy it to `dist\d3d9.dll` to use the
 source checkout's installer. MSVC links the C++ runtime statically.
+The separate startup control and probe are described in
+[startup-test2.md](docs/startup-test2.md); their delivered build uses MinGW.
 
 Linux cross-build: MinGW-w64 x64, CMake, and make or Ninja.
 

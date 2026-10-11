@@ -1,0 +1,53 @@
+{
+  "version": "0.1.1-startup-test2",
+  "compiler": "MinGW-w64 GCC 13-posix, RelWithDebInfo, freestanding C, no CRT",
+  "startup_dll": {
+    "file": "d3d9.dll",
+    "bytes": 92736,
+    "sha256": "73d7d53306a66a0031857dc835d2f8064628b85a26a3a0cce1e0c67e415b7cab",
+    "imports": [
+      "kernel32.dll"
+    ],
+    "exports": [
+      "D3DPERF_BeginEvent",
+      "D3DPERF_EndEvent",
+      "D3DPERF_GetStatus",
+      "D3DPERF_QueryRepeatFrame",
+      "D3DPERF_SetMarker",
+      "D3DPERF_SetOptions",
+      "D3DPERF_SetRegion",
+      "DebugSetMute",
+      "Direct3DCreate9",
+      "Direct3DCreate9Ex"
+    ],
+    "checks": {
+      "amd64_pe32_plus": true,
+      "exact_system_imports": true,
+      "no_tls_directory": true,
+      "entry_point_present": true,
+      "aslr_and_nx": true,
+      "correct_dll_flag": true,
+      "exact_ten_exports": true
+    }
+  },
+  "probe_exe": {
+    "file": "LoaderProbe.exe",
+    "bytes": 64679,
+    "sha256": "ba50775b11499f90214e5eb2c3160bf1e08e1a8ea2c71725514574cb408212ba",
+    "imports": [
+      "kernel32.dll",
+      "shell32.dll"
+    ],
+    "exports": [],
+    "checks": {
+      "amd64_pe32_plus": true,
+      "exact_system_imports": true,
+      "no_tls_directory": true,
+      "entry_point_present": true,
+      "aslr_and_nx": true,
+      "correct_dll_flag": true
+    }
+  },
+  "runtime_status": "Retail test 1 launch failed per owner; root cause unknown. Test 2 Windows execution pending.",
+  "powershell_status": "Four scripts parsed in PowerShell 7.6.6 on Linux. Isolated no-log collection and startup install/hash/receipt/uninstall/log-preservation checks passed. Windows event queries and executable loading remain pending."
+}

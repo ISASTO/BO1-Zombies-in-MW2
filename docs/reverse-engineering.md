@@ -4,6 +4,27 @@ Updated 2026-10-11. Evidence labels: **static confirmed** means verified in the
 uploaded bytes; **runtime pending** means not yet observed in retail MW2. A
 signature match is not a runtime test.
 
+## Runtime iteration log
+
+| Iteration | Observation | Confirmed scope / unresolved work |
+| --- | --- | --- |
+| `0.1.0-menu-test1`, 2026-10-11 | Owner: "the game does not launch" | Failed launch reported. No error, log, module, fault offset, or unmodified-launch comparison yet. No successful menu/level/God runtime behavior confirmed. |
+| `0.1.1-startup-test2` | Freestanding forwarding control + separate loader probe built | Static PE/import/export checks pass. Owner Windows execution pending. Root cause not assigned. |
+
+Test 1 initialized its C++ static runtime, then logging/crash handling, engine
+hash/scanning, factory/device shadows, WndProc, and rendering across startup.
+Potential failure stages include DLL dependency/runtime loading, System32
+forwarding, scan initialization, hook interoperability, and the first draw.
+These are hypotheses, not diagnoses. Test 2 isolates the dependency/forwarding
+path and preserves the original failed-run evidence before any re-test.
+
+The separate startup DLL has only Kernel32 imports and no CRT/TLS/hooks. Its
+entry point does minimal bookkeeping; first-export initialization records host,
+proxy, System32 module, and factory call completion. The loader probe verifies
+the old DLL without its iw4sp-specific paths. Windows event evidence and the
+no-DLL/forwarding-control launch comparison determine the next small change.
+See [startup-test2.md](startup-test2.md) for exact tests and interpretation.
+
 ## Executable identity
 
 | Property | Uploaded MW2 SP | Uploaded BO1 |

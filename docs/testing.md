@@ -1,5 +1,10 @@
 # Test 1: F4 menu foundation
 
+**Observed result: the owner reports that the game does not launch.** No log or
+specific error has been supplied. Pause this sequence and follow
+[startup test 2](startup-test2.md) first. Menu/navigation/God acceptance remains
+pending; compilation did not prove retail startup compatibility.
+
 Build: `0.1.0-menu-test1`, exact September 16, 2026 AMD64 executable. This is an
 initial diagnostic build, not an accepted or proven retail mod yet.
 
