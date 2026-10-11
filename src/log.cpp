@@ -85,7 +85,7 @@ void InitializeLog() {
         }
     }
     Log("BO1MW2 %s | AMD64 | log=%ls", kVersion, file);
-    Log("Player test 4: corrected WORD entity-number gate at +0x7e. Test 3 menu hooks preserved.");
+    Log("Round test 5: read-only BO1 script-default preview; tuning CSV missing. Player test 4 engine path preserved.");
 }
 void Log(const char* format, ...) {
     char body[4096]{};

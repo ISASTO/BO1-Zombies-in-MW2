@@ -1,101 +1,59 @@
-# Test 4: player identity, health, and God Mode
+# Current test5 owner checks
 
-The owner reports that menu test 3 works. Its log confirms rendering, 82 keyboard
-actions, all categories, and server/map transitions without new crash evidence.
-It also kept God Mode locked because the identity guard read the wrong field.
-Test 4 corrects that guard to the native 16-bit entity number at `+0x7e` and
-retains the working graphics/input hooks. Health and God behavior are pending.
+Build `0.1.4-round-test5`, exact supplied AMD64 MW2 executable.
+Phase 1 core passed in the owner's test4 estate session: correct health, God
+ON/OFF and tested checkpoint persistence. This test adds a read-only BO1 round
+preview using labeled script defaults. No Zombies gameplay is implemented.
 
-Build: `0.1.3-player-test4`, exact supplied September 16, 2026 AMD64 executable.
-This is a focused Phase 1 test, with no Zombies gameplay implemented.
-
-## Installation
-
-1. Exit both MW2 executables.
-2. Extract the whole test ZIP to an ordinary folder, such as Desktop\BO1MW2-test4.
-3. Find the installed Single Player game folder through Steam's Browse button.
-4. Run Uninstall.cmd for an earlier project build, then Install.cmd and paste
-   that folder. It checks the executable SHA256 and
-   refuses to replace an existing D3D9 wrapper.
-5. Launch Single Player normally through Steam; no command-line switches,
-   alternate client, injector, Bink replacement, or executable replacement.
-
-The only installed runtime file is `<MW2>\d3d9.dll`. The installer also creates a
-receipt and the diagnostics directory. Keep the `.ps1`/`.cmd` tools outside the
-game directory. Manual DLL copying also works, with the limits in the README.
-
-## Test sequence
-
-For this iteration, focus on steps 3-5 and 8-11, then collect diagnostics
-(step 13). Briefly confirm the working menu after replacing the DLL. Step 12
-is optional. If the HUD still reports loading or UNKNOWN health after you can
-move/fire normally, leave God Mode locked and collect that log immediately.
-
-| Step | Do this | Observe |
-| --- | --- | --- |
-| 1 | Reach the main menu | Upper-left BO1MW2/F4 badge appears; game UI works |
-| 2 | Press F4, Up/Down, Enter, Backspace, F4 | Menu opens, selection moves, categories open/close |
-| 3 | Load any campaign mission and wait for control | HUD reports active level and correct map; PLAYER/God changes from LOCKED to OFF/ON |
-| 4 | Open F4 while a friendly NPC is walking/talking | NPC keeps moving/talking; game is not paused |
-| 5 | Use WASD, mouse, and fire with the menu open | Gameplay still receives these inputs |
-| 6 | Navigate all six categories | Planned entries do nothing; Diagnostics HUD toggle works |
-| 7 | Close the menu using Esc at its home page | Menu closes; arrows/Enter/Esc behave normally in the game afterward |
-| 8 | Open PLAYER, select God Mode, press Enter | Status turns ON; ordinary enemy gunfire no longer removes health |
-| 9 | Turn God Mode off, close menu, take damage | Normal damage returns; record actual health before/after |
-| 10 | Let the player die normally or reload a checkpoint | No crash; state/health refresh; do not assume God persists across reloads |
-| 11 | Return to main menu, then load another mission | No crash; God is locked in main menu and correct map returns in mission |
-| 12 | Optionally Alt-Tab once and change game resolution | Renderer recovers; text and controls still work |
-| 13 | Exit and run Diagnose.cmd | A ZIP contains the run log, receipt, crash files, Windows events, and loader-probe results |
-
-Step 12 tests device-reset handling; it is not required to operate the mod menu.
-God Mode is tested against ordinary damage. Scripted mission failure, a kill
-volume, or a cutscene may use a different path and does not prove the flag failed.
-The flag is changed once per selection and is not reapplied continuously. The
-display reads the actual current entity flag, including changes caused by reloads.
-UNKNOWN health means field validation did not complete; it is not a reported
-health value of zero. The log records the entity number and precise field-read
-status so an identity failure differs from a dead player.
+Follow [round-test5.md](round-test5.md) for installation, keyboard controls,
+expected numbers and the focused test sequence. Use the package's Uninstall.cmd
+before Install.cmd; extract all tools outside the game folder. Launch SP through
+Steam normally. Only d3d9.dll runs beside iw4sp.exe.
 
 ## Return these observations
 
-Copy this into the next message and fill it in:
-
 ```
-Launch: worked / failed before main menu / failed loading mission
-Upper-left badge: visible / missing / unreadable
-Mission:
-Display mode and resolution:
-F4 opens and closes:
-Up/Down/Enter/Backspace work:
-Esc closes and normal controls return:
-NPCs keep moving; WASD/mouse/fire work while menu is open:
-Displayed level state, map name, health:
-God ON under ordinary gunfire:
-God OFF takes damage again:
-Checkpoint reload and second mission:
-Any crash or rendering corruption:
+Launch and mission:
+F4 > ZOMBIE MODE > Round rules preview opens:
+Displayed total/health for rounds 1, 7, 10 and 20:
+Left/Right bounds at 1 and 100:
+F4 close/reopen retains the preview round:
+Back returns to ZOMBIE MODE, then the home category:
+Preview text fits and values are readable:
+Movement, mouse and firing continue with preview open:
+Existing player health and God ON/OFF still work:
+God is LOCKED after returning to the main menu:
+Any crash, last action or rendering corruption:
 ```
 
-Attach the results ZIP. For a crash, describe the last action, any error dialog,
-and whether it happened before or after the badge appeared. A screenshot of the
-menu is useful if its text or positioning is wrong.
+Exit MW2, run Diagnose.cmd and attach the results ZIP. A screenshot is useful
+if text clips. Please also provide the local BO1 common_zombie.ff candidate to
+resolve the concrete missing mp/zombiemode.csv dependency. Original assets
+remain private inputs, not repository/distribution content.
 
-If the game fails to launch, close it and remove this project's `d3d9.dll`. Copy
-the log before relaunching; a new launch replaces `latest.log`. A main-menu load
-without a badge should still be checked for a log, which identifies the last
-completed stage: host, system DLL, factory, device, input, EndScene, Present, font,
-and first draw.
+## Remaining robustness checks
 
-The exception handler attempts a text crash report and a normal minidump for
-unhandled faults reaching it. Steam/game handlers, early loader errors, or a
-later filter replacement can prevent those files. If no crash dump exists,
-return the last log and Windows Application Error's faulting module/offset.
+A different campaign map from estate is useful in this iteration. Device reset,
+resolution changes and Steam-overlay interoperability remain separate tests.
+Opening F4 does not pause the game. Navigation keys are consumed while it is
+open; releases reach the game, and WASD/mouse/fire pass through. The preview
+has no engine writes. God still flips only its native entity bit on an explicit
+selection, and its actual current state is read after reloads. Observed
+checkpoint persistence is not promised for every mission or scripted failure.
 
-## Acceptance gates
+## Diagnostics after a fault
 
-The owner reports a working test 3 menu; its log confirms normal launch, in-game
-rendering, and navigation. Continuous gameplay and correct controls after closing
-still need explicit observations. Phase 1 additionally requires correct level gating,
-God-on/God-off damage observations, a checkpoint reload, and a second mission.
-Further code changes should address observed failures, then repeat the affected
-checks. BO1 AI and asset injection wait until this foundation passes.
+Copy <MW2>\bo1mw2\logs\latest.log before launching again; each launch replaces
+it. Logging can fall back to %LOCALAPPDATA%\BO1MW2. Diagnose.cmd collects logs,
+receipt, available crash files, Windows events and loader-probe results.
+Describe the last action and whether the badge/menu appeared before the fault.
+If needed, close the game and run Uninstall.cmd to remove our receipt-owned DLL.
+
+The exception handler attempts a text crash report and normal minidump for
+unhandled faults reaching it. Earlier loader errors or other game/Steam handlers
+can prevent capture. If no dump exists, return the last log and Application
+Error's faulting module/offset. Full returned logs/dumps are not committed.
+
+Historical failure/correction evidence and original test4 steps remain in
+[player-test4.md](player-test4.md), [menu-test3.md](menu-test3.md) and the
+versioned runtime/build evidence files. Those files describe their own build.

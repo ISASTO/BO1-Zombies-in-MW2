@@ -24,3 +24,16 @@ does not include OAT source. External implementation code, generated BO1 source,
 and game assets are not vendored. If future integration adopts licensed external
 code, add its precise revision, license, notices, and distribution obligations
 before committing that dependency.
+
+## Test5 numeric and StringTable references
+
+- [Pinned T5 VM operator implementation](https://github.com/MisaDev4/bo1-zombies-decompiled/blob/102f6992be332610aff587e681e3180b15f395bb/src/clientscript/cscr_variable.cpp):
+  `Scr_EvalDivide` was a lead for float division. Independently matched its
+  semantics in the owner's exact executable at RVA `0x1bde60`; no source copied.
+- [Pinned VM value definitions](https://github.com/MisaDev4/bo1-zombies-decompiled/blob/102f6992be332610aff587e681e3180b15f395bb/src/clientscript/cscr_variable.h):
+  float/integer tags 5/6. Native getter/divide code independently corroborates
+  the tags and partial layout; not an IW4 structure definition.
+- [Pinned OAT T5 asset definitions](https://github.com/Laupetin/OpenAssetTools/blob/068d4cd9f513ff0509b757498712b2ec3dee9463/src/Common/Game/T5/T5_Assets.h)
+  and [StringTable zone schema](https://github.com/Laupetin/OpenAssetTools/blob/068d4cd9f513ff0509b757498712b2ec3dee9463/src/ZoneCode/Game/T5/XAssets/StringTable.txt):
+  format/dependency references for the missing tuning asset. No OAT loader or
+  GPL source copied. Pointer/stream resolution still needs an independent tool.

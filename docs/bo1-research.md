@@ -70,9 +70,20 @@ included here.
 
 These are **source defaults and control flow**, not fully verified final retail
 parameters. `set_zombie_var` loads the configured CSV column and can supersede
-the defaults. Extract/parse the string table, resolve Kino overrides, and verify
-GSC numeric division/truncation and scheduling semantics before publishing a
-round-count table or implementing deterministic fixtures.
+the defaults. Normal difficulty selects column 2; between-round time omits the
+argument and uses utility default column 1. No `zombiemode.csv` name was found
+in any of the five supplied decompressed zone streams. Inspect the missing
+`common_zombie.ff` next. A name scan is not a full StringTable parser.
+
+The exact local native divide implementation now confirms that integer operands
+return binary32 float, and the int builtin truncates toward zero. Test5's pure
+rules implement this calculation order with bounded, source-default fixtures.
+The menu labels their provenance and does not spawn actors. See
+[round-test5.md](round-test5.md) and [numeric evidence](bo1-round-rules-evidence.json).
+No active normal-round count callback assignment was found in the supplied Kino
+map scripts. Special quad scheduling does have a separate count/pacing path,
+which is excluded. Full configuration, callbacks and VM scheduling remain to be
+resolved before a playable controller is claimed.
 
 ## Pursuit, attack, reaction, and animation coupling
 

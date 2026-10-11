@@ -2,18 +2,20 @@
 
 Incremental mod framework for **retail Modern Warfare 2 (2009), single player**.
 The first deliverable is an AMD64 D3D9 DLL that renders a keyboard menu in the
-game. BO1 Zombies is a future mode, not implemented in this first test.
+game. BO1 Zombies gameplay is a future mode. The current build adds a read-only
+preview of source-derived BO1 round defaults.
 
-**Status: the owner reports that the in-game menu works in test 3.** The returned
-log confirms rendering at 3440x1440, F4 input, all six categories, 82 keyboard
-actions, and a return from `estate` to no active level. There are no new crash
-files or crash events in that bundle. Test 1's graphics-table crash is resolved
-in this observed run. Live gameplay/control recovery still needs explicit feedback.
+**Status: Phase 1 core passed in the owner's test4 estate run.** The owner
+confirms correct health, working God ON/OFF and retained God state through
+checkpoint reloads. Matching diagnostics show complete player reads, five God
+toggles preserving other flags, working menu rendering/input, and God blocked
+back at the main menu. No new crash evidence is included. See
+[test4 evidence](docs/runtime-test4-evidence.json).
 
-`0.1.3-player-test4` corrects the next Phase 1 issue: the player identity guard
-used an entity-type field instead of the native 16-bit entity number. Test 3
-therefore kept God Mode locked and never confirmed player health. See
-[player test 4](docs/player-test4.md) for the evidence and focused next test.
+`0.1.4-round-test5` adds **ZOMBIE MODE > Round rules preview**. It uses actual
+local BO1 GSC fallback defaults and numeric semantics verified in the supplied
+BlackOps.exe. The tuning CSV is still missing, so these are explicitly labeled
+defaults, not final retail/Kino tuning. No Zombies actors or game are started.
 
 ## Exact supported executable
 
@@ -29,9 +31,9 @@ An executable hash mismatch disables game-state access and memory writes.
 The installer rejects a mismatched build. A manually installed proxy can still
 show its diagnostic menu in an unknown AMD64 `iw4sp.exe`.
 
-## Current player test 4
+## Current round test5
 
-1. Close MW2 and extract the entire `BO1MW2-player-test4.zip` outside the game folder.
+1. Close MW2 and extract the entire `BO1MW2-round-test5.zip` outside the game folder.
 2. Run `Uninstall.cmd` to remove an installed earlier project build, then run
    `Install.cmd` and paste the folder containing the installed `iw4sp.exe`.
    Find it through Steam: MW2 Single Player > Properties > Installed Files > Browse.
@@ -39,10 +41,10 @@ show its diagnostic menu in an unknown AMD64 `iw4sp.exe`.
    wait until you can move the player.
 4. Press **F4**. Use **Up/Down**, **Enter**, and **Backspace/Esc**. F4 closes the menu.
    WASD, mouse look, and firing remain available; opening the menu does not pause.
-5. Check that the mission reports an active, living player with positive health.
-   Open PLAYER, turn God Mode on, and test ordinary enemy gunfire. Turn it off
-   and confirm damage returns. Also check gameplay while the menu is open,
-   checkpoint reload, and return to the main menu.
+5. Open ZOMBIE MODE > Round rules preview. With Preview round selected, use
+   Left/Right or Enter to change round 1-100. Compare the values in
+   [round-test5.md](docs/round-test5.md), test nested back/close, and briefly
+   confirm the existing health/God behavior in a campaign mission.
 6. Close the game and run `Diagnose.cmd`. Return its ZIP and the observations
    requested in [testing.md](docs/testing.md).
 
@@ -60,12 +62,14 @@ Copy the log immediately after a failing run: `latest.log` is replaced on launch
 
 | Feature | State |
 | --- | --- |
-| Normal Steam launch; no external trainer | Owner confirms test 2 and menu test 3 work |
-| In-game F4 menu and category navigation | Owner reports success; test 3 log confirms render/input and all categories |
+| Normal Steam launch; no external trainer | Owner confirms tests 2-4 work |
+| In-game F4 menu and category navigation | Owner-confirmed working; matching logs confirm render/input |
 | Render-state preservation and reset handling | Basic rendering observed; reset and overlay interoperability pending |
-| Active-level / player-health display | Server/map reads observed; test 4 corrects identity gate, health test pending |
-| God Mode | Test 3 blocked by identity guard; test 4 damage test pending |
+| Active-level / player-health display | Test4 complete player reads and owner-confirmed correct health |
+| God Mode | Test4 owner confirms ON/OFF and tested checkpoint persistence; no continuous reapplication |
 | Status HUD toggle and state-log action | Implemented |
+| BO1 round-rules preview | Read-only normal-solo script defaults; portable fixtures pass, retail test5 pending |
+| FOV selector and saved preference | Requested; deferred to a later focused iteration |
 | Ammo, weapons, world, spawning, Zombies | Visible placeholders with no action |
 
 ## Architecture
@@ -99,9 +103,9 @@ The owner logs resolved all five signatures and name anchors in the live process
 Test 3 observed server/map transitions, but our incorrect `+0x00` integer identity
 guard rejected the player. The exact executable's allocator assigns the entity
 index with a WORD store at `+0x7e`; a separate native read corroborates it. Test 4
-uses that 16-bit field. Portable tests reproduce the former failure and verify
-unreadable/wrong-slot/implausible-health guards. Health and God behavior still
-require mission observations. Failed field reads display UNKNOWN health.
+uses that 16-bit field, now confirmed by test4 live reads and owner observations.
+Portable tests reproduce the former failure and verify
+unreadable/wrong-slot/implausible-health guards. Failed reads display UNKNOWN.
 No historical IW4 address is used. No T5 structure is cast as an IW4 structure.
 Hooks are process-lifetime objects; DLL hot-unload is intentionally unsupported.
 This proxy targets the supplied game's regular D3D9 device, not a general D3D9Ex
@@ -139,6 +143,8 @@ For input metadata and signature verification, install `requirements-dev.txt`:
 ```sh
 python3 tools/inspect_inputs.py /path/to/iw4sp.exe /path/to/BlackOps.exe
 python3 tools/verify_profile.py /path/to/iw4sp.exe
+python3 tools/verify_bo1_round_rules.py /path/to/BlackOps.exe \
+  --zone /path/to/common_zombie_patch.ff
 python3 tools/extract_bo1_scripts.py /path/to/zombie_theater.ff \
   /path/to/common_zombie_patch.ff /path/to/zombie_theater_patch.ff
 ```
@@ -156,11 +162,13 @@ Original games remain user-supplied inputs and must never be added to this repo.
   and the A/B/C division for future translation.
 - [Testing](docs/testing.md): exact observations needed to accept the milestone.
 - [Menu test 3](docs/menu-test3.md) and [test 2 evidence](docs/runtime-test2-evidence.json): diagnosed launch failure and correction.
-- [Test 3 evidence](docs/runtime-test3-evidence.json) and [player test 4](docs/player-test4.md): working menu, corrected identity field, and next test.
+- [Test4 evidence](docs/runtime-test4-evidence.json) and [player test4](docs/player-test4.md): accepted health/God foundation.
+- [Round test5](docs/round-test5.md) and [numeric evidence](docs/bo1-round-rules-evidence.json): current preview and provenance.
+- [Roadmap](docs/roadmap.md): incremental gates and persistent FOV request.
 - [Reference projects](docs/references.md): upstream sources and limits of reuse.
 - [Input hashes](docs/input-manifest.json) and [profile checks](docs/profile-checks.json).
 
-The render/input path now has an observed retail success. Next validate player
-health, God-on/God-off damage, level gating, live gameplay, and checkpoint/mission
-transitions. Renderer reset remains a separate robustness check. BO1 AI and asset
-injection wait until the Phase 1 foundation is accepted.
+The core foundation is accepted in the tested session. Next test the read-only
+preview, recover final BO1 tuning, and broaden campaign-map/reset coverage.
+AI and asset injection need separate compatibility and behavior tests; shared
+engine ancestry does not imply compatible binary layouts or actor behavior.

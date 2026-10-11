@@ -4,9 +4,10 @@
 #include <cstring>
 #include <string>
 #include <vector>
+#include "bo1_round_rules.hpp"
 
 namespace mod {
-inline constexpr const char* kVersion = "0.1.3-player-test4";
+inline constexpr const char* kVersion = "0.1.4-round-test5";
 inline constexpr const char* kExeSha256 = "fb7e8a987c371dea7b666091b0b9e2011c0cd9cd277b191ad453d11d557dd777";
 
 // -1 is a wildcard. Reject malformed patterns rather than matching everything.
@@ -68,15 +69,16 @@ inline constexpr const char* kGodDamagePattern =
 inline constexpr const char* kHealthGuardPattern =
     "83 B9 64 01 00 00 00 7F 09 48 8D 0D ?? ?? ?? ?? EB AD";
 
-enum class Page { Home, Player, Weapons, World, AI, Zombies, Diagnostics };
-enum class Input { Toggle, Up, Down, Select, Back };
-enum class Action { None, ToggleGod, ToggleHud, WriteSnapshot };
+enum class Page { Home, Player, Weapons, World, AI, Zombies, Diagnostics, ZombieRules };
+enum class Input { Toggle, Up, Down, Select, Back, Left, Right };
+enum class Action { None, ToggleGod, ToggleHud, WriteSnapshot, WriteRoundPreview };
 struct MenuState {
     bool visible = false;
     bool hud = true;
     Page page = Page::Home;
     int selected = 0;
     int homeSelection = 0;
+    int previewRound = bo1::kPreviewMinRound;
     int count() const {
         switch (page) {
             case Page::Home: return 6;
@@ -84,18 +86,27 @@ struct MenuState {
             case Page::Weapons: return 5;
             case Page::World: return 4;
             case Page::AI: return 3;
-            case Page::Zombies: return 3;
+            case Page::Zombies: return 4;
             case Page::Diagnostics: return 2;
+            case Page::ZombieRules: return 6;
         }
         return 0;
     }
     Action input(Input key) {
         if (key == Input::Toggle) { visible = !visible; return Action::None; }
         if (!visible) return Action::None;
+        if (page == Page::ZombieRules && selected == 0
+            && (key == Input::Left || key == Input::Right || key == Input::Select)) {
+            const int oldRound = previewRound;
+            if (key == Input::Left && previewRound > bo1::kPreviewMinRound) --previewRound;
+            if (key != Input::Left && previewRound < bo1::kPreviewMaxRound) ++previewRound;
+            return previewRound == oldRound ? Action::None : Action::WriteRoundPreview;
+        }
         if (key == Input::Up) selected = (selected + count() - 1) % count();
         if (key == Input::Down) selected = (selected + 1) % count();
         if (key == Input::Back) {
             if (page == Page::Home) visible = false;
+            else if (page == Page::ZombieRules) { page = Page::Zombies; selected = 0; }
             else { page = Page::Home; selected = homeSelection; }
         }
         if (key == Input::Select) {
@@ -104,6 +115,9 @@ struct MenuState {
                 page = static_cast<Page>(selected + 1);
                 selected = 0;
             } else if (page == Page::Player && selected == 0) return Action::ToggleGod;
+            else if (page == Page::Zombies && selected == 0) {
+                page = Page::ZombieRules; selected = 0; return Action::WriteRoundPreview;
+            }
             else if (page == Page::Diagnostics && selected == 0) {
                 hud = !hud; return Action::ToggleHud;
             } else if (page == Page::Diagnostics && selected == 1) return Action::WriteSnapshot;

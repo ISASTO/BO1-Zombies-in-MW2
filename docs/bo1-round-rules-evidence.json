@@ -1,0 +1,61 @@
+{
+  "executable_sha256": "2ba4a04e81de2b60582da0e4489efde21e6cb07904a223bae633b6ccaebbf759",
+  "architecture": "I386",
+  "integer_division": {
+    "integer_case_rva": "0x1bde9b",
+    "result_type": 5,
+    "type_semantics": "float",
+    "float_width_bytes": 4,
+    "evidence": "set type 5, CVTSI2SS both operands, DIVSS, MOVSS result"
+  },
+  "float_to_integer": {
+    "truncation_sequence_rva": "0x566a92",
+    "evidence": "FSTP qword followed by CVTTSD2SI; truncates toward zero",
+    "builtin_entries": [
+      {
+        "table_entry_rva": "0x771f9c",
+        "function_rva": "0x386ca0",
+        "float_conversion_call": "0x386cf3"
+      },
+      {
+        "table_entry_rva": "0x7767bc",
+        "function_rva": "0x3f8c50",
+        "float_conversion_call": "0x3f8caa"
+      }
+    ]
+  },
+  "zone_scans": [
+    {
+      "file": "common_zombie_patch.ff",
+      "sha256": "3311182f5cb9af07d69d628b8223ab43e47992e4951b46e761d4f0152f33787e",
+      "raw_size": 1119345,
+      "tuning_name_present": false
+    },
+    {
+      "file": "zombie_theater.ff",
+      "sha256": "970db88bb5ae9aa1d3875cdbd55d43212f22ee55096ce251f596d4a38a776786",
+      "raw_size": 111197376,
+      "tuning_name_present": false
+    },
+    {
+      "file": "zombie_theater_patch.ff",
+      "sha256": "694c29e4e25af78b658de822ac16ea044b78768495624062cecff1c353f9d2fc",
+      "raw_size": 799783,
+      "tuning_name_present": false
+    },
+    {
+      "file": "en_common_zombie.ff",
+      "sha256": "d5dd554025ddaf60d670714b216fa2ef801d89ace970630fdefa6504ff25777d",
+      "raw_size": 122932,
+      "tuning_name_present": false
+    },
+    {
+      "file": "en_zombie_theater.ff",
+      "sha256": "d26cbc49349ff971ca12cb8cace8cc147bd64564974ece106d6ce08ae4e75756",
+      "raw_size": 1654841,
+      "tuning_name_present": false
+    }
+  ],
+  "scan_limit": "Name search in decompressed streams; not a full StringTable loader",
+  "retail_final_parameters_verified": false
+}

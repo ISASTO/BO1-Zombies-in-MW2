@@ -1,0 +1,43 @@
+{
+  "version": "0.1.4-round-test5",
+  "compiler": "MinGW-w64 GCC 13-posix, RelWithDebInfo, static runtime",
+  "architecture": "AMD64",
+  "dll_size": 1531272,
+  "dll_sha256": "c1d2a8fc7f94b6ee21a0cc951ba39f458c7e78953332b090abec253951f3cbae",
+  "imports": [
+    "bcrypt.dll",
+    "dbghelp.dll",
+    "gdi32.dll",
+    "kernel32.dll",
+    "msvcrt.dll",
+    "user32.dll"
+  ],
+  "exports": [
+    "D3DPERF_BeginEvent",
+    "D3DPERF_EndEvent",
+    "D3DPERF_GetStatus",
+    "D3DPERF_QueryRepeatFrame",
+    "D3DPERF_SetMarker",
+    "D3DPERF_SetOptions",
+    "D3DPERF_SetRegion",
+    "DebugSetMute",
+    "Direct3DCreate9",
+    "Direct3DCreate9Ex"
+  ],
+  "checks": {
+    "aslr_and_nx": true,
+    "native_cpp_tests": "4 passed: menu/pattern and preview navigation/bounds; private-vtable/shared-table; player-fields; BO1 default round fixtures/float and pacing boundaries",
+    "regression_before_implementation": "BO1 fixture test failed against empty rules, then passed after source-derived implementation",
+    "preserved_test4_sources": {
+      "src/proxy.cpp": "7f794cdd99c355b4dce2609726164d80e7695e62",
+      "src/engine.cpp": "c79be1b756e395d4af171185c063b2930363081c",
+      "include/player_fields.hpp": "6826725ad49d6f6b4203e832638d1acdc763dc20"
+    },
+    "bo1_native_numeric_evidence": "Exact T5 hash; unique division and truncation patterns; two int builtin table entries and relative conversion calls verified",
+    "bo1_configuration": "SCRIPT_FALLBACK_DEFAULTS only. Missing tuning name in five uploaded decompressed zone streams. No final retail parameters verified.",
+    "powershell_scripts": "All four parsed with PowerShell 7.6.6. Isolated test4-to-test5 uninstall/install, receipt/hash, diagnostic selection, removal, game/log preservation passed on Linux. Windows probe execution unavailable here.",
+    "retail_mw2_runtime": "Test4 owner-confirmed success with matching diagnostics. Test5 runtime pending owner observations.",
+    "original_game_assets_in_distribution": "none"
+  },
+  "change": "Read-only normal-solo source-default BO1 round rules preview, round 1-100, Left/Right/Enter, nested back. No new engine writes or AI/asset operations."
+}

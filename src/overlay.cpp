@@ -24,10 +24,13 @@ LRESULT CALLBACK WindowProc(HWND window, UINT message, WPARAM wparam, LPARAM lpa
             if (down && !repeat) overlay->queue(Input::Toggle);
             return 0;
         }
-        if (overlay->visible && (wparam == VK_UP || wparam == VK_DOWN || wparam == VK_RETURN || wparam == VK_BACK || wparam == VK_ESCAPE)) {
-            if (down && (wparam == VK_UP || wparam == VK_DOWN || !repeat)) {
+        if (overlay->visible && (wparam == VK_UP || wparam == VK_DOWN || wparam == VK_LEFT || wparam == VK_RIGHT
+                                || wparam == VK_RETURN || wparam == VK_BACK || wparam == VK_ESCAPE)) {
+            if (down && (wparam == VK_UP || wparam == VK_DOWN || wparam == VK_LEFT || wparam == VK_RIGHT || !repeat)) {
                 if (wparam == VK_UP) overlay->queue(Input::Up);
                 else if (wparam == VK_DOWN) overlay->queue(Input::Down);
+                else if (wparam == VK_LEFT) overlay->queue(Input::Left);
+                else if (wparam == VK_RIGHT) overlay->queue(Input::Right);
                 else if (wparam == VK_RETURN) overlay->queue(Input::Select);
                 else overlay->queue(Input::Back);
             }
@@ -138,6 +141,7 @@ const char* PageName(Page page) {
         case Page::AI: return "AI";
         case Page::Zombies: return "ZOMBIE MODE";
         case Page::Diagnostics: return "DIAGNOSTICS";
+        case Page::ZombieRules: return "BO1 ROUND RULES PREVIEW";
     }
     return "";
 }
@@ -147,15 +151,24 @@ const char* Row(Page page, int n) {
     static constexpr const char* weapons[] = {"Give All", "Infinite Grenades", "Rapid Fire", "Explosive Bullets", "Debug Features"};
     static constexpr const char* world[] = {"Slow Motion", "Freeze AI", "Gravity", "Kill All Enemies"};
     static constexpr const char* ai[] = {"Spawn Enemy", "Spawn Friendly", "AI Controls"};
-    static constexpr const char* zombies[] = {"Enable Zombies", "Start Game", "Round / Population Controls"};
+    static constexpr const char* zombies[] = {"Round rules preview", "Enable Zombies", "Start Game", "Round / Population Controls"};
     static constexpr const char* diag[] = {"Status HUD", "Write State to Log"};
+    static constexpr const char* rules[] = {"Preview round", "Total zombies", "Zombie health", "Simultaneous cap", "Spawn interval", "Between rounds"};
     switch (page) {
         case Page::Home: return home[n]; case Page::Player: return player[n];
         case Page::Weapons: return weapons[n]; case Page::World: return world[n];
         case Page::AI: return ai[n]; case Page::Zombies: return zombies[n];
         case Page::Diagnostics: return diag[n];
+        case Page::ZombieRules: return rules[n];
     }
     return "";
+}
+void LogRoundPreview(int round) {
+    const auto p = bo1::EvaluateNormalSoloRound(round, round == 1);
+    if (!p) return;
+    Log("BO1_RULES source=SCRIPT_FALLBACK_DEFAULTS tuning_csv=MISSING profile=NORMAL_SOLO "
+        "round=%d first_round=%d total=%d health=%d concurrent_limit=%d spawn_interval=%.9f between_round_seconds=%d",
+        p->round, round == 1, p->total, p->health, p->concurrentLimit, p->spawnInterval, p->betweenRoundSeconds);
 }
 void Configure(IDirect3DDevice9* device) {
     device->SetVertexShader(nullptr); device->SetPixelShader(nullptr); device->SetFVF(kFvf);
@@ -234,6 +247,7 @@ void Overlay::frame() {
             static_cast<int>(menu.page), menu.selected);
         if (action == Action::ToggleGod) ToggleGod();
         else if (action == Action::WriteSnapshot) LogSnapshot();
+        else if (action == Action::WriteRoundPreview) LogRoundPreview(menu.previewRound);
     }
     {
         std::lock_guard<std::mutex> lock(inputMutex);
@@ -281,28 +295,52 @@ void Overlay::frame() {
         rect(40,74,570,4,kAccent);
         text(61,92,kAccent,"MW2 / BO1 ZOMBIES",1.15f);
         text(61,125,kText,PageName(menu.page));
-        text(61,156,kMuted,StateText(s.state),.88f);
-        if (s.map[0]) {
+        if (menu.page == Page::ZombieRules) {
+            text(61,156,kMuted,"Script defaults | tuning CSV missing",.88f);
+            std::snprintf(line,sizeof(line),"Normal solo rounds | Preview %d / %d", menu.previewRound, bo1::kPreviewMaxRound);
+            text(61,180,kMuted,line,.88f);
+        } else if (s.map[0]) {
+            text(61,156,kMuted,StateText(s.state),.88f);
             if (s.playerRead == PlayerReadStatus::Complete)
                 std::snprintf(line,sizeof(line),"Map: %.32s   Health: %d",s.map,s.health);
             else std::snprintf(line,sizeof(line),"Map: %.32s   Health: UNKNOWN",s.map);
             text(61,180,kMuted,line,.88f);
-        } else text(61,180,kMuted,"Player test 4 | Zombies under development",.88f);
+        } else {
+            text(61,156,kMuted,StateText(s.state),.88f);
+            text(61,180,kMuted,"Round test 5 | Zombies under development",.88f);
+        }
+        const auto preview = menu.page == Page::ZombieRules
+            ? bo1::EvaluateNormalSoloRound(menu.previewRound, menu.previewRound == 1) : std::nullopt;
         for (int n=0; n<menu.count(); ++n) {
             const float y=216.f+n*42.f;
             const bool selected=menu.selected==n;
             if (selected) { rect(52,y-2,546,37,D3DCOLOR_ARGB(255,49,57,32)); rect(52,y-2,3,37,kAccent); }
             text(67,y+3,selected?kAccent:kText,Row(menu.page,n));
             const char* status="PLANNED";
+            char value[32]{};
             if (menu.page==Page::Home) status=">";
             else if (menu.page==Page::Player && n==0) status=s.state==LevelState::Ready?(s.god?"ON":"OFF"):"LOCKED";
             else if (menu.page==Page::Diagnostics) status=n==0?(menu.hud?"ON":"OFF"):"ENTER";
+            else if (menu.page==Page::Zombies && n==0) status="ENTER";
+            else if (preview) {
+                switch (n) {
+                    case 0: std::snprintf(value,sizeof(value),"%d",preview->round); break;
+                    case 1: std::snprintf(value,sizeof(value),"%d",preview->total); break;
+                    case 2: std::snprintf(value,sizeof(value),"%d",preview->health); break;
+                    case 3: std::snprintf(value,sizeof(value),"%d",preview->concurrentLimit); break;
+                    case 4: std::snprintf(value,sizeof(value),"%.3fs",preview->spawnInterval); break;
+                    case 5: std::snprintf(value,sizeof(value),"%ds",preview->betweenRoundSeconds); break;
+                }
+                status=value;
+            }
             text(503,y+5,kMuted,status,.85f);
         }
         rect(52,483,546,1,D3DCOLOR_ARGB(255,57,63,47));
-        text(61,497,kMuted,"UP/DOWN: Select  ENTER: Activate",.88f);
+        text(61,497,kMuted,menu.page==Page::ZombieRules
+            ? "LEFT/RIGHT: Round  ENTER: Next  UP/DOWN: Row" : "UP/DOWN: Select  ENTER: Activate",.88f);
         text(61,522,kMuted,"BACKSPACE/ESC: Back   F4: Close",.88f);
-        text(61,551,kAccent,"Game keeps running. WASD and mouse work.",.85f);
+        text(61,551,kAccent,menu.page==Page::ZombieRules
+            ? "Read-only preview. No zombies spawned." : "Game keeps running. WASD and mouse work.",.85f);
     }
     state->Apply();
     if (SUCCEEDED(worldResult)) device->SetTransform(D3DTS_WORLD,&world);

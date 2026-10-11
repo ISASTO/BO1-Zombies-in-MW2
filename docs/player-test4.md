@@ -1,5 +1,13 @@
 # Player test 4: correct the entity-number guard
 
+**Owner result, 2026-10-11: passed in the tested estate session.** The owner
+confirms correct health, working God ON/OFF, and God state retained through
+their checkpoint reloads. The matching log has complete slot-zero reads,
+five successful toggles preserving unrelated flags, health 2/70/100, and a
+blocked God selection after return to the main menu. No new crash evidence is
+included. See [test4 evidence](runtime-test4-evidence.json). The Phase 1 core
+milestone is accepted on this exact build; second-map/reset checks remain.
+
 ## Evidence from the working menu
 
 The owner reports that menu test 3 works. The returned ZIP's receipt and DLL
@@ -64,9 +72,10 @@ instructions, including optional device-reset testing, are in [testing.md](testi
 
 ## Limits
 
-The layout correction is statically confirmed in the owner's executable and
-covered by the regression. Retail test 4 health/God behavior is pending. The
-working test 3 does not establish reset handling, Steam-overlay interoperability,
-continuous gameplay, or full input recovery by itself. BO1 AI/asset work remains
-behind the Phase 1 acceptance gate. No original game assets or returned logs/dumps
+The layout correction is statically confirmed, covered by regression tests, and
+now accepted through owner observations and test4 diagnostics. The observed
+checkpoint persistence is not a universal guarantee: the mod reads the actual
+flag and does not continuously reapply it. Device reset, a second mission,
+Steam-overlay interoperability and cutscene/player swaps remain separate checks.
+No original game assets or returned logs/dumps
 are included in the source repository or test distribution.

@@ -11,7 +11,8 @@ signature match is not a runtime test.
 | `0.1.0-menu-test1`, 2026-10-11 | Owner: "the game does not launch"; later supplied three dumps | All fail during native SetRenderState private slot 134 after a 119-entry shadow was installed. Exact host/profile resolution and successful device/input setup confirmed; first frame not reached. |
 | `0.1.1-startup-test2` | Owner: "launch worked both times" (unmodified and forwarding control) | Retail forwarding baseline passed. System/old-DLL/control probes all exit zero in both result bundles. Windows collector and installer executed successfully. |
 | `0.1.2-menu-test3` | Owner: "It works!!! this is so cool!!!"; returned matching diagnostic bundle | EndScene/font/3440x1440 draw, 82 key actions, all six categories, close/back, and estate-to-no-server transition observed. No new crash evidence. Player readiness failed and three God actions were blocked. |
-| `0.1.3-player-test4` | Correct the player number to a WORD at `+0x7e`; add field-read diagnostics | New regression fails with the former guard and passes after correction. Existing menu/private-table tests pass. Health/God/checkpoint observations pending. |
+| `0.1.3-player-test4` | Owner confirms correct health, working God ON/OFF and retained God state through checkpoint reloads | Matching log shows complete slot-zero reads, five toggles preserving other flags, health 2/70/100, and God blocked back at main menu. No new crash evidence. Phase 1 core accepted in estate on the exact build. |
+| `0.1.4-round-test5` | Add read-only normal-solo BO1 script-default preview | T5 float division/int truncation confirmed in local native code. Source-derived fixtures pass; CSV tuning absent from supplied zone name scans. Retail UI/regression test pending. |
 
 Test 1 initialized its C++ static runtime, then logging/crash handling, engine
 hash/scanning, factory/device shadows, WndProc, and rendering across startup.
@@ -107,8 +108,9 @@ column is for static analysis only; ASLR changes runtime addresses.
 | `Dvar_GetString` candidate | `0x26c050` | `0x14026c050` | Current string pointer `+0x10`, enum handling at type 6 |
 
 All rows above are static confirmed. The test 3 log additionally confirms live
-signature resolution and server/map/entity-pointer reads. Validated player health
-and God behavior remain pending.
+signature resolution and server/map/entity-pointer reads. Test4 additionally
+confirms slot-zero identity, validated health reads and God flag writes; the
+owner confirms damage behavior and checkpoint persistence in the tested run.
 Native function names are assigned from semantics, not recovered symbols. None
 of the listed engine functions are called by our DLL. RCX/RDX/ECX observations
 are Microsoft x64 ABI evidence; they do not authorize using an old x86 typedef.
@@ -123,7 +125,7 @@ independently corroborates its meaning. It leaves other entity flags intact.
 | --- | --- | --- |
 | MW2 entity stride | `0x2a0` | Client command indexing and God loop |
 | Entity type | `+0x00`, 8-bit | Native allocation/type branches; not used as an identity guard. Former 32-bit entity-number interpretation was wrong. |
-| Entity number | `+0x7e`, unsigned 16-bit | Native array-index WORD store and independent zero-extended WORD read; corrected in test 4, runtime gate pending |
+| Entity number | `+0x7e`, unsigned 16-bit | Native array-index WORD store and independent zero-extended WORD read; test4 runtime reads number 0 and passes gate |
 | Entity flags | `+0x150`, 32-bit | Native XOR/store and damage test |
 | God bit | `0x1` | Native command and damage branch |
 | Entity health | `+0x164`, signed 32-bit | Native cheat-alive guard |
@@ -139,7 +141,7 @@ Only individual fields are read; no complete `gentity_s`, `gclient_s`,
 `playerState_s`, or `actor_s` is assumed. Ammo and weapon layouts remain unknown.
 Player identification by slot zero is supported by the dispatcher; mission and
 checkpoint behavior are still local tests, not a claim of universal reliability.
-Test 3 established the slot-zero pointer, not successful identity/health validation.
+Test 3 established the slot-zero pointer; test4 confirmed identity/health reads.
 
 ## Resolution and level gate
 
@@ -162,12 +164,49 @@ No renderer callback alone is treated as proof that a level is active.
 No game-state flag is modified to make the level gate pass.
 Test 4 corrects only the identity member/width and exposes each failed field-read
 stage in the log. The old Transition report could reflect the wrong guard rather
-than actual loading. Health/God still require the owner's observed results.
+than actual loading. Test4 now supplies successful health/God observations and
+confirms writes are blocked after the estate-to-main-menu transition.
 
 Remaining level-gate questions: initialization/unload ordering; whether any
 front-end map can leave a running server and a live slot-zero entity; effects of
 cutscene/player-entity swaps; and invalid/dead states during checkpoint reloads.
-Use the next test log to resolve these before adding recurring or AI operations.
+Broaden the mission checks before adding recurring or AI operations. Test5's
+preview uses only local mathematical constants and does not require a live actor.
+
+## T5 round-rule numeric evidence: exact uploaded BlackOps.exe
+
+These are private-input research RVAs, not functions called by the MW2 DLL.
+The verification tool checks the complete T5 hash and unique instruction
+patterns, and decodes builtin-table name/function pointers and relative calls.
+
+| Assigned function / finding | RVA | Evidence / calling convention |
+| --- | --- | --- |
+| `Scr_EvalDivide` candidate | `0x1bde60` | x86 stack arguments `(instance, value1, value2)`; plain RET, caller cleanup, consistent with cdecl; inferred name confirmed by matching operator semantics and divide-by-zero references |
+| Integer divide branch | `0x1bde9b` | Type 6 dispatch; sets result type 5, CVTSI2SS operands, DIVSS, MOVSS. Integer operands therefore yield binary32 float |
+| `int` builtin, VM selector 0 | `0x3f8c50` | Table at `0x7767bc` names `int`; float case gets float then calls truncation helper at `0x3f8caa`. No-argument builtin wrapper; instance selector supplied internally |
+| `int` builtin, VM selector 1 | `0x386ca0` | Table at `0x771f9c` names `int`; corresponding float conversion call `0x386cf3` |
+| Float-to-int helper candidate | `0x566a80` | x87 ST(0) input; SSE path at `0x566a92` stores qword then CVTTSD2SI to EAX, truncating toward zero. Legacy fallback also present; no runtime call made |
+| Partial T5 VM value | union `+0`, type `+4`, stride 8 | Native float getter at `0x73380` indexes stack by 8 and distinguishes tags 5/6; research only, never cast into IW4 |
+
+Normal GSC uses column 2 for main round tuning, whereas the between-round value
+omits a column and uses utility default 1. Five supplied version-473 zone streams
+contain no `zombiemode.csv` name. Request/inspect BO1 `common_zombie.ff` next to
+resolve this concrete missing dependency. Until then, the menu and all rule
+logs mark fallback-default provenance. No final retail/Kino table is claimed.
+
+OpenAssetTools' pinned T5 schema describes StringTable name, row/column counts,
+cell strings/hashes and a cell-index array. For T5 x86 the serialized structure
+uses 32-bit pointers; cells contain string pointer plus hash. Parse its zone
+pointer/stream fixups before using this as an asset importer. A string-name scan
+does not implement that parser, and this format must not be cast into x64 IW4.
+
+The portable preview is bounded to rounds 1-100 and only normal solo rounds.
+The first-round flag remains independent in the calculation API; the UI sets it
+only at round 1 in a fresh-start profile. Health truncates on every multiplicative
+step, and pacing applies the prior-value branch (round64 undershoots .08,
+round65 resets to .08). Dog/quad timing, map hooks, VM wait/thread semantics and
+actual spawn capacity accounting remain unimplemented. See
+[round test5](round-test5.md) and [numeric evidence](bo1-round-rules-evidence.json).
 
 ## Render/input and loading
 
