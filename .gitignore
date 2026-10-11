@@ -1,0 +1,12 @@
+/build*/
+/dist/
+/local-data/
+/analysis/
+*.exe
+*.dll
+*.ff
+*.iwd
+*.pdb
+*.dmp
+*.log
+__pycache__/
