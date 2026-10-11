@@ -2,8 +2,8 @@
 
 Incremental mod framework for **retail Modern Warfare 2 (2009), single player**.
 The first deliverable is an AMD64 D3D9 DLL that renders a keyboard menu in the
-game. BO1 Zombies gameplay is a future mode. The current build adds a read-only
-preview of source-derived BO1 round defaults.
+game. BO1 Zombies gameplay is a future mode. The current build adds a base-FOV
+selector with an explicit saved preference. The BO1 round preview remains read-only.
 
 **Status: Phase 1 core passed in the owner's test4 estate run.** The owner
 confirms correct health, working God ON/OFF and retained God state through
@@ -12,10 +12,15 @@ toggles preserving other flags, working menu rendering/input, and God blocked
 back at the main menu. No new crash evidence is included. See
 [test4 evidence](docs/runtime-test4-evidence.json).
 
-`0.1.4-round-test5` adds **ZOMBIE MODE > Round rules preview**. It uses actual
-local BO1 GSC fallback defaults and numeric semantics verified in the supplied
-BlackOps.exe. The tuning CSV is still missing, so these are explicitly labeled
-defaults, not final retail/Kino tuning. No Zombies actors or game are started.
+The owner also confirms test5 works. Its matching front-end diagnostics cover
+all 100 preview rounds and navigation, with no new crash evidence. That run did
+not enter a mission. See [test5 evidence](docs/runtime-test5-evidence.json).
+
+`0.1.5-fov-test6` adds **PLAYER > FOV settings**: 60-120 in steps of 5, Save for
+next launch, and Restore default / clear saved. FOV runtime/restart/ADS checks
+are pending. The supplied BO1 `common_zombie.ff` now resolves the normal tuning
+CSV; recovered values match the preview, so its numbers are unchanged. Special
+rounds and final map/runtime overrides remain outside that preview.
 
 ## Exact supported executable
 
@@ -31,9 +36,9 @@ An executable hash mismatch disables game-state access and memory writes.
 The installer rejects a mismatched build. A manually installed proxy can still
 show its diagnostic menu in an unknown AMD64 `iw4sp.exe`.
 
-## Current round test5
+## Current FOV test6
 
-1. Close MW2 and extract the entire `BO1MW2-round-test5.zip` outside the game folder.
+1. Close MW2 and extract the entire `BO1MW2-fov-test6.zip` outside the game folder.
 2. Run `Uninstall.cmd` to remove an installed earlier project build, then run
    `Install.cmd` and paste the folder containing the installed `iw4sp.exe`.
    Find it through Steam: MW2 Single Player > Properties > Installed Files > Browse.
@@ -41,11 +46,14 @@ show its diagnostic menu in an unknown AMD64 `iw4sp.exe`.
    wait until you can move the player.
 4. Press **F4**. Use **Up/Down**, **Enter**, and **Backspace/Esc**. F4 closes the menu.
    WASD, mouse look, and firing remain available; opening the menu does not pause.
-5. Open ZOMBIE MODE > Round rules preview. With Preview round selected, use
-   Left/Right or Enter to change round 1-100. Compare the values in
-   [round-test5.md](docs/round-test5.md), test nested back/close, and briefly
-   confirm the existing health/God behavior in a campaign mission.
-6. Close the game and run `Diagnose.cmd`. Return its ZIP and the observations
+5. Open PLAYER > FOV settings. With Base FOV selected, use Left/Right to choose
+   90. Confirm Live base FOV becomes 90 and the view widens. Select Save for next
+   launch and press Enter. Saved base FOV should become 90.
+6. Exit and relaunch through Steam, enter a mission, and confirm 90 is restored
+   without reselecting it. Check ADS/zoom, a checkpoint reload and existing God
+   behavior. Restore default clears the preference and queues the native 65
+   once. Follow the focused sequence in [fov-test6.md](docs/fov-test6.md).
+7. Close the game and run `Diagnose.cmd`. Return its ZIP and the observations
    requested in [testing.md](docs/testing.md).
 
 For manual installation, copy only the package's `d3d9.dll` beside `iw4sp.exe`.
@@ -53,6 +61,8 @@ Never overwrite an existing `d3d9.dll`; temporarily move a previous wrapper out
 of the folder for this isolated test. Keep the original Bink DLL and all fastfiles.
 For manual removal, close the game and remove that copied `d3d9.dll`.
 `Uninstall.cmd` removes an installer-owned DLL after checking its receipt and hash.
+It preserves `<MW2>\bo1mw2\settings.ini` and logs. Reinstalling/upgrading keeps
+the saved preference. Use the FOV menu's Restore default action to clear it.
 
 The status HUD should appear near the upper left. Logs are written to
 `<MW2>\bo1mw2\logs\latest.log`; the fallback is `%LOCALAPPDATA%\BO1MW2`.
@@ -68,8 +78,8 @@ Copy the log immediately after a failing run: `latest.log` is replaced on launch
 | Active-level / player-health display | Test4 complete player reads and owner-confirmed correct health |
 | God Mode | Test4 owner confirms ON/OFF and tested checkpoint persistence; no continuous reapplication |
 | Status HUD toggle and state-log action | Implemented |
-| BO1 round-rules preview | Read-only normal-solo script defaults; portable fixtures pass, retail test5 pending |
-| FOV selector and saved preference | Requested; deferred to a later focused iteration |
+| BO1 round-rules preview | Owner test5 front-end navigation passed; normal CSV values now recovered locally and match the preview |
+| FOV selector and saved preference | Implemented in test6; exact-build static evidence and portable tests pass; retail FOV/restart/ADS pending |
 | Ammo, weapons, world, spawning, Zombies | Visible placeholders with no action |
 
 ## Architecture
@@ -94,12 +104,21 @@ engine ended on an offscreen target. A state block and explicit transform/viewpo
 restoration protect the engine's rendering state. A local Windows font becomes
 a managed texture atlas; no game fonts or third-party UI library are bundled.
 The window procedure queues input; menu actions and rendering run on the frame
-callback. Only God Mode changes game data, using a single atomic flag-bit toggle.
+callback. God Mode uses a single explicit atomic flag-bit toggle. FOV uses an
+atomic four-byte compare-and-exchange on the verified float current field,
+only with a living player in a supported active level. The desired value is
+checked at most every 250ms to recover level/checkpoint resets. No FOV override
+is active on a clean install until the user selects or saves a value.
 
 Engine resolution requires the full executable SHA256, five unique `.text`
 patterns, name anchors, in-image pointer slots, typed/named dvars, a running server,
 a nonempty map name, a valid slot-zero entity, and positive player health.
-The owner logs resolved all five signatures and name anchors in the live process.
+Two optional FOV signatures additionally corroborate its registration constants,
+name and camera pointer slot. Failure of those checks disables FOV independently
+of the five core patterns. Settings use the mod's own versioned text file; the
+DLL does not call a native dvar API or change archive/latched values. The native
+camera applies ADS and scaling separately; owner zoom/cutscene tests remain.
+The owner logs resolved all five core signatures and name anchors in the live process.
 Test 3 observed server/map transitions, but our incorrect `+0x00` integer identity
 guard rejected the player. The exact executable's allocator assigns the entity
 index with a WORD store at `+0x7e`; a separate native read corroborates it. Test 4
@@ -145,6 +164,7 @@ python3 tools/inspect_inputs.py /path/to/iw4sp.exe /path/to/BlackOps.exe
 python3 tools/verify_profile.py /path/to/iw4sp.exe
 python3 tools/verify_bo1_round_rules.py /path/to/BlackOps.exe \
   --zone /path/to/common_zombie_patch.ff
+python3 tools/recover_bo1_tuning.py /path/to/common_zombie.ff
 python3 tools/extract_bo1_scripts.py /path/to/zombie_theater.ff \
   /path/to/common_zombie_patch.ff /path/to/zombie_theater_patch.ff
 ```
@@ -164,11 +184,14 @@ Original games remain user-supplied inputs and must never be added to this repo.
 - [Menu test 3](docs/menu-test3.md) and [test 2 evidence](docs/runtime-test2-evidence.json): diagnosed launch failure and correction.
 - [Test4 evidence](docs/runtime-test4-evidence.json) and [player test4](docs/player-test4.md): accepted health/God foundation.
 - [Round test5](docs/round-test5.md) and [numeric evidence](docs/bo1-round-rules-evidence.json): current preview and provenance.
+- [FOV test6](docs/fov-test6.md): selector, persistence and exact owner checks.
+- [BO1 tuning evidence](docs/bo1-normal-tuning-evidence.json): selected local CSV values and pointer-resolution limits.
 - [Roadmap](docs/roadmap.md): incremental gates and persistent FOV request.
 - [Reference projects](docs/references.md): upstream sources and limits of reuse.
 - [Input hashes](docs/input-manifest.json) and [profile checks](docs/profile-checks.json).
 
-The core foundation is accepted in the tested session. Next test the read-only
-preview, recover final BO1 tuning, and broaden campaign-map/reset coverage.
+The core foundation and test5 front-end preview are accepted in their observed
+sessions. Next test the FOV selector/restart behavior, audit remaining BO1
+overrides/dependencies, and broaden campaign-map/reset coverage.
 AI and asset injection need separate compatibility and behavior tests; shared
 engine ancestry does not imply compatible binary layouts or actor behavior.

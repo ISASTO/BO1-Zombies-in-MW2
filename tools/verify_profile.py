@@ -27,19 +27,56 @@ def verify(path, header):
             raise ValueError(f'{name}: {len(matches)} matches, expected exactly one')
         at = section.VirtualAddress + matches[0].start()
         record = dict(match_count=1, match_rva=hex(at))
-        rip_offsets = {'kSvRunningPattern': (29,54), 'kMapNamePattern': (13,27), 'kEntityPattern': (0,)}.get(name, ())
+        rip_offsets = {
+            'kSvRunningPattern': (29,54), 'kMapNamePattern': (13,27), 'kEntityPattern': (0,),
+            'kFovRegistrationPattern': (9,68), 'kFovCameraPattern': (0,),
+        }.get(name, ())
         record['rip_targets'] = {str(n): hex(at+n+7+struct.unpack_from('<i', text, matches[0].start()+n+3)[0]) for n in rip_offsets}
-        if name in ('kSvRunningPattern','kMapNamePattern'):
+        if name in ('kSvRunningPattern','kMapNamePattern','kFovRegistrationPattern'):
             offset = rip_offsets[0]
             target = int(record['rip_targets'][str(offset)], 16)
             anchor = pe.get_data(target,64).split(b'\0',1)[0].decode()
-            wanted = 'sv_running' if name=='kSvRunningPattern' else 'mapname'
+            wanted = {'kSvRunningPattern': 'sv_running', 'kMapNamePattern': 'mapname',
+                      'kFovRegistrationPattern': 'cg_fov'}[name]
             if anchor != wanted:
                 raise ValueError(f'{name}: wrong name anchor {anchor}')
             record['name_anchor'] = anchor
         result['signatures'][name] = record
-    if len(result['signatures']) != 5:
-        raise ValueError('Expected all five profile signatures')
+    wanted_patterns = {'kSvRunningPattern', 'kMapNamePattern', 'kEntityPattern',
+                       'kGodDamagePattern', 'kHealthGuardPattern',
+                       'kFovRegistrationPattern', 'kFovCameraPattern'}
+    if set(result['signatures']) != wanted_patterns:
+        raise ValueError('Expected five core and two optional FOV signatures')
+    # Independent registration constants and the native camera's four-byte read.
+    fov_layout = header.with_name('fov_preferences.hpp').read_text()
+    default = int(re.search(r'kDefaultFov = (\d+)', fov_layout)[1])
+    member = int(re.search(r'kDvarFloatCurrent = (0x[0-9a-f]+)', fov_layout)[1], 16)
+    registration = result['signatures']['kFovRegistrationPattern']
+    camera = result['signatures']['kFovCameraPattern']
+    if registration['rip_targets']['68'] != camera['rip_targets']['0']:
+        raise ValueError('FOV registration and camera read use different pointer slots')
+    at = int(registration['match_rva'], 16)
+    constants = {}
+    for name, offset, displacement, length, wanted in (
+        ('minimum', 0, 5, 9, 1.0), ('maximum', 16, 4, 8, 160.0),
+        ('default', 28, 4, 8, float(default)),
+    ):
+        instruction = pe.get_data(at+offset, length)
+        target = at+offset+length+struct.unpack_from('<i', instruction, displacement)[0]
+        actual_value = struct.unpack('<f', pe.get_data(target, 4))[0]
+        if actual_value != wanted:
+            raise ValueError(f'FOV {name}: native {actual_value} differs from our {wanted}')
+        constants[name] = {'value': actual_value, 'rva': hex(target)}
+    camera_at = int(camera['match_rva'], 16)
+    actual_member = pe.get_data(camera_at+20, 1)[0]
+    if actual_member != member:
+        raise ValueError(f'FOV camera member {actual_member:#x} differs from our {member:#x}')
+    result['fov'] = {
+        'slot_rva': registration['rip_targets']['68'], 'type': 1,
+        'current_offset': hex(member), 'width_bytes': 4,
+        'camera_read_rva': hex(camera_at+16), 'registration_constants': constants,
+        'limits': 'Static exact-build evidence; retail FOV/ADS/restart tests pending.',
+    }
     # Independent native WORD store/read evidence for the field that blocked test 3.
     # The member displacement is decoded from the file, then compared to our layout.
     layout = header.with_name('player_fields.hpp').read_text()

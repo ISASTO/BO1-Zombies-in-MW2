@@ -68,22 +68,51 @@ included here.
 | Spawn chosen from active enemy spawners | `:3207-3217` | Random selection with previous-spawn handling; Kino zone graph decides which spawners are active |
 | Round completion waits for alive count, unspawned budget, and intermission | `:4158` | Separate outstanding budget from living entities |
 
-These are **source defaults and control flow**, not fully verified final retail
-parameters. `set_zombie_var` loads the configured CSV column and can supersede
-the defaults. Normal difficulty selects column 2; between-round time omits the
-argument and uses utility default column 1. No `zombiemode.csv` name was found
-in any of the five supplied decompressed zone streams. Inspect the missing
-`common_zombie.ff` next. A name scan is not a full StringTable parser.
+These are **source control flow plus recovered normal tuning**, not a complete
+final map/runtime configuration. Normal difficulty selects CSV column 2;
+between-round time omits the argument and uses utility default column 1.
+The original five supplied streams lacked the table name. The subsequently
+provided common_zombie.ff contains the complete structural StringTable.
 
 The exact local native divide implementation now confirms that integer operands
 return binary32 float, and the int builtin truncates toward zero. Test5's pure
-rules implement this calculation order with bounded, source-default fixtures.
+rules implement this calculation order with bounded fixtures.
 The menu labels their provenance and does not spawn actors. See
 [round-test5.md](round-test5.md) and [numeric evidence](bo1-round-rules-evidence.json).
 No active normal-round count callback assignment was found in the supplied Kino
 map scripts. Special quad scheduling does have a separate count/pacing path,
 which is excluded. Full configuration, callbacks and VM scheduling remain to be
 resolved before a playable controller is claimed.
+
+### Common-zone tuning recovered for test6
+
+`tools/recover_bo1_tuning.py` reads the supplied unsigned version-473 zone and
+emits selected derived values/provenance, never a full original CSV. The table
+at raw offset 0x2a5b17f is 5 columns by 106 rows, with 530 eight-byte cells.
+Normal column 2 is labeled MEDIUM. Recovered health 150 / increase 100 /
+multiplier .1, spawn delay 2.0, base budget 24 and per-player modifier 6 match
+test5. Runner interval 10 and movement multiplier 8 are recorded for later AI
+research and are not implemented. The between-round key is absent across the
+table's key hashes, so 10s remains the patched GSC fallback. Concurrent limit
+24 comes from script initialization/SetAILimit, distinct from CSV max_ai.
+
+Inline strings use checked case-insensitive DJB2 hashes. Packed XString refs
+subtract one, then split into three block bits and 29 offset bits. Virtual block
+4 offsets are not raw file offsets. The tool reconstructs a constant physical
+minus virtual delta only for tables whose local aliases give a unique mapping,
+builds a pointer-keyed cache, and verifies each selected reference's hash.
+The input yields 13 structural tables, 12 mapped tables and 754 cached strings.
+The target has 14 distinct alias values; two source tables rely on one alias
+each. Those weaker anchors and unresolved unrelated references limit the scope.
+Global hash matching is never used to choose a shared string: real collisions
+exist for short numeric text. Ambiguous/conflicting/unresolved required pointers
+fail rather than guessing. Index arrays are validated as permutations; their
+sort order is not claimed. This is a scoped forensic reader, not a full zone
+fixup loader or importer. Synthetic corruption/alias/truncation fixtures pass.
+
+See [tuning evidence](bo1-normal-tuning-evidence.json) for exact file hash,
+selected cell references, raw offsets and mappings. Patch precedence, final
+callbacks, special rounds and native timing still need independent audits.
 
 ## Pursuit, attack, reaction, and animation coupling
 

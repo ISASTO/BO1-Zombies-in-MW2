@@ -28,7 +28,17 @@ int main() {
     m.input(Input::Back); Check(m.page==Page::Home && m.selected==5, "back retains category selection");
     m.input(Input::Down); m.input(Input::Select);
     Check(m.page==Page::Player && m.input(Input::Select)==Action::ToggleGod, "God action routing");
+    m.input(Input::Down); m.input(Input::Select);
+    Check(m.page==Page::View && m.selected==0 && m.count()==5,"nested FOV page opens");
+    Check(m.input(Input::Right)==Action::ChangeFov && m.fov.selected==70,"FOV keyboard action");
+    m.input(Input::Down); Check(m.input(Input::Select)==Action::SaveFov,"save action routing");
+    m.input(Input::Down); Check(m.input(Input::Select)==Action::ResetFov,"default action routing");
+    m.input(Input::Down); Check(m.input(Input::Select)==Action::None,"live FOV output is read-only");
+    m.input(Input::Down); Check(m.input(Input::Select)==Action::None,"saved FOV output is read-only");
+    m.input(Input::Back); Check(m.page==Page::Player && m.selected==1,"FOV back remembers parent row");
     for(int i=0;i<5;++i) { m.input(Input::Down); Check(m.input(Input::Select)==Action::None, "unimplemented features have no action"); }
+    Check(m.selected==6 && m.firstVisibleRow()==1,"seventh player row scrolls into viewport");
+    m.input(Input::Down); Check(m.selected==0 && m.firstVisibleRow()==0,"player menu wraps after seven rows");
     m.input(Input::Back); m.input(Input::Back);
     Check(!m.visible, "back from home closes menu");
     m.input(Input::Toggle); m.input(Input::Toggle); Check(!m.visible, "two toggle events cancel");

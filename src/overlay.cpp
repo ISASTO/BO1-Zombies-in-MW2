@@ -142,31 +142,34 @@ const char* PageName(Page page) {
         case Page::Zombies: return "ZOMBIE MODE";
         case Page::Diagnostics: return "DIAGNOSTICS";
         case Page::ZombieRules: return "BO1 ROUND RULES PREVIEW";
+        case Page::View: return "VIEW / FOV SETTINGS";
     }
     return "";
 }
 const char* Row(Page page, int n) {
     static constexpr const char* home[] = {"PLAYER", "WEAPONS", "WORLD", "AI", "ZOMBIE MODE", "DIAGNOSTICS"};
-    static constexpr const char* player[] = {"God Mode", "Infinite Ammo", "No Reload", "Noclip", "Super Speed", "Super Jump"};
+    static constexpr const char* player[] = {"God Mode", "FOV settings", "Infinite Ammo", "No Reload", "Noclip", "Super Speed", "Super Jump"};
     static constexpr const char* weapons[] = {"Give All", "Infinite Grenades", "Rapid Fire", "Explosive Bullets", "Debug Features"};
     static constexpr const char* world[] = {"Slow Motion", "Freeze AI", "Gravity", "Kill All Enemies"};
     static constexpr const char* ai[] = {"Spawn Enemy", "Spawn Friendly", "AI Controls"};
     static constexpr const char* zombies[] = {"Round rules preview", "Enable Zombies", "Start Game", "Round / Population Controls"};
     static constexpr const char* diag[] = {"Status HUD", "Write State to Log"};
     static constexpr const char* rules[] = {"Preview round", "Total zombies", "Zombie health", "Simultaneous cap", "Spawn interval", "Between rounds"};
+    static constexpr const char* view[] = {"Base FOV", "Save for next launch", "Restore default / clear saved", "Live base FOV", "Saved base FOV"};
     switch (page) {
         case Page::Home: return home[n]; case Page::Player: return player[n];
         case Page::Weapons: return weapons[n]; case Page::World: return world[n];
         case Page::AI: return ai[n]; case Page::Zombies: return zombies[n];
         case Page::Diagnostics: return diag[n];
         case Page::ZombieRules: return rules[n];
+        case Page::View: return view[n];
     }
     return "";
 }
 void LogRoundPreview(int round) {
     const auto p = bo1::EvaluateNormalSoloRound(round, round == 1);
     if (!p) return;
-    Log("BO1_RULES source=SCRIPT_FALLBACK_DEFAULTS tuning_csv=MISSING profile=NORMAL_SOLO "
+    Log("BO1_RULES source=LOCAL_CSV_PLUS_GSC_FALLBACK tuning_csv=PRESENT column=2 profile=NORMAL_SOLO "
         "round=%d first_round=%d total=%d health=%d concurrent_limit=%d spawn_interval=%.9f between_round_seconds=%d",
         p->round, round == 1, p->total, p->health, p->concurrentLimit, p->spawnInterval, p->betweenRoundSeconds);
 }
@@ -238,6 +241,7 @@ void Overlay::invalidate() {
 }
 void Overlay::frame() {
     lastRenderThread = GetCurrentThreadId();
+    if (!settingsLoaded) { LoadFovPreference(menu.fov); settingsLoaded=true; }
     std::deque<Input> events;
     { std::lock_guard<std::mutex> lock(inputMutex); events.swap(inputQueue); }
     for (const auto event : events) {
@@ -248,6 +252,18 @@ void Overlay::frame() {
         if (action == Action::ToggleGod) ToggleGod();
         else if (action == Action::WriteSnapshot) LogSnapshot();
         else if (action == Action::WriteRoundPreview) LogRoundPreview(menu.previewRound);
+        else if (action == Action::ChangeFov) {
+            nextFovAttempt=0; settingsResult="Session FOV selected";
+            Log("FOV_PREF selected=%d saved=%d active=1",menu.fov.selected,menu.fov.saved.value_or(0));
+        } else if (action == Action::SaveFov) {
+            if (SaveFovPreference(menu.fov.selected)) {
+                menu.fov.savedSuccessfully(); nextFovAttempt=0; settingsResult="Saved for next launch";
+            } else settingsResult="Save failed; see log";
+        } else if (action == Action::ResetFov) {
+            if (ClearFovPreference()) {
+                menu.fov.defaultSuccessfullyCleared(); nextFovAttempt=0; settingsResult="Saved preference cleared";
+            } else settingsResult="Clear failed; see log";
+        }
     }
     {
         std::lock_guard<std::mutex> lock(inputMutex);
@@ -255,13 +271,19 @@ void Overlay::frame() {
         for (const auto event : inputQueue) predicted.input(event);
         visible = predicted.visible;
     }
-    const Snapshot s = ReadSnapshot();
+    Snapshot s = ReadSnapshot();
     const ULONGLONG now = GetTickCount64();
+    if (menu.fov.desired && s.state==LevelState::Ready && s.fov.valid && now>=nextFovAttempt) {
+        nextFovAttempt=now+250;
+        if (SetFov(*menu.fov.desired)) { menu.fov.applied(); s=ReadSnapshot(); }
+    }
     if (!lastHeartbeat || now - lastHeartbeat >= 10000) {
         lastHeartbeat = now;
         Log("HEARTBEAT present=%u endscene=%u draws=%u inputs=%u resets=%u visible=%d render_thread=%lu",
             presents, endScenes, draws, inputs, resets, menu.visible, lastRenderThread);
         LogSnapshot();
+        Log("FOV_PREF selected=%d saved=%d active=%d reset_pending=%d",
+            menu.fov.selected,menu.fov.saved.value_or(0),menu.fov.desired.has_value(),menu.fov.releaseAfterDefault);
     }
     if (!menu.visible && !menu.hud) return;
     IDirect3DStateBlock9* state = nullptr;
@@ -296,9 +318,12 @@ void Overlay::frame() {
         text(61,92,kAccent,"MW2 / BO1 ZOMBIES",1.15f);
         text(61,125,kText,PageName(menu.page));
         if (menu.page == Page::ZombieRules) {
-            text(61,156,kMuted,"Script defaults | tuning CSV missing",.88f);
+            text(61,156,kMuted,"Local BO1 CSV + script fallbacks",.88f);
             std::snprintf(line,sizeof(line),"Normal solo rounds | Preview %d / %d", menu.previewRound, bo1::kPreviewMaxRound);
             text(61,180,kMuted,line,.88f);
+        } else if (menu.page==Page::View) {
+            text(61,156,kMuted,StateText(s.state),.88f);
+            text(61,180,kMuted,"Game default: 65 | Selector: 60-120",.88f);
         } else if (s.map[0]) {
             text(61,156,kMuted,StateText(s.state),.88f);
             if (s.playerRead == PlayerReadStatus::Complete)
@@ -307,12 +332,13 @@ void Overlay::frame() {
             text(61,180,kMuted,line,.88f);
         } else {
             text(61,156,kMuted,StateText(s.state),.88f);
-            text(61,180,kMuted,"Round test 5 | Zombies under development",.88f);
+            text(61,180,kMuted,"FOV test 6 | Zombies under development",.88f);
         }
         const auto preview = menu.page == Page::ZombieRules
             ? bo1::EvaluateNormalSoloRound(menu.previewRound, menu.previewRound == 1) : std::nullopt;
-        for (int n=0; n<menu.count(); ++n) {
-            const float y=216.f+n*42.f;
+        const int first=menu.firstVisibleRow();
+        for (int n=first; n<menu.count() && n<first+6; ++n) {
+            const float y=216.f+(n-first)*42.f;
             const bool selected=menu.selected==n;
             if (selected) { rect(52,y-2,546,37,D3DCOLOR_ARGB(255,49,57,32)); rect(52,y-2,3,37,kAccent); }
             text(67,y+3,selected?kAccent:kText,Row(menu.page,n));
@@ -322,6 +348,17 @@ void Overlay::frame() {
             else if (menu.page==Page::Player && n==0) status=s.state==LevelState::Ready?(s.god?"ON":"OFF"):"LOCKED";
             else if (menu.page==Page::Diagnostics) status=n==0?(menu.hud?"ON":"OFF"):"ENTER";
             else if (menu.page==Page::Zombies && n==0) status="ENTER";
+            else if (menu.page==Page::Player && n==1) status=">";
+            else if (menu.page==Page::View) {
+                if (n==0) std::snprintf(value,sizeof(value),"%d",menu.fov.selected);
+                else if (n==1 || n==2) std::snprintf(value,sizeof(value),"ENTER");
+                else if (n==3) {
+                    if (s.fov.valid) std::snprintf(value,sizeof(value),"%.1f",s.fov.current);
+                    else std::snprintf(value,sizeof(value),"UNKNOWN");
+                } else if (menu.fov.saved) std::snprintf(value,sizeof(value),"%d",*menu.fov.saved);
+                else std::snprintf(value,sizeof(value),"NONE");
+                status=value;
+            }
             else if (preview) {
                 switch (n) {
                     case 0: std::snprintf(value,sizeof(value),"%d",preview->round); break;
@@ -337,10 +374,18 @@ void Overlay::frame() {
         }
         rect(52,483,546,1,D3DCOLOR_ARGB(255,57,63,47));
         text(61,497,kMuted,menu.page==Page::ZombieRules
-            ? "LEFT/RIGHT: Round  ENTER: Next  UP/DOWN: Row" : "UP/DOWN: Select  ENTER: Activate",.88f);
+            ? "LEFT/RIGHT: Round  ENTER: Next  UP/DOWN: Row" : menu.page==Page::View
+            ? "LEFT/RIGHT: FOV  UP/DOWN: Row  ENTER: Act" : "UP/DOWN: Select  ENTER: Activate",.88f);
         text(61,522,kMuted,"BACKSPACE/ESC: Back   F4: Close",.88f);
-        text(61,551,kAccent,menu.page==Page::ZombieRules
-            ? "Read-only preview. No zombies spawned." : "Game keeps running. WASD and mouse work.",.85f);
+        const char* footer="Game keeps running. WASD and mouse work.";
+        if (menu.page==Page::ZombieRules) footer="Read-only preview. No zombies spawned.";
+        if (menu.page==Page::View) {
+            if (!s.fov.resolved || !s.fov.valid) footer="FOV unavailable; see log.";
+            else if (menu.fov.desired && s.state!=LevelState::Ready) footer="FOV queued until player is alive.";
+            else if (settingsResult[0]) footer=settingsResult;
+            else footer="Save keeps this FOV for future launches.";
+        }
+        text(61,551,kAccent,footer,.85f);
     }
     state->Apply();
     if (SUCCEEDED(worldResult)) device->SetTransform(D3DTS_WORLD,&world);

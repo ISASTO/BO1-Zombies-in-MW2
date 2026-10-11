@@ -74,4 +74,17 @@ are an original implementation; no original script body is distributed.
 Portable rule fixtures were first run against an empty implementation and
 failed, then passed after adding the source-derived calculations. Menu tests
 cover nested back behavior, read-only actions, hidden input and both round
-bounds. The Windows DLL still requires the owner's retail test5 observations.
+bounds. The Windows DLL was delivered for the owner's retail test5 observations.
+
+## Owner result and subsequent tuning recovery
+
+Owner: "Seems to be working fine." Matching test5 diagnostics show a front-end
+session with 344 inputs and 290 preview records covering every round 1-100,
+native font rendering at 3440x1440, nested back/close, and God blocked without
+an active level. No new crash event or dump is included. That run does not prove
+mission regression/reset behavior. See [test5 evidence](runtime-test5-evidence.json).
+
+The subsequently supplied common_zombie.ff contains mp/zombiemode.csv. The
+original scoped tool recovers normal values matching this preview; test6 changes
+its provenance label accordingly. This document's missing-CSV label describes
+the delivered test5 build. See [tuning evidence](bo1-normal-tuning-evidence.json).

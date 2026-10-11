@@ -85,7 +85,7 @@ void InitializeLog() {
         }
     }
     Log("BO1MW2 %s | AMD64 | log=%ls", kVersion, file);
-    Log("Round test 5: read-only BO1 script-default preview; tuning CSV missing. Player test 4 engine path preserved.");
+    Log("FOV test 6: bounded base-FOV selector and own saved preference. BO1 normal tuning recovered from local CSV.");
 }
 void Log(const char* format, ...) {
     char body[4096]{};

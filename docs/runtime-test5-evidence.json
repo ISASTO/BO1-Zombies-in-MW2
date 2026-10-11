@@ -1,0 +1,45 @@
+{
+  "received_date": "2026-10-11",
+  "owner_report": "Seems to be working fine.",
+  "bundle": {
+    "file": "BO1MW2-startup-results-20261011-092301-7f01cfee.zip",
+    "sha256": "ed167c184d4ac3ffdbc024c566bb378fe970843f543c812d3a40994da458ed41",
+    "collected_utc": "2026-10-11T14:23:01.0618453Z",
+    "installed_version": "0.1.4-round-test5",
+    "installed_utc": "2026-10-11T14:21:20.5012414Z",
+    "installed_dll_sha256": "c1d2a8fc7f94b6ee21a0cc951ba39f458c7e78953332b090abec253951f3cbae",
+    "executable_sha256": "fb7e8a987c371dea7b666091b0b9e2011c0cd9cd277b191ad453d11d557dd777",
+    "log_sha256": "a930796308b8fff9165c637a16e0611e03cc9ae5a327023118e41921e53c5f0a"
+  },
+  "observed_in_log": {
+    "input_events": 344,
+    "round_records": 290,
+    "distinct_rounds": 100,
+    "round_range": [
+      1,
+      100
+    ],
+    "level_states": [
+      "NO ACTIVE LEVEL"
+    ],
+    "first_draw_size": [
+      3440,
+      1440
+    ],
+    "nested_back_and_close": true,
+    "god_blocked_without_level": true,
+    "god_writes": 0,
+    "last_heartbeat_end_scenes": 9808,
+    "last_heartbeat_draws": 9807,
+    "last_heartbeat_resets": 0,
+    "new_crash_events_since_install": 0,
+    "included_crash_files": "Three historical test1 dump/report pairs; no test5 crash files.",
+    "factory_probes_exit_zero": true
+  },
+  "accepted_scope": "Owner-confirmed test5 preview/menu behavior with matching front-end diagnostics.",
+  "not_separately_confirmed": [
+    "test5 active mission/health/God regression",
+    "device reset",
+    "FOV selection/persistence/ADS, introduced only in test6"
+  ]
+}

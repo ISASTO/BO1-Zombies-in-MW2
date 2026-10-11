@@ -346,5 +346,14 @@
       "magic": "IWffu100",
       "version": 473
     }
+  },
+  {
+    "name": "common_zombie.ff",
+    "size": 51325344,
+    "sha256": "f812069ef2ff446b97051e75d6a5ee49687a8085218b8f79dc2d8237e543117e",
+    "fastfile": {
+      "magic": "IWffu100",
+      "version": 473
+    }
   }
 ]

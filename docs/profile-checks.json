@@ -36,7 +36,45 @@
       "match_count": 1,
       "match_rva": "0x1656de",
       "rip_targets": {}
+    },
+    "kFovRegistrationPattern": {
+      "match_count": 1,
+      "match_rva": "0xa7177",
+      "rip_targets": {
+        "9": "0x327bb4",
+        "68": "0x51e1a8"
+      },
+      "name_anchor": "cg_fov"
+    },
+    "kFovCameraPattern": {
+      "match_count": 1,
+      "match_rva": "0xbc25d",
+      "rip_targets": {
+        "0": "0x51e1a8"
+      }
     }
+  },
+  "fov": {
+    "slot_rva": "0x51e1a8",
+    "type": 1,
+    "current_offset": "0x10",
+    "width_bytes": 4,
+    "camera_read_rva": "0xbc26d",
+    "registration_constants": {
+      "minimum": {
+        "value": 1.0,
+        "rva": "0x385a54"
+      },
+      "maximum": {
+        "value": 160.0,
+        "rva": "0x31e6a4"
+      },
+      "default": {
+        "value": 65.0,
+        "rva": "0x32ae10"
+      }
+    },
+    "limits": "Static exact-build evidence; retail FOV/ADS/restart tests pending."
   },
   "entity_number": {
     "offset": "0x7e",

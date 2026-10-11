@@ -14,6 +14,8 @@ struct Profile {
     std::uintptr_t serverDvarSlot = 0;
     std::uintptr_t mapDvarSlot = 0;
     std::uintptr_t entitySlot = 0;
+    std::uintptr_t fovDvarSlot = 0;
+    bool fovResolved = false;
 } profile;
 
 bool Read(std::uintptr_t address, void* output, std::size_t size) {
@@ -105,6 +107,13 @@ bool Writable(std::uintptr_t address) {
     return protection == PAGE_READWRITE || protection == PAGE_WRITECOPY ||
            protection == PAGE_EXECUTE_READWRITE || protection == PAGE_EXECUTE_WRITECOPY;
 }
+FovSnapshot ReadFov() {
+    FovSnapshot s;
+    s.resolved=profile.supported && profile.resolved && profile.fovResolved;
+    if (!s.resolved || !NamedDvar(profile.fovDvarSlot,"cg_fov",1,s.dvar)) return s;
+    const auto field=ReadNativeFovValue(s.dvar,Read);
+    s.valid=field.valid; s.current=field.current; return s;
+}
 }
 const char* StateText(LevelState state) {
     switch (state) {
@@ -157,6 +166,22 @@ void InitializeEngine() {
             static_cast<unsigned long long>(profile.serverDvarSlot - profile.base),
             static_cast<unsigned long long>(profile.mapDvarSlot - profile.base),
             static_cast<unsigned long long>(profile.entitySlot - profile.base), profile.resolved);
+        // Optional feature resolution is independent of the working core gate.
+        const auto fov=Unique(text,start,"cg_fov registration",kFovRegistrationPattern);
+        const auto camera=Unique(text,start,"cg_fov camera read",kFovCameraPattern);
+        if (fov && camera && Anchor(fov,9,"cg_fov")) {
+            profile.fovDvarSlot=ResolveRip(fov,68);
+            auto constant=[&](unsigned offset,unsigned displacement,unsigned length,float wanted) {
+                std::uint8_t bytes[9]{}; float value=0.f;
+                return Read(fov+offset,bytes,length)
+                    && ReadValue(RipTarget(fov+offset,bytes,displacement,length),value) && value==wanted;
+            };
+            profile.fovResolved=InImage(profile.fovDvarSlot,8) && profile.fovDvarSlot==ResolveRip(camera,0)
+                && constant(0,5,9,1.f) && constant(16,4,8,160.f) && constant(28,4,8,static_cast<float>(kDefaultFov));
+        }
+        Log("FOV slot_rva=0x%llx resolved=%d native_default=%d menu_range=%d..%d",
+            static_cast<unsigned long long>(profile.fovDvarSlot?profile.fovDvarSlot-profile.base:0),
+            profile.fovResolved,kDefaultFov,kMinFov,kMaxFov);
         return;
     }
 }
@@ -166,6 +191,7 @@ Snapshot ReadSnapshot() {
     s.resolved = profile.resolved;
     if (!s.supported) { s.state = LevelState::Unsupported; return s; }
     if (!s.resolved) { s.state = LevelState::Unresolved; return s; }
+    s.fov=ReadFov();
     s.state = LevelState::Transition;
     std::uintptr_t server = 0, map = 0, mapString = 0;
     std::uint8_t running = 0;
@@ -198,10 +224,30 @@ bool ToggleGod() {
         static_cast<unsigned long>(old), static_cast<unsigned long>(old ^ 1), s.map, s.health);
     return true;
 }
+bool SetFov(int value) {
+    const auto s=ReadSnapshot();
+    const auto at=s.fov.dvar+kDvarFloatCurrent;
+    if (!s.fov.valid || !FovWriteAllowed(s.supported,s.fov.resolved,s.state==LevelState::Ready,s.fov.current,value)
+        || (at&3) || !Writable(at)) {
+        Log("FOV blocked state=%s resolved=%d valid=%d current=%.3f requested=%d",
+            StateText(s.state),s.fov.resolved,s.fov.valid,s.fov.current,value); return false;
+    }
+    const float target=static_cast<float>(value);
+    if (s.fov.current==target) return true;
+    static_assert(sizeof(LONG)==sizeof(float),"Atomic field write must stay four bytes");
+    LONG before=0,after=0;
+    std::memcpy(&before,&s.fov.current,sizeof(before)); std::memcpy(&after,&target,sizeof(after));
+    if (InterlockedCompareExchange(reinterpret_cast<volatile LONG*>(at),after,before)!=before) {
+        Log("FOV concurrent value change; retry deferred"); return false;
+    }
+    Log("FOV applied current_before=%.3f current_after=%d map=%s",s.fov.current,value,s.map);
+    return true;
+}
 void LogSnapshot() {
     const auto s = ReadSnapshot();
-    Log("STATE %s supported=%d resolved=%d sv_running=%d map=%s entity=%p health=%d flags=0x%08x god=%d entity_number=%d player_read=%s",
+    Log("STATE %s supported=%d resolved=%d sv_running=%d map=%s entity=%p health=%d flags=0x%08x god=%d entity_number=%d player_read=%s fov_resolved=%d fov_valid=%d base_fov=%.3f",
         StateText(s.state), s.supported, s.resolved, s.serverRunning, s.map,
-        reinterpret_cast<void*>(s.entity), s.health, s.flags, s.god, s.entityNumber, PlayerReadText(s.playerRead));
+        reinterpret_cast<void*>(s.entity), s.health, s.flags, s.god, s.entityNumber, PlayerReadText(s.playerRead),
+        s.fov.resolved,s.fov.valid,s.fov.current);
 }
 } // namespace mod

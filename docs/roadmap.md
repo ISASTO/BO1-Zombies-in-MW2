@@ -6,17 +6,15 @@ Updated 2026-10-11. Complete one useful, testable change at a time.
    reads, displayed health, and God toggle work in the owner's test4 estate run.
    The owner also confirms God state survives their checkpoint reloads.
    Keep second-map/reset checks in subsequent small tests.
-2. **Current test5:** read-only normal-solo BO1 round-rules preview, from actual
-   local GSC fallback values and native numeric evidence. Obtain the missing
-   tuning StringTable before claiming final retail/Kino parameters.
-3. **FOV selector with saved preference, requested by owner 2026-10-11:** identify
-   the exact build's FOV dvar/API, value range, ADS behavior, and mission/reload
-   resets. Add a keyboard selector and explicit save/reset controls. Store the
-   preference in the mod's own configuration and restore it on later launches
-   when game state is valid. Verify persistence after a full game restart.
-   The owner explicitly permits finishing the current work first; FOV is not
-   implemented in test5. No engine address or safe range is assumed yet.
-4. Recover final BO1 tuning and dependency closure, then incrementally test round
+2. **Test5 preview accepted in the front end:** matching diagnostics cover all
+   100 rounds, bounds and navigation. No mission/regression run was included.
+   The new common_zombie.ff normal tuning recovery matches existing numbers.
+3. **Current test6: FOV selector with saved preference:** static exact-build
+   registration/domain and camera reads verified; portable selector/persistence
+   tests and Windows build pass. Test 60-120 selection, explicit Save/reset,
+   full restart persistence, ADS and checkpoint/mission reapplication in retail.
+   This implements the owner's request using the mod's own settings file.
+4. Audit remaining BO1 configuration overrides and dependency closure, then incrementally test round
    controller scheduling and an IW4 actor adapter. Identify required native
    targeting, pursuit, damage/notetrack and death semantics before enabling AI.
 5. Audit/import one local asset type at a time with versioned conversion tools.

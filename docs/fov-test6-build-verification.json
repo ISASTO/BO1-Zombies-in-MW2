@@ -1,0 +1,46 @@
+{
+  "version": "0.1.5-fov-test6",
+  "compiler": "MinGW-w64 GCC 13-posix, RelWithDebInfo, static runtime",
+  "architecture": "AMD64",
+  "dll_size": 1837622,
+  "dll_sha256": "e287ad42e34a20e2107a43b79a4ed71118dea2e623ae65f79fa07b73682dbb44",
+  "imports": [
+    "bcrypt.dll",
+    "dbghelp.dll",
+    "gdi32.dll",
+    "kernel32.dll",
+    "msvcrt.dll",
+    "user32.dll"
+  ],
+  "exports": [
+    "D3DPERF_BeginEvent",
+    "D3DPERF_EndEvent",
+    "D3DPERF_GetStatus",
+    "D3DPERF_QueryRepeatFrame",
+    "D3DPERF_SetMarker",
+    "D3DPERF_SetOptions",
+    "D3DPERF_SetRegion",
+    "DebugSetMute",
+    "Direct3DCreate9",
+    "Direct3DCreate9Ex"
+  ],
+  "loader_probe_sha256": "ba50775b11499f90214e5eb2c3160bf1e08e1a8ea2c71725514574cb408212ba",
+  "loader_probe_provenance": "Unchanged owned probe reused from delivered test5 package; its source remains unchanged.",
+  "checks": {
+    "aslr_and_nx": true,
+    "native_cpp_tests": "5 passed: menu/pattern/FOV/preview navigation; native private-vtable/shared-table; player fields; BO1 round fixtures; FOV parsing/persistence/reset/bounds/float-field/write gates.",
+    "python_tests": "9 passed: script extractor and synthetic StringTable inline/reference/corruption/ambiguity/truncation fixtures.",
+    "test_first": "Initial FOV preference fixture failed before implementation in the earlier session; reconstructed implementation passes the same checks.",
+    "exact_profile": "All five core plus two optional FOV signatures unique, name anchor/constants/pointer-slot agreement/current-member offset verified against exact uploaded hash.",
+    "preserved_sources": {
+      "src/proxy.cpp": "7f794cdd99c355b4dce2609726164d80e7695e62",
+      "include/player_fields.hpp": "6826725ad49d6f6b4203e832638d1acdc763dc20"
+    },
+    "preserved_functions": "God toggle body and BO1 preview calculations exactly match test5 source.",
+    "bo1_tuning": "Local version-473 common_zombie.ff: selected normal column2 values recovered using scoped pointer/hash validation. Matches preview. Between-round fallback and script capacity remain separate; final overrides unaudited.",
+    "powershell_scripts": "All four parsed with PowerShell 7.6.6. Isolated test5-to-test6 upgrade, copied receipt/hash, diagnostics selection/setting collection, removal and game/log/settings preservation passed on Linux. Windows probe execution unavailable here.",
+    "retail_mw2_runtime": "Test4 health/God owner-confirmed; test5 preview owner-confirmed with front-end diagnostics. Test6 FOV/ADS/restart/checkpoint observations pending.",
+    "original_game_assets_in_distribution": "none"
+  },
+  "change": "Base-FOV selector 60-120/5, explicit save/default clear, typed/named exact-build live-player gate and 4-byte atomic current-float edit; own versioned preferences. No AI/asset operations; unchanged preview math with improved local-CSV provenance."
+}

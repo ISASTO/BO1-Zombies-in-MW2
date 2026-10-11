@@ -14,6 +14,7 @@ void InstallCrashHandler();
 const wchar_t* LogDirectory();
 
 enum class LevelState { Unsupported, Unresolved, NoLevel, Transition, PlayerDead, Ready };
+struct FovSnapshot { bool resolved=false; bool valid=false; float current=0.f; std::uintptr_t dvar=0; };
 struct Snapshot {
     LevelState state = LevelState::Unresolved;
     bool supported = false;
@@ -26,12 +27,17 @@ struct Snapshot {
     unsigned flags = 0;
     std::uintptr_t entity = 0;
     char map[96]{};
+    FovSnapshot fov;
 };
 const char* StateText(LevelState state);
 void InitializeEngine();
 Snapshot ReadSnapshot();
 bool ToggleGod();
+bool SetFov(int value);
 void LogSnapshot();
+void LoadFovPreference(FovPreference& preference);
+bool SaveFovPreference(int value);
+bool ClearFovPreference();
 
 struct Overlay {
     IDirect3DDevice9* device = nullptr;
@@ -51,6 +57,9 @@ struct Overlay {
     unsigned inputs = 0;
     ULONGLONG lastHeartbeat = 0;
     DWORD lastRenderThread = 0;
+    bool settingsLoaded = false;
+    const char* settingsResult = "";
+    ULONGLONG nextFovAttempt = 0;
     void attach(IDirect3DDevice9* d, HWND w);
     void detach();
     void invalidate();

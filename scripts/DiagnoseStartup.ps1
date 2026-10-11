@@ -20,6 +20,8 @@ try {
     if (Test-Path -LiteralPath $normal) { Copy-Item -LiteralPath $normal -Destination (Join-Path $stage 'game-logs') -Recurse }
     if (Test-Path -LiteralPath $fallback) { Copy-Item -LiteralPath $fallback -Destination (Join-Path $stage 'prior-fallback-logs') -Recurse }
     if (Test-Path -LiteralPath $receiptPath) { Copy-Item -LiteralPath $receiptPath -Destination $stage }
+    $settings = Join-Path $root 'bo1mw2\settings.ini'
+    if (Test-Path -LiteralPath $settings -PathType Leaf) { Copy-Item -LiteralPath $settings -Destination $stage }
     $info = [ordered]@{
         collected_utc = [DateTime]::UtcNow.ToString('o'); windows = [Environment]::OSVersion.VersionString;
         os_64bit = [Environment]::Is64BitOperatingSystem; powershell_64bit = [Environment]::Is64BitProcess;

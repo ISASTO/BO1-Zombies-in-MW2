@@ -1,0 +1,166 @@
+{
+  "file": "common_zombie.ff",
+  "size": 51325344,
+  "sha256": "f812069ef2ff446b97051e75d6a5ee49687a8085218b8f79dc2d8237e543117e",
+  "raw_size": 79661349,
+  "asset": "mp/zombiemode.csv",
+  "header_raw_offset": "0x2a5b17f",
+  "columns": 5,
+  "rows": 106,
+  "normal_column": 2,
+  "column_label": "MEDIUM",
+  "parameters": {
+    "zombie_health_start": {
+      "value": 150,
+      "row": 3,
+      "column": 2,
+      "cell_hash": "0xb878a5b",
+      "kind": "reconstructed_shared_xstring",
+      "pointer": "0x81edf811",
+      "raw_offset": "0x1f18c13",
+      "source_table": "mp/challengetable_zmabilities.csv"
+    },
+    "zombie_health_increase": {
+      "value": 100,
+      "row": 4,
+      "column": 2,
+      "cell_hash": "0xb8789b6",
+      "kind": "reconstructed_shared_xstring",
+      "pointer": "0x81ee13ad",
+      "raw_offset": "0x1f1a7c2",
+      "source_table": "mp/challengetable_zmcadet.csv"
+    },
+    "zombie_health_increase_multiplier": {
+      "value": 0.1,
+      "row": 5,
+      "column": 2,
+      "cell_hash": "0xb878534",
+      "kind": "inline",
+      "raw_offset": "0x2a5c2cb",
+      "source_table": "mp/zombiemode.csv"
+    },
+    "zombie_spawn_delay": {
+      "value": 2.0,
+      "row": 6,
+      "column": 2,
+      "cell_hash": "0xb878db5",
+      "kind": "reconstructed_shared_xstring",
+      "pointer": "0x82a095a2",
+      "raw_offset": "0x2a5c2e2",
+      "source_table": "mp/zombiemode.csv"
+    },
+    "zombie_max_ai": {
+      "value": 24,
+      "row": 10,
+      "column": 2,
+      "cell_hash": "0x5970eb",
+      "kind": "reconstructed_shared_xstring",
+      "pointer": "0x81edfe2e",
+      "raw_offset": "0x1f19230",
+      "source_table": "mp/challengetable_zmabilities.csv"
+    },
+    "zombie_ai_per_player": {
+      "value": 6,
+      "row": 11,
+      "column": 2,
+      "cell_hash": "0x2b5db",
+      "kind": "reconstructed_shared_xstring",
+      "pointer": "0x81dd7032",
+      "raw_offset": "0x1e0b197",
+      "source_table": "mp/zm_titles.csv"
+    },
+    "zombie_new_runner_interval": {
+      "value": 10,
+      "row": 7,
+      "column": 2,
+      "cell_hash": "0x5970c6",
+      "kind": "reconstructed_shared_xstring",
+      "pointer": "0x81ede4c2",
+      "raw_offset": "0x1f178b3",
+      "source_table": "mp/challengetable_zm.csv"
+    },
+    "zombie_move_speed_multiplier": {
+      "value": 8,
+      "row": 8,
+      "column": 2,
+      "cell_hash": "0x2b5dd",
+      "kind": "reconstructed_shared_xstring",
+      "pointer": "0x81ede445",
+      "raw_offset": "0x1f17836",
+      "source_table": "mp/challengetable_zm.csv"
+    }
+  },
+  "between_round_time": {
+    "value": 10,
+    "source": "Patched GSC fallback; CSV key absent"
+  },
+  "concurrent_limit": {
+    "value": 24,
+    "source": "Patched GSC init level.zombie_ai_limit and SetAILimit"
+  },
+  "structurally_valid_tables": 13,
+  "mapped_xstrings": 754,
+  "mappings": [
+    {
+      "table": "mp/zm_titles.csv",
+      "alias_values": 1,
+      "raw_minus_virtual_delta": "0x34166"
+    },
+    {
+      "table": "mp/challengetable_zm.csv",
+      "alias_values": 1,
+      "raw_minus_virtual_delta": "0x393f2"
+    },
+    {
+      "table": "mp/challengetable_zmabilities.csv",
+      "alias_values": 30,
+      "raw_minus_virtual_delta": "0x39403"
+    },
+    {
+      "table": "mp/challengetable_zmcadet.csv",
+      "alias_values": 19,
+      "raw_minus_virtual_delta": "0x39416"
+    },
+    {
+      "table": "mp/challengetable_zmpistol.csv",
+      "alias_values": 5,
+      "raw_minus_virtual_delta": "0x39428"
+    },
+    {
+      "table": "mp/challengetable_zmsmg.csv",
+      "alias_values": 12,
+      "raw_minus_virtual_delta": "0x39439"
+    },
+    {
+      "table": "mp/challengetable_zmcqb.csv",
+      "alias_values": 8,
+      "raw_minus_virtual_delta": "0x3944b"
+    },
+    {
+      "table": "mp/challengetable_zmassault.csv",
+      "alias_values": 9,
+      "raw_minus_virtual_delta": "0x3945d"
+    },
+    {
+      "table": "mp/challengetable_zmrifle.csv",
+      "alias_values": 12,
+      "raw_minus_virtual_delta": "0x39470"
+    },
+    {
+      "table": "mp/challengetable_zmspecialty.csv",
+      "alias_values": 16,
+      "raw_minus_virtual_delta": "0x39482"
+    },
+    {
+      "table": "mp/challengetable_zmperk.csv",
+      "alias_values": 10,
+      "raw_minus_virtual_delta": "0x39495"
+    },
+    {
+      "table": "mp/zombiemode.csv",
+      "alias_values": 14,
+      "raw_minus_virtual_delta": "0x52d41"
+    }
+  ],
+  "limits": "Scoped ASCII/inline/virtual-block CSV reader. Some unneeded tables/references remain unresolved. Not a full zone pointer loader or final runtime override audit."
+}

@@ -35,5 +35,15 @@ before committing that dependency.
   the tags and partial layout; not an IW4 structure definition.
 - [Pinned OAT T5 asset definitions](https://github.com/Laupetin/OpenAssetTools/blob/068d4cd9f513ff0509b757498712b2ec3dee9463/src/Common/Game/T5/T5_Assets.h)
   and [StringTable zone schema](https://github.com/Laupetin/OpenAssetTools/blob/068d4cd9f513ff0509b757498712b2ec3dee9463/src/ZoneCode/Game/T5/XAssets/StringTable.txt):
-  format/dependency references for the missing tuning asset. No OAT loader or
-  GPL source copied. Pointer/stream resolution still needs an independent tool.
+  format/dependency references for the tuning asset. The independent scoped
+  reader now recovers selected normal tuning; no OAT/GPL code is copied.
+
+## Test6 packed-pointer references
+
+- [Pinned OAT zone input stream](https://github.com/Laupetin/OpenAssetTools/blob/068d4cd9f513ff0509b757498712b2ec3dee9463/src/ZoneLoading/Zone/Stream/ZoneInputStream.cpp)
+  and [T5 constants](https://github.com/Laupetin/OpenAssetTools/blob/068d4cd9f513ff0509b757498712b2ec3dee9463/src/ZoneCommon/Game/T5/ZoneConstantsT5.h):
+  reference leads for subtract-one packed references, three block bits and zone
+  version 473. The supplied records independently corroborate selected mappings.
+- [Pinned T5 StringTable loader](https://github.com/Laupetin/OpenAssetTools/blob/068d4cd9f513ff0509b757498712b2ec3dee9463/src/ObjLoading/Game/T5/StringTable/LoaderStringTableT5.cpp):
+  string/hash and cell-index concepts. Our reader validates hashes/permutations,
+  but does not claim to reproduce all native sorting/fixup behavior.

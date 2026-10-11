@@ -12,7 +12,8 @@ signature match is not a runtime test.
 | `0.1.1-startup-test2` | Owner: "launch worked both times" (unmodified and forwarding control) | Retail forwarding baseline passed. System/old-DLL/control probes all exit zero in both result bundles. Windows collector and installer executed successfully. |
 | `0.1.2-menu-test3` | Owner: "It works!!! this is so cool!!!"; returned matching diagnostic bundle | EndScene/font/3440x1440 draw, 82 key actions, all six categories, close/back, and estate-to-no-server transition observed. No new crash evidence. Player readiness failed and three God actions were blocked. |
 | `0.1.3-player-test4` | Owner confirms correct health, working God ON/OFF and retained God state through checkpoint reloads | Matching log shows complete slot-zero reads, five toggles preserving other flags, health 2/70/100, and God blocked back at main menu. No new crash evidence. Phase 1 core accepted in estate on the exact build. |
-| `0.1.4-round-test5` | Add read-only normal-solo BO1 script-default preview | T5 float division/int truncation confirmed in local native code. Source-derived fixtures pass; CSV tuning absent from supplied zone name scans. Retail UI/regression test pending. |
+| `0.1.4-round-test5` | Owner: "Seems to be working fine." | Matching front-end log covers all 100 rounds, 344 inputs, 290 preview records and 3440x1440 rendering. No active mission or new crash evidence in this run. |
+| `0.1.5-fov-test6` | Base-FOV selector, explicit saved preference/reset; recover normal BO1 CSV tuning | Seven unique exact-build patterns and five native suites pass. FOV/ADS/restart/checkpoint runtime pending. Normal CSV values match the unchanged preview calculations. |
 
 Test 1 initialized its C++ static runtime, then logging/crash handling, engine
 hash/scanning, factory/device shadows, WndProc, and rendering across startup.
@@ -106,6 +107,11 @@ column is for static analysis only; ASLR changes runtime addresses.
 | `mapname` dvar pointer slot | `0x19ada88` | `0x1419ada88` | Named string registration and RIP store |
 | `Dvar_GetBool` candidate | `0x26bf90` | `0x14026bf90` | Type check at `+0xc`, bool current read at `+0x10` |
 | `Dvar_GetString` candidate | `0x26c050` | `0x14026c050` | Current string pointer `+0x10`, enum handling at type 6 |
+| `cg_fov` registration sequence | `0xa7177` | `0x1400a7177` | RIP name load, min/default/max floats, call and pointer store |
+| `Dvar_RegisterFloat` assigned wrapper | `0x26cb90` | `0x14026cb90` | Sets type DL=1 at `0x26cbaa`, calls generic registration `0x26cf60` |
+| `cg_fov` dvar pointer slot | `0x51e1a8` | `0x14051e1a8` | Registration and camera signatures resolve the same RIP-relative slot |
+| Camera base-FOV read | `0xbc26d` | `0x1400bc26d` | MOVSS from `[dvar+0x10]`, then separate ADS interpolation/scale logic; enclosing signature starts `0xbc25d` |
+| Alternate-view base-FOV read | `0x6a641` | `0x14006a641` | Independent same-slot load at `0x6a62a`, scalar read and projection/tangent calculations |
 
 All rows above are static confirmed. The test 3 log additionally confirms live
 signature resolution and server/map/entity-pointer reads. Test4 additionally
@@ -133,8 +139,9 @@ independently corroborates its meaning. It leaves other entity flags intact.
 | Non-client damage pointer | `+0x110`, 64-bit | Native damage path uses this pointer; former client assignment was incorrect. Exact pointed-to type unresolved and unused. |
 | Dvar name pointer | `+0x0`, 64-bit | Registration/getter conventions; validated against exact string at runtime |
 | Dvar type | `+0xc`, 8-bit | Getter type comparisons |
-| Dvar current | `+0x10` | Bool byte or string pointer, depending on type |
+| Dvar current | `+0x10` | Bool byte, four-byte float or string pointer, depending on type |
 | Dvar bool type | `0` | Getter treats type zero as bool |
+| Dvar float type | `1` | Native float registration wrapper and MOVSS camera read |
 | Dvar string type | `7` | String registration/getter family; runtime name/type validation required |
 
 Only individual fields are read; no complete `gentity_s`, `gclient_s`,
@@ -143,9 +150,36 @@ Player identification by slot zero is supported by the dispatcher; mission and
 checkpoint behavior are still local tests, not a claim of universal reliability.
 Test 3 established the slot-zero pointer; test4 confirmed identity/health reads.
 
+### FOV registration, ABI and persistence
+
+Static confirmed for this exact hash: name string cg_fov at RVA 0x327bb4,
+minimum 1 at 0x385a54, maximum 160 at 0x31e6a4, default 65 at 0x32ae10.
+Registration uses Microsoft x64 RCX=name, XMM1=default, XMM2=minimum,
+XMM3=maximum, stack flags 0x44 at rsp+0x20 and description at rsp+0x28.
+These are semantic assignments, not recovered symbols or a called DLL API.
+The flags' meaning and complete dvar layout are not assumed.
+
+Test6 uses optional registration and camera patterns separate from the core
+gate. Both must identify the same in-image pointer slot and exact constants.
+Live reads validate the dvar name/type and finite domain 1-160. Writes additionally
+require Ready, a writable aligned field and a valid selector value 60-120 in
+steps of 5. An atomic compare-and-exchange changes only the four-byte current
+float; a concurrent change defers a retry. No native dvar call, domain/reset/
+latched/flag write, cg_fovScale change or weapon-zoom patch occurs.
+
+The render callback checks an explicitly selected/saved desired FOV at most
+every 250ms while Ready, reapplying only if current differs. No selection means
+no override. Restore default queues 65 once and releases the override after
+success. `bo1mw2/settings.ini` contains version=1 and fov=<integer>, with strict
+128-byte bounded parsing. Save flushes an own temp file then replaces the own
+settings file; only successful disk operations change the saved indication.
+Uninstall preserves it; clear/reset deletes only that own file. Diagnostics
+include that file when present. Native ADS/scale and alternate/cutscene paths
+still need owner tests; a static read is not proof of final camera behavior.
+
 ## Resolution and level gate
 
-The five patterns are centralized in `include/core.hpp`, with the static check
+The five core plus two optional FOV patterns are centralized in `include/core.hpp`, with the static check
 report in `profile-checks.json`. Each final pattern has exactly one match in the
 uploaded `.text`. Registration name anchors and RIP-relative stores resolve
 slots. Addresses are not copied from another client, platform, or build.
@@ -189,16 +223,45 @@ patterns, and decodes builtin-table name/function pointers and relative calls.
 | Partial T5 VM value | union `+0`, type `+4`, stride 8 | Native float getter at `0x73380` indexes stack by 8 and distinguishes tags 5/6; research only, never cast into IW4 |
 
 Normal GSC uses column 2 for main round tuning, whereas the between-round value
-omits a column and uses utility default 1. Five supplied version-473 zone streams
-contain no `zombiemode.csv` name. Request/inspect BO1 `common_zombie.ff` next to
-resolve this concrete missing dependency. Until then, the menu and all rule
-logs mark fallback-default provenance. No final retail/Kino table is claimed.
+omits a column and uses utility default 1. The initial five zone streams lacked
+the table name. The later common_zombie.ff resolves its normal column; selected
+values match the preview. Test5 retains its historical fallback label, whereas
+test6 reports local CSV plus GSC fallback. A full final-map override audit remains.
 
 OpenAssetTools' pinned T5 schema describes StringTable name, row/column counts,
 cell strings/hashes and a cell-index array. For T5 x86 the serialized structure
 uses 32-bit pointers; cells contain string pointer plus hash. Parse its zone
 pointer/stream fixups before using this as an asset importer. A string-name scan
 does not implement that parser, and this format must not be cast into x64 IW4.
+
+### Scoped StringTable recovery from common_zombie.ff
+
+SHA256 f812069ef2ff446b97051e75d6a5ee49687a8085218b8f79dc2d8237e543117e,
+51,325,344 bytes; inflated stream 79,661,349 bytes. Target record header at raw
+0x2a5b17f: five 32-bit fields (inline name, columns=5, rows=106, inline values,
+inline index array). Name starts 0x2a5b193 and is 18 bytes including NUL. Cells
+start 0x2a5b1a5: 530 entries, each a 32-bit XString pointer and 32-bit hash.
+The 118 inline strings span 0x2a5c235 through 0x2a5c9fe. Hashes use lowercase
+ASCII DJB2 with seed 5381. The following signed-16-bit index entries form a
+permutation of 0-529; sortedness is not established.
+
+Packed references subtract one and split into three high block bits / 29 low
+offset bits. A virtual block 4 offset cannot be read as a raw stream offset.
+Our original scoped reader maps unambiguous in-table aliases, then resolves
+exact pointer-keyed strings and verifies each used hash. Thirteen structural
+tables yield twelve mappings and 754 cached strings; the target delta is 0x52d41
+with fourteen distinct alias values. Two earlier source tables have only one
+alias anchor each. Ambiguous tables are skipped; conflicting mappings and
+unresolved required cells fail. Hash-only guessing would encounter real short
+numeric-text collisions, so it is not used. Unneeded weapon-name references
+remain unresolved. This is not a complete XAsset pointer/fixup loader.
+
+Normal column 2 (MEDIUM): health start 150, increase 100, multiplier .1,
+spawn delay 2.0, max_ai base budget 24, per-player 6, runner interval 10,
+movement multiplier 8. The between-round key is absent by all key hashes, so
+10s remains the patched-script fallback. Concurrent cap 24 is a script value,
+not inferred from CSV max_ai. Exact selected references and provenance are in
+`bo1-normal-tuning-evidence.json`; no original table is distributed.
 
 The portable preview is bounded to rounds 1-100 and only normal solo rounds.
 The first-round flag remains independent in the calculation API; the UI sets it
@@ -244,7 +307,8 @@ uncompressed-size and compressed-size words followed by zlib. Source lengths,
 EOF, and trailing NUL are validated by our scoped extraction tool. This yields
 actual readable source from the user's supplied files. No decompiler output
 needs to be trusted for those scripts. A full XAsset loader is still needed for
-models, animation data, sound tables, and the final CSV overrides.
+models, animation data and sound tables. Selected normal CSV values now have a
+scoped independent reader; final configuration overrides still require auditing.
 
 T5 XModel, XAnimParts, material/technique/shader, skeleton, and sound structures
 are not accepted as IW4 structures. Nor does the new x64 engine prove a serialized
@@ -257,10 +321,12 @@ IW4 zone uses 64-bit pointer records. Asset conversion is unimplemented.
 | 2026-10-11 / test 1 | Exact-build identity, D3D9 proxy/menu, level reads, single God-bit action, logs/crash dump attempt | AMD64 cross-build; portable signature/menu tests; extractor fixtures; five live signature matches | Failed before first frame: three execute AVs from truncated native device table |
 | 2026-10-11 / test 2 | Forwarding-only startup control and loader/event collector | Import/export/TLS checks; PowerShell parsing/filesystem checks; owner probes all exit zero | Owner confirms normal launch with DLL removed and with forwarding control |
 | 2026-10-11 / test 3 | Keep native vptr/table; patch selected public slots with conditional rollback | AMD64 cross-build; two native tests including private slot 134 and shared-table regression; PowerShell menu-upgrade/collector checks | Owner reports working menu; render/input/categories/estate-to-no-server observed, no new crash evidence; player guard failed |
-| 2026-10-11 / test 4 | Correct WORD entity number; distinguish failed health reads; log read status | Regression reproduced former rejection and passes after fix; three native tests; exact-byte layout verification; AMD64 build | Pending owner health/God/transition tests |
+| 2026-10-11 / test 4 | Correct WORD entity number; distinguish failed health reads; log read status | Regression reproduced former rejection and passes after fix; three native tests; exact-byte layout verification; AMD64 build | Owner confirms health/God/checkpoint behavior in estate with matching log |
+| 2026-10-11 / test 5 | Read-only source-derived normal-solo BO1 round preview | Four native suites, T5 numeric evidence, Windows build and script checks | Owner confirms working; front-end run covers rounds 1-100, no new crash evidence |
+| 2026-10-11 / test 6 | FOV selector/save/reset and derived normal CSV recovery | Five native suites, nine Python fixtures, seven static patterns; Windows/package checks recorded separately | Pending owner FOV/ADS/restart/checkpoint observations |
 
-The three owner dumps and three results ZIPs have been analyzed and their redacted
-findings recorded above. No retail game is executed in this Linux workspace.
-The next acceptance gate is player test 4: mission health, God-on/God-off damage,
-level gating, checkpoint/mission transitions, and explicit live gameplay/control
-observations. Continue recording failures and successes before AI/asset injection.
+Returned owner evidence is redacted into the versioned runtime JSON files; full
+logs/dumps stay private. No retail game is executed in this Linux workspace.
+The next acceptance gate is FOV test6: selector, saved-value restart, ADS,
+checkpoint reapplication and existing gameplay regression. Second-map/reset
+coverage and native BO1 actor/asset compatibility remain separate gates.

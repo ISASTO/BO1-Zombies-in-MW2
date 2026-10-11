@@ -3,8 +3,9 @@
 #include <limits>
 
 namespace mod::bo1 {
-// Fallback values read from the owner's _zombiemode.gsc. The tuning CSV is
-// missing: these are not a verified final retail/Kino configuration.
+// Main normal-column values recovered from the owner's common_zombie.ff
+// StringTable match these patched GSC defaults. Capacity/inter-round time stay
+// script values. Special rounds/map/runtime overrides are not simulated here.
 inline constexpr int kPreviewMinRound = 1;
 inline constexpr int kPreviewMaxRound = 100;
 inline constexpr int kBasePopulation = 24;

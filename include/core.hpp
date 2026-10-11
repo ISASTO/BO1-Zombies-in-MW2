@@ -5,9 +5,10 @@
 #include <string>
 #include <vector>
 #include "bo1_round_rules.hpp"
+#include "fov_preferences.hpp"
 
 namespace mod {
-inline constexpr const char* kVersion = "0.1.4-round-test5";
+inline constexpr const char* kVersion = "0.1.5-fov-test6";
 inline constexpr const char* kExeSha256 = "fb7e8a987c371dea7b666091b0b9e2011c0cd9cd277b191ad453d11d557dd777";
 
 // -1 is a wildcard. Reject malformed patterns rather than matching everything.
@@ -69,9 +70,14 @@ inline constexpr const char* kGodDamagePattern =
 inline constexpr const char* kHealthGuardPattern =
     "83 B9 64 01 00 00 00 7F 09 48 8D 0D ?? ?? ?? ?? EB AD";
 
-enum class Page { Home, Player, Weapons, World, AI, Zombies, Diagnostics, ZombieRules };
+inline constexpr const char* kFovRegistrationPattern =
+    "F3 44 0F 10 15 ?? ?? ?? ?? 48 8D 0D ?? ?? ?? ?? F3 0F 10 1D ?? ?? ?? ?? 41 0F 28 D2 F3 0F 10 0D ?? ?? ?? ?? 48 89 05 ?? ?? ?? ?? 48 8D 05 ?? ?? ?? ?? 48 89 44 24 28 C7 44 24 20 44 00 00 00 E8 ?? ?? ?? ?? 48 89 05 ?? ?? ?? ??";
+inline constexpr const char* kFovCameraPattern =
+    "48 8B 05 ?? ?? ?? ?? 48 8D 0D ?? ?? ?? ?? 8B D7 F3 0F 10 78 10 E8 ?? ?? ?? ?? 85 C0 74 ?? F3 0F 10 76 28";
+
+enum class Page { Home, Player, Weapons, World, AI, Zombies, Diagnostics, ZombieRules, View };
 enum class Input { Toggle, Up, Down, Select, Back, Left, Right };
-enum class Action { None, ToggleGod, ToggleHud, WriteSnapshot, WriteRoundPreview };
+enum class Action { None, ToggleGod, ToggleHud, WriteSnapshot, WriteRoundPreview, ChangeFov, SaveFov, ResetFov };
 struct MenuState {
     bool visible = false;
     bool hud = true;
@@ -79,22 +85,28 @@ struct MenuState {
     int selected = 0;
     int homeSelection = 0;
     int previewRound = bo1::kPreviewMinRound;
+    FovPreference fov;
     int count() const {
         switch (page) {
             case Page::Home: return 6;
-            case Page::Player: return 6;
+            case Page::Player: return 7;
             case Page::Weapons: return 5;
             case Page::World: return 4;
             case Page::AI: return 3;
             case Page::Zombies: return 4;
             case Page::Diagnostics: return 2;
             case Page::ZombieRules: return 6;
+            case Page::View: return 5;
         }
         return 0;
     }
+    int firstVisibleRow() const { return selected>=6 ? selected-5 : 0; }
     Action input(Input key) {
         if (key == Input::Toggle) { visible = !visible; return Action::None; }
         if (!visible) return Action::None;
+        if (page == Page::View && selected == 0
+            && (key == Input::Left || key == Input::Right || key == Input::Select))
+            return fov.step(key==Input::Left?-1:1) ? Action::ChangeFov : Action::None;
         if (page == Page::ZombieRules && selected == 0
             && (key == Input::Left || key == Input::Right || key == Input::Select)) {
             const int oldRound = previewRound;
@@ -107,6 +119,7 @@ struct MenuState {
         if (key == Input::Back) {
             if (page == Page::Home) visible = false;
             else if (page == Page::ZombieRules) { page = Page::Zombies; selected = 0; }
+            else if (page == Page::View) { page = Page::Player; selected = 1; }
             else { page = Page::Home; selected = homeSelection; }
         }
         if (key == Input::Select) {
@@ -115,6 +128,9 @@ struct MenuState {
                 page = static_cast<Page>(selected + 1);
                 selected = 0;
             } else if (page == Page::Player && selected == 0) return Action::ToggleGod;
+            else if (page == Page::Player && selected == 1) { page=Page::View; selected=0; }
+            else if (page == Page::View && selected == 1) return Action::SaveFov;
+            else if (page == Page::View && selected == 2) return Action::ResetFov;
             else if (page == Page::Zombies && selected == 0) {
                 page = Page::ZombieRules; selected = 0; return Action::WriteRoundPreview;
             }
