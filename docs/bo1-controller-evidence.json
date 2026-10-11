@@ -1,0 +1,700 @@
+{
+  "schema_version": 1,
+  "reviewed_utc_date": "2026-10-11",
+  "iteration": "0.1.10-zombies-controller-test11",
+  "inputs": [
+    {
+      "file": "common_zombie_patch.ff",
+      "sha256": "3311182f5cb9af07d69d628b8223ab43e47992e4951b46e761d4f0152f33787e",
+      "decompressed_size": 1119345,
+      "validated_script_count": 72
+    },
+    {
+      "file": "common_zombie.ff",
+      "sha256": "f812069ef2ff446b97051e75d6a5ee49687a8085218b8f79dc2d8237e543117e",
+      "decompressed_size": 79661349,
+      "validated_script_count": 80
+    }
+  ],
+  "dependency_audit": {
+    "tool": "tools/audit_bo1_scripts.py",
+    "zone_precedence": [
+      "common_zombie.ff",
+      "common_zombie_patch.ff"
+    ],
+    "roots": [
+      "maps/_zombiemode.gsc",
+      "maps/_zombiemode_spawner.gsc",
+      "maps/_zombiemode_zone_manager.gsc",
+      "animscripts/zombie_init.gsc",
+      "animscripts/zombie_combat.gsc",
+      "animscripts/zombie_melee.gsc",
+      "animscripts/zombie_move.gsc",
+      "animscripts/zombie_run.gsc",
+      "animscripts/zombie_pain.gsc",
+      "animscripts/zombie_death.gsc"
+    ],
+    "reachable_scripts": 60,
+    "overridden_paths_count": 48,
+    "missing_count": 64,
+    "missing_dependencies": [
+      "character/c_cub_castro_zt.gsc",
+      "character/c_ger_richtofen_zt.gsc",
+      "character/c_jap_takeo_zt.gsc",
+      "character/c_rus_nikolai_zt.gsc",
+      "character/c_usa_dempsey_zt.gsc",
+      "character/c_usa_jfk_zt.gsc",
+      "character/c_usa_marine_michael_carter_player_zm.gsc",
+      "character/c_usa_mcnamara_zt.gsc",
+      "character/c_usa_nixon_zt.gsc",
+      "character/c_usa_sog2_zt.gsc",
+      "character/c_zom_blue_guy_zt.gsc",
+      "character/c_zom_red_guy_zt.gsc",
+      "character/c_zom_yellow_guy_zt.gsc",
+      "codescripts/character.gsc",
+      "common_scripts/utility.gsc",
+      "maps/_anim.gsc",
+      "maps/_animatedmodels.gsc",
+      "maps/_art.gsc",
+      "maps/_audio.gsc",
+      "maps/_autosave.gsc",
+      "maps/_bayonet.gsc",
+      "maps/_bulletcam.gsc",
+      "maps/_busing.gsc",
+      "maps/_callbacksetup.gsc",
+      "maps/_cheat.gsc",
+      "maps/_colors.gsc",
+      "maps/_constants.gsc",
+      "maps/_contextual_melee.gsc",
+      "maps/_cooplogic.gsc",
+      "maps/_createfx.gsc",
+      "maps/_damagefeedback.gsc",
+      "maps/_dds.gsc",
+      "maps/_destructible.gsc",
+      "maps/_detonategrenades.gsc",
+      "maps/_endmission.gsc",
+      "maps/_explosive_bolt.gsc",
+      "maps/_flamethrower_plight.gsc",
+      "maps/_flareweapon.gsc",
+      "maps/_flashgrenades.gsc",
+      "maps/_friendlyfire.gsc",
+      "maps/_gamemode.gsc",
+      "maps/_global_fx.gsc",
+      "maps/_hud.gsc",
+      "maps/_hud_util.gsc",
+      "maps/_ingamemenus.gsc",
+      "maps/_introscreen.gsc",
+      "maps/_load_common.gsc",
+      "maps/_meatshield.gsc",
+      "maps/_mgturret.gsc",
+      "maps/_minefields.gsc",
+      "maps/_music.gsc",
+      "maps/_names.gsc",
+      "maps/_serverfaceanim.gsc",
+      "maps/_shellshock.gsc",
+      "maps/_spawn_manager.gsc",
+      "maps/_spawner.gsc",
+      "maps/_swimming.gsc",
+      "maps/_utility_code.gsc",
+      "maps/_vehicle.gsc",
+      "maps/_vehicle_aianim.gsc",
+      "mptype/player_t5_zm.gsc",
+      "mptype/player_t5_zm_pentagon.gsc",
+      "mptype/player_t5_zm_theater.gsc",
+      "mptype/player_t5_zt.gsc"
+    ],
+    "limits": [
+      "Lexical script references only; dynamic calls/assets are not resolved.",
+      "No native API, final map configuration or asset binary compatibility is inferred.",
+      "Debug-only /# #/ blocks are excluded; missing paths are relative to the supplied input set."
+    ]
+  },
+  "scripts": [
+    {
+      "path": "animscripts/zombie_combat.gsc",
+      "zone": "common_zombie_patch.ff",
+      "sha256": "86fbf92d4af78b7d37660fae9ad17fabdcf24a7c02dd06731cbfcd101a051ea3",
+      "size_bytes": 10563,
+      "lexical_encoding": "utf-8-sig",
+      "includes": [
+        "animscripts/Combat_utility.gsc",
+        "animscripts/Debug.gsc",
+        "animscripts/zombie_SetPoseMovement.gsc",
+        "animscripts/zombie_shared.gsc",
+        "animscripts/zombie_utility.gsc",
+        "common_scripts/utility.gsc"
+      ],
+      "script_calls": [
+        "animscripts/weaponList.gsc",
+        "animscripts/zombie_melee.gsc",
+        "animscripts/zombie_utility.gsc",
+        "maps/_bayonet.gsc",
+        "maps/_mgturret.gsc"
+      ],
+      "animtrees": [
+        "generic_human"
+      ],
+      "function_anchors": [
+        {
+          "name": "main",
+          "start_line": 10,
+          "end_line": 22
+        }
+      ],
+      "animation_symbol_count": 20,
+      "literal_sound_aliases": [],
+      "dynamic_sound_calls": 0,
+      "literal_model_count": 0
+    },
+    {
+      "path": "animscripts/zombie_death.gsc",
+      "zone": "common_zombie_patch.ff",
+      "sha256": "8a534e44dbf2695d749f12900a95d711bc85adf4ff923812cc932a09484db814",
+      "size_bytes": 45787,
+      "lexical_encoding": "utf-8-sig",
+      "includes": [
+        "animscripts/zombie_utility.gsc",
+        "common_scripts/utility.gsc"
+      ],
+      "script_calls": [
+        "animscripts/face.gsc",
+        "animscripts/zombie_pain.gsc",
+        "animscripts/zombie_shared.gsc",
+        "animscripts/zombie_utility.gsc"
+      ],
+      "animtrees": [
+        "generic_human"
+      ],
+      "function_anchors": [
+        {
+          "name": "main",
+          "start_line": 24,
+          "end_line": 201
+        }
+      ],
+      "animation_symbol_count": 85,
+      "literal_sound_aliases": [
+        "bullet_impact_headshot",
+        "bullet_impact_headshot_helmet"
+      ],
+      "dynamic_sound_calls": 0,
+      "literal_model_count": 0
+    },
+    {
+      "path": "animscripts/zombie_init.gsc",
+      "zone": "common_zombie_patch.ff",
+      "sha256": "a6bacfda7a739659efa9c035de8f407241b821c50a2e3eaecb9c411d3bbbac94",
+      "size_bytes": 43435,
+      "lexical_encoding": "utf-8-sig",
+      "includes": [
+        "animscripts/Combat_utility.gsc",
+        "animscripts/zombie_utility.gsc",
+        "common_scripts/Utility.gsc",
+        "maps/_utility.gsc"
+      ],
+      "script_calls": [
+        "animscripts/battleChatter.gsc",
+        "animscripts/battleChatter_ai.gsc",
+        "animscripts/battlechatter.gsc",
+        "animscripts/combat_utility.gsc",
+        "animscripts/face.gsc",
+        "animscripts/squadManager.gsc",
+        "animscripts/squadmanager.gsc",
+        "animscripts/zombie_SetPoseMovement.gsc",
+        "animscripts/zombie_init.gsc",
+        "animscripts/zombie_run.gsc",
+        "animscripts/zombie_shared.gsc",
+        "maps/_gameskill.gsc",
+        "maps/_names.gsc",
+        "maps/_serverfaceanim.gsc"
+      ],
+      "animtrees": [
+        "generic_human"
+      ],
+      "function_anchors": [
+        {
+          "name": "main",
+          "start_line": 33,
+          "end_line": 205
+        }
+      ],
+      "animation_symbol_count": 113,
+      "literal_sound_aliases": [],
+      "dynamic_sound_calls": 0,
+      "literal_model_count": 0
+    },
+    {
+      "path": "animscripts/zombie_melee.gsc",
+      "zone": "common_zombie_patch.ff",
+      "sha256": "de519dff8337d73b8edb46a444ac701d17e036e94e8ecb9f04fa6226ba69d797",
+      "size_bytes": 16724,
+      "lexical_encoding": "utf-8-sig",
+      "includes": [
+        "animscripts/Combat_Utility.gsc",
+        "animscripts/Debug.gsc",
+        "animscripts/zombie_SetPoseMovement.gsc",
+        "animscripts/zombie_utility.gsc",
+        "common_scripts/utility.gsc",
+        "maps/_utility.gsc"
+      ],
+      "script_calls": [
+        "animscripts/battleChatter_ai.gsc",
+        "animscripts/face.gsc",
+        "animscripts/zombie_combat.gsc",
+        "animscripts/zombie_run.gsc",
+        "animscripts/zombie_shared.gsc",
+        "animscripts/zombie_utility.gsc"
+      ],
+      "animtrees": [
+        "generic_human"
+      ],
+      "function_anchors": [
+        {
+          "name": "MeleeCombat",
+          "start_line": 13,
+          "end_line": 227
+        },
+        {
+          "name": "resetGiveUpTime",
+          "start_line": 229,
+          "end_line": 239
+        },
+        {
+          "name": "CanMeleeInternal",
+          "start_line": 346,
+          "end_line": 503
+        },
+        {
+          "name": "isMeleePathClear",
+          "start_line": 505,
+          "end_line": 554
+        }
+      ],
+      "animation_symbol_count": 4,
+      "literal_sound_aliases": [
+        "zmb_vocals_boss_attack",
+        "zmb_vocals_napalm_attack",
+        "zmb_vocals_quad_attack",
+        "zmb_vocals_sonic_attack",
+        "zmb_vocals_zombie_attack"
+      ],
+      "dynamic_sound_calls": 0,
+      "literal_model_count": 0
+    },
+    {
+      "path": "animscripts/zombie_move.gsc",
+      "zone": "common_zombie_patch.ff",
+      "sha256": "1ac4ba650c4c69cf77d3f96934ad5f0e9ea98c502fcb639cb41bf1b4868f4dfe",
+      "size_bytes": 13983,
+      "lexical_encoding": "utf-8-sig",
+      "includes": [
+        "animscripts/combat_utility.gsc",
+        "animscripts/zombie_SetPoseMovement.gsc",
+        "animscripts/zombie_shared.gsc",
+        "animscripts/zombie_utility.gsc",
+        "common_scripts/utility.gsc"
+      ],
+      "script_calls": [
+        "animscripts/battleChatter_ai.gsc",
+        "animscripts/face.gsc",
+        "animscripts/shared.gsc",
+        "animscripts/zombie_move.gsc",
+        "animscripts/zombie_run.gsc",
+        "animscripts/zombie_utility.gsc",
+        "maps/_zombiemode_spawner.gsc"
+      ],
+      "animtrees": [
+        "generic_human"
+      ],
+      "function_anchors": [
+        {
+          "name": "main",
+          "start_line": 9,
+          "end_line": 59
+        }
+      ],
+      "animation_symbol_count": 10,
+      "literal_sound_aliases": [],
+      "dynamic_sound_calls": 0,
+      "literal_model_count": 0
+    },
+    {
+      "path": "animscripts/zombie_pain.gsc",
+      "zone": "common_zombie_patch.ff",
+      "sha256": "cdd2ab75f4d2f52aee85e8152a0eb8a15ebc174c977140d055125608470fc94b",
+      "size_bytes": 17329,
+      "lexical_encoding": "utf-8-sig",
+      "includes": [
+        "animscripts/Combat_Utility.gsc",
+        "animscripts/weaponList.gsc",
+        "animscripts/zombie_utility.gsc",
+        "common_scripts/utility.gsc",
+        "maps/_utility.gsc"
+      ],
+      "script_calls": [
+        "animscripts/face.gsc",
+        "animscripts/zombie_death.gsc",
+        "animscripts/zombie_shared.gsc",
+        "animscripts/zombie_utility.gsc"
+      ],
+      "animtrees": [
+        "generic_human"
+      ],
+      "function_anchors": [
+        {
+          "name": "main",
+          "start_line": 9,
+          "end_line": 100
+        }
+      ],
+      "animation_symbol_count": 42,
+      "literal_sound_aliases": [],
+      "dynamic_sound_calls": 0,
+      "literal_model_count": 0
+    },
+    {
+      "path": "animscripts/zombie_run.gsc",
+      "zone": "common_zombie_patch.ff",
+      "sha256": "19d9e7677ecfa730b3bb3eb062eccb60da8c37269ecebd7bb8d37c6f3078cfe8",
+      "size_bytes": 12069,
+      "lexical_encoding": "utf-8-sig",
+      "includes": [
+        "animscripts/Combat_Utility.gsc",
+        "animscripts/debug.gsc",
+        "animscripts/zombie_SetPoseMovement.gsc",
+        "animscripts/zombie_utility.gsc",
+        "common_scripts/utility.gsc"
+      ],
+      "script_calls": [
+        "animscripts/zombie_run.gsc",
+        "animscripts/zombie_shared.gsc",
+        "animscripts/zombie_utility.gsc"
+      ],
+      "animtrees": [
+        "generic_human"
+      ],
+      "function_anchors": [],
+      "animation_symbol_count": 15,
+      "literal_sound_aliases": [
+        "fly_step_run_npc_concrete"
+      ],
+      "dynamic_sound_calls": 0,
+      "literal_model_count": 0
+    },
+    {
+      "path": "maps/_zombiemode.gsc",
+      "zone": "common_zombie_patch.ff",
+      "sha256": "39ede844d034f9e8dd4af2e34fc2d70a142017750166e2dc8797a36020750a15",
+      "size_bytes": 183546,
+      "lexical_encoding": "utf-8-sig",
+      "includes": [
+        "common_scripts/utility.gsc",
+        "maps/_anim.gsc",
+        "maps/_busing.gsc",
+        "maps/_music.gsc",
+        "maps/_utility.gsc",
+        "maps/_zombiemode_utility.gsc"
+      ],
+      "script_calls": [
+        "animscripts/zombie_init.gsc",
+        "maps/_cheat.gsc",
+        "maps/_gameskill.gsc",
+        "maps/_hud_util.gsc",
+        "maps/_laststand.gsc",
+        "maps/_utility.gsc",
+        "maps/_zombiemode.gsc",
+        "maps/_zombiemode_ai_dogs.gsc",
+        "maps/_zombiemode_audio.gsc",
+        "maps/_zombiemode_blockers.gsc",
+        "maps/_zombiemode_bowie.gsc",
+        "maps/_zombiemode_claymore.gsc",
+        "maps/_zombiemode_equipment.gsc",
+        "maps/_zombiemode_ffotd.gsc",
+        "maps/_zombiemode_load.gsc",
+        "maps/_zombiemode_perks.gsc",
+        "maps/_zombiemode_powerups.gsc",
+        "maps/_zombiemode_score.gsc",
+        "maps/_zombiemode_spawner.gsc",
+        "maps/_zombiemode_traps.gsc",
+        "maps/_zombiemode_user.gsc",
+        "maps/_zombiemode_weap_crossbow.gsc",
+        "maps/_zombiemode_weap_cymbal_monkey.gsc",
+        "maps/_zombiemode_weap_freezegun.gsc",
+        "maps/_zombiemode_weap_tesla.gsc",
+        "maps/_zombiemode_weap_thundergun.gsc",
+        "maps/_zombiemode_weapon_box.gsc",
+        "maps/_zombiemode_weapons.gsc",
+        "maps/_zombiemode_zone_manager.gsc"
+      ],
+      "animtrees": [
+        "generic_human"
+      ],
+      "function_anchors": [
+        {
+          "name": "main",
+          "start_line": 10,
+          "end_line": 188
+        },
+        {
+          "name": "default_max_zombie_func",
+          "start_line": 3075,
+          "end_line": 3101
+        },
+        {
+          "name": "round_spawning",
+          "start_line": 3103,
+          "end_line": 3289
+        },
+        {
+          "name": "zombie_speed_up",
+          "start_line": 3294,
+          "end_line": 3343
+        },
+        {
+          "name": "chalk_one_up",
+          "start_line": 3641,
+          "end_line": 3820
+        },
+        {
+          "name": "chalk_round_over",
+          "start_line": 3825,
+          "end_line": 3897
+        },
+        {
+          "name": "round_think",
+          "start_line": 3899,
+          "end_line": 3983
+        },
+        {
+          "name": "ai_calculate_health",
+          "start_line": 4017,
+          "end_line": 4032
+        },
+        {
+          "name": "round_spawn_failsafe",
+          "start_line": 4059,
+          "end_line": 4127
+        },
+        {
+          "name": "round_wait",
+          "start_line": 4130,
+          "end_line": 4167
+        }
+      ],
+      "animation_symbol_count": 103,
+      "literal_sound_aliases": [
+        "door_deny",
+        "evt_player_swiped",
+        "zmb_director_light_hit"
+      ],
+      "dynamic_sound_calls": 1,
+      "literal_model_count": 20
+    },
+    {
+      "path": "maps/_zombiemode_spawner.gsc",
+      "zone": "common_zombie_patch.ff",
+      "sha256": "74abc4bba225fc83872c24f1fed9026beb2bee8946b5117fb16fa218ff4856a6",
+      "size_bytes": 137767,
+      "lexical_encoding": "utf-8-sig",
+      "includes": [
+        "common_scripts/utility.gsc",
+        "maps/_utility.gsc",
+        "maps/_zombiemode_audio.gsc",
+        "maps/_zombiemode_net.gsc",
+        "maps/_zombiemode_utility.gsc"
+      ],
+      "script_calls": [
+        "animscripts/utility.gsc",
+        "animscripts/zombie_death.gsc",
+        "animscripts/zombie_shared.gsc",
+        "maps/_laststand.gsc",
+        "maps/_zombiemode.gsc",
+        "maps/_zombiemode_audio.gsc",
+        "maps/_zombiemode_blockers.gsc",
+        "maps/_zombiemode_powerups.gsc",
+        "maps/_zombiemode_score.gsc",
+        "maps/_zombiemode_spawner.gsc",
+        "maps/_zombiemode_weap_freezegun.gsc",
+        "maps/_zombiemode_weap_tesla.gsc",
+        "maps/_zombiemode_weap_thundergun.gsc",
+        "maps/_zombiemode_weapons.gsc"
+      ],
+      "animtrees": [
+        "generic_human"
+      ],
+      "function_anchors": [
+        {
+          "name": "find_flesh",
+          "start_line": 3922,
+          "end_line": 4066
+        },
+        {
+          "name": "zombie_pathing",
+          "start_line": 4082,
+          "end_line": 4199
+        },
+        {
+          "name": "zombie_follow_enemy",
+          "start_line": 4295,
+          "end_line": 4354
+        }
+      ],
+      "animation_symbol_count": 86,
+      "literal_sound_aliases": [
+        "zmb_bar_bend",
+        "zmb_zombie_spawn",
+        "zmb_zombie_spawn_snow",
+        "zmb_zombie_spawn_water"
+      ],
+      "dynamic_sound_calls": 0,
+      "literal_model_count": 4
+    },
+    {
+      "path": "maps/_zombiemode_utility.gsc",
+      "zone": "common_zombie_patch.ff",
+      "sha256": "0157cf6c0c7135cf8b907b170afa340b5c3f98c33064e388c4fb89167a279770",
+      "size_bytes": 97044,
+      "lexical_encoding": "utf-8-sig",
+      "includes": [
+        "common_scripts/utility.gsc",
+        "maps/_utility.gsc"
+      ],
+      "script_calls": [
+        "maps/_cheat.gsc",
+        "maps/_hud_message.gsc",
+        "maps/_laststand.gsc",
+        "maps/_zombiemode_equipment.gsc",
+        "maps/_zombiemode_powerups.gsc",
+        "maps/_zombiemode_server_throttle.gsc",
+        "maps/_zombiemode_weapons.gsc"
+      ],
+      "animtrees": [],
+      "function_anchors": [
+        {
+          "name": "get_enemy_count",
+          "start_line": 51,
+          "end_line": 69
+        },
+        {
+          "name": "spawn_zombie",
+          "start_line": 71,
+          "end_line": 109
+        },
+        {
+          "name": "get_zombie_point_of_interest",
+          "start_line": 523,
+          "end_line": 629
+        },
+        {
+          "name": "get_closest_valid_player",
+          "start_line": 996,
+          "end_line": 1048
+        }
+      ],
+      "animation_symbol_count": 0,
+      "literal_sound_aliases": [],
+      "dynamic_sound_calls": 7,
+      "literal_model_count": 0
+    },
+    {
+      "path": "maps/_zombiemode_zone_manager.gsc",
+      "zone": "common_zombie_patch.ff",
+      "sha256": "ccb33c865ea82639f3edcbe8ff2221c9902427d507770c4901013b04b1b26076",
+      "size_bytes": 21405,
+      "lexical_encoding": "utf-8-sig",
+      "includes": [
+        "common_scripts/utility.gsc",
+        "maps/_utility.gsc"
+      ],
+      "script_calls": [],
+      "animtrees": [],
+      "function_anchors": [],
+      "animation_symbol_count": 0,
+      "literal_sound_aliases": [],
+      "dynamic_sound_calls": 0,
+      "literal_model_count": 0
+    }
+  ],
+  "controller": {
+    "first_intro_wait_ms": 8250,
+    "later_intro_wait_ms": 2500,
+    "between_round_wait_ms": 10000,
+    "capacity_poll_ms": 100,
+    "round_completion_poll_ms": 1000,
+    "cap": 24,
+    "spending": "confirmed creation only",
+    "selection": "one extra draw if selected spawner equals previous; repeat still possible",
+    "adapter": "SIMULATED",
+    "native_actors_spawned": 0,
+    "clock": "exact-profile IW4 client+0 commandTime, not wall time",
+    "round_bound": [
+      1,
+      100
+    ],
+    "failsafe": "explicit recycle accounting tested; no automatic world/movement policy",
+    "final_map_configuration_verified": false,
+    "vm_frame_quantization_verified": false
+  },
+  "melee_rule": {
+    "scope": "ordinary zombie versus player admission only; no native execution",
+    "close_range": 64,
+    "charge_range": 200,
+    "long_charge_range": 512,
+    "new_attack_max_yaw_degrees": 60,
+    "continued_max_yaw_degrees": 110,
+    "recent_miss_charge_block_ms": 3000,
+    "path_result_required": "close attack and explicit charge-path branch",
+    "damage": "unimplemented; animation fire notetrack/native hit adapter required"
+  },
+  "upstream_references": [
+    {
+      "repository": "MisaDev4/bo1-zombies-decompiled",
+      "commit": "102f6992be332610aff587e681e3180b15f395bb",
+      "inspected": [
+        "README.md",
+        "src/game/actor.h",
+        "src/game/actor_state.cpp",
+        "src/game/actor_zombie_exposed.cpp"
+      ],
+      "status": "reference only, not exact-byte verification; no code or data copied"
+    },
+    {
+      "repository": "Laupetin/OpenAssetTools",
+      "commit": "068d4cd9f513ff0509b757498712b2ec3dee9463",
+      "inspected": [
+        "docs/SupportedAssetTypes.md",
+        "src/Common/Game/T5/T5_Assets.h",
+        "src/Common/Game/IW4/IW4_Assets.h",
+        "src/ObjCommon/XAnim/BinaryXAnimCommon.h",
+        "src/ObjWriting/XAnim/XAnimDumper.cpp.template",
+        "src/ObjWriting/XAnim/CompiledXAnimWriter.cpp",
+        "src/ObjLoading/XAnim/CompiledXAnimLoader.cpp"
+      ],
+      "status": "game-specific format and conversion reference; no source copied"
+    },
+    {
+      "repository": "ZoneTool/zonetool",
+      "commit": "aa4475b185de5ef6f5a63360d3d5e9c3321ca7ff",
+      "branch": "develop",
+      "inspected": [
+        "src/IW4/Assets/XAnimParts.cpp"
+      ],
+      "status": "historical linker reference, not exact retail ABI"
+    },
+    {
+      "repository": "iw4x/iw4x-client",
+      "commit": "d1b175da1a25d31043246de103a702b206269e5a",
+      "branch": "main",
+      "inspected": [
+        "src/Game/Structs.hpp"
+      ],
+      "status": "MP/historical structure concepts only, no SP actor ABI inferred"
+    }
+  ],
+  "limits": [
+    "Original game script bodies/assets are excluded.",
+    "Animation symbols are tree identifiers; binary XAnim assets are not resolved by this lexical audit.",
+    "Current available input set excludes the previously examined Kino streams and BO1 executable; no new native BO1 verification was performed.",
+    "New controller and test10 weapon repair retail execution pending."
+  ]
+}

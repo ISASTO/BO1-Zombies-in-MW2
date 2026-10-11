@@ -1,10 +1,11 @@
-# Current test10 owner checks
+# Current combined test11 owner checks
 
-Install **BO1MW2-weapons-test10.zip**: close MW2, extract outside the game folder,
+Install **BO1MW2-zombies-controller-test11.zip**: close MW2, extract outside the game folder,
 run **Uninstall.cmd**, then **Install.cmd**, and select the folder containing
 `iw4sp.exe`. Launch through Steam and **restart the mission once** for a clean
-initial inventory. Saved FOV is preserved. Read [weapons-test10.md](weapons-test10.md)
-for compatibility details and the focused sequence.
+initial inventory. Saved FOV is preserved. Read
+[zombies-controller-test11.md](zombies-controller-test11.md) for the full sequence;
+it includes test10's weapon repairs. Install only the combined package.
 
 ```text
 Build / map / resolution:
@@ -22,6 +23,15 @@ Dual ON -> Give ON -> Give OFF -> Dual OFF:
 Checkpoint with both ON and subsequent OFF:
 Reset weapons; God/health/FOV/Rapid Fire still work:
 Any RESTART, WAIT, COMPAT, ON*, UNDO or LOCKED label and when:
+Rehearsal round1: intro duration, six virtual actors, 2s pacing:
+Clear virtual alive: remaining queue finishes, 10s BETWEEN, 2.5s INTRO, round2 eight:
+Rehearsal round10: reaches 24 alive / 9 queue / health 1045; replacement after one kill:
+Pause spawn queue / resume / Auto-clear behavior:
+Controller page scroll, timers, close/reopen F4 and rehearsal HUD:
+Campaign actors stay normal during rehearsal; no real zombie appears:
+Game pause and Slow Motion effects on controller timers:
+Checkpoint / death / menu / map transition: stopped reason and any automatic restart:
+Start locked in front end; End clears virtual counts and preserves existing toggles:
 Any crash, exact error/module/offset, and last action:
 ```
 
@@ -37,6 +47,8 @@ already modified checkpoint requires an unmodified mission restart for baseline
 capture. No original game assets, scripts or complete returned logs/dumps are
 committed or distributed.
 
-The static/build/portable checks pass; retail animation behavior and FPS await
-this run. After acceptance, move to the BO1 round/spawn controller and IW4 actor
-compatibility work. AI spawning and playable Zombies are not enabled yet.
+The static/build/portable checks pass; retail weapon/animation/FPS and controller
+integration await this run. The rehearsal uses simulated tickets in mod memory,
+not campaign soldiers. Normal-solo scheduling is source-derived; debug auto-clear
+is a test adapter. Native AI spawning, damage and playable Zombies remain locked.
+After evidence-driven fixes, establish an IW4 engine-thread actor adapter.

@@ -4,6 +4,7 @@
 #include "player_controls.hpp"
 #include "control_extensions.hpp"
 #include "weapon_inventory.hpp"
+#include "zombie_rehearsal.hpp"
 #include <windows.h>
 #include <d3d9.h>
 #include <atomic>
@@ -86,6 +87,10 @@ struct WeaponModeStatus {
 };
 WeaponModeStatus GetWeaponModeStatus();
 bool AdjustWeaponBank(int direction);
+void UpdateZombieRehearsal(const Snapshot& snapshot);
+void HandleZombieRehearsal(Action action,const Snapshot& snapshot,int startingRound);
+ZombieRehearsalStatus GetZombieRehearsalStatus();
+void LogZombieRehearsal();
 bool SetFov(int value);
 void LogSnapshot();
 void LoadFovPreference(FovPreference& preference);

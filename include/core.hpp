@@ -8,7 +8,7 @@
 #include "fov_preferences.hpp"
 
 namespace mod {
-inline constexpr const char* kVersion = "0.1.9-weapons-test10";
+inline constexpr const char* kVersion = "0.1.10-zombies-controller-test11";
 inline constexpr const char* kExeSha256 = "fb7e8a987c371dea7b666091b0b9e2011c0cd9cd277b191ad453d11d557dd777";
 
 // -1 is a wildcard. Reject malformed patterns rather than matching everything.
@@ -180,14 +180,19 @@ inline constexpr const char* kWeaponAnimBuildPattern =
     "BB 01 00 00 00 48 8D 7D 08 0F 1F 84 00 00 00 00 00 4C 8B 07 41 80 38 00 75 ?? 4C 8B 45 08 8B D3 48 8B CE E8 ?? ?? ?? ?? FF C3 48 83 C7 08 83 FB 25 7C ??";
 
 inline constexpr int kVisibleMenuRows = 8;
-enum class Page { Home, Player, Weapons, World, AI, Zombies, Diagnostics, ZombieRules, View };
+enum class Page { Home, Player, Weapons, World, AI, Zombies, Diagnostics, ZombieRules, View, ZombieController };
 enum class Input { Toggle, Up, Down, Select, Back, Left, Right };
 enum class Action { None, ToggleGod, ToggleHud, WriteSnapshot, WriteRoundPreview, ChangeFov, SaveFov, ResetFov,
     ToggleInfiniteAmmo, ToggleNoReload, ToggleNoclip, ToggleSuperSpeed, ToggleSuperJump, ResetPlayer,
     DecreaseSpeed, IncreaseSpeed, DecreaseJump, IncreaseJump,
     ToggleGiveAll, ToggleRapidFire, ToggleExplosiveBullets, ResetWeapons, ToggleDualWield, PreviousWeaponBank, NextWeaponBank,
     ToggleSlowMotion, ToggleFreezeAI, ToggleGravity, ResetWorld,
-    DecreaseTimeScale, IncreaseTimeScale, DecreaseGravity, IncreaseGravity };
+    DecreaseTimeScale, IncreaseTimeScale, DecreaseGravity, IncreaseGravity,
+    ToggleRehearsal, ChangeRehearsalRound, ToggleRehearsalAutoClear, ToggleRehearsalSpawning,
+    KillRehearsalActor, ClearRehearsalActors, WriteRehearsal };
+inline bool IsRehearsalAction(Action action) {
+    return action>=Action::ToggleRehearsal && action<=Action::WriteRehearsal;
+}
 struct MenuState {
     bool visible = false;
     bool hud = true;
@@ -195,6 +200,7 @@ struct MenuState {
     int selected = 0;
     int homeSelection = 0;
     int previewRound = bo1::kPreviewMinRound;
+    int rehearsalRound = bo1::kPreviewMinRound;
     FovPreference fov;
     int count() const {
         switch (page) {
@@ -203,10 +209,11 @@ struct MenuState {
             case Page::Weapons: return 7;
             case Page::World: return 5;
             case Page::AI: return 3;
-            case Page::Zombies: return 4;
+            case Page::Zombies: return 3;
             case Page::Diagnostics: return 2;
             case Page::ZombieRules: return 6;
             case Page::View: return 5;
+            case Page::ZombieController: return 12;
         }
         return 0;
     }
@@ -232,11 +239,18 @@ struct MenuState {
             if (key != Input::Left && previewRound < bo1::kPreviewMaxRound) ++previewRound;
             return previewRound == oldRound ? Action::None : Action::WriteRoundPreview;
         }
+        if(page==Page::ZombieController && selected==1 && (key==Input::Left || key==Input::Right || key==Input::Select)) {
+            const int oldRound=rehearsalRound;
+            if(key==Input::Left && rehearsalRound>bo1::kPreviewMinRound) --rehearsalRound;
+            if(key!=Input::Left && rehearsalRound<bo1::kPreviewMaxRound) ++rehearsalRound;
+            return rehearsalRound==oldRound?Action::None:Action::ChangeRehearsalRound;
+        }
         if (key == Input::Up) selected = (selected + count() - 1) % count();
         if (key == Input::Down) selected = (selected + 1) % count();
         if (key == Input::Back) {
             if (page == Page::Home) visible = false;
             else if (page == Page::ZombieRules) { page = Page::Zombies; selected = 0; }
+            else if (page == Page::ZombieController) { page=Page::Zombies; selected=1; }
             else if (page == Page::View) { page = Page::Player; selected = 1; }
             else { page = Page::Home; selected = homeSelection; }
         }
@@ -268,6 +282,17 @@ struct MenuState {
             else if (page == Page::View && selected == 2) return Action::ResetFov;
             else if (page == Page::Zombies && selected == 0) {
                 page = Page::ZombieRules; selected = 0; return Action::WriteRoundPreview;
+            }
+            else if(page==Page::Zombies && selected==1) {
+                page=Page::ZombieController; selected=0; return Action::WriteRehearsal;
+            }
+            else if(page==Page::ZombieController) {
+                if(selected==0) return Action::ToggleRehearsal;
+                if(selected==2) return Action::ToggleRehearsalAutoClear;
+                if(selected==3) return Action::ToggleRehearsalSpawning;
+                if(selected==4) return Action::KillRehearsalActor;
+                if(selected==5) return Action::ClearRehearsalActors;
+                if(selected==11) return Action::WriteRehearsal;
             }
             else if (page == Page::Diagnostics && selected == 0) {
                 hud = !hud; return Action::ToggleHud;

@@ -18,6 +18,29 @@ signature match is not a runtime test.
 | `0.1.7-world-weapons-test8` | Owner reports invisible/empty Give All guns and LOCKED Rapid Fire; matching estate log | Runtime correctly rejects three overlapping catalog matches; offline consuming regex missed overlap. Movement/world apply/restore observed. No new crash evidence; see runtime-test8-evidence.json. |
 | `0.1.8-weapons-test9` | Owner reports working other controls, but checkpoint bank collapse/failed OFF and G18/dual FPS defects | Matching log confirms contaminated recapture, G18 veto and Rapid Fire; no new dump. |
 | `0.1.9-weapons-test10` | Preserve baseline and introduced IDs; held-gun generic dual compatibility; cached metadata/performance diagnostics | Eight C++ suites, 12 Python tests, 57 signatures, clean AMD64 build and actual-test9 upgrade pass; retail acceptance pending. |
+| `0.1.10-zombies-controller-test11` | Owner authorizes further work without current game access; combined weapon repairs plus BO1 controller rehearsal | Source-derived normal-solo lifecycle, simulated callbacks, source-only melee admission port and dependency/asset audit. New native/retail execution remains pending; no actor/damage/asset mutation APIs added. |
+
+### Test11 controller and AI portability
+
+The exact-profile player commandTime field at client+0, already confirmed for
+checkpoint ownership, supplies a read-only translated rehearsal clock. Existing
+Ready/client/map guards scope the model. A detected unavailable level/read,
+death, map/client change or clock rewind invalidates the simulated session and
+its tickets. Pause/Slow Motion and checkpoint detection require retail evidence;
+this is not a newly confirmed BO1 GetTime ABI. No new native signatures were
+introduced. Actor/VM calls from the rendering hook remain prohibited by design.
+
+The actual patched scripts confirm 8.25s first intro, 2.5s later intro, 10s
+inter-round sequence, one-repeat spawn selection, success-only budget spending,
+enemy-count filters, last-zombie speed-up and guarded failsafe requeue. The
+common base supplies previously missing animation utility sources. A lexical
+60-script dependency graph still has 64 unresolved references in this input
+set. Scoped ordinary-zombie/player melee admission is implemented in portable
+source; no native attack or damage adapter is connected. Pain/death remain
+researched dependencies, not generic health-zero/deletion substitutes.
+See [bo1-controller-evidence.json](bo1-controller-evidence.json),
+[bo1-portability.md](bo1-portability.md) and
+[zombies-controller-test11.md](zombies-controller-test11.md).
 
 Test 1 initialized its C++ static runtime, then logging/crash handling, engine
 hash/scanning, factory/device shadows, WndProc, and rendering across startup.

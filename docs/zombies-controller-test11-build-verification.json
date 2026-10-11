@@ -1,0 +1,43 @@
+{
+  "version": "0.1.10-zombies-controller-test11",
+  "dll_size": 2435944,
+  "dll_sha256": "11cfe3aaf7de05af26c7a20d168da03d1412ccbe5f15184c29a55752e7b483f7",
+  "imports": [
+    "bcrypt.dll",
+    "dbghelp.dll",
+    "gdi32.dll",
+    "kernel32.dll",
+    "msvcrt.dll",
+    "user32.dll"
+  ],
+  "exports": [
+    "D3DPERF_BeginEvent",
+    "D3DPERF_EndEvent",
+    "D3DPERF_GetStatus",
+    "D3DPERF_QueryRepeatFrame",
+    "D3DPERF_SetMarker",
+    "D3DPERF_SetOptions",
+    "D3DPERF_SetRegion",
+    "DebugSetMute",
+    "Direct3DCreate9",
+    "Direct3DCreate9Ex"
+  ],
+  "loader_probe_sha256": "9fffb5e9a028be30be5cbc8fa3555a6f48178208ba978e800c2e38b5b637a447",
+  "architecture": "AMD64",
+  "signature_count": 57,
+  "probe_text_unchanged": true,
+  "probe_text_sha256": "58c5718f659347387b80a3c51bf9ed56de8d0b89c03362b3a6ee662ab8bf4180",
+  "compiler": "MinGW-w64 GCC 13-posix, RelWithDebInfo, static runtime",
+  "loader_probe_provenance": "Unchanged owned probe source rebuilt by the same toolchain; timestamp/header SHA changed, .text bytes and entry RVA match test10.",
+  "checks": {
+    "aslr_and_nx": true,
+    "native_cpp_tests": "10 suites passed. New controller fixtures cover 1..100 full progression, failed/duplicate/stale creation callbacks, recycling, cap, pacing, intro/inter-round delays, lifetime guard and menu scroll. Scoped ordinary-player melee fixtures cover range/facing/path/reservation/miss boundaries.",
+    "python_tests": "17 passed: existing 12 extractor/tuning/pattern fixtures plus 5 dependency-audit fixtures for comments/strings, patch precedence, casefold cycles, unsafe/dynamic references and non-UTF8 source bytes.",
+    "exact_profile": "57 existing unique overlap-aware patterns against the supplied exact AMD64 hash; no new native addresses/signatures added.",
+    "powershell_scripts": "Four scripts parse with PowerShell 7.6.6. Actual-test10-to-test11 isolated uninstall/install, receipt/hash, diagnostic selection, saved FOV collection, removal and game/log/settings preservation pass on Linux.",
+    "retail_runtime": "No new owner run or Windows game/probe execution. Test10 weapon/dual/FPS and new rehearsal integration remain pending.",
+    "original_game_assets_in_distribution": "none"
+  },
+  "change": "Include test10 weapon repairs; add source-derived bounded normal-solo controller rehearsal with simulated tickets and exact-profile commandTime/lifetime guard. Add disconnected portable ordinary-zombie/player melee admission and local dependency/asset-reference auditing tooling. No native actor/damage/asset calls.",
+  "limits": "Rehearsal is not playable Zombies. Auto-clear and virtual spawners are test fixtures. BO1 final map overrides, VM frame quantization, AI execution and asset conversion remain pending. Generic weapon dual fallback and all new retail effects require owner testing."
+}

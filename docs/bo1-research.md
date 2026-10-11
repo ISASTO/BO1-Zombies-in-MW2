@@ -1,8 +1,10 @@
 # BO1 Zombies: initial local-input research
 
-Scope: inventory and behavioral evidence only. No zombie AI, actor spawning,
-asset import, or round replacement is implemented in test 1. This document
-distinguishes readable source evidence from native-function hypotheses.
+Scope: local behavioral evidence and staged portability work. Test11 adds a
+bounded controller rehearsal with simulated tickets and a source-only melee
+admission port. Native zombie AI/spawning, damage, asset import and campaign
+round replacement remain pending. This document distinguishes readable source
+evidence from native-function hypotheses.
 
 ## Provenance and extraction
 
@@ -79,10 +81,14 @@ return binary32 float, and the int builtin truncates toward zero. Test5's pure
 rules implement this calculation order with bounded fixtures.
 The menu labels their provenance and does not spawn actors. See
 [round-test5.md](round-test5.md) and [numeric evidence](bo1-round-rules-evidence.json).
-No active normal-round count callback assignment was found in the supplied Kino
+No active normal-round count callback assignment was found in the earlier supplied Kino
 map scripts. Special quad scheduling does have a separate count/pacing path,
 which is excluded. Full configuration, callbacks and VM scheduling remain to be
-resolved before a playable controller is claimed.
+resolved before playable Zombies is claimed. Test11's explicitly simulated
+controller uses the audited normal subset and labels its compatibility limits.
+See [the current audit](bo1-portability.md) and
+[controller evidence](bo1-controller-evidence.json) for the new source anchors,
+dependency graph, native-reference pins, A/B/C split and asset conversion plan.
 
 ### Common-zone tuning recovered for test6
 

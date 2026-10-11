@@ -52,7 +52,7 @@ int main() {
     m.input(Input::Toggle);
     for(int i=0;i<4;++i) m.input(Input::Down);
     m.input(Input::Select);
-    Check(m.page==Page::Zombies && m.count()==4, "Zombies category includes preview");
+    Check(m.page==Page::Zombies && m.count()==3, "Zombies category includes preview and controller");
     Check(m.input(Input::Select)==Action::WriteRoundPreview && m.page==Page::ZombieRules,
           "open nested read-only preview and log it");
     Check(m.input(Input::Left)==Action::None && m.previewRound==1, "minimum round clamps");
@@ -68,7 +68,21 @@ int main() {
     Check(m.page==Page::ZombieRules && m.previewRound==99, "close/reopen retains preview and ignores hidden select");
     m.input(Input::Back);
     Check(m.page==Page::Zombies && m.selected==0, "nested back returns to parent selection");
-    for(int i=0;i<3;++i) { m.input(Input::Down); Check(m.input(Input::Select)==Action::None, "Zombies gameplay remains unimplemented"); }
+    m.input(Input::Down);
+    Check(m.input(Input::Select)==Action::WriteRehearsal && m.page==Page::ZombieController,"controller opens with diagnostics");
+    Check(m.count()==12 && m.input(Input::Select)==Action::ToggleRehearsal,"bounded controller start/end routing");
+    m.input(Input::Down);
+    Check(m.input(Input::Left)==Action::None && m.rehearsalRound==1,"rehearsal starting round minimum");
+    Check(m.input(Input::Right)==Action::ChangeRehearsalRound && m.rehearsalRound==2,"rehearsal starting round adjustment");
+    const std::array<Action,4> rehearsalActions={Action::ToggleRehearsalAutoClear,Action::ToggleRehearsalSpawning,
+        Action::KillRehearsalActor,Action::ClearRehearsalActors};
+    for(const auto action:rehearsalActions) { m.input(Input::Down); Check(m.input(Input::Select)==action,"debug adapter routing"); }
+    for(int i=0;i<5;++i) { m.input(Input::Down); Check(m.input(Input::Select)==Action::None,"controller diagnostic rows are read-only"); }
+    m.input(Input::Down);
+    Check(m.selected==11 && m.firstVisibleRow()==4 && m.input(Input::Select)==Action::WriteRehearsal,"controller scroll reaches final row");
+    m.input(Input::Back);
+    Check(m.page==Page::Zombies && m.selected==1,"controller back returns to parent row");
+    m.input(Input::Down); Check(m.input(Input::Select)==Action::None,"playable Zombies remains locked");
     m.input(Input::Back);
     Check(m.page==Page::Home && m.selected==4, "second back returns to remembered home category");
     std::cout << "All signature and menu tests passed\n";

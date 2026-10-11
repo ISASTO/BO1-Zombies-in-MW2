@@ -24,7 +24,7 @@ Updated 2026-10-11. Complete one useful, testable change at a time.
    recovery discarded the original snapshot and captured a full bank as the
    baseline. OFF then restored that contaminated state. G18 has native
    noDualWield=1; all-slot dual scans were expensive. No new crash evidence.
-7. **Current test10 final weapon gate:** retain original snapshot and introduced
+7. **Test10 weapon repair, retail pending:** retain original snapshot and introduced
    IDs across checkpoints/banks; selectively remove introduced guns on OFF;
    preserve foreign pickups; cache metadata and update only the held gun. A
    reversible normal-animation/arena-definition fallback provides generic dual
@@ -32,11 +32,18 @@ Updated 2026-10-11. Complete one useful, testable change at a time.
    12 Python fixtures, 57 exact anchors, AMD64 build and actual-test9 upgrade
    pass. Owner checkpoint/undo/G18/FPS/both-order acceptance is next. Initial
    testing starts from a clean mission restart; history is in-process.
-8. After that acceptance, prioritize the BO1 normal round/spawn controller and
-   verified IW4 actor adapter. BO1 configuration overrides and dependency closure, then incrementally test round
-   controller scheduling and an IW4 actor adapter. Identify required native
-   targeting, pursuit, damage/notetrack and death semantics before enabling AI.
-9. Audit/import one local asset type at a time with versioned conversion tools.
+8. **Current combined test11, explicitly authorized before owner testing:**
+   BO1 source-derived normal round/spawn controller with simulated tickets,
+   in-game diagnostics, bounded starts and game-clock/lifetime guards. Scoped
+   ordinary-player melee admission port and local dependency audit are tested
+   in source. Ten C++ suites and 17 Python fixtures cover owned code/tooling;
+   live gameplay and all test10 weapon repairs remain pending in tomorrow's
+   combined package. No native actor, damage or asset calls were added.
+9. Use that evidence to fix regressions, then identify a verified IW4 SP
+   engine-thread scheduling point and read-only actor/sentient/asset identities.
+   Establish one safe spawn/init/cleanup fixture; translate targeting, pursuit,
+   collision, damage/notetrack and death semantics before enabling live AI.
+10. Audit/import one local asset type at a time with versioned conversion tools.
    Validate zombie behavior against BO1 observations before expanding gameplay,
    special rounds, weapon features, or a native IW4 menu.
 

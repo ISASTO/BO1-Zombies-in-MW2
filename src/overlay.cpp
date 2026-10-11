@@ -143,6 +143,7 @@ const char* PageName(Page page) {
         case Page::Diagnostics: return "DIAGNOSTICS";
         case Page::ZombieRules: return "BO1 ROUND RULES PREVIEW";
         case Page::View: return "VIEW / FOV SETTINGS";
+        case Page::ZombieController: return "BO1 CONTROLLER REHEARSAL";
     }
     return "";
 }
@@ -152,10 +153,11 @@ const char* Row(Page page, int n) {
     static constexpr const char* weapons[] = {"Give All (usable banks)", "Infinite Grenades (linked)", "Rapid Fire", "Explosive Bullets", "Force Dual Wield", "Weapon info to log", "Reset weapon toggles"};
     static constexpr const char* world[] = {"Slow Motion", "Freeze AI", "Gravity", "Kill All Enemies", "Reset world toggles"};
     static constexpr const char* ai[] = {"Spawn Enemy", "Spawn Friendly", "AI Controls"};
-    static constexpr const char* zombies[] = {"Round rules preview", "Enable Zombies", "Start Game", "Round / Population Controls"};
+    static constexpr const char* zombies[] = {"Round rules preview", "Controller rehearsal", "Playable Zombies / actors"};
     static constexpr const char* diag[] = {"Status HUD", "Write State to Log"};
     static constexpr const char* rules[] = {"Preview round", "Total zombies", "Zombie health", "Simultaneous cap", "Spawn interval", "Between rounds"};
     static constexpr const char* view[] = {"Base FOV", "Save for next launch", "Restore default / clear saved", "Live base FOV", "Saved base FOV"};
+    static constexpr const char* controller[] = {"Start / End rehearsal", "Starting round", "Auto-clear simulated actors", "Pause spawn queue", "Simulate one kill", "Clear simulated alive", "Current round", "Simulated alive", "Unspawned queue", "Phase / timer", "Zombie health", "Controller info to log"};
     switch (page) {
         case Page::Home: return home[n]; case Page::Player: return player[n];
         case Page::Weapons: return weapons[n]; case Page::World: return world[n];
@@ -163,6 +165,7 @@ const char* Row(Page page, int n) {
         case Page::Diagnostics: return diag[n];
         case Page::ZombieRules: return rules[n];
         case Page::View: return view[n];
+        case Page::ZombieController: return controller[n];
     }
     return "";
 }
@@ -280,6 +283,7 @@ void Overlay::frame() {
             AdjustExtraFeature(ExtraFeature::Gravity,action==Action::IncreaseGravity?1:-1);
         else if (action == Action::WriteSnapshot) LogSnapshot();
         else if (action == Action::WriteRoundPreview) LogRoundPreview(menu.previewRound);
+        else if(IsRehearsalAction(action)) HandleZombieRehearsal(action,ReadSnapshot(),menu.rehearsalRound);
         else if (action == Action::ChangeFov) {
             nextFovAttempt=0; settingsResult="Session FOV selected";
             Log("FOV_PREF selected=%d saved=%d active=1",menu.fov.selected,menu.fov.saved.value_or(0));
@@ -302,6 +306,8 @@ void Overlay::frame() {
     const ULONGLONG now = GetTickCount64();
     UpdatePlayerFeatures(now);
     Snapshot s = ReadSnapshot();
+    UpdateZombieRehearsal(s);
+    const auto rehearsal=GetZombieRehearsalStatus();
     const auto playerPreferences=GetPlayerPreferences();
     const auto extraPreferences=GetExtraPreferences();
     const auto weaponMode=GetWeaponModeStatus();
@@ -314,6 +320,7 @@ void Overlay::frame() {
         Log("HEARTBEAT present=%u endscene=%u draws=%u inputs=%u resets=%u visible=%d render_thread=%lu",
             presents, endScenes, draws, inputs, resets, menu.visible, lastRenderThread);
         LogSnapshot();
+        LogZombieRehearsal();
         Log("FOV_PREF selected=%d saved=%d active=%d reset_pending=%d",
             menu.fov.selected,menu.fov.saved.value_or(0),menu.fov.desired.has_value(),menu.fov.releaseAfterDefault);
         Log("PLAYER_PREF god=%d infinite_ammo=%d no_reload=%d noclip=%d super_speed=%d super_jump=%d session_only=1",
@@ -352,6 +359,12 @@ void Overlay::frame() {
         rect(12,12,446,25,D3DCOLOR_ARGB(205,7,10,6));
         std::snprintf(line,sizeof(line),"BO1MW2 | F4 | %s",StateText(s.state));
         text(20,13,kAccent,line,.7f);
+        if(rehearsal.controller.running() && !menu.visible) {
+            rect(12,38,610,25,D3DCOLOR_ARGB(205,7,10,6));
+            std::snprintf(line,sizeof(line),"BO1 REHEARSAL | R%d | Virtual %d | Queue %d | %s",rehearsal.controller.round,
+                rehearsal.controller.alive,rehearsal.controller.queued,bo1::PhaseText(rehearsal.controller.phase));
+            text(20,39,kAccent,line,.7f);
+        }
     }
     if (menu.visible) {
         rect(24,54,500,410,D3DCOLOR_ARGB(240,10,13,9));
@@ -361,6 +374,13 @@ void Overlay::frame() {
         if (menu.page == Page::ZombieRules) {
             text(40,121,kMuted,"Local BO1 CSV + script fallbacks",.7f);
             std::snprintf(line,sizeof(line),"Normal solo rounds | Preview %d / %d", menu.previewRound, bo1::kPreviewMaxRound);
+            text(40,143,kMuted,line,.7f);
+        } else if(menu.page==Page::ZombieController) {
+            text(40,121,kMuted,"Simulated actor adapter | No native actors",.7f);
+            if(rehearsal.controller.running())
+                std::snprintf(line,sizeof(line),"R%d | Virtual %d | Queue %d | %s",rehearsal.controller.round,
+                    rehearsal.controller.alive,rehearsal.controller.queued,bo1::PhaseText(rehearsal.controller.phase));
+            else std::snprintf(line,sizeof(line),"Clock: commandTime | Stop: %s",bo1::ReasonText(rehearsal.controller.reason));
             text(40,143,kMuted,line,.7f);
         } else if (menu.page==Page::View) {
             text(40,121,kMuted,StateText(s.state),.7f);
@@ -373,7 +393,7 @@ void Overlay::frame() {
             text(40,143,kMuted,line,.7f);
         } else {
             text(40,121,kMuted,StateText(s.state),.7f);
-            text(40,143,kMuted,"WEAPONS test 10 | Checkpoint + dual repair",.7f);
+            text(40,143,kMuted,"Test 11 | Weapon repairs + BO1 controller",.7f);
         }
         const auto preview = menu.page == Page::ZombieRules
             ? bo1::EvaluateNormalSoloRound(menu.previewRound, menu.previewRound == 1) : std::nullopt;
@@ -395,7 +415,21 @@ void Overlay::frame() {
                 else status=s.client.valid && s.damageRead?"OFF":"OFF*";
             }
             else if (menu.page==Page::Diagnostics) status=n==0?(menu.hud?"ON":"OFF"):"ENTER";
-            else if (menu.page==Page::Zombies && n==0) status="ENTER";
+            else if (menu.page==Page::Zombies) status=n<2?"ENTER":"LOCKED";
+            else if(menu.page==Page::ZombieController) {
+                const auto& c=rehearsal.controller;
+                if(n==0) status=c.running()?"END":rehearsal.ready?"START":"LOCKED";
+                else if(n==1) { std::snprintf(value,sizeof(value),"%d",menu.rehearsalRound); status=value; }
+                else if(n==2) status=rehearsal.autoClear?"ON":"OFF";
+                else if(n==3) status=!c.running()?"LOCKED":c.spawnEnabled?"OFF":"ON";
+                else if(n==4 || n==5) status=c.alive>0?"ENTER":"EMPTY";
+                else if(n==6) { std::snprintf(value,sizeof(value),"%d",c.round); status=value; }
+                else if(n==7) { std::snprintf(value,sizeof(value),"%d / %d",c.alive,bo1::kConcurrentLimit); status=value; }
+                else if(n==8) { std::snprintf(value,sizeof(value),"%d",c.queued); status=value; }
+                else if(n==9) { std::snprintf(value,sizeof(value),"%s %.1fs",bo1::PhaseText(c.phase),c.waitMilliseconds/1000.0); status=value; }
+                else if(n==10) { std::snprintf(value,sizeof(value),"%d",c.health); status=value; }
+                else status="ENTER";
+            }
             else if (menu.page==Page::Player && n==1) status=">";
             else if (menu.page==Page::Player && n>=2 && n<=6) {
                 const auto feature=static_cast<PlayerFeature>(n-1);
@@ -463,13 +497,32 @@ void Overlay::frame() {
         }
         rect(34,383,480,1,D3DCOLOR_ARGB(255,57,63,47));
         text(40,390,kMuted,menu.page==Page::ZombieRules
-            ? "LEFT/RIGHT: Round  ENTER: Next  UP/DOWN: Row" : menu.page==Page::View
+            ? "LEFT/RIGHT: Round  ENTER: Next  UP/DOWN: Row" : menu.page==Page::ZombieController
+            ? "LEFT/RIGHT: Start round  UP/DOWN: Scroll" : menu.page==Page::View
             ? "LEFT/RIGHT: FOV  UP/DOWN: Row  ENTER: Act" : (menu.page==Page::Player || menu.page==Page::World)
             ? "LEFT/RIGHT: Value  ENTER: Toggle  UP/DOWN: Row" : menu.page==Page::Weapons
             ? "LEFT/RIGHT: Bank  ENTER: Toggle  UP/DOWN: Row" : "UP/DOWN: Select  ENTER: Toggle / Open",.7f);
         text(40,412,kMuted,"BACKSPACE/ESC: Back   F4: Close",.7f);
         const char* footer="Game keeps running. WASD and mouse work.";
         if (menu.page==Page::ZombieRules) footer="Read-only preview. No zombies spawned.";
+        if(menu.page==Page::Zombies) footer="Controller rehearsal ready. Native actors pending.";
+        if(menu.page==Page::ZombieController) {
+            static constexpr const char* hints[]={
+                "Rehearsal only. Campaign AI and assets are untouched.",
+                "LEFT/RIGHT: 1-100. Applies at the next START.",
+                "Debug adapter clears one virtual actor per game second.",
+                "Gates new requests; existing virtual actors remain.",
+                "Reports one simulated death. Queue is unchanged.",
+                "Clears alive only; queued obligations still spawn.",
+                "Normal solo rules; special rounds are excluded.",
+                "24 simultaneous slots. No native zombies spawned.",
+                "Spent only after a simulated creation succeeds.",
+                "Game clock drives intro, spawning and round delays.",
+                "Recovered normal CSV + patched BO1 health calculation.",
+                "Logs counts, timers, callbacks and budget invariant."
+            };
+            footer=hints[menu.selected];
+        }
         if (menu.page==Page::Player) {
             static constexpr const char* hints[]={
                 "GUARDED = other native protection, including noclip.",

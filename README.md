@@ -2,10 +2,11 @@
 
 Incremental mod framework for **retail Modern Warfare 2 (2009), single player**.
 The first deliverable is an AMD64 D3D9 DLL that renders a keyboard menu in the
-game. BO1 Zombies gameplay is a future mode. The current test10 build repairs
-checkpoint bank recovery and inventory OFF restoration, adds held-gun dual
-animation compatibility, and removes repeated weapon scans. The compact menu,
-PLAYER/WORLD controls, saved FOV and BO1 round preview remain available.
+game. BO1 Zombies gameplay is a future mode. The current test11 package combines
+test10 checkpoint/undo/dual/performance repairs with an in-game BO1 controller
+rehearsal. It tracks simulated actors using source-derived round rules; it does
+not spawn native zombies. The compact menu, PLAYER/WORLD controls, saved FOV and
+round preview remain available. New retail checks are pending.
 
 **Status: Phase 1 core passed in the owner's test4 estate run.** The owner
 confirms correct health, working God ON/OFF and retained God state through
@@ -55,6 +56,15 @@ without firing-time assumptions, caches metadata and updates only the held gun.
 A reversible normal-animation fallback bypasses the verified campaign veto
 where assets are available. New retail animation/undo/FPS results are pending.
 
+`0.1.10-zombies-controller-test11` adds source-derived normal-solo round lifecycle,
+budget/capacity accounting, paced request/confirmation callbacks, lifecycle
+guards and a simulated adapter inside the menu. A scoped BO1 player-melee
+admission rule and local dependency/asset-reference auditor are tested in source.
+The owner authorized proceeding before test10 execution and will test the
+combined package. No actor/damage/asset adapter or full Zombies mode is enabled.
+See [test11 instructions](docs/zombies-controller-test11.md) and
+[portability audit](docs/bo1-portability.md).
+
 The supplied BO1 `common_zombie.ff` resolves the normal tuning CSV. Recovered
 values match the preview, so its numbers are unchanged. Special rounds and
 final map/runtime overrides remain outside that preview.
@@ -73,9 +83,9 @@ An executable hash mismatch disables game-state access and memory writes.
 The installer rejects a mismatched build. A manually installed proxy can still
 show its diagnostic menu in an unknown AMD64 `iw4sp.exe`.
 
-## Current WEAPONS test10
+## Current combined test11
 
-1. Close MW2 and extract the entire `BO1MW2-weapons-test10.zip` outside the game folder.
+1. Close MW2 and extract the entire `BO1MW2-zombies-controller-test11.zip` outside the game folder.
 2. Run `Uninstall.cmd` to remove the earlier project build, then `Install.cmd`
    and select the folder containing `iw4sp.exe`. Find it through Steam:
    MW2 Single Player > Properties > Installed Files > Browse.
@@ -84,10 +94,11 @@ show its diagnostic menu in an unknown AMD64 `iw4sp.exe`.
    then press **F4**. Up/Down selects, Enter toggles/opens, Left/Right changes
    the Give All bank or speed/jump/time/gravity, Backspace/Esc goes back.
    F4 closes the menu.
-4. Test bank selection after checkpoint reload, actual weapon removal on OFF,
-   G18 Dual ON/OFF, fixed-camera FPS and both OFF orders. Follow
-   [weapons-test10.md](docs/weapons-test10.md)
-   for the sequence and exact scopes. Keep Infinite Ammo and No Reload OFF
+4. Test checkpoint banks, actual weapon removal on OFF, G18 Dual ON/OFF, fixed-camera
+   FPS and both OFF orders. Then open ZOMBIE MODE → Controller rehearsal and
+   test round 1, round 10 capacity, queue pause, auto-clear, scrolling, game-clock
+   timers and lifetime stops. Follow [the combined sequence](docs/zombies-controller-test11.md).
+   Keep Infinite Ammo and No Reload OFF
    for initial ammo checks. Turn Give All and Dual Wield OFF before saving or
    quitting: their undo snapshots are in-process, with lifetime/identity guards.
 5. Close MW2 and run `Diagnose.cmd` before another launch replaces the log.
@@ -123,6 +134,7 @@ Copy the log immediately after a failing run: `latest.log` is replaced on launch
 | Reset player toggles | Requests every player cheat OFF and keeps saved FOV |
 | Status HUD toggle and state-log action | Implemented |
 | BO1 round-rules preview | Owner test5 front-end navigation passed; normal CSV values now recovered locally and match the preview |
+| BO1 controller rehearsal | Test11 simulated actors only; normal solo lifecycle, cap/queue/confirmation accounting and game-clock guards; portable fixtures passed, retail pending |
 | FOV selector and saved preference | Owner confirms test6 behavior; matching logs show load/selection/save/reset |
 | WEAPONS | Test10 checkpoint/provenance-based undo, held-gun dual animation fallback, cached metadata/performance diagnostics; Rapid Fire and previous controls retained; new retail test pending |
 | WORLD | Adjustable time/gravity, actor-think freeze, reset; test8 logs confirm several apply/restore paths; broader gameplay coverage pending |
