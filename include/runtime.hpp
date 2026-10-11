@@ -3,6 +3,7 @@
 #include "player_fields.hpp"
 #include "player_controls.hpp"
 #include "control_extensions.hpp"
+#include "weapon_inventory.hpp"
 #include <windows.h>
 #include <d3d9.h>
 #include <atomic>
@@ -57,6 +58,11 @@ struct Snapshot {
     bool weaponResolved=false;
     unsigned weaponCount=0;
     WeaponFields weapon;
+    BoolDvarSnapshot dualWield;
+    bool inventoryResolved=false,inventoryValid=false;
+    InventoryData inventory;
+    bool dualCurrentSupported=false;
+    int lastWeaponHand=-1;
 };
 const char* StateText(LevelState state);
 void InitializeEngine();
@@ -74,6 +80,9 @@ ExtraPreferences GetExtraPreferences();
 void ResetWeaponFeatures();
 void ResetWorldFeatures();
 bool RapidFireApplied(const WeaponFields& weapon);
+struct WeaponModeStatus { bool owned=false; int page=0,pages=1,added=0; bool dualOwned=false; };
+WeaponModeStatus GetWeaponModeStatus();
+bool AdjustWeaponBank(int direction);
 bool SetFov(int value);
 void LogSnapshot();
 void LoadFovPreference(FovPreference& preference);

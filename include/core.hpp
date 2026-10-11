@@ -8,7 +8,7 @@
 #include "fov_preferences.hpp"
 
 namespace mod {
-inline constexpr const char* kVersion = "0.1.7-world-weapons-test8";
+inline constexpr const char* kVersion = "0.1.8-weapons-test9";
 inline constexpr const char* kExeSha256 = "fb7e8a987c371dea7b666091b0b9e2011c0cd9cd277b191ad453d11d557dd777";
 
 // -1 is a wildcard. Reject malformed patterns rather than matching everything.
@@ -131,7 +131,7 @@ inline constexpr const char* kGravityTrajectoryPattern =
 inline constexpr const char* kPlayerGravityPattern =
     "F3 0F 10 05 ?? ?? ?? ?? E8 ?? ?? ?? ?? F3 0F 10 3D ?? ?? ?? ?? 33 D2 45 8B BE B0 00 00 00 41 B8 B4 00 00 00 F3 0F 2C C0 44 89 BD E0 00 00 00 F3 41 0F 10 86 C4 02 00 00 41 89 46 54 48 8B 05 ?? ?? ?? ??";
 inline constexpr const char* kWeaponCatalogPattern =
-    "33 D2 48 8D 0D ?? ?? ?? ?? 41 B8 40 06 00 00 E8 ?? ?? ?? ?? 33 D2 48 8D 0D ?? ?? ?? ?? 41 B8 40 06 00 00 E8 ?? ?? ?? ?? 33 D2";
+    "48 83 EC 28 33 D2 48 8D 0D ?? ?? ?? ?? 41 B8 40 06 00 00 E8 ?? ?? ?? ?? 33 D2 48 8D 0D ?? ?? ?? ?? 41 B8 40 06 00 00 E8 ?? ?? ?? ?? 33 D2";
 inline constexpr const char* kWeaponCountPattern =
     "8B 1D ?? ?? ?? ?? 4C 8D 35 ?? ?? ?? ?? 85 DB 74 ?? 8B 05 ?? ?? ?? ?? 3B D8 77 1D 49 8B 04 DE";
 inline constexpr const char* kWeaponPointersPattern =
@@ -145,13 +145,34 @@ inline constexpr const char* kWeaponFireConsumerPattern =
 inline constexpr const char* kGrenadeSustainPattern =
     "48 8B D3 48 8D 0D ?? ?? ?? ?? E8 ?? ?? ?? ?? 85 C0 0F 84 ?? ?? ?? ?? 48 8B D3 48 8D 0D ?? ?? ?? ?? E8 ?? ?? ?? ?? 85 C0 0F 84 ?? ?? ?? ??";
 
+inline constexpr const char* kDualRegistrationPattern =
+    "4C 8D 0D ?? ?? ?? ?? 48 8D 0D ?? ?? ?? ?? 44 8D 42 0C E8 ?? ?? ?? ?? 33 D2 48 89 05 ?? ?? ?? ??";
+inline constexpr const char* kDualConsumerPattern =
+    "48 8B 05 ?? ?? ?? ?? 40 38 70 10 75 ?? 8B D5 48 8B CF E8 ?? ?? ?? ?? 8B CE 85 C0 0F 95 C1 89 8F D4 02 00 00 EB ?? 41 38 B4 24 73 08 00 00 74 ?? 89 B7 D4 02 00 00 41 88 76 01 EB";
+inline constexpr const char* kWeaponSlotGrantPattern =
+    "48 8D 04 8E 89 94 01 5C 02 00 00 88 94 01 60 02 00 00 44 89 B4 8E 20 02 00 00 41 8B CE";
+inline constexpr const char* kWeaponMetadataPattern =
+    "8B C8 49 8D 81 5C 02 00 00 48 8D 04 88 48 03 C1 C3";
+inline constexpr const char* kAmmoIndexPattern =
+    "48 83 EC 28 48 63 C9 E8 ?? ?? ?? ?? 8B 80 48 03 00 00 48 83 C4 28 C3";
+inline constexpr const char* kClipIndexPattern =
+    "49 8B CE E8 ?? ?? ?? ?? 49 8B CD 8B 90 58 03 00 00 48 8B C6";
+inline constexpr const char* kClipSizePattern =
+    "48 83 EC 28 8B CA E8 ?? ?? ?? ?? 8B 40 34 48 83 C4 28 C3";
+inline constexpr const char* kPlayableWeaponPattern =
+    "8B 50 58 83 EA 08 F7 C2 FD FF FF FF 0F 84 ?? ?? ?? ?? 83 78 60 05 0F 84 ?? ?? ?? ?? 48 8B 48 08 4A 83 3C F1 00 0F 84 ?? ?? ?? ??";
+inline constexpr const char* kAlternateChainPattern =
+    "E8 ?? ?? ?? ?? 8B 58 58 85 DB 74 ?? 8B D3 48 8B CF E8 ?? ?? ?? ?? 85 C0 75 ??";
+inline constexpr const char* kClipPoolPattern =
+    "4C 8D 99 50 03 00 00 45 33 D2 49 8B C3 0F 1F 00 39 10 74 ?? 49 FF C2 48 83 C0 0C 49 83 FA 0F 7C ?? 33 C9 49 8B C3 83 38 00 74 ?? 48 FF C1 48 83 C0 0C 48 83 F9 0F 7C ?? 49 63 C0 41 89 13 45 01 4C 83 04 C3";
+
 inline constexpr int kVisibleMenuRows = 8;
 enum class Page { Home, Player, Weapons, World, AI, Zombies, Diagnostics, ZombieRules, View };
 enum class Input { Toggle, Up, Down, Select, Back, Left, Right };
 enum class Action { None, ToggleGod, ToggleHud, WriteSnapshot, WriteRoundPreview, ChangeFov, SaveFov, ResetFov,
     ToggleInfiniteAmmo, ToggleNoReload, ToggleNoclip, ToggleSuperSpeed, ToggleSuperJump, ResetPlayer,
     DecreaseSpeed, IncreaseSpeed, DecreaseJump, IncreaseJump,
-    ToggleGiveAll, ToggleRapidFire, ToggleExplosiveBullets, ResetWeapons,
+    ToggleGiveAll, ToggleRapidFire, ToggleExplosiveBullets, ResetWeapons, ToggleDualWield, PreviousWeaponBank, NextWeaponBank,
     ToggleSlowMotion, ToggleFreezeAI, ToggleGravity, ResetWorld,
     DecreaseTimeScale, IncreaseTimeScale, DecreaseGravity, IncreaseGravity };
 struct MenuState {
@@ -166,7 +187,7 @@ struct MenuState {
         switch (page) {
             case Page::Home: return 6;
             case Page::Player: return 8;
-            case Page::Weapons: return 6;
+            case Page::Weapons: return 7;
             case Page::World: return 5;
             case Page::AI: return 3;
             case Page::Zombies: return 4;
@@ -182,6 +203,7 @@ struct MenuState {
         if (!visible) return Action::None;
         if (key==Input::Left || key==Input::Right) {
             const bool right=key==Input::Right;
+            if (page==Page::Weapons && selected==0) return right?Action::NextWeaponBank:Action::PreviousWeaponBank;
             if (page==Page::Player && selected==5) return right?Action::IncreaseSpeed:Action::DecreaseSpeed;
             if (page==Page::Player && selected==6) return right?Action::IncreaseJump:Action::DecreaseJump;
             if (page==Page::World && selected==0) return right?Action::IncreaseTimeScale:Action::DecreaseTimeScale;
@@ -222,8 +244,9 @@ struct MenuState {
             else if (page == Page::Weapons && selected == 1) return Action::ToggleNoReload;
             else if (page == Page::Weapons && selected == 2) return Action::ToggleRapidFire;
             else if (page == Page::Weapons && selected == 3) return Action::ToggleExplosiveBullets;
-            else if (page == Page::Weapons && selected == 4) return Action::WriteSnapshot;
-            else if (page == Page::Weapons && selected == 5) return Action::ResetWeapons;
+            else if (page == Page::Weapons && selected == 4) return Action::ToggleDualWield;
+            else if (page == Page::Weapons && selected == 5) return Action::WriteSnapshot;
+            else if (page == Page::Weapons && selected == 6) return Action::ResetWeapons;
             else if (page == Page::World && selected == 0) return Action::ToggleSlowMotion;
             else if (page == Page::World && selected == 1) return Action::ToggleFreezeAI;
             else if (page == Page::World && selected == 2) return Action::ToggleGravity;

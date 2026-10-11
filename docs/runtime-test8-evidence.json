@@ -1,0 +1,42 @@
+{
+  "version": "0.1.7-world-weapons-test8",
+  "source_bundle": {
+    "filename": "BO1MW2-startup-results-20261011-150107-a5d79f90.zip",
+    "bytes": 98232,
+    "sha256": "0b9206bb400830d73fe21c146fdcb55fa6a6c3b8d9ddf4fae3732e5d32f63368",
+    "entries": 21
+  },
+  "log": {
+    "bytes": 91163,
+    "sha256": "557a9284a336efe80dd15b03694c58d42e8eb874622342ae00e450bf95d2dd29"
+  },
+  "installed_dll_sha256": "a681510a86c0700add5e513125d30ecff7e7d6c8186b7b876114032ead6cd0fc",
+  "executable_sha256": "fb7e8a987c371dea7b666091b0b9e2011c0cd9cd277b191ad453d11d557dd777",
+  "owner_report": [
+    "Give All intermittently exposes invisible weapons and weapons without ammo.",
+    "Rapid Fire remains LOCKED.",
+    "Requested Force Dual Wield and reversible OFF behavior for both inventory controls."
+  ],
+  "confirmed_runtime": {
+    "map": "estate",
+    "catalog_pattern_matches": 3,
+    "catalog_resolved": false,
+    "rapid_requests_blocked": 3,
+    "give_all_native_bool": "0 -> 1 at 14:54:47.357; 1 -> 0 at 14:55:20.662; enabled again at 14:55:27.246; reset to 0 at 14:57:16.201.",
+    "adjustable_movement": "Speed selected/applied up to 950; jump up to 312/624. Server exit restored 190 and 39/78; mission re-entry reapplied desired values; later reset restored defaults.",
+    "world_controls": "Slow Motion 1 -> .5 -> .25 and further strengths, OFF -> 1; Freeze AI 1 -> 0 -> 1; Gravity 800 -> 400/300/200/100, reset -> 800.",
+    "loader_probes": "Both returned exit 0.",
+    "new_crash_evidence": false,
+    "crash_limit": "Bundle repeats the three previously investigated test1 dumps; no new test8 dump identified."
+  },
+  "confirmed_static": {
+    "old_catalog_overlaps": [
+      "0x85224",
+      "0x85238",
+      "0x8524c"
+    ],
+    "offline_verifier_bug": "Consuming re.finditer missed overlaps; corrected to positive-lookahead scanning for every byte pattern in test9.",
+    "give_all_scope": "Old native bool bypasses owned-slot membership; its mod action did not grant metadata/ammo or filter player models."
+  },
+  "limits": "Runtime option writes do not prove all gameplay/render effects. Model/ammo faults are owner observations; no live model catalog was instrumented in test8. Full returned logs/dumps/game bytes remain private."
+}

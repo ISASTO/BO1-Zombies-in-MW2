@@ -1,63 +1,48 @@
-# Current test8 owner checks
+# Current test9 owner checks
 
-Build `0.1.7-world-weapons-test8` for the exact supplied AMD64 MW2 executable.
-The owner accepts test7's expanded PLAYER behavior. Its matching diagnostics
-confirm valid fields, God OFF/death/recovery, compact rendering/navigation and
-saved FOV, but contain no individual cheat toggle actions. See
-[redacted evidence](runtime-test7-evidence.json).
+Build **0.1.8-weapons-test9** for the exact supplied AMD64 executable.
+Test8's matching log identified Rapid Fire's ambiguous catalog signature;
+the owner reported invisible/empty Give All weapons. See
+[redacted evidence](runtime-test8-evidence.json). Test9 replaces that global
+bypass with filtered, reversible inventory banks, adds reversible Force Dual
+Wield, and corrects the catalog signature and overlap-aware verifier.
 
-Test8 adds adjustable movement and bounded WEAPONS/WORLD controls. Follow
-[world-weapons-test8.md](world-weapons-test8.md) for installation, exact scopes
-and the sequence. Fully close MW2, extract outside the game folder, run
-**Uninstall.cmd**, then **Install.cmd**, and launch Single Player through Steam.
-Saved FOV is preserved. No playable Zombies mode is added.
-
-## Return these observations
+Fully close MW2, extract **BO1MW2-weapons-test9.zip** outside the game folder,
+run **Uninstall.cmd**, then **Install.cmd**, and launch Single Player through
+Steam. Enter a mission, press F4, and open WEAPONS. Saved FOV is preserved.
+Follow [weapons-test9.md](weapons-test9.md) for the exact scopes and sequence.
 
 ```text
-Build / campaign map / resolution:
-God OFF + Noclip OFF: ordinary damage still works:
-Speed: Left/Right while OFF; two strengths while ON; OFF returns base speed:
-Jump: Left/Right while OFF; two heights while ON; land then OFF returns normal:
-Give All loaded: available weapons cycle; OFF returns ordinary access:
-Infinite Grenades: frag/flash counts stable; linked No Reload row/gun clips; OFF consumes:
-Rapid Fire: weapon names/timings from info log; faster; switch/back/OFF restores:
-Semi-auto still needs presses; reload/equip behavior:
-Explosive Bullets: player and AI effects; OFF returns ordinary bullets:
-Slow Motion: 0.5x/0.25x; OFF returns captured speed:
-Freeze AI: friendly/enemy thinking; OFF resumes; any animation/scripts continuing:
-Gravity: 400/1200 with Super Jump OFF; subsequent jumps after OFF normal:
-Weapon reset clears linked No Reload; world reset restores its controls:
-Checkpoint and mission exit/re-entry while one control enabled:
-Full quit with controls ON, relaunch: menu OFF and ordinary gameplay:
-Saved FOV still persists:
-Any LOCKED, WAIT, NATIVE, AT MIN or GUARDED label, and when:
-Any clipping, crash, exact error and last action:
+Build / map / resolution:
+Original weapon names and ammo before Give All:
+Give All ON: visible models, ammo, firing and reloads; failing weapon names:
+Give All Left/Right: banks shown and cycling behavior:
+Give All OFF: original inventory, held weapon and ammo restored:
+Dual Wield ON: held weapon name, ON/ON*, both models/hands/firing/reload:
+Dual Wield OFF: original single/natural-dual state and left ammo:
+Give ON -> Dual ON -> Dual OFF -> Give OFF:
+Dual ON -> Give ON -> Give OFF -> Dual OFF:
+Rapid Fire: unlock, firing difference, before/ON/OFF logged timing:
+Rapid ON: switching/back and bank switching; OFF restores timing:
+Checkpoint and mission exit/re-entry results:
+Weapon reset clears Give, Dual, Rapid and linked No Reload:
+God/health/F4 navigation/saved FOV still work:
+Any LOCKED, WAIT, UNDO, ON*, NATIVE or AT MIN label and when:
+Any invisible weapon, clipping, crash, exact error and last action:
 ```
 
-Test new controls separately. For the linked grenade test, keep Infinite Ammo
-OFF. Use God ON only for the initial isolated explosive-bullet test, and turn
-Noclip OFF when assessing damage. Kill All Enemies is a PLANNED row with no
-handler. Give All only exposes the current map's loaded catalog. Native global
-explosive bullets, shared Rapid Fire weapon timing and the actor-think gate can
-affect AI/friendlies as described in the focused test document.
+Keep Infinite Ammo and No Reload OFF for the initial ammo/undo tests. Turn Give
+All and Dual Wield OFF before saving/exiting: their captured undo snapshots are
+in-process. Changed native inventory or map/asset identity blocks stale restores;
+record that result. Cross-process save recovery is not implemented in test9.
 
-Close MW2 and run **Diagnose.cmd** before another launch replaces `latest.log`.
-Attach the resulting ZIP. The collector includes settings, receipt, logs,
-events and probe results. Record before/after weapon info with its menu action.
-A screenshot helps if text clips. Stop at an unexpected result and preserve
-`<MW2>\bo1mw2\logs\latest.log`; fallback is `%LOCALAPPDATA%\BO1MW2`.
+Close MW2 and run **Diagnose.cmd** before another launch replaces the log.
+Attach its ZIP, which includes receipt, settings, logs, events and probes.
+Use the **Weapon info to log** row before and after toggles. A screenshot helps
+with model/menu issues. Return any new crash text/dump or faulting module/offset.
 
-For rollback, close MW2 and run **Uninstall.cmd**. It removes the owned DLL,
-keeps logs/settings and leaves original game files intact. Return any generated
-crash text/minidump, or Application Error faulting module/offset if no dump
-exists. The unhandled exception handler may not see loader errors or faults
-handled by the game.
-
-The Windows build, portable ownership/adjustment tests, exact-file verifier and
-isolated PowerShell upgrade checks passed here. No retail game or Windows
-probe is executed in this Linux environment. New test8 gameplay requires the
-owner run. Second-map, cutscene, resolution/device-reset and Steam-overlay
-coverage remain useful. F4 does not pause; WASD/mouse/fire pass through.
-Historical test2–7 instructions and evidence remain available. Complete user
-logs/dumps and original assets are never committed or distributed.
+Eight C++ suites, 12 Python fixtures, 51 overlap-aware exact patterns, the AMD64
+build and isolated actual-test8-to-test9 PowerShell upgrade pass here. The retail
+game and Windows probes cannot run in this Linux workspace. New gameplay and
+model/animation behavior await your run. AI spawning and playable Zombies remain
+separate gates; complete returned logs/dumps and original assets remain private.

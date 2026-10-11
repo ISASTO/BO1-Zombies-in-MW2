@@ -16,18 +16,22 @@ Updated 2026-10-11. Complete one useful, testable change at a time.
    reserve ammo, native clip sustain, noclip, speed, fixed-jump compatibility,
    reset and the compact eight-row menu. The returned run confirms God
    OFF/death/recovery and valid fields but has no per-feature toggle actions.
-5. **Current test8: adjustable movement and WEAPONS/WORLD prototype:** Left/Right
-   strengths for speed/jump; native loaded weapon access; explicitly linked
-   frag/flash sustain; current-gun Rapid Fire; global explosive bullets;
-   adjustable clock/gravity; native actor-think freeze; scoped resets. Seven
-   C++ suites, nine Python fixtures, 41 exact patterns, Windows build and
-   isolated test7-to-test8 upgrade pass. Owner gameplay/restore/restart checks
-   are next. Kill All Enemies awaits hostile filtering and an engine-thread
-   death path; no health-zero shortcut is enabled.
-6. Audit remaining BO1 configuration overrides and dependency closure, then incrementally test round
+5. **Test8 feedback received:** matching estate log confirms speed/jump
+   adjustment and several world apply/restore paths. Owner reports invisible,
+   empty Give All weapons and LOCKED Rapid Fire. Runtime correctly rejects
+   three overlapping catalog matches; offline consuming regex hid ambiguity.
+6. **Current test9: focused reversible WEAPONS repair:** filtered loaded primary
+   inventory banks with native ammo IDs; Force Dual Wield for compatible guns;
+   coordinated OFF restoration; corrected catalog and overlap-aware verifier.
+   Eight C++ suites, 12 Python fixtures, 51 exact anchors, clean AMD64 build and
+   actual-test8-to-test9 upgrade pass. Owner models/firing/undo/both-order checks
+   are next. Undo snapshots are in-process; checkpoint/save recovery requires
+   separate evidence. Kill All Enemies still needs hostile filtering and an
+   engine-thread death path; no health-zero shortcut is enabled.
+7. Audit remaining BO1 configuration overrides and dependency closure, then incrementally test round
    controller scheduling and an IW4 actor adapter. Identify required native
    targeting, pursuit, damage/notetrack and death semantics before enabling AI.
-7. Audit/import one local asset type at a time with versioned conversion tools.
+8. Audit/import one local asset type at a time with versioned conversion tools.
    Validate zombie behavior against BO1 observations before expanding gameplay,
    special rounds, weapon features, or a native IW4 menu.
 

@@ -1,0 +1,49 @@
+{
+  "version": "0.1.8-weapons-test9",
+  "compiler": "MinGW-w64 GCC 13-posix, RelWithDebInfo, static runtime",
+  "architecture": "AMD64",
+  "dll_size": 2201509,
+  "dll_sha256": "3b688c08cbd1caf7e71f900e9967b8fb6c86e1cd11b2fca82280ec4c0dfd7382",
+  "imports": [
+    "bcrypt.dll",
+    "dbghelp.dll",
+    "gdi32.dll",
+    "kernel32.dll",
+    "msvcrt.dll",
+    "user32.dll"
+  ],
+  "exports": [
+    "D3DPERF_BeginEvent",
+    "D3DPERF_EndEvent",
+    "D3DPERF_GetStatus",
+    "D3DPERF_QueryRepeatFrame",
+    "D3DPERF_SetMarker",
+    "D3DPERF_SetOptions",
+    "D3DPERF_SetRegion",
+    "DebugSetMute",
+    "Direct3DCreate9",
+    "Direct3DCreate9Ex"
+  ],
+  "loader_probe_sha256": "1f3d3fca5fe31a163e5d14b6315d3a53a31b6b59a19a02bb1a81b528061d820b",
+  "loader_probe_provenance": "Owned probe source unchanged; same toolchain-built bytes as test8.",
+  "checks": {
+    "aslr_and_nx": true,
+    "native_cpp_tests": "8 passed: core/menu and overlap, vtable, entity fields, BO1 rounds, FOV, PLAYER, scalar/rapid ownership, inventory eligibility/ammo/banks, natural-dual baseline and pending dual-restore gates.",
+    "python_tests": "12 passed: extractor, tuning, overlap scanning and synthetic repeated-catalog regression.",
+    "exact_profile": "51 overlap-aware unique patterns; typed named registration/consumer pairs, independently decoded inventory/model/ammo/clip/hand/dual/alternate fields, getter target agreement, table bounds, gravity and grenade references agree with the exact supplied hash.",
+    "powershell_scripts": "All four parse with PowerShell 7.6.6. Isolated actual-test8-to-test9 uninstall/install, receipt/hash, diagnostic menu probe selection, FOV collection, removal and preservation of game/settings/log bytes pass on Linux. Windows probes unavailable.",
+    "retail_runtime": "Test8 returned evidence identifies old ambiguous catalog and global Give All defects. New test9 models/ammo/undo/dual/gameplay require owner retail validation.",
+    "original_game_assets_in_distribution": "none"
+  },
+  "catalog_regression": {
+    "old_pattern_rvas": [
+      "0x85224",
+      "0x85238",
+      "0x8524c"
+    ],
+    "corrected_pattern_rva": "0x85220",
+    "cause": "Consuming offline regex hid overlapping matches; runtime scanner correctly rejected three."
+  },
+  "change": "Filtered reversible native inventory banks with ammo; reversible compatible Force Dual Wield; corrected catalog resolution/verifier; coordinated OFF orders; Rapid Fire refreshes held state after bank change.",
+  "limits": "No Windows game/probe executed here. In-process undo snapshots; changed native inventory/lifetime invalidates stale restore. No saved-checkpoint recovery or new fastfile/model/animation import."
+}

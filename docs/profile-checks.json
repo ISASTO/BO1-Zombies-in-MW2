@@ -256,10 +256,10 @@
     },
     "kWeaponCatalogPattern": {
       "match_count": 1,
-      "match_rva": "0x85224",
+      "match_rva": "0x85220",
       "rip_targets": {
-        "2": "0x3edce0",
-        "22": "0x3ee320"
+        "6": "0x3edce0",
+        "26": "0x3ee320"
       }
     },
     "kWeaponCountPattern": {
@@ -306,6 +306,63 @@
         "3": "0x3246f8",
         "26": "0x324708"
       }
+    },
+    "kDualRegistrationPattern": {
+      "match_count": 1,
+      "match_rva": "0x746ac",
+      "rip_targets": {
+        "0": "0x3212f0",
+        "7": "0x321318",
+        "25": "0x3d99a8"
+      },
+      "name_anchor": "bg_forceDualWield"
+    },
+    "kDualConsumerPattern": {
+      "match_count": 1,
+      "match_rva": "0x82a67",
+      "rip_targets": {
+        "0": "0x3d99a8"
+      }
+    },
+    "kWeaponSlotGrantPattern": {
+      "match_count": 1,
+      "match_rva": "0x861d3",
+      "rip_targets": {}
+    },
+    "kWeaponMetadataPattern": {
+      "match_count": 1,
+      "match_rva": "0x1a0d2b",
+      "rip_targets": {}
+    },
+    "kAmmoIndexPattern": {
+      "match_count": 1,
+      "match_rva": "0x84280",
+      "rip_targets": {}
+    },
+    "kClipIndexPattern": {
+      "match_count": 1,
+      "match_rva": "0x16d2c0",
+      "rip_targets": {}
+    },
+    "kClipSizePattern": {
+      "match_count": 1,
+      "match_rva": "0x86290",
+      "rip_targets": {}
+    },
+    "kPlayableWeaponPattern": {
+      "match_count": 1,
+      "match_rva": "0x1a1d41",
+      "rip_targets": {}
+    },
+    "kAlternateChainPattern": {
+      "match_count": 1,
+      "match_rva": "0x1a1e34",
+      "rip_targets": {}
+    },
+    "kClipPoolPattern": {
+      "match_count": 1,
+      "match_rva": "0x84210",
+      "rip_targets": {}
     }
   },
   "fov": {
@@ -433,7 +490,7 @@
     "sustain_type": 0,
     "speed_slot_rva": "0xd9c040",
     "speed_type": 5,
-    "limits": "Static exact-build evidence; owner accepts test7. Adjustable movement and new weapon/world actions await test8 retail run.",
+    "limits": "Static exact-build evidence. Owner accepts PLAYER test7 and adjustable movement test8; new weapon behavior awaits test9 retail run.",
     "jump": {
       "height_constant_rva": "0x31f8cc",
       "twice_height_constant_rva": "0x31f8d0",
@@ -461,6 +518,104 @@
       "compatibility": "Runtime data-only float pair; jump_height dvar is not consumed by the observed jump paths."
     }
   },
+  "weapon_inventory": {
+    "partial_fields": {
+      "kOwnedWeapons": [
+        {
+          "signature": "kWeaponSlotGrantPattern",
+          "encoded_member_rva": "0x861e9",
+          "offset": "0x220"
+        }
+      ],
+      "kWeaponMetadata": [
+        {
+          "signature": "kWeaponSlotGrantPattern",
+          "encoded_member_rva": "0x861da",
+          "offset": "0x25c"
+        },
+        {
+          "signature": "kWeaponMetadataPattern",
+          "encoded_member_rva": "0x1a0d30",
+          "offset": "0x25c"
+        }
+      ],
+      "kClipAmmo": [
+        {
+          "signature": "kClipPoolPattern",
+          "encoded_member_rva": "0x84213",
+          "offset": "0x350"
+        }
+      ],
+      "kLastWeaponHand": [
+        {
+          "signature": "kDualConsumerPattern",
+          "encoded_member_rva": "0x82a87",
+          "offset": "0x2d4"
+        }
+      ],
+      "kNoDualWield": [
+        {
+          "signature": "kDualConsumerPattern",
+          "encoded_member_rva": "0x82a91",
+          "offset": "0x873"
+        }
+      ],
+      "kGunModels": [
+        {
+          "signature": "kPlayableWeaponPattern",
+          "encoded_member_rva": "0x1a1d60",
+          "offset": "0x8"
+        }
+      ],
+      "kWeaponClass": [
+        {
+          "signature": "kPlayableWeaponPattern",
+          "encoded_member_rva": "0x1a1d43",
+          "offset": "0x58"
+        }
+      ],
+      "kInventoryType": [
+        {
+          "signature": "kPlayableWeaponPattern",
+          "encoded_member_rva": "0x1a1d55",
+          "offset": "0x60"
+        }
+      ],
+      "kAmmoIndex": [
+        {
+          "signature": "kAmmoIndexPattern",
+          "encoded_member_rva": "0x8428e",
+          "offset": "0x348"
+        }
+      ],
+      "kClipIndex": [
+        {
+          "signature": "kClipIndexPattern",
+          "encoded_member_rva": "0x16d2cd",
+          "offset": "0x358"
+        }
+      ],
+      "kClipSize": [
+        {
+          "signature": "kClipSizePattern",
+          "encoded_member_rva": "0x8629d",
+          "offset": "0x34"
+        }
+      ],
+      "kAlternateWeapon": [
+        {
+          "signature": "kAlternateChainPattern",
+          "encoded_member_rva": "0x1a1e3b",
+          "offset": "0x58"
+        }
+      ]
+    },
+    "owned_entries": 15,
+    "metadata_stride": 5,
+    "clip_entries": 15,
+    "clip_stride": 12,
+    "limits": "Own filtered inventory/ammo compatibility; native grant/allocation routines are reference-only. Undo snapshots are in-process, validated against player/map/inventory and asset identity."
+  },
   "weapon_world": {
     "dvars": {
       "g_giveAll": {
@@ -486,6 +641,11 @@
       "g_gravity": {
         "slot_rva": "0x3dd5e8",
         "type": 1,
+        "current_offset": "0x10"
+      },
+      "bg_forceDualWield": {
+        "slot_rva": "0x3d99a8",
+        "type": 0,
         "current_offset": "0x10"
       }
     },
@@ -556,6 +716,6 @@
       "bypass_target_rva": "0x84fff",
       "compatibility": "Infinite Grenades is explicitly linked to No Reload; both use player_sustainAmmo."
     },
-    "limits": "Static evidence; test8 writes and gameplay effects require owner retail execution. Kill All Enemies remains unimplemented."
+    "limits": "Static evidence. Test8 runtime confirms the ambiguous old catalog pattern; corrected overlap-aware catalog and new filtered bank/dual behavior require test9 owner validation. Kill All Enemies remains unimplemented."
   }
 }

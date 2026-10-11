@@ -6,6 +6,7 @@ import re
 import struct
 from pathlib import Path
 import pefile
+from pattern_scan import pattern_matches
 
 # Instruction layouts of the additional exact-build references, never addresses.
 EXTRA_REFERENCES = {
@@ -20,13 +21,23 @@ EXTRA_REFERENCES = {
     'kGravityRegistrationPattern': [[0, 4, 8], [8, 3, 7], [15, 3, 7], [25, 3, 7], [57, 3, 7]],
     'kGravityTrajectoryPattern': [[0, 3, 7], [12, 4, 8]],
     'kPlayerGravityPattern': [[0, 4, 8], [13, 4, 8], [60, 3, 7]],
-    'kWeaponCatalogPattern': [[2, 3, 7], [22, 3, 7]],
+    'kWeaponCatalogPattern': [[6, 3, 7], [26, 3, 7]],
     'kWeaponCountPattern': [[0, 2, 6], [6, 3, 7], [17, 2, 6]],
     'kWeaponPointersPattern': [[2, 3, 7], [16, 3, 7]],
     'kWeaponBindingPattern': [[4, 3, 7], [11, 3, 7]],
     'kWeaponFireScriptPattern': [[15, 4, 8]],
     'kWeaponFireConsumerPattern': [],
     'kGrenadeSustainPattern': [[3, 3, 7], [26, 3, 7]],
+    'kDualRegistrationPattern': [[0,3,7],[7,3,7],[25,3,7]],
+    'kDualConsumerPattern': [[0,3,7]],
+    'kWeaponSlotGrantPattern': [],
+    'kWeaponMetadataPattern': [],
+    'kAmmoIndexPattern': [],
+    'kClipIndexPattern': [],
+    'kClipSizePattern': [],
+    'kPlayableWeaponPattern': [],
+    'kAlternateChainPattern': [],
+    'kClipPoolPattern': [],
 }
 EXTRA_NAMES = {
     'kGiveAllRegistrationPattern': [15, 'g_giveAll'],
@@ -34,6 +45,7 @@ EXTRA_NAMES = {
     'kAiRegistrationPattern': [20, 'g_ai'],
     'kTimeRegistrationPattern': [0, 'timescale'],
     'kGravityRegistrationPattern': [8, 'g_gravity'],
+    'kDualRegistrationPattern': [7, 'bg_forceDualWield'],
 }
 
 
@@ -50,8 +62,7 @@ def verify(path, header):
     text = section.get_data()
     result = dict(sha256=actual, architecture='AMD64', signatures={})
     for name, pat in re.findall(r'const char\* (k\w+Pattern) =\s*"([^"]+)"', header.read_text()):
-        expr = b''.join(b'.' if t=='??' else re.escape(bytes.fromhex(t)) for t in pat.split())
-        matches = list(re.finditer(expr, text, re.S))
+        matches = pattern_matches(text,pat)
         if len(matches) != 1:
             raise ValueError(f'{name}: {len(matches)} matches, expected exactly one')
         at = section.VirtualAddress + matches[0].start()
@@ -134,8 +145,7 @@ def verify(path, header):
     }
     result['entity_number'] = {'offset': hex(number_offset), 'width_bytes': 2, 'evidence': {}}
     for name, (pat, displacement, instruction) in evidence.items():
-        expr = b''.join(b'.' if t == '??' else re.escape(bytes.fromhex(t)) for t in pat.split())
-        matches = list(re.finditer(expr, text, re.S))
+        matches = pattern_matches(text,pat)
         if len(matches) != 1:
             raise ValueError(f'{name}: {len(matches)} native field matches, expected one')
         start = matches[0].start()
@@ -178,8 +188,7 @@ def verify(path, header):
         ('kClientHealth','89 90 ?? ?? ?? ?? 48 8B D1 C7 44 24 20 0C 00 00 00',2,4),
         ('kClientMoveType','41 89 46 ?? F3 0F 10 05 ?? ?? ?? ?? E8 ?? ?? ?? ?? F3 0F 10 3D',3,1),
     ):
-        expression=b''.join(b'.' if t=='??' else re.escape(bytes.fromhex(t)) for t in pat.split())
-        matches=list(re.finditer(expression,text,re.S))
+        matches=pattern_matches(text,pat)
         if len(matches)!=1: raise ValueError(f'{field}: independent anchor has {len(matches)} matches')
         at=matches[0].start(); actual=int.from_bytes(text[at+offset:at+offset+width],'little')
         if actual!=member(field): raise ValueError(f'{field}: independent member {actual:#x} differs from header')
@@ -194,7 +203,7 @@ def verify(path, header):
     result['player']={'partial_fields':decoded,'reserve_entries':15,'reserve_stride':8,
         'sustain_slot_rva':result['signatures']['kSustainConsumerPattern']['rip_targets']['0'],
         'sustain_type':0,'speed_slot_rva':result['signatures']['kSpeedConsumerPattern']['rip_targets']['0'],
-        'speed_type':5,'limits':'Static exact-build evidence; owner accepts test7. Adjustable movement and new weapon/world actions await test8 retail run.'}
+        'speed_type':5,'limits':'Static exact-build evidence. Owner accepts PLAYER test7 and adjustable movement test8; new weapon behavior awaits test9 retail run.'}
     def scalar_target(signature,offset):
         at,code=match_data(signature)
         return at+offset+8+struct.unpack_from('<i',code,offset+4)[0]
@@ -229,6 +238,7 @@ def verify(path, header):
         ('g_ai','kAiRegistrationPattern',41,'kAiConsumerPattern',0,0),
         ('timescale','kTimeRegistrationPattern',48,'kTimeConsumerPattern',0,1),
         ('g_gravity','kGravityRegistrationPattern',57,'kGravityTrajectoryPattern',0,1),
+        ('bg_forceDualWield','kDualRegistrationPattern',25,'kDualConsumerPattern',0,0),
     ):
         if target(reg,reg_offset)!=target(consumer,read_offset):
             raise ValueError(f'{name}: registration/consumer pointer slots differ')
@@ -249,15 +259,15 @@ def verify(path, header):
         if actual!=extra_member(field): raise ValueError(f'{signature}: native {field} differs from partial layout')
         partial_fields.setdefault(field,[]).append({'signature':signature,'encoded_member_rva':hex(at+offset),'offset':hex(actual)})
     for signature,offset,wanted in (
-        ('kWeaponCatalogPattern',2,target('kWeaponPointersPattern',2)),
+        ('kWeaponCatalogPattern',6,target('kWeaponPointersPattern',2)),
         ('kWeaponCountPattern',6,target('kWeaponPointersPattern',2)),
-        ('kWeaponCatalogPattern',22,target('kWeaponPointersPattern',16)),
+        ('kWeaponCatalogPattern',26,target('kWeaponPointersPattern',16)),
         ('kWeaponBindingPattern',4,target('kWeaponPointersPattern',16)),
     ):
         if target(signature,offset)!=wanted: raise ValueError('Native weapon tables disagree')
     capacity=int(re.search(r'kWeaponCapacity = (\d+)',extensions)[1])
     _,catalog=match_data('kWeaponCatalogPattern')
-    if any(struct.unpack_from('<I',catalog,offset)[0]!=capacity*8 for offset in (11,31)):
+    if any(struct.unpack_from('<I',catalog,offset)[0]!=capacity*8 for offset in (15,35)):
         raise ValueError('Native weapon catalog capacity differs from bound')
     def call_target(signature,offset):
         at,code=match_data(signature)
@@ -265,6 +275,37 @@ def verify(path, header):
         return at+offset+5+struct.unpack_from('<i',code,offset+1)[0]
     if hex(call_target('kWeaponFireScriptPattern',2))!=result['signatures']['kWeaponPointersPattern']['match_rva']:
         raise ValueError('Script weaponfiretime calls a different native getter')
+    inventory_header=header.with_name('weapon_inventory.hpp').read_text()
+    inventory_fields={}
+    for field,signature,offset,width in (
+        ('kOwnedWeapons','kWeaponSlotGrantPattern',22,4),
+        ('kWeaponMetadata','kWeaponSlotGrantPattern',7,4),
+        ('kWeaponMetadata','kWeaponMetadataPattern',5,4),
+        ('kClipAmmo','kClipPoolPattern',3,4),
+        ('kLastWeaponHand','kDualConsumerPattern',32,4),
+        ('kNoDualWield','kDualConsumerPattern',42,4),
+        ('kGunModels','kPlayableWeaponPattern',31,1),
+        ('kWeaponClass','kPlayableWeaponPattern',2,1),
+        ('kInventoryType','kPlayableWeaponPattern',20,1),
+        ('kAmmoIndex','kAmmoIndexPattern',14,4),
+        ('kClipIndex','kClipIndexPattern',13,4),
+        ('kClipSize','kClipSizePattern',13,1),
+        ('kAlternateWeapon','kAlternateChainPattern',7,1),
+    ):
+        at,code=match_data(signature)
+        actual=int.from_bytes(code[offset:offset+width],'little')
+        wanted=int(re.search(rf'{field}=(0x[0-9a-f]+)',inventory_header)[1],16)
+        if actual!=wanted: raise ValueError(f'{signature}: native {field} {actual:#x} differs from partial layout {wanted:#x}')
+        inventory_fields.setdefault(field,[]).append({'signature':signature,'encoded_member_rva':hex(at+offset),'offset':hex(actual)})
+    _,metadata_code=match_data('kWeaponMetadataPattern')
+    _,clip_pool_code=match_data('kClipPoolPattern')
+    if metadata_code[9:17]!=bytes.fromhex('48 8D 04 88 48 03 C1 C3') or clip_pool_code[26]!=12 or clip_pool_code[30]!=15:
+        raise ValueError('Native weapon metadata / clip stride and count disagree')
+    for signature,offset,delta in (('kAmmoIndexPattern',7,16),('kClipIndexPattern',3,16),('kClipSizePattern',6,0),('kAlternateChainPattern',0,0)):
+        if call_target(signature,offset)!=int(result['signatures']['kWeaponPointersPattern']['match_rva'],16)+delta:
+            raise ValueError(f'{signature}: native getter disagrees with complete/definition tables')
+    result['weapon_inventory']={'partial_fields':inventory_fields,'owned_entries':15,'metadata_stride':5,'clip_entries':15,'clip_stride':12,
+        'limits':'Own filtered inventory/ammo compatibility; native grant/allocation routines are reference-only. Undo snapshots are in-process, validated against player/map/inventory and asset identity.'}
     literal=scalar_target('kPlayerGravityPattern',0)
     native_literal=struct.unpack('<f',pe.get_data(literal,4))[0]
     default_gravity=scalar_target('kGravityRegistrationPattern',0)
@@ -299,7 +340,7 @@ def verify(path, header):
             'compatibility':'Selected gravity + 0.5 in the sole player constant; native g_gravity float covers trajectories.'},
         'grenade_sustain':{'aliases':['fraggrenade','flash_grenade'],'bypass_target_rva':hex(grenade_targets[0]),
             'compatibility':'Infinite Grenades is explicitly linked to No Reload; both use player_sustainAmmo.'},
-        'limits':'Static evidence; test8 writes and gameplay effects require owner retail execution. Kill All Enemies remains unimplemented.'}
+        'limits':'Static evidence. Test8 runtime confirms the ambiguous old catalog pattern; corrected overlap-aware catalog and new filtered bank/dual behavior require test9 owner validation. Kill All Enemies remains unimplemented.'}
     return result
 
 

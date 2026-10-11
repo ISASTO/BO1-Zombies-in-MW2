@@ -56,3 +56,15 @@ before committing that dependency.
   inventory consumer, command branch and loaded catalogs were independently
   checked. No GPL implementation was copied and no upstream x86 address/layout
   was used. The current unpinned link is context, not executable evidence.
+
+## Test9 inventory and dual-wield references
+
+- The same IW4x ClientCommand source was inspected for the distinction between
+  its global access bypass and its separate ammo compatibility hooks. That
+  distinction was a research lead, not an imported implementation.
+- [OAT IW4 asset definitions](https://github.com/Laupetin/OpenAssetTools/blob/main/src/Common/Game/IW4/IW4_Assets.h)
+  supplied field-name/format leads for player gun models, clip size, alternate
+  weapon chains and dual eligibility. The exact AMD64 native grant/getter/PM
+  instructions independently establish every offset used here. No complete
+  upstream structure, x86 address, T5 structure, or GPL implementation is copied.
+  The current link is context; the supplied executable hash is the authority.

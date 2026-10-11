@@ -36,5 +36,9 @@
     "original_game_assets_in_distribution": "none"
   },
   "change": "Left/Right movement strengths; loaded weapon access; explicitly linked frag/flash sustain; current-gun Rapid Fire with restore on switch; global native explosive bullets; adjustable time/gravity; native actor-think gate. Kill All Enemies remains planned.",
-  "limits": "No Windows game or probe executed in this Linux workspace. Static/portable checks are not gameplay acceptance."
+  "limits": "No Windows game or probe executed in this Linux workspace. Static/portable checks are not gameplay acceptance.",
+  "corrections": {
+    "recorded_in": "runtime-test8-evidence.json",
+    "exact_profile_claim": "The original 41-unique-pattern claim was incorrect for kWeaponCatalogPattern. Consuming regex missed three overlapping matches at 0x85224/0x85238/0x8524c. Runtime correctly failed closed; test9 repairs the pattern and all verifier scans."
+  }
 }

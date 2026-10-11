@@ -15,7 +15,8 @@ signature match is not a runtime test.
 | `0.1.4-round-test5` | Owner: "Seems to be working fine." | Matching front-end log covers all 100 rounds, 344 inputs, 290 preview records and 3440x1440 rendering. No active mission or new crash evidence in this run. |
 | `0.1.5-fov-test6` | Owner confirms FOV behavior; reports protection surviving a return/relaunch while God displays OFF | Matching logs show saved FOV 100, selection/save/reset, entity God OFF during the reported period, and health 2 after an ON/OFF cycle. Separate client guards were not logged; precise God mismatch cause is unconfirmed. Normal CSV values match the unchanged preview calculations. |
 | `0.1.6-player-test7` | God session reconciliation/guard diagnostics; every current PLAYER row; smaller eight-row menu | Owner reports normal behavior. Matching receipt/logs cover native fields, God OFF/death/recovery and FOV; no individual toggle actions or new crash evidence in this log. |
-| `0.1.7-world-weapons-test8` | Adjustable speed/jump; bounded WEAPONS/WORLD native controls | Seven C++ suites, nine Python fixtures, 41 patterns, AMD64 build and actual test7-to-test8 isolated upgrade pass. New gameplay awaits owner. Kill All Enemies remains planned. |
+| `0.1.7-world-weapons-test8` | Owner reports invisible/empty Give All guns and LOCKED Rapid Fire; matching estate log | Runtime correctly rejects three overlapping catalog matches; offline consuming regex missed overlap. Movement/world apply/restore observed. No new crash evidence; see runtime-test8-evidence.json. |
+| `0.1.8-weapons-test9` | Filtered reversible weapon banks/ammo, compatible native Force Dual Wield, corrected Rapid Fire resolution | Eight C++ suites, 12 Python fixtures, 51 overlap-aware exact anchors, clean AMD64 build and actual-test8-to-test9 upgrade pass. New gameplay/undo/model/dual behavior awaits owner. |
 
 Test 1 initialized its C++ static runtime, then logging/crash handling, engine
 hash/scanning, factory/device shadows, WndProc, and rendering across startup.
@@ -288,10 +289,13 @@ unchanged; native rendering and smaller text readability await the owner.
 
 ### Test8 WEAPONS / WORLD findings
 
-Static evidence in the same full executable hash; `docs/profile-checks.json`
-records all 41 unique anchors and independent field/slot/reference checks.
+Static evidence in the same full executable hash. The original offline claim
+of 41 unique anchors was incorrect for the catalog initializer: consuming regex
+missed overlapping matches. Current `docs/profile-checks.json` records 51
+overlap-aware unique anchors and independent field/slot/reference checks.
 These are exact-build assigned names and partial layouts, not a T5/IW4 cast.
-Test8 retail gameplay remains pending. No new engine function is invoked.
+The test8 log confirms the catalog rejection and several option apply/restore
+paths; the owner reports Give All model/ammo faults. No native function is invoked.
 
 | Finding / assigned name | RVA / slot RVA | Evidence / scope |
 | --- | --- | --- |
@@ -302,7 +306,7 @@ Test8 retail gameplay remains pending. No new engine function is invoked.
 | timescale registration / clock read | `0x1fc917`, `0x1fc269` / `0x13260b0` | Float current +0x10; distinguish com_timescale slot 0x13260b8 stored earlier in the same registration block; clock also consumes other factors |
 | g_gravity registration / trajectory read | `0x75fbe`, `0x736f7` / `0x3dd5e8` | Float, native default 800 at 0x324340; changing this alone misses player gravity |
 | Player gravity source / constant | `0x15bf24` / `0x338b0c` | Sole scalar consumer of float 800.5; calls positive floor helper 0x2f20a0, converts result and writes PS +0x54 at 0x15bf5c |
-| Weapon catalog initialize | `0x85224` | Two 0x640-byte pointer tables: CompleteDef 0x3edce0; Def 0x3ee320; capacity 200, stride eight |
+| Weapon catalog initialize | `0x85220` prologue; first block `0x85224` | Two 0x640-byte pointer tables: CompleteDef 0x3edce0; Def 0x3ee320; capacity 200, stride eight; old block-only signature also matched overlapping blocks 0x85238/0x8524c |
 | Native table getters | `0x85840`, `0x85850` | ECX index, RAX pointer, Microsoft x64 ABI; no mod call; independent initializer/binding agree |
 | Last loaded weapon index | `0x3edae4` | DWORD loaded in 0x8589d lookup; it is not adjacent cache index 0x3edae0 |
 | CompleteDef to Def binding | `0x852a8` | CompleteDef +8 pointer copied into matching Def table entry |
@@ -353,6 +357,75 @@ Unresolved: hostile team filtering and a safe engine-thread native damage/death
 call for Kill All Enemies. Actor iteration, size guesses and health-zero writes
 are not enabled. BO1 actor state, targeting, animations and death remain future
 compatibility work in the separate A/B/C research document.
+
+### Test9 native inventory, ammo and dual-wield evidence
+
+All rows are **static confirmed** in the exact supplied AMD64 hash. Gameplay is
+**runtime pending**. Names are assigned from native semantics; no engine method
+below is invoked by the DLL, and no whole asset/player structure is cast.
+
+| Finding / assigned name | RVA | ABI / evidence |
+| --- | --- | --- |
+| Owned-slot allocator/grant | `0x86160`, writes `0x861d3` | Native 15-slot scan; metadata DWORD/byte cleared before publishing owned ID |
+| Owned metadata lookup | `0x1a0ce0`, stride calculation `0x1a0d2b` | Microsoft x64 RCX=PS, EDX=index; returns PS +0x25c + slot*5; g_giveAll bypass uses slot14 |
+| HasWeapon candidate | `0x74230` | Native grant/alternate-chain membership check; reference only |
+| G_GivePlayerWeapon candidate | `0x1a1d00` | Microsoft x64 RCX=PS, EDX=index, R8B=model selector, R9D=akimbo; filters weapon class/inventory/model, reads noDual and recursively follows alternates |
+| Script giveweapon / ammo init | `0x15fba0`, calls `0x15fcae` / `0x15fcc3` | Native script path calls grant then `0x163da0`; scheduling/allocation/side effects are not exposed by this mod |
+| Ammo-pool index helper | `0x84280` | Calls Def getter `0x85850`; reads +0x348 |
+| Clip-pool index read | `0x16d2c0`, read `0x16d2cb` | Native AddAmmo path calls Def getter; reads +0x358 |
+| Magazine-size helper | `0x86290` | Calls CompleteDef getter `0x85840`; reads +0x34 |
+| Clip AddAmmo / SetAmmo candidates | `0x84210` / `0x84a00` | Same 15-entry, 12-byte pool scan; add/store distinguish unique anchors. Native full-table fallback can replace slot zero; our compatibility skips full tables |
+| Primary/model gate | `0x1a1d41` | Reads Def class/inventory and nonnull player gun model; our subset requires primary bullet guns, model0 and no alternate chain |
+| Alternate-chain read | `0x1a1e34` | Calls CompleteDef getter then reads +0x58; new grants with nonzero alternate index are excluded |
+| bg_forceDualWield registration | `0x746ac`, slot `0x3d99a8` | Named bool, default false, flags 0x0c; registration and consumer resolve the same slot |
+| Native dual hand selection | `0x82a67` | Reads bool current +0x10, tests Def noDual, writes PS last-hand and metadata dual byte |
+
+| Partial field | Width / layout | Mod use / limit |
+| --- | --- | --- |
+| PS owned weapon IDs +0x220 | 15 DWORDs, zero empty | Preserve originals; publish initialized added IDs last |
+| PS owned metadata +0x25c | 15 entries, stride5 | +1 dual bool; +2 model selector. Other bytes preserved for originals, zeroed for new grants as native allocator does |
+| PS last weapon hand +0x2d4 | DWORD 0/1 | Enable compatible held gun's second hand; OFF derives natural hand from restored metadata |
+| PS reserve +0x2d8 | 15 entries, stride8 | ID/count compared together in aligned QWORD CAS |
+| PS clips +0x350 | 15 entries, stride12 | DWORD ID, right count, left count. Publish new ID after counts; retain foreign pool identities |
+| WeaponDef gun models +8 | pointer to indexed XModel pointer array | Verify model0 and readable model name; no opaque asset edits |
+| WeaponDef class +0x58 / inventory +0x60 | DWORDs | New grants require class0..7 and inventory0 |
+| WeaponDef ammo ID +0x348 / clip ID +0x358 | DWORDs | Require nonzero IDs below200; never substitute weapon index for pool ID |
+| WeaponDef noDualWield +0x873 | byte0/1 | Do not force incompatible gun metadata or manufacture akimbo animation assets |
+| CompleteDef clipSize +0x34 / alternate +0x58 | DWORDs | Magazine1..1000; exclude unsupported new alternate chains |
+
+The runtime uses 51 centralized optional/core patterns and resolved relative
+targets; the offline verifier independently decodes these layouts and checks
+getter calls, named dvar slots, clip/metadata strides and capacity. Test8's old
+two-memset signature matched 0x85224/0x85238/0x8524c. Adding the real initializer
+prologue makes a single 0x85220 match. All offline byte scans now use lookahead
+so overlapping starts count exactly like runtime FindPattern. C++ and Python
+fixtures reproduce the former blind spot.
+
+Give All is a data compatibility mode: original equipment stays in place;
+eligible loaded primary guns occupy free slots in banks. Right clips receive
+native clipSize and reserves min(999,clipSize*5). Original natural dual guns
+also receive left ammo. Native global g_giveAll is held OFF to avoid slot14
+bypass and nonexistent inventory/ammo semantics. Full ammo tables skip a gun.
+No engine allocation, extra fastfile, model import or native grant call occurs.
+
+Inventory transactions compare before values, stage metadata/ammo and publish
+owned IDs last; failure attempts conditional reverse rollback. OFF requires the
+same player/map/time and owned IDs, restoring the original snapshot and held gun.
+Foreign ammo identities survive. Same-process checkpoints revalidate live IDs
+and CompleteDef/Def/name identity before rebasing an undo snapshot. Changed
+lifetime/inventory discards it; full-process restart does not retain snapshots.
+An actual engine-thread inventory adapter and save/checkpoint recovery remain
+future work, contingent on the owner's test9 evidence.
+
+Dual Wield captures the native bool, individual edited dual flags, left counts,
+and last-hand ownership. Bank capture/restore first removes current dual edits,
+waits for pending restores, then reapplies requested dual against the new
+inventory. Give All's neutral original snapshot is never rewritten with bank
+ammo; an unchanged full left magazine creates no dual ammo ownership record.
+This preserves either OFF order and naturally dual original guns. Native eligibility is necessary but
+does not prove every view model/animation renders correctly; require firing,
+reload, switch/back, OFF and both-order tests. Rapid Fire refreshes held state
+after bank changes before selecting the timing asset to modify.
 
 ## Resolution and level gate
 
@@ -506,11 +579,13 @@ IW4 zone uses 64-bit pointer records. Asset conversion is unimplemented.
 | 2026-10-11 / test 6 | FOV selector/save/reset and derived normal CSV recovery | Five native suites, nine Python fixtures, seven static patterns; Windows/package checks recorded separately | Owner confirms FOV behavior; matching load/save/reset log. God OFF/protection mismatch reported; precise cause unconfirmed |
 
 | 2026-10-11 / test 7 | Session God fix, expanded PLAYER and compact menu | Matching build/logs: valid fields, God OFF/death/recovery, saved FOV and navigation | Owner accepts overall behavior; returned run does not instrument each toggle |
-| 2026-10-11 / test 8 | Adjustable movement; loaded weapons, linked grenades, Rapid Fire, explosive bullets, clock/AI/gravity | Seven C++ suites, nine Python fixtures, 41 exact patterns, Windows build and isolated upgrade | Retail behavior pending; hostile death path remains unresolved |
+| 2026-10-11 / test 8 | Adjustable movement; loaded weapons, linked grenades, Rapid Fire, explosive bullets, clock/AI/gravity | Returned log plus owner feedback; old 41-unique claim corrected after overlap discovery | Invisible/empty Give All and LOCKED Rapid; movement/world option paths observed; no new dump |
+| 2026-10-11 / test 9 | Reversible filtered banks/ammo, native Force Dual Wield, catalog/verifier fix | Eight C++ suites, 12 Python fixtures, 51 overlap-aware anchors, clean AMD64 build, actual-test8 upgrade | Owner test pending; both OFF orders, models, ammo and dual animations need confirmation |
 
 Returned owner evidence is redacted into the versioned runtime JSON files; full
 logs/dumps stay private. No retail game is executed in this Linux workspace.
-The next acceptance gate is test8: adjustable movement, each new weapon/world
-control, ownership restoration, checkpoint and full-restart behavior.
+The next acceptance gate is test9: weapon banks/models/ammo, native dual behavior,
+Rapid Fire switching, both OFF orders and same-process checkpoint behavior.
+Undo snapshots are session-local; saved-checkpoint recovery remains unresolved.
 Saved FOV remains a regression check. Second-map/reset
 coverage and native BO1 actor/asset compatibility remain separate gates.

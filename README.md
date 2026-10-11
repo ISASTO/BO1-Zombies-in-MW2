@@ -2,9 +2,10 @@
 
 Incremental mod framework for **retail Modern Warfare 2 (2009), single player**.
 The first deliverable is an AMD64 D3D9 DLL that renders a keyboard menu in the
-game. BO1 Zombies gameplay is a future mode. The current test8 build adds
-adjustable speed/jump, verified weapon controls and world controls. The compact
-menu, God-state fix, saved FOV and read-only BO1 round preview remain available.
+game. BO1 Zombies gameplay is a future mode. The current test9 build repairs
+Rapid Fire resolution and replaces Give All with reversible, filtered weapon
+banks with ammo. It adds reversible Force Dual Wield. The compact menu, PLAYER
+and WORLD controls, saved FOV and read-only BO1 round preview remain available.
 
 **Status: Phase 1 core passed in the owner's test4 estate run.** The owner
 confirms correct health, working God ON/OFF and retained God state through
@@ -35,7 +36,16 @@ Player cheats start OFF on a full restart; explicitly saved FOV persists.
 weapon access, linked frag/flash sustain, current-gun Rapid Fire, native global
 Explosive Bullets, Slow Motion, actor-think Freeze AI and player/projectile
 Gravity. Kill All Enemies remains planned. See [test8 checks](docs/world-weapons-test8.md).
-New test8 gameplay needs the owner retail run.
+The returned test8 run confirms adjustable movement and several world toggles,
+but the owner reports invisible/empty Give All weapons and LOCKED Rapid Fire.
+The runtime scanner correctly rejected three overlapping catalog matches;
+the old offline verifier incorrectly consumed matches and missed the overlap.
+See [test8 evidence](docs/runtime-test8-evidence.json).
+
+`0.1.8-weapons-test9` corrects the unique catalog signature and verifier, grants
+only eligible loaded primary guns with initialized native ammo pools, and adds
+Force Dual Wield for verified compatible guns. Both toggles capture undo state
+and coordinate OFF order. The new gameplay requires the owner test9 run.
 
 The supplied BO1 `common_zombie.ff` resolves the normal tuning CSV. Recovered
 values match the preview, so its numbers are unchanged. Special rounds and
@@ -55,20 +65,21 @@ An executable hash mismatch disables game-state access and memory writes.
 The installer rejects a mismatched build. A manually installed proxy can still
 show its diagnostic menu in an unknown AMD64 `iw4sp.exe`.
 
-## Current WEAPONS / WORLD test8
+## Current WEAPONS test9
 
-1. Close MW2 and extract the entire `BO1MW2-world-weapons-test8.zip` outside the game folder.
+1. Close MW2 and extract the entire `BO1MW2-weapons-test9.zip` outside the game folder.
 2. Run `Uninstall.cmd` to remove the earlier project build, then `Install.cmd`
    and select the folder containing `iw4sp.exe`. Find it through Steam:
    MW2 Single Player > Properties > Installed Files > Browse.
 3. Launch normally through Steam, enter a mission, wait for player control,
    then press **F4**. Up/Down selects, Enter toggles/opens, Left/Right changes
-   speed/jump/time/gravity, Backspace/Esc goes back. F4 closes the menu.
-4. Test each new control separately, then OFF/reset, weapon switching,
-   checkpoint/re-entry and full restart. Land before reducing jump/gravity.
-   Follow [world-weapons-test8.md](docs/world-weapons-test8.md) for the exact
-   scopes and sequence. Give All is limited to loaded weapons; grenades share
-   No Reload; some native options affect AI. Kill All Enemies stays planned.
+   the Give All bank or speed/jump/time/gravity, Backspace/Esc goes back.
+   F4 closes the menu.
+4. Test Give All models/ammo/banks/OFF, Dual Wield ON/OFF, both OFF orders,
+   and Rapid Fire switching/OFF. Follow [weapons-test9.md](docs/weapons-test9.md)
+   for the sequence and exact scopes. Keep Infinite Ammo and No Reload OFF
+   for initial ammo checks. Turn Give All and Dual Wield OFF before saving or
+   quitting: their undo snapshots are in-process, with lifetime/identity guards.
 5. Close MW2 and run `Diagnose.cmd` before another launch replaces the log.
    Return its ZIP and [testing.md](docs/testing.md) observations. Saved FOV
    should persist; other requests/selections reset on a full process restart.
@@ -97,14 +108,14 @@ Copy the log immediately after a failing run: `latest.log` is replaced on launch
 | Infinite Ammo | Existing reserve pools to 999 with guarded cleanup; test7 owner-accepted |
 | No Reload | Native ammo sustain; normal gun clips and frag/flash grenades are linked; test7 owner-accepted |
 | Noclip | Native movement flags/type; test7 owner-accepted |
-| Super Speed | Test8 Left/Right 1x–5x in 0.5x steps; Enter toggles; retail adjustment test pending |
-| Super Jump | Test8 Left/Right 1x–8x height in 1x steps; Enter toggles; retail adjustment test pending |
+| Super Speed | Test8 Left/Right 1x–5x in 0.5x steps; returned log confirms adjustment/apply/restore |
+| Super Jump | Test8 Left/Right 1x–8x height in 1x steps; returned log confirms adjustment/apply/restore |
 | Reset player toggles | Requests every player cheat OFF and keeps saved FOV |
 | Status HUD toggle and state-log action | Implemented |
 | BO1 round-rules preview | Owner test5 front-end navigation passed; normal CSV values now recovered locally and match the preview |
 | FOV selector and saved preference | Owner confirms test6 behavior; matching logs show load/selection/save/reset |
-| WEAPONS | Loaded weapon access, linked Infinite Grenades, Rapid Fire, Explosive Bullets, info/reset; test8 retail pending |
-| WORLD | Adjustable time/gravity, actor-think freeze, reset; test8 retail pending |
+| WEAPONS | Test9 filtered reversible banks/ammo, reversible native Force Dual Wield, corrected Rapid Fire; linked Infinite Grenades, Explosive Bullets, info/reset retained; new retail test pending |
+| WORLD | Adjustable time/gravity, actor-think freeze, reset; test8 logs confirm several apply/restore paths; broader gameplay coverage pending |
 | Kill All Enemies, AI spawning, Zombies gameplay | Planned; no action |
 
 ## Architecture
@@ -145,8 +156,14 @@ a nonempty map name, a valid slot-zero entity, and positive player health.
 Two optional FOV signatures additionally corroborate its registration constants,
 name and camera pointer slot. Sixteen optional player signatures validate
 partial client/ammo fields, native dvar consumers, noclip and fixed jump data.
-Eighteen optional weapon/world signatures corroborate native dvar consumers,
-weapon tables/timing, grenade bypasses and the sole player gravity literal.
+Twenty-eight optional weapon/world/inventory signatures corroborate native dvar
+consumers, weapon tables/timing, owned slots/model/ammo/dual fields, grenade
+bypasses and the sole player gravity literal. The offline verifier and runtime
+scanner both count overlapping matches. The corrected catalog pattern includes
+the initializer prologue instead of matching repeated adjacent memset blocks.
+Weapon banks use bounded data writes and conditional rollback; no native
+grant/allocation routine is called. OFF uses the captured original inventory
+only when live player/map/owned IDs agree; changed identities discard stale state.
 Each new feature fails closed independently of the core patterns. Reserve
 edits compare ID/count together; speed restores its captured baseline. The
 verified 39/78 jump float pair uses bounded selected heights only in this process; its data
@@ -224,6 +241,7 @@ Original games remain user-supplied inputs and must never be added to this repo.
 - [FOV test6](docs/fov-test6.md): selector, persistence and owner checks.
 - [PLAYER test7](docs/player-test7.md): God regression, every player row and compact menu checks.
 - [WEAPONS/WORLD test8](docs/world-weapons-test8.md): adjustable controls, precise scopes and owner checks.
+- [WEAPONS test9](docs/weapons-test9.md): reversible weapon banks, dual wield, Rapid Fire repair and focused owner checks.
 - [BO1 tuning evidence](docs/bo1-normal-tuning-evidence.json): selected local CSV values and pointer-resolution limits.
 - [Roadmap](docs/roadmap.md): incremental gates and persistent FOV request.
 - [Reference projects](docs/references.md): upstream sources and limits of reuse.
@@ -231,7 +249,7 @@ Original games remain user-supplied inputs and must never be added to this repo.
 
 The core foundation and test5 front-end preview are accepted in their observed
 sessions. PLAYER test7 is owner-accepted following the God-state fix. Next test
-the test8 movement adjustments and weapon/world controls, then audit remaining
+the test9 weapon models/ammo/undo and native dual behavior, then audit remaining
 BO1 overrides/dependencies and broaden campaign-map/reset coverage.
 AI and asset injection need separate compatibility and behavior tests; shared
 engine ancestry does not imply compatible binary layouts or actor behavior.

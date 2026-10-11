@@ -5,7 +5,7 @@
 #include <cstring>
 
 namespace mod {
-enum class ExtraFeature { GiveAll, RapidFire, ExplosiveBullets, SlowMotion, FreezeAI, Gravity, Count };
+enum class ExtraFeature { GiveAll, RapidFire, ExplosiveBullets, SlowMotion, FreezeAI, Gravity, ForceDualWield, Count };
 inline const char* ExtraName(ExtraFeature feature) {
     switch (feature) {
         case ExtraFeature::GiveAll: return "GIVE_ALL_LOADED";
@@ -14,6 +14,7 @@ inline const char* ExtraName(ExtraFeature feature) {
         case ExtraFeature::SlowMotion: return "SLOW_MOTION";
         case ExtraFeature::FreezeAI: return "FREEZE_AI";
         case ExtraFeature::Gravity: return "GRAVITY";
+        case ExtraFeature::ForceDualWield: return "FORCE_DUAL_WIELD";
         case ExtraFeature::Count: break;
     }
     return "UNKNOWN";
@@ -37,7 +38,7 @@ struct ExtraPreferences {
         return false;
     }
     void resetWeapons() {
-        for (const auto f:{ExtraFeature::GiveAll,ExtraFeature::RapidFire,ExtraFeature::ExplosiveBullets}) enabled[static_cast<std::size_t>(f)]=false;
+        for (const auto f:{ExtraFeature::GiveAll,ExtraFeature::RapidFire,ExtraFeature::ExplosiveBullets,ExtraFeature::ForceDualWield}) enabled[static_cast<std::size_t>(f)]=false;
     }
     void resetWorld() {
         for (const auto f:{ExtraFeature::SlowMotion,ExtraFeature::FreezeAI,ExtraFeature::Gravity}) enabled[static_cast<std::size_t>(f)]=false;

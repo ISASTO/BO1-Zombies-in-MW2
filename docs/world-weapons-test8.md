@@ -1,5 +1,9 @@
 # WEAPONS / WORLD test 8
 
+Historical test. The owner's returned run exposed invisible/empty Give All
+weapons and an overlapping catalog pattern that blocked Rapid Fire. Use
+[test9](weapons-test9.md) for the current focused repair and reversible toggles.
+
 Build `0.1.7-world-weapons-test8` targets the same supplied AMD64 executable.
 The owner accepts test7's PLAYER behavior and requests adjustable speed/jump
 and the next WEAPONS/WORLD controls. This build still has no Zombies gameplay.

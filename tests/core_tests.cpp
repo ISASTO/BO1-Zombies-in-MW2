@@ -10,6 +10,9 @@ int main() {
     using namespace mod;
     const std::uint8_t bytes[] = {0x48,0x8b,0x10,0x90,0x48,0x8b,0x20,0x90};
     Check(FindPattern(bytes, sizeof(bytes), ParsePattern("48 8B ?? 90")).size()==2, "ambiguous signature remains ambiguous");
+    const std::uint8_t overlap[]={0xaa,0xaa,0xaa,0xaa};
+    Check(FindPattern(overlap,sizeof(overlap),ParsePattern("AA AA"))==std::vector<std::size_t>{0,1,2},
+        "overlapping matches are counted just like the offline verifier");
     Check(FindPattern(bytes, sizeof(bytes), ParsePattern("48 8B 20 90"))==std::vector<std::size_t>{4}, "match at end of region");
     Check(FindPattern(bytes, sizeof(bytes), ParsePattern("48 8B 21 90")).empty(), "missing signature");
     Check(ParsePattern("4G").empty() && ParsePattern("4").empty() && ParsePattern("??EE").empty(), "invalid pattern fails closed");
