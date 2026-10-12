@@ -90,6 +90,15 @@ def verify(path, header):
     for table,name,target in ((0x339860,b'player_recoilscaleon',0x163500),(0x339878,b'player_recoilscaleoff',0x163580)):
         literal,function=struct.unpack('<QQ',pe.get_data(table,16))
         if pe.get_data(literal-base,32).split(b'\0')[0]!=name or function-base!=target:raise ValueError('Native recoil method table binding disagrees')
+    # Attach without a tag loads the native empty-string constant. Its initializer
+    # interns a zero-length literal, stores its WORD id, and the native attach
+    # helper passes it straight to SL_SetString at entity+0x246.
+    def rip(at,displacement,length):return at+length+struct.unpack_from('<i',pe.get_data(at+displacement,4))[0]
+    empty=value('kAiEmptyAttachmentTagRva')
+    if rip(0x1af194,3,7)!=0x37e023 or pe.get_data(0x37e023,1)!=b'\0':raise ValueError('Default attachment tag initializer is not the empty string')
+    if branch(0x1af19b)!=0x18f440 or rip(0x1af1a7,3,7)!=empty or rip(0x18f1c2,3,7)!=empty:
+        raise ValueError('Native empty-tag initializer/default attachment binding disagrees')
+    if branch(0x19f135)!=0x21ad70:raise ValueError('Native attachment string-reference setter disagrees')
     return {'executable_sha256':expected,'calls':calls,'actor_init_rva':hex(init),'copied_prologue_bytes':len(prologue),
             'copied_prologue_instructions':len(instructions),'damage_rva':hex(value('kDamageRva')),
             'kill_argument_count':12,'kill_damage':0x3fffffff,'kill_weapon':-1,
@@ -101,6 +110,7 @@ def verify(path, header):
             'enemy_handle_field':'sentient+0x44, low WORD native entity-number+1',
             'player_recoil_flags':hex(flags),'player_recoil_scale':hex(scale),'player_recoil_mask':hex(mask),
             'player_recoil_percent_denominator':100.0,'player_recoil_target_percent':0,
+            'empty_attachment_tag_constant_rva':hex(empty),'empty_attachment_tag_is_valid':True,
             'hook_publication':'Clock call publishes first; remaining hooks publish on the next server-clock callback.',
             'native_reentrancy':'Recursive ownership lock, snapshot iteration and deferred cleanup prevent NPC freeing during active native mod calls.',
             'retail_execution':'Not executed in this Linux environment; owner test required.',

@@ -425,7 +425,7 @@ void Overlay::frame() {
             text(40,143,kMuted,line,.7f);
         } else {
             text(40,121,kMuted,StateText(s.state),.7f);
-            text(40,143,kMuted,"Test 15 | Performance + squad persistence",.7f);
+            text(40,143,kMuted,"Test 16 | Scan cost + Ghost tag repair",.7f);
         }
         const auto preview = menu.page == Page::ZombieRules
             ? bo1::EvaluateNormalSoloRound(menu.previewRound, menu.previewRound == 1) : std::nullopt;

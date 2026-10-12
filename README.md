@@ -1,23 +1,25 @@
 # BO1 Zombies in MW2
 
 Incremental mod framework for **retail Modern Warfare 2 (2009), single player**.
-Current build: **0.1.14-performance-test15**. This pass removes forced per-line
-disk flushes, moves world discovery off the render thread, caches display snapshots,
-and spreads support updates across at most four NPCs per server tick. WEAPONS adds
-a 1x-10x Rapid Fire selector and native player No Recoil. AI model rows display
-their selected names. Ghost appearance capture ignores unused attachment slots.
-Autosave writes record and rebuild living mod NPCs after native serialization;
-mission slot reclamation prioritizes corpses/enemies and queues displaced allies
-for recovery. **The native 32-actor ceiling is not expanded.**
+Current build: **0.1.15-performance-test16**. Test15 did not fix the owner's
+stutter or Ghost spawning. Its timing data measured world scans averaging 61.6 ms
+with a 152.9 ms peak. Test16 removes repeated field/name reads from those scans:
+all entity fields use the existing arena snapshot, names cache by allocation
+serial/string id, and readable permanent main-EXE pages use validated local
+copies. Heap/asset pointers retain checked kernel reads. Scan-phase and kernel
+read counters expose remaining costs. Ghost capture now accepts the native empty
+attachment tag; the executable's initializer/default-tag path is independently
+verified. **The native 32-actor ceiling is not expanded.**
+Test15's 1x-10x Rapid Fire, No Recoil, named model rows and live autosave recovery
+remain included. The owner confirms No Recoil works.
 Ghost/Price/Soap/Roach require a matching loaded character in the current mission;
 Soldier uses a loaded human spawner. Universal character asset loading is pending.
 
-The owner's test14 estate run confirms Soldier creation and Kill All Enemies,
-but reports periodic stutter, failed Ghost creation and disappearing allies.
-The log confirms repeated CHECKPOINT_WRITE deletion and detects Ghost as loaded
-before its capture is refused. Test15 passes portable and exact-executable checks;
-actual frame pacing, Ghost rendering and checkpoint recovery need the owner's
-retail test. Start with [the test15 checklist](docs/performance-test15.md).
+The owner's test15 run rejects Ghost entity 246's first attachment repeatedly:
+model 113, tag id 1. An empty successfully loaded tag was incorrectly classified
+as unavailable. Test16 distinguishes lookup failure from empty text and recognizes
+the native empty-tag constant. Actual frame pacing and Ghost rendering still need
+the owner's retail test. Start with [the test16 checklist](docs/performance-test16.md).
 G18's overlapping dual-wield models remain deferred. BO1 gameplay remains a
 simulated controller rehearsal.
 
@@ -119,16 +121,16 @@ An executable hash mismatch disables game-state access and memory writes.
 The installer rejects a mismatched build. A manually installed proxy can still
 show its diagnostic menu in an unknown AMD64 `iw4sp.exe`.
 
-## Current performance/persistence test15
+## Current scan/Ghost test16
 
-1. Close MW2 and extract the entire `BO1MW2-performance-test15.zip` outside the game folder.
+1. Close MW2 and extract the entire `BO1MW2-performance-test16.zip` outside the game folder.
 2. Run `Uninstall.cmd`, then `Install.cmd`, selecting the folder containing
    `iw4sp.exe`. Saved FOV and logs are preserved.
 3. Launch through Steam and **restart the mission once for this upgrade**.
    Avoid starting with NPCs saved by test13. Wait for player control, press F4,
    and test an enemy plus a Soldier helper before increasing population.
-4. Follow [performance-test15.md](docs/performance-test15.md): frame pacing first,
-   then rate/recoil controls, Ghost, autosave recovery and stage progression.
+4. Follow [performance-test16.md](docs/performance-test16.md): frame pacing first,
+   then Ghost and a quick check of the existing weapon/recovery controls.
    Live autosaves rebuild spawned NPCs in the same session. Death/checkpoint
    reload clears them; spawned populations are not embedded in checkpoint files.
 5. Close MW2 and run `Diagnose.cmd` before another launch replaces `latest.log`.
@@ -166,9 +168,9 @@ Copy the log immediately after a failing run: `latest.log` is replaced on launch
 | BO1 round-rules preview | Owner test5 front-end navigation passed; normal CSV values now recovered locally and match the preview |
 | BO1 controller rehearsal | Test11 owner-accepted; simulated actors only, source-derived normal solo lifecycle and game-clock guards |
 | FOV selector and saved preference | Owner confirms test6 behavior; matching logs show load/selection/save/reset |
-| WEAPONS | Test15 adds 1x-10x Rapid Fire and native player No Recoil. Rate, recoil and OFF/reset checks await the retail test. G18 dual appearance is deferred. |
+| WEAPONS | Owner confirms No Recoil works in Test15. 1x-10x Rapid Fire is retained. G18 dual appearance is deferred. |
 | WORLD | Adjustable time/gravity, actor-think freeze, reset; test8 logs confirm several apply/restore paths; broader gameplay coverage pending |
-| AI | Test15 uses bounded server updates, named model selectors, trimmed hero attachments and live autosave recovery. Campaign slot pressure queues displaced allies. Physical capacity remains 32. |
+| AI | Test16 repairs scan memory/name reads and native empty-tag capture. Test15 recovery and combat controls remain. Frame pacing/Ghost need retail verification; physical capacity remains 32. |
 | Kill All Enemies | Test14 native damage call for hostile actor entities; allies, clients and protected entities excluded. Retail check pending. |
 | BO1 Zombies gameplay | Planned; normal MW2 AI is not a BO1 behavior/animation/assets port. |
 

@@ -88,7 +88,7 @@ void InitializeLog() {
         }
     }
     Log("BO1MW2 %s | AMD64 | log=%ls", kVersion, file);
-    Log("Test15: buffered logging, bounded AI service, checkpoint squad recovery, adjustable rapid fire and native player recoil scaling. BO1 live behavior remains staged.");
+    Log("Test16: cached entity-name discovery, complete arena reads, validated host-image reads and empty attachment-tag handling. BO1 live behavior remains staged.");
 }
 void Log(const char* format, ...) {
     char body[4096]{};

@@ -1,0 +1,23 @@
+{
+  "tested_version": "0.1.14-performance-test15",
+  "owner_report": {
+    "lag": "still present",
+    "ghost": "still does not spawn",
+    "no_recoil": "works"
+  },
+  "last_logged_timing": {
+    "service_average_us": 10131.8,
+    "service_peak_us": 156782.6,
+    "world_average_us": 61605.3,
+    "world_peak_us": 152908.6
+  },
+  "ghost_failed_capture_count": 16,
+  "native_empty_attachment_tag": {
+    "constant_rva": "0x1157900",
+    "initializer_rva": "0x1af190",
+    "literal_rva": "0x37e023",
+    "literal": "",
+    "native_attach_default_load_rva": "0x18f1c2"
+  },
+  "measurement_boundary": "These are Test15 timings. Test16 native frame pacing is not measured in this Linux workspace."
+}

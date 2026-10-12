@@ -1,4 +1,5 @@
 #include "runtime.hpp"
+#include "checked_memory.hpp"
 #include <bcrypt.h>
 #include <intrin.h>
 #include <array>
@@ -80,7 +81,7 @@ struct FeatureRuntime {
     bool dualReady=false;
     DualBlocked dualBlocked=DualBlocked::None;
     unsigned dualBlockedWeapon=0;
-    struct Timing { unsigned long long updates=0,ticks=0,peak=0,reads=0; long long frequency=0; } timing;
+    struct Timing { unsigned long long updates=0,ticks=0,peak=0,reads=0,kernel=0,image=0; long long frequency=0; } timing;
     char dualMap[96]{};
     std::uintptr_t dualClient=0;
 } features;
@@ -97,6 +98,7 @@ thread_local unsigned long long readCalls=0;
 struct MeasureUpdate {
     LARGE_INTEGER start{};
     unsigned long long before=readCalls;
+    MemoryReadCounts memoryBefore=GetMemoryReadCounts();
     MeasureUpdate() {
         QueryPerformanceCounter(&start);
         if (!features.timing.frequency) { LARGE_INTEGER f{}; QueryPerformanceFrequency(&f); features.timing.frequency=f.QuadPart; }
@@ -106,13 +108,13 @@ struct MeasureUpdate {
         const auto ticks=static_cast<unsigned long long>(end.QuadPart-start.QuadPart);
         ++features.timing.updates; features.timing.ticks+=ticks;
         features.timing.peak=std::max(features.timing.peak,ticks); features.timing.reads+=readCalls-before;
+        const auto memoryAfter=GetMemoryReadCounts();features.timing.kernel+=memoryAfter.kernel-memoryBefore.kernel;features.timing.image+=memoryAfter.image-memoryBefore.image;
     }
 };
 
 bool Read(std::uintptr_t address, void* output, std::size_t size) {
     ++readCalls;
-    SIZE_T read = 0;
-    return address != 0 && ReadProcessMemory(GetCurrentProcess(), reinterpret_cast<void*>(address), output, size, &read) && read == size;
+    return CheckedReadMemory(address,output,size);
 }
 template<class T> bool ReadValue(std::uintptr_t address, T& output) { return Read(address, &output, sizeof(T)); }
 bool InImage(std::uintptr_t address, std::size_t size) {
@@ -120,10 +122,13 @@ bool InImage(std::uintptr_t address, std::size_t size) {
 }
 bool ReadString(std::uintptr_t address, char* result, std::size_t capacity) {
     if (!address || capacity < 2) return false;
-    MEMORY_BASIC_INFORMATION info{};
-    if (!VirtualQuery(reinterpret_cast<void*>(address), &info, sizeof(info)) || info.State != MEM_COMMIT ||
-        (info.Protect & (PAGE_NOACCESS | PAGE_GUARD))) return false;
-    const auto available = reinterpret_cast<std::uintptr_t>(info.BaseAddress) + info.RegionSize - address;
+    auto available=HostReadableBytes(address);
+    if(!available) {
+        MEMORY_BASIC_INFORMATION info{};
+        if (!VirtualQuery(reinterpret_cast<void*>(address), &info, sizeof(info)) || info.State != MEM_COMMIT ||
+            (info.Protect & (PAGE_NOACCESS | PAGE_GUARD))) return false;
+        available=reinterpret_cast<std::uintptr_t>(info.BaseAddress)+info.RegionSize-address;
+    }
     const auto count = (available < capacity ? static_cast<std::size_t>(available) : capacity);
     if (!Read(address, result, count)) return false;
     for (std::size_t i = 0; i < count; ++i) if (result[i] == '\0') return true;
@@ -807,6 +812,7 @@ void InitializeEngine() {
         reinterpret_cast<void*>(profile.base), nt.FileHeader.TimeDateStamp,
         static_cast<unsigned long long>(profile.size), profile.supported);
     if (!profile.supported) { Log("Game-state access and all memory writes DISABLED: unknown executable hash"); return; }
+    InitializeHostReads(profile.base,profile.size);
     const auto sectionStart = profile.base + dos.e_lfanew + sizeof(DWORD) + sizeof(IMAGE_FILE_HEADER) + nt.FileHeader.SizeOfOptionalHeader;
     for (unsigned n = 0; n < nt.FileHeader.NumberOfSections; ++n) {
         IMAGE_SECTION_HEADER section{};
@@ -1388,6 +1394,8 @@ void LogSnapshot() {
         Log("WEAPON_PERF updates=%llu average_us=%.1f peak_us=%.1f reads_per_update=%.1f cache_hits=%llu cache_misses=%llu dual_ready=%d dual_fallback=%d baseline_valid=%d",
             t.updates,t.updates?scale*t.ticks/t.updates:0.0,scale*t.peak,t.updates?double(t.reads)/t.updates:0.0,
             candidateCache.hits,candidateCache.misses,features.dualReady,features.dualAsset.fallback,features.inventory.baselineValid);
+        Log("PLAYER_READ_PERF kernel_reads_per_update=%.1f image_reads_per_update=%.1f",
+            t.updates?double(t.kernel)/t.updates:0.0,t.updates?double(t.image)/t.updates:0.0);
     }
 }
 } // namespace mod

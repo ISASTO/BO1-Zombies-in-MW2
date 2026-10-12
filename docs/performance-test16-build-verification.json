@@ -1,0 +1,41 @@
+{
+  "version": "0.1.15-performance-test16",
+  "dll_sha256": "f152d4ce8664cc0bd92fee5a31d5cc6af4ae110923fcbec94e7b20704af9c294",
+  "dll_size": 4307920,
+  "machine": "AMD64 PE32+",
+  "aslr_nx": true,
+  "imports": [
+    "bcrypt.dll",
+    "dbghelp.dll",
+    "gdi32.dll",
+    "kernel32.dll",
+    "msvcrt.dll",
+    "user32.dll"
+  ],
+  "exports": [
+    "D3DPERF_BeginEvent",
+    "D3DPERF_EndEvent",
+    "D3DPERF_GetStatus",
+    "D3DPERF_QueryRepeatFrame",
+    "D3DPERF_SetMarker",
+    "D3DPERF_SetOptions",
+    "D3DPERF_SetRegion",
+    "DebugSetMute",
+    "Direct3DCreate9",
+    "Direct3DCreate9Ex"
+  ],
+  "cpp_suites_passed": 14,
+  "python_fixtures_passed": 24,
+  "existing_exact_profile_anchors": 97,
+  "new_native_binding_audit": "performance-test16-evidence.json",
+  "regression_fixtures": [
+    "2044 valid spawners in full entity arena with zero fallback reads",
+    "span boundaries and integer overflow",
+    "valid empty tag versus invalid/unterminated text"
+  ],
+  "host_read_scope": "Exact-hash main EXE; readable committed MEM_IMAGE ranges with matching AllocationBase. Heap/asset reads retain checked kernel fallback.",
+  "name_cache_scope": "Entity useCount/string id; cleared at lifetime and checkpoint read.",
+  "retail_execution": "Not performed here; Test16 native timing/Ghost output remains pending.",
+  "actor_capacity": 32,
+  "actor_capacity_expansion": "Deferred at owner request."
+}
