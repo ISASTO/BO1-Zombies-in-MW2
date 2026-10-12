@@ -47,11 +47,19 @@ int main() {
         "upgrading compatibility hand to a distinct native definition retains original empty cache for OFF");
     Check(!handDefinition.canRestore(0x3008,0x6000),
         "foreign hand-definition replacement cannot be claimed for upgrade or undo");
-    Check(RapidFireTime(100)==50 && RapidFireTime(25)==20, "rapid fire halves normal timing with a positive floor");
+    Check(RapidFireTime(100)==50 && RapidFireTime(25)==12 && RapidFireTime(75,10)==7 && RapidFireTime(2,10)==1, "rapid fire supports ten times timing with a positive floor");
+    for(int n=0;n<30;++n)extras.adjust(ExtraFeature::RapidFire,1);
+    Check(extras.rapidFireMultiplier==10 && !extras.adjust(ExtraFeature::RapidFire,1) && !extras.wanted(ExtraFeature::RapidFire),"rapid selector clamps without enabling itself");
+    for(int n=0;n<30;++n)extras.adjust(ExtraFeature::RapidFire,-1);
+    Check(extras.rapidFireMultiplier==1 && RapidFireTime(75,extras.rapidFireMultiplier)==75,"one times preserves native timing");
+    extras.toggle(ExtraFeature::NoRecoil);extras.resetWeapons();
+    Check(extras.rapidFireMultiplier==2 && !extras.wanted(ExtraFeature::NoRecoil),"weapon reset restores rate default and clears recoil");
     WeaponFields w; w.valid=true; w.index=12; w.complete=0x4000; w.definition=0x5000; w.type=0; w.fireTime=100;
     std::strcpy(w.name,"test_rifle");
     RapidOwnership rapid; rapid.applied(w,50); w.fireTime=50;
     Check(rapid.canRestore(w), "same catalog identity and injected timing may restore");
+    rapid.applied(w,10);w.fireTime=10;
+    Check(rapid.original==100 && rapid.canRestore(w),"changing rate retains the native timing baseline");
     w.index=13; Check(!rapid.canRestore(w), "recycled weapon index never receives another weapon baseline"); w.index=12;
     w.definition=0x6000; Check(!rapid.canRestore(w), "definition pointer changes invalidate ownership"); w.definition=0x5000;
     std::strcpy(w.name,"different_rifle"); Check(!rapid.canRestore(w), "name changes invalidate reused addresses"); std::strcpy(w.name,"test_rifle");
@@ -63,6 +71,9 @@ int main() {
     Check(menu.input(Input::Left)==Action::DecreaseJump, "jump left arrow routes correctly");
     menu.page=Page::Weapons; menu.selected=3;
     Check(menu.input(Input::Select)==Action::ToggleNoReload, "grenade row explicitly shares native ammo sustain");
+    menu.selected=4;
+    Check(menu.input(Input::Right)==Action::IncreaseRapidFire && menu.input(Input::Left)==Action::DecreaseRapidFire,"rapid fire arrows select the multiplier");
+    menu.selected=7;Check(menu.input(Input::Select)==Action::ToggleNoRecoil,"no recoil routes independently from weapon info");
     menu.page=Page::World; menu.selected=0;
     Check(menu.input(Input::Left)==Action::DecreaseTimeScale, "time scale slider routes correctly");
     menu.selected=3; Check(menu.input(Input::Select)==Action::KillAllEnemies, "enemy kill routes to the native service");

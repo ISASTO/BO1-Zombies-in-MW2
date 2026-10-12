@@ -22,6 +22,15 @@ struct AiAppearance {
     std::array<std::string,kAiAttachmentCount> tagNames{};
     std::uint32_t flags=0;
 };
+// The native DObj builder stops at the first empty model slot. Tags beyond
+// that point are not attachments and may contain stale/uninitialized values.
+inline void TrimAiAttachments(AiAppearance& appearance) {
+    bool ended=false;
+    for(std::size_t n=0;n<kAiAttachmentCount;++n) {
+        ended=ended || !appearance.models[n];
+        if(ended) {appearance.models[n]=0;appearance.tags[n]=0;appearance.tagNames[n].clear();}
+    }
+}
 inline constexpr const char* kFriendlyCharacters[]={"Soldier","Ghost","Price","Soap","Roach"};
 inline constexpr int kFriendlyCharacterCount=5;
 inline constexpr std::array<std::uint8_t,15> kActorInitPrologue={

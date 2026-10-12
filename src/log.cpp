@@ -13,14 +13,17 @@ std::mutex logMutex;
 LPTOP_LEVEL_EXCEPTION_FILTER previousFilter = nullptr;
 LONG crashing = 0;
 
-void RawWrite(HANDLE file, const char* text, DWORD length) {
+void RawWrite(HANDLE file, const char* text, DWORD length, bool durable=false) {
     if (file == INVALID_HANDLE_VALUE) return;
     DWORD written = 0;
     WriteFile(file, text, length, &written, nullptr);
-    FlushFileBuffers(file);
+    // Normal diagnostics use the OS cache. Forcing a physical disk flush for
+    // every combat/input line stalls both the native and render threads.
+    if (durable) FlushFileBuffers(file);
 }
 LONG WINAPI CrashFilter(EXCEPTION_POINTERS* info) {
     if (InterlockedCompareExchange(&crashing, 1, 0) != 0) return EXCEPTION_CONTINUE_SEARCH;
+    if (logFile != INVALID_HANDLE_VALUE) FlushFileBuffers(logFile);
     SYSTEMTIME time{}; GetLocalTime(&time);
     wchar_t path[32768]{};
     std::swprintf(path, 32768, L"%ls\\crash-%04u%02u%02u-%02u%02u%02u.txt", directory,
@@ -36,7 +39,7 @@ LONG WINAPI CrashFilter(EXCEPTION_POINTERS* info) {
         static_cast<unsigned long long>(base), static_cast<unsigned long long>(address - base),
         GetCurrentThreadId(), static_cast<unsigned long long>(info->ContextRecord->Rip),
         static_cast<unsigned long long>(info->ContextRecord->Rsp));
-    if (size > 0) RawWrite(report, message, static_cast<DWORD>(size));
+    if (size > 0) RawWrite(report, message, static_cast<DWORD>(size),true);
     HMODULE faultModule = nullptr;
     if (GetModuleHandleExW(GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS | GET_MODULE_HANDLE_EX_FLAG_UNCHANGED_REFCOUNT,
                           reinterpret_cast<LPCWSTR>(address), &faultModule)) {
@@ -44,7 +47,7 @@ LONG WINAPI CrashFilter(EXCEPTION_POINTERS* info) {
         GetModuleFileNameW(faultModule, moduleName, 32768);
         size = std::snprintf(message, sizeof(message), "fault_module=%ls module_rva=0x%llx\r\n", moduleName,
             static_cast<unsigned long long>(address - reinterpret_cast<std::uintptr_t>(faultModule)));
-        if (size > 0) RawWrite(report, message, static_cast<DWORD>(size < 2048 ? size : 2047));
+        if (size > 0) RawWrite(report, message, static_cast<DWORD>(size < 2048 ? size : 2047),true);
     }
     std::swprintf(path, 32768, L"%ls\\crash-%04u%02u%02u-%02u%02u%02u.dmp", directory,
         time.wYear, time.wMonth, time.wDay, time.wHour, time.wMinute, time.wSecond);
@@ -54,7 +57,7 @@ LONG WINAPI CrashFilter(EXCEPTION_POINTERS* info) {
         BOOL ok = MiniDumpWriteDump(GetCurrentProcess(), GetCurrentProcessId(), dump, MiniDumpNormal,
                                    &exception, nullptr, nullptr);
         size = std::snprintf(message, sizeof(message), "minidump=%s error=%lu\r\n", ok ? "written" : "failed", ok ? 0 : GetLastError());
-        if (size > 0) RawWrite(report, message, static_cast<DWORD>(size));
+        if (size > 0) RawWrite(report, message, static_cast<DWORD>(size),true);
         CloseHandle(dump);
     }
     if (report != INVALID_HANDLE_VALUE) CloseHandle(report);
@@ -85,7 +88,7 @@ void InitializeLog() {
         }
     }
     Log("BO1MW2 %s | AMD64 | log=%ls", kVersion, file);
-    Log("Spawn test13: closest-point enemies, near-player allies, traced clearance/retries, native movement/team control, dynamic ownership and independent native hand definitions. BO1 live behavior remains staged.");
+    Log("Test15: buffered logging, bounded AI service, checkpoint squad recovery, adjustable rapid fire and native player recoil scaling. BO1 live behavior remains staged.");
 }
 void Log(const char* format, ...) {
     char body[4096]{};

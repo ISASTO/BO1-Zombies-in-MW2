@@ -19,6 +19,9 @@ int main() {
     sameTeam.origin={2600,0,0};
     Check(!ChooseAiTarget(self,kAlliesTeam,0x9000,player,{sameTeam}).entity,"friendly follows when threats are outside local combat range");
     Check(!NeedsAiGoal(true,{0,0,0},{20,0,0}) && NeedsAiGoal(true,{0,0,0},{100,0,0}),"small movement preserves native path instead of resetting it");
+    AiAppearance look;look.models[0]=10;look.tags[0]=11;look.tags[1]=65000;look.models[2]=88;look.tags[2]=99;
+    TrimAiAttachments(look);
+    Check(look.models[0]==10 && look.tags[0]==11 && !look.tags[1] && !look.models[2] && !look.tags[2],"unused attachment garbage cannot reject a loaded hero appearance");
     Check(BodiesOverlap({0,0,0},{30,20,0}) && !BodiesOverlap({0,0,0},{40,0,0}) && !BodiesOverlap({0,0,0},{0,0,80}),"actor occupancy rejects overlapping bodies but permits another floor");
     AiEntity templateNpc;templateNpc.valid=true;templateNpc.inUse=true;templateNpc.type=kActorSpawnerType;
     templateNpc.number=8;templateNpc.team=kAxisTeam;templateNpc.classname="actor_enemy_test_AR";

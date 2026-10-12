@@ -8,7 +8,7 @@
 #include "fov_preferences.hpp"
 
 namespace mod {
-inline constexpr const char* kVersion = "0.1.13-combat-test14";
+inline constexpr const char* kVersion = "0.1.14-performance-test15";
 inline constexpr const char* kExeSha256 = "fb7e8a987c371dea7b666091b0b9e2011c0cd9cd277b191ad453d11d557dd777";
 
 // -1 is a wildcard. Reject malformed patterns rather than matching everything.
@@ -292,6 +292,7 @@ enum class Action { None, ToggleGod, ToggleHud, WriteSnapshot, WriteRoundPreview
     ToggleInfiniteAmmo, ToggleNoReload, ToggleNoclip, ToggleSuperSpeed, ToggleSuperJump, ResetPlayer,
     DecreaseSpeed, IncreaseSpeed, DecreaseJump, IncreaseJump,
     ToggleGiveAll, ToggleRapidFire, ToggleExplosiveBullets, ResetWeapons, ToggleDualWield, PreviousWeaponBank, NextWeaponBank,
+    DecreaseRapidFire, IncreaseRapidFire, ToggleNoRecoil,
     ToggleSlowMotion, ToggleFreezeAI, ToggleGravity, ResetWorld,
     DecreaseTimeScale, IncreaseTimeScale, DecreaseGravity, IncreaseGravity,
     ToggleRehearsal, ChangeRehearsalRound, ToggleRehearsalAutoClear, ToggleRehearsalSpawning,
@@ -314,7 +315,7 @@ struct MenuState {
         switch (page) {
             case Page::Home: return 6;
             case Page::Player: return 6;
-            case Page::Weapons: return 9;
+            case Page::Weapons: return 10;
             case Page::World: return 5;
             case Page::AI: return 11;
             case Page::Zombies: return 3;
@@ -332,6 +333,7 @@ struct MenuState {
         if (key==Input::Left || key==Input::Right) {
             const bool right=key==Input::Right;
             if (page==Page::Weapons && selected==0) return right?Action::NextWeaponBank:Action::PreviousWeaponBank;
+            if (page==Page::Weapons && selected==4) return right?Action::IncreaseRapidFire:Action::DecreaseRapidFire;
             if (page==Page::Player && selected==3) return right?Action::IncreaseSpeed:Action::DecreaseSpeed;
             if (page==Page::Player && selected==4) return right?Action::IncreaseJump:Action::DecreaseJump;
             if (page==Page::World && selected==0) return right?Action::IncreaseTimeScale:Action::DecreaseTimeScale;
@@ -381,8 +383,9 @@ struct MenuState {
             else if (page == Page::Weapons && selected == 4) return Action::ToggleRapidFire;
             else if (page == Page::Weapons && selected == 5) return Action::ToggleExplosiveBullets;
             else if (page == Page::Weapons && selected == 6) return Action::ToggleDualWield;
-            else if (page == Page::Weapons && selected == 7) return Action::WriteSnapshot;
-            else if (page == Page::Weapons && selected == 8) return Action::ResetWeapons;
+            else if (page == Page::Weapons && selected == 7) return Action::ToggleNoRecoil;
+            else if (page == Page::Weapons && selected == 8) return Action::WriteSnapshot;
+            else if (page == Page::Weapons && selected == 9) return Action::ResetWeapons;
             else if (page == Page::World && selected == 0) return Action::ToggleSlowMotion;
             else if (page == Page::World && selected == 1) return Action::ToggleFreezeAI;
             else if (page == Page::World && selected == 2) return Action::ToggleGravity;

@@ -1,0 +1,15 @@
+{
+  "tested_version": "0.1.13-combat-test14",
+  "owner_report": {
+    "periodic_stutter": "roughly three times per second; borderline unplayable",
+    "soldier_spawn": "works",
+    "ghost_spawn": "does not seem to work despite mission presence",
+    "kill_all_enemies": "works great",
+    "autosave": "spawned friendlies disappear"
+  },
+  "logged_combat_lines": 1090,
+  "ghost_loaded_selection_lines": 9,
+  "model_unavailable_results": 14,
+  "checkpoint_write_deleted_actor_lines": 62,
+  "diagnostic_measurement_limit": "No AI service/world timing was collected by test14; periodic stall attribution is based on code inspection and log bursts, not a measured native profile."
+}

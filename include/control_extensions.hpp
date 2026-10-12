@@ -5,7 +5,7 @@
 #include <cstring>
 
 namespace mod {
-enum class ExtraFeature { GiveAll, RapidFire, ExplosiveBullets, SlowMotion, FreezeAI, Gravity, ForceDualWield, Count };
+enum class ExtraFeature { GiveAll, RapidFire, ExplosiveBullets, SlowMotion, FreezeAI, Gravity, ForceDualWield, NoRecoil, Count };
 inline const char* ExtraName(ExtraFeature feature) {
     switch (feature) {
         case ExtraFeature::GiveAll: return "GIVE_ALL_LOADED";
@@ -15,6 +15,7 @@ inline const char* ExtraName(ExtraFeature feature) {
         case ExtraFeature::FreezeAI: return "FREEZE_AI";
         case ExtraFeature::Gravity: return "GRAVITY";
         case ExtraFeature::ForceDualWield: return "FORCE_DUAL_WIELD";
+        case ExtraFeature::NoRecoil: return "NO_RECOIL";
         case ExtraFeature::Count: break;
     }
     return "UNKNOWN";
@@ -23,10 +24,15 @@ struct ExtraPreferences {
     std::array<bool,static_cast<std::size_t>(ExtraFeature::Count)> enabled{};
     float timeScale=.5f;
     int gravity=400;
+    int rapidFireMultiplier=2;
     bool wanted(ExtraFeature feature) const { return enabled[static_cast<std::size_t>(feature)]; }
     void toggle(ExtraFeature feature) { const auto n=static_cast<std::size_t>(feature); enabled[n]=!enabled[n]; }
     bool adjust(ExtraFeature feature,int direction) {
         if (!direction) return false;
+        if (feature==ExtraFeature::RapidFire) {
+            const int next=std::clamp(rapidFireMultiplier+(direction>0?1:-1),1,10);
+            const bool changed=next!=rapidFireMultiplier; rapidFireMultiplier=next; return changed;
+        }
         if (feature==ExtraFeature::SlowMotion) {
             const float next=std::clamp(timeScale+(direction>0?.25f:-.25f),.25f,1.f);
             const bool changed=next!=timeScale; timeScale=next; return changed;
@@ -38,7 +44,8 @@ struct ExtraPreferences {
         return false;
     }
     void resetWeapons() {
-        for (const auto f:{ExtraFeature::GiveAll,ExtraFeature::RapidFire,ExtraFeature::ExplosiveBullets,ExtraFeature::ForceDualWield}) enabled[static_cast<std::size_t>(f)]=false;
+        for (const auto f:{ExtraFeature::GiveAll,ExtraFeature::RapidFire,ExtraFeature::ExplosiveBullets,ExtraFeature::ForceDualWield,ExtraFeature::NoRecoil}) enabled[static_cast<std::size_t>(f)]=false;
+        rapidFireMultiplier=2;
     }
     void resetWorld() {
         for (const auto f:{ExtraFeature::SlowMotion,ExtraFeature::FreezeAI,ExtraFeature::Gravity}) enabled[static_cast<std::size_t>(f)]=false;
@@ -70,7 +77,10 @@ inline bool ValidGravityLiteral(float value) {
     const float gravity=value-.5f;
     return gravity>=100.f && gravity<=1600.f && gravity==100.f*static_cast<int>(gravity/100.f);
 }
-inline int RapidFireTime(int milliseconds) { return std::max(20,milliseconds/2); }
+inline int RapidFireTime(int milliseconds,int multiplier=2) { return std::max(1,milliseconds/std::clamp(multiplier,1,10)); }
+// Independently checked against the native player_recoilscaleon/off methods.
+inline constexpr std::size_t kClientWeaponFlags=0x2bc,kClientRecoilScale=0xac98;
+inline constexpr unsigned kRecoilScaleFlag=0x400;
 struct WeaponFields {
     bool valid=false;
     unsigned index=0;

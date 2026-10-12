@@ -1,0 +1,39 @@
+{
+  "version": "0.1.14-performance-test15",
+  "dll_sha256": "653e24a1143a36e2ec9695fae94f904bbfc4ea8ea47472510460078aae1c4f93",
+  "dll_size": 4180185,
+  "machine": "AMD64 PE32+",
+  "aslr_nx": true,
+  "imports": [
+    "bcrypt.dll",
+    "dbghelp.dll",
+    "gdi32.dll",
+    "kernel32.dll",
+    "msvcrt.dll",
+    "user32.dll"
+  ],
+  "exports": [
+    "D3DPERF_BeginEvent",
+    "D3DPERF_EndEvent",
+    "D3DPERF_GetStatus",
+    "D3DPERF_QueryRepeatFrame",
+    "D3DPERF_SetMarker",
+    "D3DPERF_SetOptions",
+    "D3DPERF_SetRegion",
+    "DebugSetMute",
+    "Direct3DCreate9",
+    "Direct3DCreate9Ex"
+  ],
+  "cpp_suites_passed": 13,
+  "python_fixtures_passed": 24,
+  "existing_exact_profile_anchors": 97,
+  "new_native_binding_audit": "performance-test15-evidence.json",
+  "render_world_reads": 0,
+  "max_supported_npcs_per_native_tick": 4,
+  "normal_logging_forced_disk_flushes": 0,
+  "display_snapshot_interval_ms": 50,
+  "world_scan_interval_ms": 500,
+  "actor_capacity": 32,
+  "actor_capacity_expansion": "Deferred at owner request.",
+  "retail_execution": "Not performed here; owner frame-pacing/Ghost/save-recovery test required."
+}

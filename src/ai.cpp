@@ -41,6 +41,15 @@ struct OwnedAi {
     AiIdentity identity,spawner;int team=0,lastGoalTime=-1;
     std::uintptr_t target=0;AiPoint goal{};bool hasGoal=false;
     AiAppearance appearance;int appearanceAt=0;bool modelApplied=false;
+    std::string sourceName;
+    bool tagsHeld=false;
+};
+struct RecoveryAi {
+    AiIdentity previous;
+    std::string sourceName;
+    int team=0,health=100;
+    AiAppearance appearance;
+    bool tagsHeld=false;
 };
 struct HandBuild {
     std::uint64_t ticket=0; WeaponFields weapon;
@@ -53,12 +62,17 @@ struct AiRuntime {
     AiStatus status;
     AiRequestQueue queue;
     std::vector<OwnedAi> owned;
+    std::deque<RecoveryAi> recovery;
     std::vector<AiEntity> enemies,friends,enemyPoints,combatants;
     AiPoint playerPosition{};
     bool playerPositionValid=false;
     std::array<AiIdentity,kFriendlyCharacterCount> appearances{};
     int enemyIndex=0,friendlyIndex=0;
-    ULONGLONG nextRead=0;
+    int nextWorldTime=-1,nextRecoveryTime=-1,allyTeam=kAlliesTeam;
+    std::size_t followCursor=0;
+    bool detailed=false,recoverDeferred=false;
+    std::vector<std::uint8_t> worldPool,worldActive;
+    double worldTotalUs=0,serviceTotalUs=0;
     bool pauseWanted=false,scopeActive=false;
     bool cleanupDeferred=false;
     ScalarOwnership<std::uint8_t> pause;
@@ -68,7 +82,6 @@ struct AiRuntime {
     std::uint64_t nextHandTicket=0;
     std::uintptr_t client=0,pool=0;
     int commandTime=0,lastServiceTime=-1;
-    int nextFollowTime=-1;
     char map[96]{};
 } ai;
 std::recursive_mutex aiMutex;
@@ -270,6 +283,10 @@ bool clockInstalled=false;
 void Service();
 bool CompleteServiceInstall();
 unsigned CleanupOwned(const char* reason,bool one=false);
+void CaptureRecovery(const AiIdentity* only=nullptr);
+void ClearRecovery(bool releaseTags);
+void HoldAppearance(AiAppearance& appearance);
+void ReleaseAppearance(AiAppearance& appearance);
 void ClockHook() {
     originalClock();++nativeCallbacks;
     DWORD expected=0;nativeThread.compare_exchange_strong(expected,GetCurrentThreadId());
@@ -279,26 +296,46 @@ void ClockHook() {
         nativePending=!ai.owned.empty();Log("AI_SERVICE C++ failure on server clock; queued work canceled");
     }
 }
-void BeforeSave(const char* reason) {
+void BeforeSave(const char* reason,bool write) {
     std::lock_guard<std::recursive_mutex> lock(aiMutex);
     if(servicing || cleaningOwned) {
         // Never free an NPC while a native damage/model/spawn call has that
         // NPC on its stack. Complete the cleanup at the following clock boundary.
-        ai.cleanupDeferred=true;nativePending=true;
+        ai.cleanupDeferred=true;ai.recoverDeferred=write;nativePending=true;
         Log("AI_CLEANUP deferred=1 reason=%s",reason);return;
     }
     ai.queue.cancel(AiRequestResult::LifetimeChanged);
     ai.hands.pending=false;ai.handCache.clear();
+    if(write)CaptureRecovery();else ClearRecovery(true);
     const auto count=CleanupOwned(reason);
-    if(count) {ai.status.lastResult=AiRequestResult::Deleted;ai.nextRead=0;}
+    // A protected/refused allocation stays alive; do not create a duplicate.
+    for(auto it=ai.recovery.begin();it!=ai.recovery.end();) {
+        if(SameAiAllocation(it->previous,ReadAiAllocation(it->previous,ReadAi))) {
+            if(it->tagsHeld)for(auto& tag:it->appearance.tags)reinterpret_cast<ScriptStringFn>(aiProfile.setString)(reinterpret_cast<std::uintptr_t>(&tag),0);
+            it=ai.recovery.erase(it);
+        } else ++it;
+    }
+    ai.nextRecoveryTime=-1;nativePending=nativePending || !ai.recovery.empty();
+    if(count) {ai.status.lastResult=AiRequestResult::Deleted;ai.nextWorldTime=0;}
 }
-void SaveReadHook(std::uintptr_t save) {BeforeSave("CHECKPOINT_READ");originalSaveRead(save);}
-void SaveWriteHook(bool flag,std::uintptr_t save) {BeforeSave("CHECKPOINT_WRITE");originalSaveWrite(flag,save);}
+void SaveReadHook(std::uintptr_t save) {BeforeSave("CHECKPOINT_READ",false);originalSaveRead(save);}
+void SaveWriteHook(bool flag,std::uintptr_t save) {
+    // Player feature code takes its lock before the AI lock. Keep that order;
+    // a save nested inside an active native AI call defers its AI cleanup.
+    const bool suspend=!servicing && !cleaningOwned;
+    if(suspend)SuspendRecoilForCheckpoint(true);
+    struct Resume {bool active;~Resume(){if(active)SuspendRecoilForCheckpoint(false);}} resume{suspend};
+    BeforeSave("CHECKPOINT_WRITE",true);originalSaveWrite(flag,save);
+}
 int ActorInitHook(std::uintptr_t entity) {
     if(!spawningOwned) {
         std::lock_guard<std::recursive_mutex> lock(aiMutex);
         int count=0,limit=kAiNativeActorCapacity;std::uintptr_t dvar=0;
         if(Value(aiProfile.actorLimitSlot,dvar) && dvar)Value(dvar+0x10,limit);
+        if((!ai.owned.empty() || !ai.recovery.empty()) && limit>0 && limit<kAiNativeActorCapacity
+            && SetCount(dvar+0x10,limit,kAiNativeActorCapacity)) {
+            ai.capacity.applied(dvar,limit,kAiNativeActorCapacity);limit=kAiNativeActorCapacity;
+        }
         while(limit>0 && limit<=kAiNativeActorCapacity && Value(aiProfile.actorCountSlot,count) && count>=limit && !ai.owned.empty()) {
             const auto removed=CleanupOwned("CAMPAIGN_NEEDS_SLOT",true);
             ai.status.reclaimed+=removed;
@@ -400,16 +437,19 @@ int PlayerTeam(const Snapshot& s) {
         && Value(sentient+8,team) && (team==kAxisTeam || team==kAlliesTeam)) return team;
     return kAlliesTeam;
 }
-void WorkWanted() { nativePending=ai.queue.pending() || ai.hands.pending || !ai.owned.empty() || ai.cleanupDeferred; }
+void WorkWanted() { ai.status.recovering=static_cast<int>(ai.recovery.size());nativePending=ai.queue.pending() || ai.hands.pending || !ai.owned.empty() || !ai.recovery.empty() || ai.cleanupDeferred || ai.detailed || ai.pauseWanted || ai.pause.owned; }
 void RestoreCapacity();
 void Lifetime(const AiScope& s) {
     const bool changed=!s.ready || (ai.scopeActive && (ai.client!=s.client || ai.pool!=s.pool || std::strcmp(ai.map,s.map)
         || s.commandTime<ai.commandTime));
     if(changed) {
         RestoreCapacity();
+        ClearRecovery(false);
         if(ai.queue.discardStale(s)) ai.status.lastResult=AiRequestResult::LifetimeChanged;
         nativePending=ai.queue.pending(); ai.status.pending=ai.queue.pending(); ai.owned={}; ai.scopeActive=false;ai.cleanupDeferred=false;
-        ai.enemies.clear(); ai.friends.clear(); ai.enemyPoints.clear(); ai.nextRead=0; ai.lastServiceTime=-1;ai.nextFollowTime=-1;
+        ai.enemies.clear(); ai.friends.clear(); ai.enemyPoints.clear();ai.lastServiceTime=-1;
+        ai.status.ready=false;ai.status.owned=0;ai.status.enemySpawners=0;ai.status.friendlySpawners=0;ai.status.enemyName={};ai.status.friendlyName={};
+        ai.nextWorldTime=-1;ai.nextRecoveryTime=-1;ai.followCursor=0;
         ai.status.lastEntity=0;ai.status.lastPosition={};ai.status.lastName={};ai.status.placementAttempts=0;ai.status.lastSpawnDistance=0.f;
         ai.hands.pending=false; ai.hands.result.state=NativeHandBuildState::Canceled; ai.handCache.clear();
     }
@@ -419,9 +459,9 @@ void Lifetime(const AiScope& s) {
     }
 }
 void Finish(AiRequestResult result) {
-    if(ai.owned.empty())RestoreCapacity();
+    if(ai.owned.empty() && ai.recovery.empty())RestoreCapacity();
     ai.status.lastResult=result; ai.status.pending=ai.queue.pending();
-    WorkWanted(); ai.nextRead=0;
+    WorkWanted(); ai.nextWorldTime=0;
     Log("AI_RESULT result=%s native_thread=%lu owned=%d",AiResultText(result),GetCurrentThreadId(),OwnCount());
 }
 struct IntDvarRead { bool valid=false; std::uintptr_t address=0; int current=0; };
@@ -446,6 +486,14 @@ unsigned CleanupOwned(const char* reason,bool one) {
     cleaningOwned=true;
     struct ClearCleanupFlag {~ClearCleanupFlag(){cleaningOwned=false;}} cleanupFlag;
     unsigned removed=0;
+    if(one) {
+        // Reserve campaign slots by retiring corpses/hostiles before allies.
+        auto priority=[&](const OwnedAi& x) {
+            const auto raw=ReadAiAllocation(x.identity,ReadAi);
+            return raw.type==kActorCorpseType?0:x.team!=ai.allyTeam?1:2;
+        };
+        std::stable_sort(ai.owned.begin(),ai.owned.end(),[&](const auto& a,const auto& b){return priority(a)<priority(b);});
+    }
     for(auto it=ai.owned.begin();it!=ai.owned.end();) {
         const auto raw=ReadAiAllocation(it->identity,ReadAi);
         if(!raw.valid) {++it;continue;}
@@ -454,6 +502,7 @@ unsigned CleanupOwned(const char* reason,bool one) {
             int protectedNumber=-1;
             if(!Value(aiProfile.protectedSlot,protectedNumber) || protectedNumber==raw.number) {++it;continue;}
             Log("AI_DELETE_BEGIN entity=%u serial=%u type=%u reason=%s",raw.number,raw.serial,raw.type,reason);
+            if(one && it->team==ai.allyTeam)CaptureRecovery(&it->identity);
             // Native delete sends notifications and performs brain/sentient/VM cleanup.
             reinterpret_cast<DeleteFn>(aiProfile.remove)(raw.number);
             const auto after=ReadAiAllocation(it->identity,ReadAi);
@@ -463,12 +512,70 @@ unsigned CleanupOwned(const char* reason,bool one) {
         const auto helper=ReadAiAllocation(it->spawner,ReadAi);
         if(SameAiAllocation(it->spawner,helper) && helper.type==kActorSpawnerType)
             reinterpret_cast<EntityFn>(aiProfile.freeEntity)(it->spawner.address);
+        if(it->tagsHeld)ReleaseAppearance(it->appearance);
         it=ai.owned.erase(it);
         if(one && removed)break;
     }
-    if(ai.owned.empty())RestoreCapacity();
+    if(ai.owned.empty() && ai.recovery.empty())RestoreCapacity();
     ai.status.owned=OwnCount();WorkWanted();
     Log("AI_CLEANUP reason=%s removed=%u remaining=%d",reason,removed,OwnCount());return removed;
+}
+bool ReadAppearance(const AiEntity& e,AiAppearance& out) {
+    out={};
+    if(!e.valid || !Value(e.address+kAiModelIndex,out.model) || !out.model
+        || !ReadAi(e.address+kAiAttachmentModels,out.models.data(),sizeof(out.models))
+        || !ReadAi(e.address+kAiAttachmentTags,out.tags.data(),sizeof(out.tags))
+        || !Value(e.address+kAiAttachmentFlags,out.flags)) {
+        Log("AI_MODEL_CAPTURE entity=%u result=MODEL_READ_FAILED",e.number);return false;
+    }
+    TrimAiAttachments(out);
+    for(std::size_t n=0;n<kAiAttachmentCount;++n)if(out.tags[n]) {
+        out.tagNames[n]=ClassName(out.tags[n]);
+        if(out.tagNames[n].empty()) {
+            Log("AI_MODEL_CAPTURE entity=%u slot=%u model=%u tag=%u result=TAG_NOT_LOADED",e.number,static_cast<unsigned>(n),out.models[n],out.tags[n]);return false;
+        }
+    }
+    return true;
+}
+void HoldAppearance(AiAppearance& appearance) {
+    for(auto& tag:appearance.tags)if(tag) {
+        const auto value=tag;tag=0;
+        reinterpret_cast<ScriptStringFn>(aiProfile.setString)(reinterpret_cast<std::uintptr_t>(&tag),value);
+    }
+}
+void ReleaseAppearance(AiAppearance& appearance) {
+    for(auto& tag:appearance.tags)if(tag)
+        reinterpret_cast<ScriptStringFn>(aiProfile.setString)(reinterpret_cast<std::uintptr_t>(&tag),0);
+}
+void ReleaseRecovery(RecoveryAi& r) {
+    if(r.tagsHeld)ReleaseAppearance(r.appearance);
+    r.tagsHeld=false;
+}
+void ClearRecovery(bool releaseTags) {
+    if(releaseTags)for(auto& r:ai.recovery)ReleaseRecovery(r);
+    ai.recovery.clear();ai.status.recovering=0;
+}
+void CaptureRecovery(const AiIdentity* only) {
+    for(const auto& owned:ai.owned) {
+        if(only && (owned.identity.address!=only->address || owned.identity.serial!=only->serial))continue;
+        if(ai.recovery.size()>=kAiNativeActorCapacity)break;
+        if(std::any_of(ai.recovery.begin(),ai.recovery.end(),[&](const auto& r){return r.previous.address==owned.identity.address && r.previous.serial==owned.identity.serial;}))continue;
+        const auto e=Entity(owned.identity,ai.pool,false);
+        if(!owned.identity.matches(e) || e.health<=0)continue;
+        RecoveryAi r;r.previous=owned.identity;r.sourceName=owned.sourceName;r.team=owned.team;r.health=e.health;
+        if(owned.appearance.model) {
+            r.appearance=owned.appearance;
+            if(owned.modelApplied && !ReadAppearance(e,r.appearance))continue;
+            bool valid=true;
+            for(std::size_t n=0;n<kAiAttachmentCount;++n)if(r.appearance.tags[n] && ClassName(r.appearance.tags[n])!=r.appearance.tagNames[n])valid=false;
+            if(!valid)continue;
+            HoldAppearance(r.appearance);
+            r.tagsHeld=true;
+        }
+        ai.recovery.push_back(std::move(r));
+    }
+    std::stable_partition(ai.recovery.begin(),ai.recovery.end(),[](const auto& r){return r.team==ai.allyTeam;});
+    ai.status.recovering=static_cast<int>(ai.recovery.size());
 }
 AiTraceResult Trace(const AiPoint& start,const AiPoint& end,const AiBounds& bounds) {
     alignas(16) std::array<std::uint8_t,48> output{};
@@ -534,7 +641,11 @@ void FollowOwned(const Snapshot& s,const AiScope& scope,int time) {
     // Native notifications may re-enter checkpoint cleanup. Iterate a snapshot,
     // then commit only to a still-owned allocation instead of keeping iterators
     // across engine calls that can erase ownership records.
-    const auto ownedSnapshot=ai.owned;
+    std::vector<OwnedAi> ownedSnapshot;
+    const auto count=std::min<std::size_t>(4,ai.owned.size());
+    ownedSnapshot.reserve(count);
+    for(std::size_t n=0;n<count;++n)ownedSnapshot.push_back(ai.owned[(ai.followCursor+n)%ai.owned.size()]);
+    if(!ai.owned.empty())ai.followCursor=(ai.followCursor+count)%ai.owned.size();
     for(const auto& original:ownedSnapshot) {
         auto update=original;
         auto* it=&update;
@@ -544,6 +655,7 @@ void FollowOwned(const Snapshot& s,const AiScope& scope,int time) {
         if(raw.valid && !SameAiAllocation(it->identity,raw)) {
             const auto helper=ReadAiAllocation(it->spawner,ReadAi);
             if(SameAiAllocation(it->spawner,helper) && helper.type==kActorSpawnerType)reinterpret_cast<EntityFn>(aiProfile.freeEntity)(it->spawner.address);
+            for(auto& x:ai.owned)if(x.identity.address==it->identity.address && x.identity.serial==it->identity.serial && x.tagsHeld)ReleaseAppearance(x.appearance);
             ai.owned.erase(std::remove_if(ai.owned.begin(),ai.owned.end(),[&](const auto& x){return x.identity.address==it->identity.address && x.identity.serial==it->identity.serial;}),ai.owned.end());continue;
         }
         const auto e=Entity(it->identity,scope.pool,false);
@@ -571,9 +683,11 @@ void FollowOwned(const Snapshot& s,const AiScope& scope,int time) {
         std::uint16_t currentEnemy=0;
         const auto desiredEnemy=target?static_cast<std::uint16_t>((target-scope.pool)/kAiEntityStride+1):0;
         const bool enemyRead=Value(e.sentient+0x44,currentEnemy);
-        if(target!=it->target || (enemyRead && currentEnemy!=desiredEnemy)) {
+        if(target!=it->target || (target && enemyRead && currentEnemy!=desiredEnemy)) {
             reinterpret_cast<EnemyFn>(aiProfile.setEnemy)(e.sentient,target,1,0);
-            it->target=target;Log("AI_COMBAT entity=%u team=%d target=%u",e.number,it->team,target?static_cast<unsigned>((target-scope.pool)/kAiEntityStride):0);
+            if(target!=it->target)Log("AI_COMBAT entity=%u team=%d target=%u",e.number,it->team,target?static_cast<unsigned>((target-scope.pool)/kAiEntityStride):0);
+            else ++ai.status.combatReassertions;
+            it->target=target;
         }
         if(!tracked() || !it->identity.matches(Entity(it->identity,scope.pool,false)))continue;
         // This is the native lastenemysightpos script property, not fabricated
@@ -588,6 +702,7 @@ void FollowOwned(const Snapshot& s,const AiScope& scope,int time) {
         const bool follow=it->team==ally && (!target || PointDistanceSquared(e.origin,player)>640.f*640.f);
         const bool advance=it->team!=ally && distance>384.f*384.f;
         if(follow) {
+            goal=player;
             const float angle=static_cast<float>(e.number%12)*.5235987756f;
             goal[0]+=112.f*std::cos(angle);goal[1]+=112.f*std::sin(angle);
             if(NeedsAiGoal(it->hasGoal,it->goal,goal)) {
@@ -623,8 +738,19 @@ void FollowOwned(const Snapshot& s,const AiScope& scope,int time) {
         }
         for(auto& live:ai.owned)if(live.identity.address==it->identity.address && live.identity.serial==it->identity.serial) {live=std::move(update);break;}
     }
-    if(ai.owned.empty())RestoreCapacity();
+    if(ai.owned.empty() && ai.recovery.empty())RestoreCapacity();
 }
+struct AiMeasure {
+    LARGE_INTEGER start{},frequency{};bool world=false;
+    explicit AiMeasure(bool scan=false):world(scan) {QueryPerformanceCounter(&start);QueryPerformanceFrequency(&frequency);}
+    ~AiMeasure() {
+        LARGE_INTEGER end{};QueryPerformanceCounter(&end);
+        const double us=(end.QuadPart-start.QuadPart)*1000000.0/frequency.QuadPart;
+        if(world) {++ai.status.worldReads;ai.worldTotalUs+=us;ai.status.worldAverageUs=ai.worldTotalUs/ai.status.worldReads;ai.status.worldPeakUs=std::max(ai.status.worldPeakUs,us);}
+        else {++ai.status.serviceUpdates;ai.serviceTotalUs+=us;ai.status.serviceAverageUs=ai.serviceTotalUs/ai.status.serviceUpdates;ai.status.servicePeakUs=std::max(ai.status.servicePeakUs,us);}
+    }
+};
+void SpawnOwned(const AiRequest& request,const Snapshot& s,const AiScope& scope,int time,const RecoveryAi* recovery=nullptr);
 void Service() {
     if(servicing || !nativePending.load(std::memory_order_acquire)) return;
     servicing=true;
@@ -636,29 +762,54 @@ void Service() {
     }
     int time=0;
     if(!Value(aiProfile.timeSlot,time) || time==ai.lastServiceTime) return;
-    if(!ai.queue.pending() && !ai.hands.pending && ai.nextFollowTime>=0 && time<ai.nextFollowTime && time>=ai.lastServiceTime)return;
+    AiMeasure measure;
     const auto s=ReadSnapshot(); const auto scope=Scope(s);
     Lifetime(scope);
     if(ai.cleanupDeferred && scope.ready) {
-        ai.cleanupDeferred=false;CleanupOwned("DEFERRED_CHECKPOINT");
+        ai.cleanupDeferred=false;if(ai.recoverDeferred)CaptureRecovery();else ClearRecovery(true);
+        ai.recoverDeferred=false;CleanupOwned("DEFERRED_CHECKPOINT");
         ai.queue.cancel(AiRequestResult::LifetimeChanged);ai.hands.pending=false;ai.handCache.clear();WorkWanted();
     }
     if(s.state==LevelState::PlayerDead && scope.ready) {
+        ClearRecovery(true);
         CleanupOwned("PLAYER_DEATH");ai.queue.cancel(AiRequestResult::LifetimeChanged);
         ai.hands.pending=false;ai.hands.result.state=NativeHandBuildState::Canceled;ai.handCache.clear();
-        ai.lastServiceTime=time;ai.nextFollowTime=time+500;WorkWanted();return;
+        ai.lastServiceTime=time;WorkWanted();return;
     }
-    if(!scope.ready)return;
+    if(!scope.ready) {Pause(s);WorkWanted();return;}
     ai.lastServiceTime=time;
-    ai.nextFollowTime=time+500;ReadWorld(s,scope);ServiceHands(scope);FollowOwned(s,scope,time);
-    if(!ai.queue.pending()) {WorkWanted();return;}
+    if(ai.nextWorldTime<0 || time>=ai.nextWorldTime || ai.queue.pending()) {ai.nextWorldTime=time+500;ReadWorld(s,scope);}
+    Pause(s);ServiceHands(scope);FollowOwned(s,scope,time);
+    if(!ai.queue.pending()) {
+        if(!ai.recovery.empty() && (ai.nextRecoveryTime<0 || time>=ai.nextRecoveryTime)) {
+            auto& r=ai.recovery.front();
+            if(SameAiAllocation(r.previous,ReadAiAllocation(r.previous,ReadAi))) {ReleaseRecovery(r);ai.recovery.pop_front();}
+            else {
+                const bool friendly=r.team==PlayerTeam(s);const auto& list=friendly?ai.friends:ai.enemies;
+                auto source=std::find_if(list.begin(),list.end(),[&](const auto& e){return e.classname==r.sourceName;});
+                if(source==list.end() && !list.empty())source=list.begin();
+                if(source!=list.end()) {
+                    AiRequest request;request.operation=friendly?AiOperation::SpawnFriendly:AiOperation::SpawnEnemy;request.source=AiIdentity::capture(*source);
+                    SpawnOwned(request,s,scope,time,&r);
+                    if(ai.status.lastResult==AiRequestResult::Created) {ReleaseRecovery(r);ai.recovery.pop_front();}
+                }
+                ai.nextRecoveryTime=time+(ai.status.lastResult==AiRequestResult::Created?50:1000);
+            }
+        }
+        WorkWanted();return;
+    }
     const auto request=ai.queue.take(scope);
     if(!request) {Finish(ai.queue.reason());return;}
     if(request->operation==AiOperation::RemoveOwned) {
+        ClearRecovery(true);
         const auto removed=CleanupOwned("MENU_REMOVE");
         Finish(removed?AiRequestResult::Deleted:ai.owned.empty()?AiRequestResult::IdentityChanged:AiRequestResult::Protected);return;
     }
     if(request->operation==AiOperation::KillEnemies) {
+        const int ally=PlayerTeam(s);
+        for(auto it=ai.recovery.begin();it!=ai.recovery.end();) {
+            if(it->team!=ally) {ReleaseRecovery(*it);it=ai.recovery.erase(it);}else ++it;
+        }
         int count=0;if(!Value(aiProfile.countSlot,count) || count<2 || count>kAiEntityCapacity) {Finish(AiRequestResult::NotReady);return;}
         const int team=PlayerTeam(s);unsigned killed=0;
         std::vector<AiIdentity> targets;
@@ -679,6 +830,10 @@ void Service() {
         ai.status.killed+=killed;Log("AI_KILL_ALL selected=%llu killed=%u",static_cast<unsigned long long>(targets.size()),killed);
         Finish(killed?AiRequestResult::Killed:AiRequestResult::NativeRefused);return;
     }
+    SpawnOwned(*request,s,scope,time);
+}
+void SpawnOwned(const AiRequest& input,const Snapshot& s,const AiScope& scope,int time,const RecoveryAi* recovery) {
+    const auto* request=&input;
     const auto source=Entity(request->source,scope.pool);
     const bool friendly=request->operation==AiOperation::SpawnFriendly;
     const int playerTeam=PlayerTeam(s),team=friendly?playerTeam:(playerTeam==kAlliesTeam?kAxisTeam:kAlliesTeam);
@@ -687,6 +842,7 @@ void Service() {
     if(!enabled.valid || !enabled.current || !disabled.valid || disabled.current || ai.pauseWanted) {Finish(AiRequestResult::SpawnPaused);return;}
     const auto limit=ActorLimit(); int actorCount=0;
     if(!limit.valid || !Value(aiProfile.actorCountSlot,actorCount) || actorCount<0 || actorCount>=kAiNativeActorCapacity) {Finish(AiRequestResult::Limit);return;}
+    if(!recovery && actorCount+static_cast<int>(ai.recovery.size())>=kAiNativeActorCapacity) {Finish(AiRequestResult::Limit);return;}
     if(limit.current<kAiNativeActorCapacity && SetCount(limit.address+0x10,limit.current,kAiNativeActorCapacity)) {
         ai.capacity.applied(limit.address,limit.current,kAiNativeActorCapacity);
         Log("AI_CAPACITY requested native maximum %d original=%d",kAiNativeActorCapacity,limit.current);
@@ -709,16 +865,10 @@ void Service() {
         if(!pointNumber) nearPlayer=true;
     }
     AiAppearance appearance;
-    if(request->appearance.address) {
+    if(recovery)appearance=recovery->appearance;
+    else if(request->appearance.address) {
         const auto hero=Entity(request->appearance,scope.pool);
-        if(!request->appearance.matches(hero) || !Value(hero.address+kAiModelIndex,appearance.model) || !appearance.model
-            || !ReadAi(hero.address+kAiAttachmentModels,appearance.models.data(),sizeof(appearance.models))
-            || !ReadAi(hero.address+kAiAttachmentTags,appearance.tags.data(),sizeof(appearance.tags))
-            || !Value(hero.address+kAiAttachmentFlags,appearance.flags)) {Finish(AiRequestResult::ModelUnavailable);return;}
-        for(std::size_t n=0;n<kAiAttachmentCount;++n)if(appearance.tags[n]) {
-            appearance.tagNames[n]=ClassName(appearance.tags[n]);
-            if(appearance.tagNames[n].empty()) {Finish(AiRequestResult::ModelUnavailable);return;}
-        }
+        if(!SameAiAllocation(request->appearance,ReadAiAllocation(request->appearance,ReadAi)) || !ReadAppearance(hero,appearance)) {Finish(AiRequestResult::ModelUnavailable);return;}
     }
     const auto placement=FindSpawnPlacement(center,nearPlayer,Trace);
     if(!placement) {Finish(AiRequestResult::NoClearPosition);return;}
@@ -771,17 +921,19 @@ void Service() {
     reinterpret_cast<EnemyFn>(aiProfile.setEnemy)(actor.sentient,friendly?0:s.entity,1,0);
     actor=ReadAiEntity(spawned,actor.number,ReadAi);
     if(!actor.valid || actor.team!=team) {Finish(AiRequestResult::NativeReturnedInvalid);return;}
+    if(recovery && actor.health!=recovery->health)SetCount(actor.address+kAiHealth,actor.health,recovery->health);
     const auto temp=ReadAiEntity(temporary,static_cast<int>((temporary-scope.pool)/kAiEntityStride),ReadAi);
     if(!temp.valid) {Finish(AiRequestResult::NativeReturnedInvalid);return;}
     ai.combatants.push_back(actor);
-    ai.owned.push_back({AiIdentity::capture(actor),AiIdentity::capture(temp),team,-1,0,{},false,appearance,time+1000,false});cleanup.keep=true;rollback.keep=true;++ai.status.created;
+    ai.owned.push_back({AiIdentity::capture(actor),AiIdentity::capture(temp),team,-1,0,{},false,appearance,time+1000,false,source.classname});cleanup.keep=true;rollback.keep=true;++ai.status.created;
+    if(appearance.model) {HoldAppearance(ai.owned.back().appearance);ai.owned.back().tagsHeld=true;}
     ai.status.lastEntity=actor.number;ai.status.lastTeam=team;ai.status.lastPosition=actor.origin;
     ai.status.lastSpawnDistance=std::sqrt(PointDistanceSquared(actor.origin,player));ai.status.placementAttempts=placement->attempts;
     std::snprintf(ai.status.lastName.data(),ai.status.lastName.size(),"%s",source.classname.c_str());
     Log("AI_SPAWN_ACCEPT entity=%u serial=%u actor=%p sentient=%p team=%d health=%d origin=%.1f,%.1f,%.1f distance=%.1f original_spawner_untouched=1",
         actor.number,actor.serial,reinterpret_cast<void*>(actor.actor),reinterpret_cast<void*>(actor.sentient),actor.team,actor.health,
         actor.origin[0],actor.origin[1],actor.origin[2],ai.status.lastSpawnDistance);
-    FollowOwned(s,scope,time);Finish(AiRequestResult::Created);
+    Finish(AiRequestResult::Created);
 }
 bool InstallService() {
     if(clockInstalled)return true;
@@ -820,13 +972,16 @@ float Distance(const AiEntity& e,const std::array<float,3>& origin) {
     return std::sqrt(squared);
 }
 void ReadWorld(const Snapshot& s,const AiScope& scope) {
+    AiMeasure measure(true);
     int count=0;
     if(!scope.ready || !Value(aiProfile.countSlot,count) || count<2 || count>kAiEntityCapacity-2) {ai.status.ready=false;return;}
-    std::vector<std::uint8_t> pool(static_cast<std::size_t>(count)*kAiEntityStride),active(static_cast<std::size_t>(count));
+    auto& pool=ai.worldPool;auto& active=ai.worldActive;
+    pool.resize(static_cast<std::size_t>(count)*kAiEntityStride);active.resize(static_cast<std::size_t>(count));
     if(!ReadAi(scope.pool,pool.data(),pool.size()) || !ReadAi(aiProfile.activeArray,active.data(),active.size())) {ai.status.ready=false;return;}
     AiPoint player{};
     if(!ReadAi(s.entity+kAiOrigin,player.data(),sizeof(player)) || !FinitePoint(player)) {ai.status.ready=false;return;}
     const int friendlyTeam=PlayerTeam(s),enemyTeam=friendlyTeam==kAlliesTeam?kAxisTeam:kAlliesTeam;
+    ai.allyTeam=friendlyTeam;
     const std::string oldEnemy=ai.enemies.empty()?"":ai.enemies[ai.enemyIndex].classname;
     ai.appearances={};
     ai.enemies.clear();ai.friends.clear();ai.enemyPoints.clear();ai.combatants.clear();
@@ -844,9 +999,11 @@ void ReadWorld(const Snapshot& s,const AiScope& scope) {
         auto e=ReadAiEntity(address,n,snapshotRead);if(!e.valid)continue;
         e.classname=ClassName(e.classnameId);
         if(e.type==kActorType) {
+            std::string lower=e.classname;
+            std::uint16_t targetname=0;
+            if(snapshotRead(e.address+kAiTargetname,&targetname,2) && targetname)lower+=" "+ClassName(targetname);
+            std::transform(lower.begin(),lower.end(),lower.begin(),[](unsigned char c){return static_cast<char>(std::tolower(c));});
             for(int character=1;character<kFriendlyCharacterCount;++character) {
-                std::string lower=e.classname;
-                std::transform(lower.begin(),lower.end(),lower.begin(),[](unsigned char c){return static_cast<char>(std::tolower(c));});
                 std::string wanted=kFriendlyCharacters[character];std::transform(wanted.begin(),wanted.end(),wanted.begin(),[](unsigned char c){return static_cast<char>(std::tolower(c));});
                 std::uint16_t model=0;
                 if(lower.find(wanted)!=std::string::npos && e.team==friendlyTeam && Value(e.address+kAiModelIndex,model) && model)
@@ -986,27 +1143,19 @@ void InitializeAiEngine(std::uintptr_t base,std::size_t size,std::uintptr_t text
         aiProfile.resolved,static_cast<unsigned long long>(aiProfile.thinkSlot-base),static_cast<unsigned long long>(spawn-base),
         static_cast<unsigned long long>(remove-base),static_cast<unsigned long long>(aiProfile.poolSlot-base),static_cast<unsigned long long>(aiProfile.timeSlot-base));
 }
-void UpdateAiControls(const Snapshot& s,ULONGLONG now) {
-    std::lock_guard<std::recursive_mutex> lock(aiMutex);
+void UpdateAiControls(const Snapshot& s,ULONGLONG,bool detailed) {
+    std::unique_lock<std::recursive_mutex> lock(aiMutex,std::try_to_lock);
+    if(!lock.owns_lock())return;
     if(!aiProfile.resolved) return;
-    const auto scope=Scope(s); Pause(s);
-    if(ai.queue.discardStale(scope)) Finish(ai.queue.reason());
-    if(!scope.ready) {
-        RestoreCapacity();
-        ai.status.ready=false; ai.status.owned=0; ai.status.enemySpawner=0; ai.status.friendlySpawner=0;
-        ai.status.enemySpawners=0; ai.status.friendlySpawners=0;
-        ai.status.enemyAlive=0; ai.status.friendlyAlive=0; ai.status.otherAlive=0; ai.status.nativeCount=0;
-        ai.status.engineActors=0;ai.status.engineLimit=kAiNativeActorCapacity;ai.status.friendlyFallback=false;
-        ai.status.enemyName={}; ai.status.friendlyName={}; return;
-    }
-    if(now>=ai.nextRead) { ai.nextRead=now+500; ReadWorld(s,scope); }
-    ai.status.pending=ai.queue.pending();WorkWanted();
+    ai.detailed=detailed;
+    if(detailed && s.state==LevelState::Ready && !clockInstalled)InstallService();
+    WorkWanted();
 }
 void RequestAiOperation(AiOperation op,const Snapshot& s) {
     std::lock_guard<std::recursive_mutex> lock(aiMutex);
     const auto scope=Scope(s);
-    if(ai.owned.empty() && !ai.queue.pending() && !ai.hands.pending)Lifetime(scope);
-    if(s.state!=LevelState::Ready || !scope.ready || !ai.status.ready) { Finish(AiRequestResult::NotReady); return; }
+    if(ai.owned.empty() && ai.recovery.empty() && !ai.queue.pending() && !ai.hands.pending)Lifetime(scope);
+    if(s.state!=LevelState::Ready || !scope.ready) { Finish(AiRequestResult::NotReady); return; }
     if(ai.queue.pending()) { ai.status.lastResult=AiRequestResult::Busy; return; }
     const bool spawn=op==AiOperation::SpawnEnemy || op==AiOperation::SpawnFriendly;
     const bool friendly=op==AiOperation::SpawnFriendly;
@@ -1020,7 +1169,7 @@ void RequestAiOperation(AiOperation op,const Snapshot& s) {
             appearance=ai.appearances[ai.friendlyIndex];
             if(!appearance.address) {Finish(AiRequestResult::ModelUnavailable);return;}
         }
-    } else if(op==AiOperation::RemoveOwned && !OwnCount()) {Finish(AiRequestResult::IdentityChanged);return;}
+    } else if(op==AiOperation::RemoveOwned && !OwnCount() && ai.recovery.empty()) {Finish(AiRequestResult::IdentityChanged);return;}
     if(!InstallService()) { Finish(AiRequestResult::HookUnavailable); return; }
     if(!ai.queue.enqueue(op,source,scope,appearance)) { Finish(ai.queue.reason()); return; }
     ai.status.lastResult=AiRequestResult::Queued; ai.status.pending=true;
@@ -1039,17 +1188,19 @@ void AdjustAiSpawner(bool friendly,int direction) {
         ai.enemyIndex=(ai.enemyIndex+static_cast<int>(ai.enemies.size())+(direction>0?1:-1))%static_cast<int>(ai.enemies.size());
         Log("AI_SPAWNER_SELECT friendly=0 entity=%u classname=%s",ai.enemies[ai.enemyIndex].number,ai.enemies[ai.enemyIndex].classname.c_str());
     }
-    ai.nextRead=0;
+    ai.nextWorldTime=0;
 }
 void ToggleAiSpawnPause() {
     std::lock_guard<std::recursive_mutex> lock(aiMutex);
     if(!ai.status.ready) return;
-    ai.pauseWanted=!ai.pauseWanted; ai.nextRead=0;
+    ai.pauseWanted=!ai.pauseWanted;WorkWanted();
     Log("AI_SPAWN_PAUSE requested=%d",ai.pauseWanted);
 }
 AiStatus GetAiStatus() {
-    std::lock_guard<std::recursive_mutex> lock(aiMutex);
-    auto status=ai.status; status.callbacks=nativeCallbacks.load(); status.nativeThread=nativeThread.load(); return status;
+    thread_local AiStatus cached;
+    std::unique_lock<std::recursive_mutex> lock(aiMutex,std::try_to_lock);
+    if(lock.owns_lock())cached=ai.status;
+    auto status=cached;status.callbacks=nativeCallbacks.load();status.nativeThread=nativeThread.load();return status;
 }
 void LogAiState() {
     const auto s=GetAiStatus();
@@ -1063,13 +1214,14 @@ void LogAiState() {
     Log("AI_PLACEMENT engine_actors=%d engine_limit=%d friendly_fallback=%d last_entity=%u last_team=%d last_position=%.1f,%.1f,%.1f last_distance=%.1f placement_attempts=%d",
         s.engineActors,s.engineLimit,s.friendlyFallback,s.lastEntity,s.lastTeam,s.lastPosition[0],s.lastPosition[1],s.lastPosition[2],s.lastSpawnDistance,s.placementAttempts);
     Log("AI_COMBAT_STATS killed=%llu campaign_reclaimed=%llu character_loaded=%d scheduler=SERVER_CLOCK",s.killed,s.reclaimed,s.characterLoaded);
+    Log("AI_PERF service_updates=%llu service_average_us=%.1f service_peak_us=%.1f world_reads=%llu world_average_us=%.1f world_peak_us=%.1f max_npcs_per_tick=4 recovery_pending=%d reassertions=%llu render_world_reads=0 disk_flush=CRASH_ONLY",
+        s.serviceUpdates,s.serviceAverageUs,s.servicePeakUs,s.worldReads,s.worldAverageUs,s.worldPeakUs,s.recovering,s.combatReassertions);
 }
 std::uint64_t RequestNativeHandDefinitions(const WeaponFields& weapon,std::uintptr_t names,std::uintptr_t normalTree,
     std::uintptr_t cache,const Snapshot& s) {
     std::lock_guard<std::recursive_mutex> lock(aiMutex);
     const auto scope=Scope(s);
-    if(!scope.ready || !weapon.valid || !names || !normalTree || !cache || !aiProfile.animationBuilder
-        || !ai.status.ready) return 0;
+    if(!scope.ready || !weapon.valid || !names || !normalTree || !cache || !aiProfile.animationBuilder) return 0;
     if(ai.hands.pending) return SameWeapon(ai.hands.weapon,weapon)?ai.hands.ticket:0;
     if(!InstallService())return 0;
     HandBuild h;h.ticket=++ai.nextHandTicket;h.weapon=weapon;h.names=names;h.normal=normalTree;h.cache=cache;

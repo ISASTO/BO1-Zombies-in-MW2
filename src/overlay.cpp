@@ -150,7 +150,7 @@ const char* PageName(Page page) {
 const char* Row(Page page, int n) {
     static constexpr const char* home[] = {"PLAYER", "WEAPONS", "WORLD", "AI", "ZOMBIE MODE", "DIAGNOSTICS"};
     static constexpr const char* player[] = {"God Mode", "FOV settings", "Noclip", "Super Speed", "Super Jump", "Reset player toggles"};
-    static constexpr const char* weapons[] = {"Give All (usable banks)", "Infinite Ammo", "No Reload", "Infinite Grenades (linked)", "Rapid Fire", "Explosive Bullets", "Force Dual Wield", "Weapon info to log", "Reset weapon toggles"};
+    static constexpr const char* weapons[] = {"Give All (usable banks)", "Infinite Ammo", "No Reload", "Infinite Grenades (linked)", "Rapid Fire", "Explosive Bullets", "Force Dual Wield", "No Recoil", "Weapon info to log", "Reset weapon toggles"};
     static constexpr const char* world[] = {"Slow Motion", "Freeze AI", "Gravity", "Kill All Enemies", "Reset world toggles"};
     static constexpr const char* ai[] = {"Spawn Enemy (nearest point)", "Spawn Friendly (near you)", "Enemy model", "Friendly model", "Pause AI spawning", "Freeze AI (linked)", "Alive enemy / friendly", "Our spawned actors", "Remove our spawned actors", "AI info to log", "Engine actor slots"};
     static constexpr const char* zombies[] = {"Round rules preview", "Controller rehearsal", "Playable Zombies / actors"};
@@ -271,6 +271,9 @@ void Overlay::frame() {
         else if (action == Action::PreviousWeaponBank || action == Action::NextWeaponBank)
             AdjustWeaponBank(action==Action::NextWeaponBank?1:-1);
         else if (action == Action::ToggleRapidFire) ToggleExtraFeature(ExtraFeature::RapidFire);
+        else if (action == Action::DecreaseRapidFire || action == Action::IncreaseRapidFire)
+            AdjustExtraFeature(ExtraFeature::RapidFire,action==Action::IncreaseRapidFire?1:-1);
+        else if (action == Action::ToggleNoRecoil) ToggleExtraFeature(ExtraFeature::NoRecoil);
         else if (action == Action::ToggleExplosiveBullets) ToggleExtraFeature(ExtraFeature::ExplosiveBullets);
         else if (action == Action::ResetWeapons) ResetWeaponFeatures();
         else if (action == Action::ToggleSlowMotion) ToggleExtraFeature(ExtraFeature::SlowMotion);
@@ -315,8 +318,9 @@ void Overlay::frame() {
     }
     const ULONGLONG now = GetTickCount64();
     UpdatePlayerFeatures(now);
-    Snapshot s = ReadSnapshot();
-    UpdateAiControls(s,now);
+    if(!events.empty() || now>=nextSnapshotRead) {displaySnapshot=ReadSnapshot();nextSnapshotRead=now+50;}
+    Snapshot s = displaySnapshot;
+    UpdateAiControls(s,now,menu.visible && menu.page==Page::AI);
     const auto aiStatus=GetAiStatus();
     UpdateZombieRehearsal(s);
     const auto rehearsal=GetZombieRehearsalStatus();
@@ -345,6 +349,8 @@ void Overlay::frame() {
             extraPreferences.wanted(ExtraFeature::ExplosiveBullets),extraPreferences.wanted(ExtraFeature::SlowMotion),extraPreferences.timeScale,
             extraPreferences.wanted(ExtraFeature::FreezeAI),extraPreferences.wanted(ExtraFeature::Gravity),extraPreferences.gravity,
             extraPreferences.wanted(ExtraFeature::ForceDualWield),weaponMode.page+1,weaponMode.pages,weaponMode.added,weaponMode.owned,weaponMode.dualOwned);
+        Log("WEAPON_OPTIONS rapid_multiplier=%d no_recoil=%d resolved=%d valid=%d native_scale=%d native_flag=%d",
+            extraPreferences.rapidFireMultiplier,extraPreferences.wanted(ExtraFeature::NoRecoil),s.recoilResolved,s.recoilValid,s.recoilScale,(s.weaponFlags&kRecoilScaleFlag)!=0);
     }
     if (!menu.visible && !menu.hud) return;
     IDirect3DStateBlock9* state = nullptr;
@@ -397,7 +403,7 @@ void Overlay::frame() {
             else std::snprintf(line,sizeof(line),"Clock: commandTime | Stop: %s",bo1::ReasonText(rehearsal.controller.reason));
             text(40,143,kMuted,line,.7f);
         } else if(menu.page==Page::AI) {
-            std::snprintf(line,sizeof(line),"Native mission AI | Result: %s",AiResultText(aiStatus.lastResult));
+            std::snprintf(line,sizeof(line),"Native mission AI | %s | Recovering: %d",AiResultText(aiStatus.lastResult),aiStatus.recovering);
             text(40,121,kMuted,line,.7f);
             const bool friendly=menu.selected==1 || menu.selected==3;
             if(aiStatus.lastEntity)
@@ -419,7 +425,7 @@ void Overlay::frame() {
             text(40,143,kMuted,line,.7f);
         } else {
             text(40,121,kMuted,StateText(s.state),.7f);
-            text(40,143,kMuted,"Test 14 | Combat, cleanup + level lifetime",.7f);
+            text(40,143,kMuted,"Test 15 | Performance + squad persistence",.7f);
         }
         const auto preview = menu.page == Page::ZombieRules
             ? bo1::EvaluateNormalSoloRound(menu.previewRound, menu.previewRound == 1) : std::nullopt;
@@ -428,7 +434,12 @@ void Overlay::frame() {
             const float y=170.f+(n-first)*26.f;
             const bool selected=menu.selected==n;
             if (selected) { rect(34,y-1,640,24,D3DCOLOR_ARGB(255,49,57,32)); rect(34,y-1,3,24,kAccent); }
-            text(45,y+1,selected?kAccent:kText,Row(menu.page,n));
+            if(menu.page==Page::AI && (n==2 || n==3)) {
+                const char* name=n==2?aiStatus.enemyName.data():aiStatus.friendlyName.data();
+                if(n==2 && std::strncmp(name,"actor_enemy_",12)==0)name+=12;
+                std::snprintf(line,sizeof(line),"%s model: %.45s",n==2?"Enemy":"Friendly",name[0]?name:"None");
+                text(45,y+1,selected?kAccent:kText,line,.64f);
+            } else text(45,y+1,selected?kAccent:kText,Row(menu.page,n));
             const char* status="PLANNED";
             char value[32]{};
             if (menu.page==Page::Home) status=">";
@@ -482,9 +493,13 @@ void Overlay::frame() {
                 }
                 else if (n==1) status=!FeatureAvailable(s,PlayerFeature::InfiniteAmmo)?"LOCKED":playerPreferences.wanted(PlayerFeature::InfiniteAmmo)?"ON":"OFF";
                 else if (n==2 || n==3) status=(n==3 && !s.grenadeSustainResolved) || !FeatureAvailable(s,PlayerFeature::NoReload)?"LOCKED":s.sustain.current?(playerPreferences.wanted(PlayerFeature::NoReload)?"ON":"NATIVE"):(playerPreferences.wanted(PlayerFeature::NoReload)?"WAIT":"OFF");
-                else if (n==4) status=!ExtraAvailable(s,ExtraFeature::RapidFire)?"LOCKED":extraPreferences.wanted(ExtraFeature::RapidFire)?(RapidFireApplied(s.weapon)?"ON":s.weapon.fireTime==20?"AT MIN":"WAIT"):"OFF";
+                else if (n==4) {
+                    const char* state=!ExtraAvailable(s,ExtraFeature::RapidFire)?"LOCKED":extraPreferences.wanted(ExtraFeature::RapidFire)?(extraPreferences.rapidFireMultiplier==1 || RapidFireApplied(s.weapon)?"ON":"WAIT"):"OFF";
+                    std::snprintf(value,sizeof(value),"%s %dx",state,extraPreferences.rapidFireMultiplier);status=value;
+                }
                 else if (n==5) status=!ExtraAvailable(s,ExtraFeature::ExplosiveBullets)?"LOCKED":s.explosive.current?(extraPreferences.wanted(ExtraFeature::ExplosiveBullets)?"ON":"NATIVE"):(extraPreferences.wanted(ExtraFeature::ExplosiveBullets)?"WAIT":"OFF");
                 else if (n==6) status=!ExtraAvailable(s,ExtraFeature::ForceDualWield)?"LOCKED":extraPreferences.wanted(ExtraFeature::ForceDualWield)?(weaponMode.dualReady && s.dualWield.current && s.lastWeaponHand==1?(weaponMode.dualFallback?(weaponMode.nativeHandState==NativeHandBuildState::Queued?"BUILD":"COMPAT"):"ON"):s.dualCurrentSupported?"WAIT":"ON*"):weaponMode.dualOwned?"UNDO":s.dualWield.current?"NATIVE":"OFF";
+                else if (n==7) status=!ExtraAvailable(s,ExtraFeature::NoRecoil)?"LOCKED":extraPreferences.wanted(ExtraFeature::NoRecoil)?(s.recoilScale==0 && (s.weaponFlags&kRecoilScaleFlag)?"ON":"WAIT"):"OFF";
                 else status="ENTER";
             }
             else if (menu.page==Page::World) {
@@ -543,7 +558,7 @@ void Overlay::frame() {
             ? "LEFT/RIGHT: Start round  UP/DOWN: Row" : menu.page==Page::View
             ? "LEFT/RIGHT: FOV  UP/DOWN: Row  ENTER: Act" : (menu.page==Page::Player || menu.page==Page::World)
             ? "LEFT/RIGHT: Value  ENTER: Toggle  UP/DOWN: Row" : menu.page==Page::Weapons
-            ? "LEFT/RIGHT: Bank  ENTER: Toggle  UP/DOWN: Row" : menu.page==Page::AI
+            ? "LEFT/RIGHT: Bank / Rate  ENTER: Toggle" : menu.page==Page::AI
             ? "LEFT/RIGHT: Template  ENTER: Act  UP/DOWN: Row" : "UP/DOWN: Select  ENTER: Toggle / Open",.7f);
         text(40,divider+29,kMuted,"BACKSPACE/ESC: Back   F4: Close",.7f);
         const char* footer="Game keeps running. WASD and mouse work.";
@@ -585,9 +600,10 @@ void Overlay::frame() {
                 "Maintains reserve ammo; magazines still reload.",
                 "Stops normal gun clip consumption; reload key works.",
                 "Linked to No Reload above. Frag/flash grenades.",
-                "Halves gun delay (20ms min); AI sharing gun too.",
+                "LEFT/RIGHT: 1x-10x. ENTER: Toggle; shared gun timing.",
                 "All bullet weapons, including AI. Try with God ON.",
                 "COMPAT: normal animations. BUILD: native hand setup.",
+                "Native player recoil scale is zero; OFF restores it.",
                 "Records current weapon and new controls in latest.log.",
                 "Weapon cheats OFF, including ammo, reload and grenade sustain."
             };

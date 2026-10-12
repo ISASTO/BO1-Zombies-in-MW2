@@ -66,6 +66,9 @@ struct Snapshot {
     InventoryData inventory;
     bool dualCurrentSupported=false;
     int lastWeaponHand=-1;
+    bool recoilResolved=false,recoilValid=false;
+    unsigned weaponFlags=0;
+    int recoilScale=0;
 };
 const char* StateText(LevelState state);
 void InitializeEngine();
@@ -82,6 +85,7 @@ bool AdjustExtraFeature(ExtraFeature feature,int direction);
 ExtraPreferences GetExtraPreferences();
 void ResetWeaponFeatures();
 void ResetWorldFeatures();
+void SuspendRecoilForCheckpoint(bool suspend);
 bool RapidFireApplied(const WeaponFields& weapon);
 struct WeaponModeStatus {
     bool owned=false; int page=0,pages=1,added=0;
@@ -97,7 +101,7 @@ void HandleZombieRehearsal(Action action,const Snapshot& snapshot,int startingRo
 ZombieRehearsalStatus GetZombieRehearsalStatus();
 void LogZombieRehearsal();
 void InitializeAiEngine(std::uintptr_t base,std::size_t size,std::uintptr_t text,std::size_t textSize,bool supported);
-void UpdateAiControls(const Snapshot& snapshot,ULONGLONG now);
+void UpdateAiControls(const Snapshot& snapshot,ULONGLONG now,bool detailed=false);
 void RequestAiOperation(AiOperation operation,const Snapshot& snapshot);
 void AdjustAiSpawner(bool friendly,int direction);
 void ToggleAiSpawnPause();
@@ -133,6 +137,8 @@ struct Overlay {
     bool settingsLoaded = false;
     const char* settingsResult = "";
     ULONGLONG nextFovAttempt = 0;
+    ULONGLONG nextSnapshotRead = 0;
+    Snapshot displaySnapshot;
     void attach(IDirect3DDevice9* d, HWND w);
     void detach();
     void invalidate();

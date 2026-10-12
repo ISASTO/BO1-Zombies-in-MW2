@@ -1,4 +1,4 @@
-"""Independent instruction/descriptor checks for exact-retail combat test14."""
+"""Independent instruction/descriptor checks for exact-retail combat and recoil controls."""
 import argparse
 import hashlib
 import json
@@ -70,6 +70,26 @@ def verify(path, header):
     setter=pe.get_data(0x13ac00,21)
     if struct.unpack_from('<I',setter,3)[0]!=value('kAiEnemySightPosition') or struct.unpack_from('<I',setter,16)[0]!=value('kAiEnemySightValid'):
         raise ValueError('Native enemy sight-position setter offsets disagree')
+    # Native player_recoilscaleon(percentage) sets client weaponFlags bit 10
+    # and its percentage field; off clears that bit. The recoil consumer gates
+    # a percentage/100 multiply using exactly those same fields.
+    controls=(header.parent/'control_extensions.hpp').read_text()
+    def control(name):return int(re.search(r'\b'+name+r'\s*=\s*(0x[0-9a-f]+|\d+)',controls)[1],0)
+    flags=control('kClientWeaponFlags');scale=control('kClientRecoilScale');mask=control('kRecoilScaleFlag')
+    if pe.get_data(0x16355a,16)!=b'\x81\x8b'+struct.pack('<II',flags,mask)+b'\x89\xbb'+struct.pack('<I',scale):
+        raise ValueError('Native recoil on setter disagrees')
+    if pe.get_data(0x1635c3,10)!=b'\x81\xa0'+struct.pack('<II',flags,(~mask)&0xffffffff):
+        raise ValueError('Native recoil off setter disagrees')
+    consumer=list(decoder.disasm(pe.get_data(0x87248,0x28),base+0x87248))
+    offsets={o.mem.disp for i in consumer for o in i.operands if o.type==X86_OP_MEM}
+    if flags not in offsets or scale not in offsets or not any(i.mnemonic=='bt' and i.operands[-1].type==X86_OP_IMM and i.operands[-1].imm==10 for i in consumer):
+        raise ValueError('Independent recoil consumer offsets/bit disagree')
+    divide=next(i for i in consumer if i.mnemonic=='divss')
+    constant=divide.address+divide.size+divide.operands[-1].mem.disp-base
+    if struct.unpack('<f',pe.get_data(constant,4))[0]!=100.0:raise ValueError('Recoil percentage denominator disagrees')
+    for table,name,target in ((0x339860,b'player_recoilscaleon',0x163500),(0x339878,b'player_recoilscaleoff',0x163580)):
+        literal,function=struct.unpack('<QQ',pe.get_data(table,16))
+        if pe.get_data(literal-base,32).split(b'\0')[0]!=name or function-base!=target:raise ValueError('Native recoil method table binding disagrees')
     return {'executable_sha256':expected,'calls':calls,'actor_init_rva':hex(init),'copied_prologue_bytes':len(prologue),
             'copied_prologue_instructions':len(instructions),'damage_rva':hex(value('kDamageRva')),
             'kill_argument_count':12,'kill_damage':0x3fffffff,'kill_weapon':-1,
@@ -79,6 +99,8 @@ def verify(path, header):
             'appearance_attachment_flags':'0x148','appearance_attachment_count':31,
             'enemy_sight_override_flag':'0x309','enemy_sight_override_position':'0x30c',
             'enemy_handle_field':'sentient+0x44, low WORD native entity-number+1',
+            'player_recoil_flags':hex(flags),'player_recoil_scale':hex(scale),'player_recoil_mask':hex(mask),
+            'player_recoil_percent_denominator':100.0,'player_recoil_target_percent':0,
             'hook_publication':'Clock call publishes first; remaining hooks publish on the next server-clock callback.',
             'native_reentrancy':'Recursive ownership lock, snapshot iteration and deferred cleanup prevent NPC freeing during active native mod calls.',
             'retail_execution':'Not executed in this Linux environment; owner test required.',

@@ -199,6 +199,9 @@ struct AiStatus {
     AiRequestResult lastResult=AiRequestResult::None;
     unsigned long long callbacks=0,created=0,deleted=0,killed=0,reclaimed=0;
     bool characterLoaded=true;
+    int recovering=0;
+    unsigned long long worldReads=0,serviceUpdates=0,combatReassertions=0;
+    double worldAverageUs=0,worldPeakUs=0,serviceAverageUs=0,servicePeakUs=0;
     unsigned long nativeThread=0;
 };
 } // namespace mod

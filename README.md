@@ -1,22 +1,25 @@
 # BO1 Zombies in MW2
 
 Incremental mod framework for **retail Modern Warfare 2 (2009), single player**.
-Current build: **0.1.13-combat-test14**. This pass moves ammo/reload controls to
-WEAPONS, fits every page's complete list on screen, and adds native hostile-NPC
-kill, server-clock scheduling, combat/follow control, human-only spawner templates,
-character appearance attachments and allocation-based cleanup through death,
-saving and checkpoint reload. **The native 32-actor ceiling is not expanded.**
-Capacity failure is guarded and campaign creation can reclaim mod-owned slots.
+Current build: **0.1.14-performance-test15**. This pass removes forced per-line
+disk flushes, moves world discovery off the render thread, caches display snapshots,
+and spreads support updates across at most four NPCs per server tick. WEAPONS adds
+a 1x-10x Rapid Fire selector and native player No Recoil. AI model rows display
+their selected names. Ghost appearance capture ignores unused attachment slots.
+Autosave writes record and rebuild living mod NPCs after native serialization;
+mission slot reclamation prioritizes corpses/enemies and queues displaced allies
+for recovery. **The native 32-actor ceiling is not expanded.**
 Ghost/Price/Soap/Roach require a matching loaded character in the current mission;
 Soldier uses a loaded human spawner. Universal character asset loading is pending.
 
-The incoming test13 diagnostics contain three crashes at engine RVA `0x29a713`
-in animation-tree access during script execution, plus ownership records retiring
-while NPCs remained alive. Copying live actors' runtime VM state into spawners is
-removed. These changes pass portable and exact-executable checks; new native
-execution and combat/crash outcomes need the owner's retail test. Start with
-[the test14 checklist](docs/combat-test14.md). G18's overlapping dual-wield models
-remain deferred. BO1 gameplay remains a simulated controller rehearsal.
+The owner's test14 estate run confirms Soldier creation and Kill All Enemies,
+but reports periodic stutter, failed Ghost creation and disappearing allies.
+The log confirms repeated CHECKPOINT_WRITE deletion and detects Ghost as loaded
+before its capture is refused. Test15 passes portable and exact-executable checks;
+actual frame pacing, Ghost rendering and checkpoint recovery need the owner's
+retail test. Start with [the test15 checklist](docs/performance-test15.md).
+G18's overlapping dual-wield models remain deferred. BO1 gameplay remains a
+simulated controller rehearsal.
 
 The following paragraphs record earlier iterations and their original test state.
 
@@ -116,17 +119,18 @@ An executable hash mismatch disables game-state access and memory writes.
 The installer rejects a mismatched build. A manually installed proxy can still
 show its diagnostic menu in an unknown AMD64 `iw4sp.exe`.
 
-## Current combat/lifecycle test14
+## Current performance/persistence test15
 
-1. Close MW2 and extract the entire `BO1MW2-combat-test14.zip` outside the game folder.
+1. Close MW2 and extract the entire `BO1MW2-performance-test15.zip` outside the game folder.
 2. Run `Uninstall.cmd`, then `Install.cmd`, selecting the folder containing
    `iw4sp.exe`. Saved FOV and logs are preserved.
 3. Launch through Steam and **restart the mission once for this upgrade**.
    Avoid starting with NPCs saved by test13. Wait for player control, press F4,
    and test an enemy plus a Soldier helper before increasing population.
-4. Follow [combat-test14.md](docs/combat-test14.md): fighting, player following,
-   removal, Kill All Enemies, Freeze AI cleanup, death and checkpoint reload.
-   Checkpoints intentionally remove this build's spawned NPCs before serialization.
+4. Follow [performance-test15.md](docs/performance-test15.md): frame pacing first,
+   then rate/recoil controls, Ghost, autosave recovery and stage progression.
+   Live autosaves rebuild spawned NPCs in the same session. Death/checkpoint
+   reload clears them; spawned populations are not embedded in checkpoint files.
 5. Close MW2 and run `Diagnose.cmd` before another launch replaces `latest.log`.
    Return its ZIP and the checklist observations. Saved FOV persists; other
    toggles and character/model selection are session-only.
@@ -162,9 +166,9 @@ Copy the log immediately after a failing run: `latest.log` is replaced on launch
 | BO1 round-rules preview | Owner test5 front-end navigation passed; normal CSV values now recovered locally and match the preview |
 | BO1 controller rehearsal | Test11 owner-accepted; simulated actors only, source-derived normal solo lifecycle and game-clock guards |
 | FOV selector and saved preference | Owner confirms test6 behavior; matching logs show load/selection/save/reset |
-| WEAPONS | Owner confirms test12 dual compatibility on several guns; G18/others still fail. Test13 adds distinct native hand definitions and setup diagnostics; appearance/FPS/undo need retail checks |
+| WEAPONS | Test15 adds 1x-10x Rapid Fire and native player No Recoil. Rate, recoil and OFF/reset checks await the retail test. G18 dual appearance is deferred. |
 | WORLD | Adjustable time/gravity, actor-think freeze, reset; test8 logs confirm several apply/restore paths; broader gameplay coverage pending |
-| AI | Test14 human spawners, hostility/follow, full appearance attachments, server-clock cleanup and campaign slot reclamation. Native retail checks pending; physical capacity remains 32. |
+| AI | Test15 uses bounded server updates, named model selectors, trimmed hero attachments and live autosave recovery. Campaign slot pressure queues displaced allies. Physical capacity remains 32. |
 | Kill All Enemies | Test14 native damage call for hostile actor entities; allies, clients and protected entities excluded. Retail check pending. |
 | BO1 Zombies gameplay | Planned; normal MW2 AI is not a BO1 behavior/animation/assets port. |
 

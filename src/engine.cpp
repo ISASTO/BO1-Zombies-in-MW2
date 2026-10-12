@@ -33,6 +33,7 @@ struct Profile {
     bool gravityResolved=false, weaponResolved=false, grenadeSustainResolved=false;
     std::uintptr_t dualSlot=0;
     bool dualResolved=false,inventoryResolved=false,dualAnimResolved=false;
+    bool recoilResolved=false;
     std::uintptr_t weaponAnimCache=0;
 } profile;
 struct DualAssetOwnership {
@@ -61,6 +62,9 @@ struct FeatureRuntime {
     ScalarOwnership<float> time, gravity;
     ScalarOwnership<float> gravityLiteral;
     RapidOwnership rapid;
+    ScalarOwnership<int> recoilScale;
+    ScalarOwnership<unsigned> recoilFlag;
+    unsigned recoilSuspensions=0;
     InventoryOwnership inventory;
     bool inventoryReconcilePending=false;
     bool inventoryNeedsBaseline=false;
@@ -717,6 +721,26 @@ void RestoreRapid() {
         features.rapid.clear();
     }
 }
+void UpdateRecoil(const Snapshot& s,bool enabled) {
+    auto& scale=features.recoilScale;auto& flag=features.recoilFlag;
+    const auto scaleAt=s.client.address+kClientRecoilScale,flagAt=s.client.address+kClientWeaponFlags;
+    if(!s.recoilValid) {scale.clear();flag.clear();return;}
+    const auto bit=s.weaponFlags&kRecoilScaleFlag;
+    if(enabled) {
+        if(s.recoilScale!=0 && SetInt(scaleAt,s.recoilScale,0))scale.applied(scaleAt,s.recoilScale,0);
+        if(bit!=kRecoilScaleFlag && SetMasked(flagAt,kRecoilScaleFlag,kRecoilScaleFlag,"NO_RECOIL"))
+            flag.applied(flagAt,bit,kRecoilScaleFlag);
+    } else {
+        if(scale.owned) {
+            if(!scale.canRestore(scaleAt,s.recoilScale))scale.clear();
+            else if(SetInt(scaleAt,s.recoilScale,scale.original))scale.clear();
+        }
+        if(flag.owned) {
+            if(!flag.canRestore(flagAt,bit))flag.clear();
+            else if(SetMasked(flagAt,kRecoilScaleFlag,flag.original,"NO_RECOIL_RESTORE"))flag.clear();
+        }
+    }
+}
 void ApplyBool(ScalarOwnership<std::uint8_t>& owned,const BoolDvarSnapshot& s,bool enabled,std::uint8_t target,const char* name) {
     if (!s.valid) return;
     if (enabled) {
@@ -755,6 +779,7 @@ void RestoreExtras() {
     ApplyFloat(features.gravity,ReadFloatDvar(profile.gravitySlot,profile.gravityResolved,"g_gravity",0.f,10000.f),false,800.f,"GRAVITY");
     RestoreGravityLiteral();
     RestoreRapid();
+    features.recoilScale.clear();features.recoilFlag.clear();
 }
 }
 const char* StateText(LevelState state) {
@@ -930,6 +955,9 @@ void InitializeEngine() {
         }
         const auto grenades=Unique(text,start,"frag/flash native ammo-sustain branches",kGrenadeSustainPattern);
         profile.grenadeSustainResolved=grenades && Anchor(grenades,3,"fraggrenade") && Anchor(grenades,26,"flash_grenade");
+        const auto recoilOn=Unique(text,start,"native recoil scale on","81 8B BC 02 00 00 00 04 00 00 89 BB 98 AC 00 00");
+        const auto recoilOff=Unique(text,start,"native recoil scale off","81 A0 BC 02 00 00 FF FB FF FF");
+        profile.recoilResolved=recoilOn==profile.base+0x16355a && recoilOff==profile.base+0x1635c3;
         const auto dual=Unique(text,start,"dual wield registration",kDualRegistrationPattern);
         const auto dualRead=Unique(text,start,"dual wield hand selection",kDualConsumerPattern);
         if (dual && dualRead && Anchor(dual,7,"bg_forceDualWield")) {
@@ -985,6 +1013,7 @@ Snapshot ReadSnapshot() {
     s.giveAll=ReadBoolDvar(profile.giveAllSlot,profile.giveAllResolved,"g_giveAll");
     s.dualWield=ReadBoolDvar(profile.dualSlot,profile.dualResolved,"bg_forceDualWield");
     s.inventoryResolved=profile.inventoryResolved;
+    s.recoilResolved=profile.recoilResolved;
     s.explosive=ReadBoolDvar(profile.explosiveSlot,profile.explosiveResolved,"bg_forceExplosiveBullets");
     s.ai=ReadBoolDvar(profile.aiSlot,profile.aiResolved,"g_ai");
     s.timeScale=ReadFloatDvar(profile.timeSlot,profile.timeResolved,"timescale",.001f,1000.f);
@@ -1014,6 +1043,8 @@ Snapshot ReadSnapshot() {
     s.takesDamage=s.damageRead && damage!=0;
     if (s.clientResolved) s.client=ReadClientFields(s.entity,Read);
     if (s.client.valid) {
+        s.recoilValid=s.recoilResolved && ReadValue(s.client.address+kClientWeaponFlags,s.weaponFlags)
+            && ReadValue(s.client.address+kClientRecoilScale,s.recoilScale) && s.recoilScale>=0 && s.recoilScale<=100;
         unsigned current=0;
         if (ReadValue(s.client.address+kCurrentWeapon,current)) s.weapon=ReadWeapon(current);
         s.inventoryValid=ReadInventory(s.client.address,s.inventory);
@@ -1090,7 +1121,8 @@ bool ExtraAvailable(const Snapshot& s,ExtraFeature feature) {
     if (s.state!=LevelState::Ready || !s.client.valid || s.client.health<=0 || s.client.moveType>=6) return false;
     switch (feature) {
         case ExtraFeature::GiveAll: return s.giveAll.valid && s.inventoryValid;
-        case ExtraFeature::RapidFire: return s.weapon.valid && s.weapon.type==0 && s.weapon.fireTime>=20 && s.weapon.fireTime<=4000;
+        case ExtraFeature::RapidFire: return s.weapon.valid && s.weapon.type==0 && s.weapon.fireTime>=1 && s.weapon.fireTime<=4000;
+        case ExtraFeature::NoRecoil: return s.recoilValid;
         case ExtraFeature::ExplosiveBullets: return s.explosive.valid;
         case ExtraFeature::SlowMotion: return s.timeScale.valid;
         case ExtraFeature::FreezeAI: return s.ai.valid;
@@ -1118,19 +1150,26 @@ bool AdjustExtraFeature(ExtraFeature feature,int direction) {
     std::lock_guard<std::mutex> lock(featuresMutex);
     if (!ExtraAvailable(ReadSnapshot(),feature) || !features.extra.adjust(feature,direction)) return false;
     features.nextUpdate=0;
-    Log("EXTRA_ADJUST %s timescale=%.2f gravity=%d requested=%d",ExtraName(feature),features.extra.timeScale,features.extra.gravity,
+    Log("EXTRA_ADJUST %s timescale=%.2f gravity=%d rapid_multiplier=%d requested=%d",ExtraName(feature),features.extra.timeScale,features.extra.gravity,features.extra.rapidFireMultiplier,
         features.extra.wanted(feature)); return true;
 }
 void ResetWeaponFeatures() {
     std::lock_guard<std::mutex> lock(featuresMutex);
     features.extra.resetWeapons(); features.preferences.enabled[static_cast<std::size_t>(PlayerFeature::InfiniteAmmo)]=false; features.preferences.enabled[static_cast<std::size_t>(PlayerFeature::NoReload)]=false;
     features.clearSustain=true; features.nextUpdate=0; RestoreRapid();
+    UpdateRecoil(ReadSnapshot(),false);
     Log("EXTRA_REQUEST RESET_WEAPONS linked_no_reload=OFF saved_fov_unchanged=1");
 }
 void ResetWorldFeatures() {
     std::lock_guard<std::mutex> lock(featuresMutex);
     features.extra.resetWorld(); features.nextUpdate=0;
     Log("EXTRA_REQUEST RESET_WORLD saved_fov_unchanged=1");
+}
+void SuspendRecoilForCheckpoint(bool suspend) {
+    std::lock_guard<std::mutex> lock(featuresMutex);
+    if(suspend) {++features.recoilSuspensions;UpdateRecoil(ReadSnapshot(),false);}
+    else if(features.recoilSuspensions)--features.recoilSuspensions;
+    features.nextUpdate=0;
 }
 void ResetPlayerFeatures() {
     std::lock_guard<std::mutex> lock(featuresMutex);
@@ -1279,12 +1318,13 @@ void UpdatePlayerFeatures(ULONGLONG now) {
     if (rapid && ExtraAvailable(held,ExtraFeature::RapidFire)
         && (!features.rapid.owned || features.rapid.sameIdentity(held.weapon))) {
         const int baseline=features.rapid.canRestore(held.weapon)?features.rapid.original:held.weapon.fireTime;
-        const int target=RapidFireTime(baseline);
+        const int target=RapidFireTime(baseline,features.extra.rapidFireMultiplier);
         if (held.weapon.fireTime!=target && SetInt(held.weapon.complete+kWeaponFireTime,held.weapon.fireTime,target)) {
             features.rapid.applied(held.weapon,target);
             Log("WEAPON_APPLY RAPID_FIRE index=%u name=%s fire_before=%d fire_after=%d",held.weapon.index,held.weapon.name,held.weapon.fireTime,target);
         }
     }
+    UpdateRecoil(s,features.extra.wanted(ExtraFeature::NoRecoil) && !features.recoilSuspensions);
 }
 bool SetFov(int value) {
     const auto s=ReadSnapshot();
