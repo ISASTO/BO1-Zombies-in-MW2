@@ -1,13 +1,24 @@
 # BO1 Zombies in MW2
 
 Incremental mod framework for **retail Modern Warfare 2 (2009), single player**.
-The first deliverable is an AMD64 D3D9 DLL that renders a keyboard menu in the
-game. BO1 Zombies gameplay is a future mode. The current test13 package improves
-native AI placement, collision retries, nearby helpers, advance/follow goals,
-population ownership and the remaining dual-wield rendering path. The owner has
-accepted the source-derived BO1 controller rehearsal, checkpoint-bank recovery,
-test12 enemy creation/cleanup and generic dual on several guns. The new native
-paths, including G18's distinct hand definitions, need the next retail test.
+Current build: **0.1.13-combat-test14**. This pass moves ammo/reload controls to
+WEAPONS, fits every page's complete list on screen, and adds native hostile-NPC
+kill, server-clock scheduling, combat/follow control, human-only spawner templates,
+character appearance attachments and allocation-based cleanup through death,
+saving and checkpoint reload. **The native 32-actor ceiling is not expanded.**
+Capacity failure is guarded and campaign creation can reclaim mod-owned slots.
+Ghost/Price/Soap/Roach require a matching loaded character in the current mission;
+Soldier uses a loaded human spawner. Universal character asset loading is pending.
+
+The incoming test13 diagnostics contain three crashes at engine RVA `0x29a713`
+in animation-tree access during script execution, plus ownership records retiring
+while NPCs remained alive. Copying live actors' runtime VM state into spawners is
+removed. These changes pass portable and exact-executable checks; new native
+execution and combat/crash outcomes need the owner's retail test. Start with
+[the test14 checklist](docs/combat-test14.md). G18's overlapping dual-wield models
+remain deferred. BO1 gameplay remains a simulated controller rehearsal.
+
+The following paragraphs record earlier iterations and their original test state.
 
 **Status: Phase 1 core passed in the owner's test4 estate run.** The owner
 confirms correct health, working God ON/OFF and retained God state through
@@ -105,30 +116,20 @@ An executable hash mismatch disables game-state access and memory writes.
 The installer rejects a mismatched build. A manually installed proxy can still
 show its diagnostic menu in an unknown AMD64 `iw4sp.exe`.
 
-## Current combined test13
+## Current combat/lifecycle test14
 
-1. Close MW2 and extract the entire `BO1MW2-spawn-test13.zip` outside the game folder.
-2. Run `Uninstall.cmd` to remove the earlier project build, then `Install.cmd`
-   and select the folder containing `iw4sp.exe`. Find it through Steam:
-   MW2 Single Player > Properties > Installed Files > Browse.
-3. Launch normally through Steam and **restart the mission once** for this
-   first test, so an older modified save is not captured as the baseline. Wait for player control,
-   then press **F4**. Up/Down selects, Enter toggles/opens, Left/Right changes
-   the Give All bank or speed/jump/time/gravity, Backspace/Esc goes back.
-   F4 closes the menu.
-4. Check Give All's label before touching arrows and after a checkpoint. Hold
-   G18, enable Dual and inspect the selected-row native hand-setup footer, both
-   models/fire inputs/reload/OFF and fixed-camera FPS. Then open **AI** and test
-   one enemy (nearest point, clearance offsets, advance goal), cleanup, then one
-   friendly (clear ground near you, converted loaded model if needed, ally team
-   and follow goal), cleanup. Repeat beyond eight if native slots are available.
-   Use a live estate combat section: the callback service still needs an existing
-   unfrozen NPC. Follow [the staged test13 sequence](docs/spawn-test13.md).
-   Turn weapon modes OFF and remove debug actors before saving/quitting;
-   ownership/undo history is limited to this process and detected level lifetime.
-5. Close MW2 and run `Diagnose.cmd` before another launch replaces the log.
-   Return its ZIP and [testing.md](docs/testing.md) observations. Saved FOV
-   should persist; other requests/selections reset on a full process restart.
+1. Close MW2 and extract the entire `BO1MW2-combat-test14.zip` outside the game folder.
+2. Run `Uninstall.cmd`, then `Install.cmd`, selecting the folder containing
+   `iw4sp.exe`. Saved FOV and logs are preserved.
+3. Launch through Steam and **restart the mission once for this upgrade**.
+   Avoid starting with NPCs saved by test13. Wait for player control, press F4,
+   and test an enemy plus a Soldier helper before increasing population.
+4. Follow [combat-test14.md](docs/combat-test14.md): fighting, player following,
+   removal, Kill All Enemies, Freeze AI cleanup, death and checkpoint reload.
+   Checkpoints intentionally remove this build's spawned NPCs before serialization.
+5. Close MW2 and run `Diagnose.cmd` before another launch replaces `latest.log`.
+   Return its ZIP and the checklist observations. Saved FOV persists; other
+   toggles and character/model selection are session-only.
 
 For manual installation, copy only the package's `d3d9.dll` beside `iw4sp.exe`.
 Never overwrite an existing `d3d9.dll`; temporarily move a previous wrapper out
@@ -163,8 +164,9 @@ Copy the log immediately after a failing run: `latest.log` is replaced on launch
 | FOV selector and saved preference | Owner confirms test6 behavior; matching logs show load/selection/save/reset |
 | WEAPONS | Owner confirms test12 dual compatibility on several guns; G18/others still fail. Test13 adds distinct native hand definitions and setup diagnostics; appearance/FPS/undo need retail checks |
 | WORLD | Adjustable time/gravity, actor-think freeze, reset; test8 logs confirm several apply/restore paths; broader gameplay coverage pending |
-| AI | Test12 native enemy creation/removal confirmed. Test13 adds nearest-point/near-player placement, collision retries, friendly team conversion, advance/follow goals and dynamic ownership; new native paths await retail testing. Physical actor slots32 |
-| Kill All Enemies, BO1 Zombies gameplay | Planned; native AI debugging does not implement BO1 targeting/pursuit/melee or assets |
+| AI | Test14 human spawners, hostility/follow, full appearance attachments, server-clock cleanup and campaign slot reclamation. Native retail checks pending; physical capacity remains 32. |
+| Kill All Enemies | Test14 native damage call for hostile actor entities; allies, clients and protected entities excluded. Retail check pending. |
+| BO1 Zombies gameplay | Planned; normal MW2 AI is not a BO1 behavior/animation/assets port. |
 
 ## Architecture
 
@@ -218,14 +220,18 @@ through bank changes and same-process checkpoints; slot reorder and older banks
 do not replace the original baseline. Invalid reads defer recovery. Native
 normal animation names/arena definitions can initially be loaned to the two hand
 slots with conditional restoration. Test13 queues separate native hand-definition
-construction on the verified actor callback thread and publishes results through
-the same ownership baseline. Actor allocation/copy/team/goal/removal calls also
-run only on that thread; rendering does not execute those native methods.
+construction on the verified server-clock thread and publishes results through
+the same ownership baseline. Actor allocation/copy/team/goal/removal/damage calls also
+run only on that thread. Test14 atomically redirects three verified native CALL
+sites through nearby relays; the complete non-relative actor-init prologue is
+replaced on the server thread. Save and load boundaries remove owned NPCs;
+rendering does not execute those native actor methods.
 Each new feature fails closed independently of the core patterns. Reserve
 edits compare ID/count together; speed restores its captured baseline. The
 verified 39/78 jump float pair uses bounded selected heights only in this process; its data
 page protection is restored after the edit, and the pair is restored on OFF
-or loss of player readiness. Instructions and the disk executable are unchanged.
+or loss of player readiness. The installed disk executable remains unchanged;
+test14 applies the documented in-memory lifecycle hooks.
 Settings use the mod's own versioned text file; the
 DLL does not call a native dvar API or change archive/latched values. The native
 camera applies ADS and scaling separately; broader cutscene/map coverage remains.

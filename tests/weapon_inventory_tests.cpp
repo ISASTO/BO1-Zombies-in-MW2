@@ -95,7 +95,7 @@ int main() {
     for (int n=0;n<15;++n) { full.reserve[n]={unsigned(60+n),1}; full.clips[n]={unsigned(80+n),{1,0}}; }
     Check(BuildWeaponBank(full,{gun},0).added==0,"full ammo tables never overwrite slot zero");
     MenuState m; m.visible=true; m.page=Page::Weapons; m.selected=0;
-    Check(m.input(Input::Right)==Action::NextWeaponBank,"weapon bank arrow routed"); m.selected=4;
+    Check(m.input(Input::Right)==Action::NextWeaponBank,"weapon bank arrow routed"); m.selected=6;
     Check(m.input(Input::Select)==Action::ToggleDualWield,"dual wield toggle routed");
     std::cout<<"Weapon eligibility, ammo allocation, bank bounds and reversible lifetime checks passed\n";
 }

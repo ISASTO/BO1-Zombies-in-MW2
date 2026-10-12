@@ -1123,7 +1123,7 @@ bool AdjustExtraFeature(ExtraFeature feature,int direction) {
 }
 void ResetWeaponFeatures() {
     std::lock_guard<std::mutex> lock(featuresMutex);
-    features.extra.resetWeapons(); features.preferences.enabled[static_cast<std::size_t>(PlayerFeature::NoReload)]=false;
+    features.extra.resetWeapons(); features.preferences.enabled[static_cast<std::size_t>(PlayerFeature::InfiniteAmmo)]=false; features.preferences.enabled[static_cast<std::size_t>(PlayerFeature::NoReload)]=false;
     features.clearSustain=true; features.nextUpdate=0; RestoreRapid();
     Log("EXTRA_REQUEST RESET_WEAPONS linked_no_reload=OFF saved_fov_unchanged=1");
 }
@@ -1134,8 +1134,12 @@ void ResetWorldFeatures() {
 }
 void ResetPlayerFeatures() {
     std::lock_guard<std::mutex> lock(featuresMutex);
-    features.preferences.reset(); features.clearInvulnerability=true; features.clearSustain=true; features.clearSpeed=true; features.nextUpdate=0;
-    Log("PLAYER_REQUEST RESET all_cheats=OFF saved_fov_unchanged=1");
+    const bool ammo=features.preferences.wanted(PlayerFeature::InfiniteAmmo),reload=features.preferences.wanted(PlayerFeature::NoReload);
+    features.preferences.reset();
+    features.preferences.enabled[static_cast<std::size_t>(PlayerFeature::InfiniteAmmo)]=ammo;
+    features.preferences.enabled[static_cast<std::size_t>(PlayerFeature::NoReload)]=reload;
+    features.clearInvulnerability=true; features.clearSpeed=true; features.nextUpdate=0;
+    Log("PLAYER_REQUEST RESET movement_protection=OFF saved_fov_unchanged=1");
 }
 void UpdatePlayerFeatures(ULONGLONG now) {
     std::lock_guard<std::mutex> lock(featuresMutex);

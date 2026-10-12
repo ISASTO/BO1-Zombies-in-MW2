@@ -1,0 +1,35 @@
+{
+  "version": "0.1.13-combat-test14",
+  "dll_sha256": "0ba37edb196e0a7cad346913ba74a4b5ef247b9a623e6871828174a9d72980b2",
+  "dll_size": 3682648,
+  "machine": "AMD64 PE32+",
+  "aslr_nx": true,
+  "imports": [
+    "bcrypt.dll",
+    "dbghelp.dll",
+    "gdi32.dll",
+    "kernel32.dll",
+    "msvcrt.dll",
+    "user32.dll"
+  ],
+  "exports": [
+    "D3DPERF_BeginEvent",
+    "D3DPERF_EndEvent",
+    "D3DPERF_GetStatus",
+    "D3DPERF_QueryRepeatFrame",
+    "D3DPERF_SetMarker",
+    "D3DPERF_SetOptions",
+    "D3DPERF_SetRegion",
+    "DebugSetMute",
+    "Direct3DCreate9",
+    "Direct3DCreate9Ex"
+  ],
+  "cpp_suites_passed": 13,
+  "python_fixtures_passed": 24,
+  "existing_exact_profile_anchors": 97,
+  "new_native_binding_audit": "combat-test14-evidence.json",
+  "retail_execution": "Not performed; owner retail test required.",
+  "actor_capacity": 32,
+  "actor_capacity_expansion": "Outstanding. See actor-capacity-audit.md.",
+  "global_character_assets": "Not loaded by this build; only current-mission character appearances are available."
+}

@@ -149,8 +149,8 @@ const char* PageName(Page page) {
 }
 const char* Row(Page page, int n) {
     static constexpr const char* home[] = {"PLAYER", "WEAPONS", "WORLD", "AI", "ZOMBIE MODE", "DIAGNOSTICS"};
-    static constexpr const char* player[] = {"God Mode", "FOV settings", "Infinite Ammo", "No Reload", "Noclip", "Super Speed", "Super Jump", "Reset player toggles"};
-    static constexpr const char* weapons[] = {"Give All (usable banks)", "Infinite Grenades (linked)", "Rapid Fire", "Explosive Bullets", "Force Dual Wield", "Weapon info to log", "Reset weapon toggles"};
+    static constexpr const char* player[] = {"God Mode", "FOV settings", "Noclip", "Super Speed", "Super Jump", "Reset player toggles"};
+    static constexpr const char* weapons[] = {"Give All (usable banks)", "Infinite Ammo", "No Reload", "Infinite Grenades (linked)", "Rapid Fire", "Explosive Bullets", "Force Dual Wield", "Weapon info to log", "Reset weapon toggles"};
     static constexpr const char* world[] = {"Slow Motion", "Freeze AI", "Gravity", "Kill All Enemies", "Reset world toggles"};
     static constexpr const char* ai[] = {"Spawn Enemy (nearest point)", "Spawn Friendly (near you)", "Enemy model", "Friendly model", "Pause AI spawning", "Freeze AI (linked)", "Alive enemy / friendly", "Our spawned actors", "Remove our spawned actors", "AI info to log", "Engine actor slots"};
     static constexpr const char* zombies[] = {"Round rules preview", "Controller rehearsal", "Playable Zombies / actors"};
@@ -255,7 +255,7 @@ void Overlay::frame() {
         if (action == Action::ToggleGod) TogglePlayerFeature(PlayerFeature::God);
         else if (action == Action::ToggleInfiniteAmmo) TogglePlayerFeature(PlayerFeature::InfiniteAmmo);
         else if (action == Action::ToggleNoReload) {
-            if (menu.page!=Page::Weapons || ReadSnapshot().grenadeSustainResolved) TogglePlayerFeature(PlayerFeature::NoReload);
+            if (menu.page!=Page::Weapons || menu.selected!=3 || ReadSnapshot().grenadeSustainResolved) TogglePlayerFeature(PlayerFeature::NoReload);
             else Log("GRENADE_REQUEST blocked: native frag/flash branches unresolved");
         }
         else if (action == Action::ToggleNoclip) TogglePlayerFeature(PlayerFeature::Noclip);
@@ -279,6 +279,7 @@ void Overlay::frame() {
         else if (action == Action::ResetWorld) ResetWorldFeatures();
         else if(action==Action::SpawnAiEnemy) RequestAiOperation(AiOperation::SpawnEnemy,ReadSnapshot());
         else if(action==Action::SpawnAiFriendly) RequestAiOperation(AiOperation::SpawnFriendly,ReadSnapshot());
+        else if(action==Action::KillAllEnemies) RequestAiOperation(AiOperation::KillEnemies,ReadSnapshot());
         else if(action==Action::RemoveSpawnedAi) RequestAiOperation(AiOperation::RemoveOwned,ReadSnapshot());
         else if(action==Action::PreviousEnemySpawner || action==Action::NextEnemySpawner)
             AdjustAiSpawner(false,action==Action::NextEnemySpawner?1:-1);
@@ -363,7 +364,8 @@ void Overlay::frame() {
     D3DVIEWPORT9 full{0,0,size.Width,size.Height,0,1}; device->SetViewport(&full);
     if (!font && !fontAttempted) BuildFont(*this);
     Configure(device);
-    const float scale = std::max(.5f, std::min(1.1f, std::min(size.Width/1280.f, size.Height/720.f)));
+    const float panelHeight=MenuPanelHeight(menu.count());
+    const float scale=std::min(1.1f,std::min(size.Width/710.f,size.Height/(panelHeight+76.f)));
     auto rect = [&](float x,float y,float w,float h,D3DCOLOR c) { Rect(device,x*scale,y*scale,w*scale,h*scale,c); };
     auto text = [&](float x,float y,D3DCOLOR c,const char* value,float factor=.8f) { Text(*this,x*scale,y*scale,scale*factor,c,value); };
     char line[128]{};
@@ -379,8 +381,8 @@ void Overlay::frame() {
         }
     }
     if (menu.visible) {
-        rect(24,54,500,410,D3DCOLOR_ARGB(240,10,13,9));
-        rect(24,54,500,3,kAccent);
+        rect(24,54,660,panelHeight,D3DCOLOR_ARGB(240,10,13,9));
+        rect(24,54,660,3,kAccent);
         text(40,66,kAccent,"MW2 / BO1 ZOMBIES",.95f);
         text(40,96,kText,PageName(menu.page));
         if (menu.page == Page::ZombieRules) {
@@ -417,15 +419,15 @@ void Overlay::frame() {
             text(40,143,kMuted,line,.7f);
         } else {
             text(40,121,kMuted,StateText(s.state),.7f);
-            text(40,143,kMuted,"Test 13 | Placement, goals + native hand trees",.7f);
+            text(40,143,kMuted,"Test 14 | Combat, cleanup + level lifetime",.7f);
         }
         const auto preview = menu.page == Page::ZombieRules
             ? bo1::EvaluateNormalSoloRound(menu.previewRound, menu.previewRound == 1) : std::nullopt;
         const int first=menu.firstVisibleRow();
-        for (int n=first; n<menu.count() && n<first+kVisibleMenuRows; ++n) {
+        for (int n=first; n<menu.count(); ++n) {
             const float y=170.f+(n-first)*26.f;
             const bool selected=menu.selected==n;
-            if (selected) { rect(34,y-1,480,24,D3DCOLOR_ARGB(255,49,57,32)); rect(34,y-1,3,24,kAccent); }
+            if (selected) { rect(34,y-1,640,24,D3DCOLOR_ARGB(255,49,57,32)); rect(34,y-1,3,24,kAccent); }
             text(45,y+1,selected?kAccent:kText,Row(menu.page,n));
             const char* status="PLANNED";
             char value[32]{};
@@ -455,8 +457,8 @@ void Overlay::frame() {
                 else status="ENTER";
             }
             else if (menu.page==Page::Player && n==1) status=">";
-            else if (menu.page==Page::Player && n>=2 && n<=6) {
-                const auto feature=static_cast<PlayerFeature>(n-1);
+            else if (menu.page==Page::Player && n>=2 && n<=4) {
+                const auto feature=static_cast<PlayerFeature>(n+1);
                 const bool wanted=playerPreferences.wanted(feature);
                 if (!FeatureAvailable(s,feature)) status="LOCKED";
                 else if (feature==PlayerFeature::InfiniteAmmo) status=wanted?"ON":"OFF";
@@ -470,7 +472,7 @@ void Overlay::frame() {
                     std::snprintf(value,sizeof(value),"%s %dx",state,playerPreferences.jump/static_cast<int>(kDefaultJump)); status=value;
                 }
             }
-            else if (menu.page==Page::Player && n==7) status="ENTER";
+            else if (menu.page==Page::Player && n==5) status="ENTER";
             else if (menu.page==Page::Weapons) {
                 if (n==0) {
                     if (weaponMode.needsBaseline) status="RESTART";
@@ -478,10 +480,11 @@ void Overlay::frame() {
                     else if(!weaponMode.pages) status="WAIT";
                     else { std::snprintf(value,sizeof(value),"%s %d/%d",extraPreferences.wanted(ExtraFeature::GiveAll)?(weaponMode.owned && !weaponMode.reconciling?"ON":"WAIT"):(weaponMode.owned?"UNDO":"OFF"),weaponMode.page+1,weaponMode.pages); status=value; }
                 }
-                else if (n==1) status=!s.grenadeSustainResolved || !FeatureAvailable(s,PlayerFeature::NoReload)?"LOCKED":s.sustain.current?(playerPreferences.wanted(PlayerFeature::NoReload)?"ON":"NATIVE"):(playerPreferences.wanted(PlayerFeature::NoReload)?"WAIT":"OFF");
-                else if (n==2) status=!ExtraAvailable(s,ExtraFeature::RapidFire)?"LOCKED":extraPreferences.wanted(ExtraFeature::RapidFire)?(RapidFireApplied(s.weapon)?"ON":s.weapon.fireTime==20?"AT MIN":"WAIT"):"OFF";
-                else if (n==3) status=!ExtraAvailable(s,ExtraFeature::ExplosiveBullets)?"LOCKED":s.explosive.current?(extraPreferences.wanted(ExtraFeature::ExplosiveBullets)?"ON":"NATIVE"):(extraPreferences.wanted(ExtraFeature::ExplosiveBullets)?"WAIT":"OFF");
-                else if (n==4) status=!ExtraAvailable(s,ExtraFeature::ForceDualWield)?"LOCKED":extraPreferences.wanted(ExtraFeature::ForceDualWield)?(weaponMode.dualReady && s.dualWield.current && s.lastWeaponHand==1?(weaponMode.dualFallback?(weaponMode.nativeHandState==NativeHandBuildState::Queued?"BUILD":"COMPAT"):"ON"):s.dualCurrentSupported?"WAIT":"ON*"):weaponMode.dualOwned?"UNDO":s.dualWield.current?"NATIVE":"OFF";
+                else if (n==1) status=!FeatureAvailable(s,PlayerFeature::InfiniteAmmo)?"LOCKED":playerPreferences.wanted(PlayerFeature::InfiniteAmmo)?"ON":"OFF";
+                else if (n==2 || n==3) status=(n==3 && !s.grenadeSustainResolved) || !FeatureAvailable(s,PlayerFeature::NoReload)?"LOCKED":s.sustain.current?(playerPreferences.wanted(PlayerFeature::NoReload)?"ON":"NATIVE"):(playerPreferences.wanted(PlayerFeature::NoReload)?"WAIT":"OFF");
+                else if (n==4) status=!ExtraAvailable(s,ExtraFeature::RapidFire)?"LOCKED":extraPreferences.wanted(ExtraFeature::RapidFire)?(RapidFireApplied(s.weapon)?"ON":s.weapon.fireTime==20?"AT MIN":"WAIT"):"OFF";
+                else if (n==5) status=!ExtraAvailable(s,ExtraFeature::ExplosiveBullets)?"LOCKED":s.explosive.current?(extraPreferences.wanted(ExtraFeature::ExplosiveBullets)?"ON":"NATIVE"):(extraPreferences.wanted(ExtraFeature::ExplosiveBullets)?"WAIT":"OFF");
+                else if (n==6) status=!ExtraAvailable(s,ExtraFeature::ForceDualWield)?"LOCKED":extraPreferences.wanted(ExtraFeature::ForceDualWield)?(weaponMode.dualReady && s.dualWield.current && s.lastWeaponHand==1?(weaponMode.dualFallback?(weaponMode.nativeHandState==NativeHandBuildState::Queued?"BUILD":"COMPAT"):"ON"):s.dualCurrentSupported?"WAIT":"ON*"):weaponMode.dualOwned?"UNDO":s.dualWield.current?"NATIVE":"OFF";
                 else status="ENTER";
             }
             else if (menu.page==Page::World) {
@@ -494,12 +497,12 @@ void Overlay::frame() {
                     const bool wanted=extraPreferences.wanted(ExtraFeature::Gravity);
                     if (!ExtraAvailable(s,ExtraFeature::Gravity)) status="LOCKED";
                     else { std::snprintf(value,sizeof(value),"%s %d",wanted?(s.gravityLiteral==extraPreferences.gravity+.5f && s.gravity.current==extraPreferences.gravity?"ON":"WAIT"):"OFF",extraPreferences.gravity); status=value; }
-                } else if (n==3) status="PLANNED";
+                } else if (n==3) status=!aiStatus.ready?"LOCKED":aiStatus.pending?"QUEUED":aiStatus.enemyAlive?"ENTER":"EMPTY";
                 else status="ENTER";
             }
             else if(menu.page==Page::AI) {
-                if(n==0 || n==1) status=!aiStatus.ready || !aiStatus.nativeCount?"LOCKED":aiStatus.pending?"QUEUED":
-                    !(n==1?aiStatus.friendlySpawners:aiStatus.enemySpawners)?"NONE":aiStatus.spawnPaused?"PAUSED":aiStatus.engineActors>=kAiNativeActorCapacity?"ENGINE FULL":"ENTER";
+                if(n==0 || n==1) status=!aiStatus.ready?"LOCKED":aiStatus.pending?"QUEUED":
+                    !(n==1?aiStatus.friendlySpawners:aiStatus.enemySpawners)?"NONE":(n==1 && !aiStatus.characterLoaded)?"NOT LOADED":aiStatus.spawnPaused?"PAUSED":aiStatus.engineActors>=kAiNativeActorCapacity?"ENGINE FULL":"ENTER";
                 else if(n==2) { std::snprintf(value,sizeof(value),"%d/%d",aiStatus.enemySpawner,aiStatus.enemySpawners); status=value; }
                 else if(n==3) { std::snprintf(value,sizeof(value),"%d/%d",aiStatus.friendlySpawner,aiStatus.friendlySpawners); status=value; }
                 else if(n==4) status=!aiStatus.ready?"LOCKED":aiStatus.spawnPaused?(aiStatus.pauseWanted?"ON":"NATIVE"):(aiStatus.pauseWanted?"WAIT":"OFF");
@@ -531,17 +534,18 @@ void Overlay::frame() {
                 }
                 status=value;
             }
-            text(422,y+3,kMuted,status,.7f);
+            text(552,y+3,kMuted,status,.7f);
         }
-        rect(34,383,480,1,D3DCOLOR_ARGB(255,57,63,47));
-        text(40,390,kMuted,menu.page==Page::ZombieRules
+        const float divider=170.f+menu.count()*26.f+5.f;
+        rect(34,divider,640,1,D3DCOLOR_ARGB(255,57,63,47));
+        text(40,divider+7,kMuted,menu.page==Page::ZombieRules
             ? "LEFT/RIGHT: Round  ENTER: Next  UP/DOWN: Row" : menu.page==Page::ZombieController
-            ? "LEFT/RIGHT: Start round  UP/DOWN: Scroll" : menu.page==Page::View
+            ? "LEFT/RIGHT: Start round  UP/DOWN: Row" : menu.page==Page::View
             ? "LEFT/RIGHT: FOV  UP/DOWN: Row  ENTER: Act" : (menu.page==Page::Player || menu.page==Page::World)
             ? "LEFT/RIGHT: Value  ENTER: Toggle  UP/DOWN: Row" : menu.page==Page::Weapons
             ? "LEFT/RIGHT: Bank  ENTER: Toggle  UP/DOWN: Row" : menu.page==Page::AI
-            ? "LEFT/RIGHT: Template  ENTER: Act  UP/DOWN: Scroll" : "UP/DOWN: Select  ENTER: Toggle / Open",.7f);
-        text(40,412,kMuted,"BACKSPACE/ESC: Back   F4: Close",.7f);
+            ? "LEFT/RIGHT: Template  ENTER: Act  UP/DOWN: Row" : "UP/DOWN: Select  ENTER: Toggle / Open",.7f);
+        text(40,divider+29,kMuted,"BACKSPACE/ESC: Back   F4: Close",.7f);
         const char* footer="Game keeps running. WASD and mouse work.";
         if (menu.page==Page::ZombieRules) footer="Read-only preview. No zombies spawned.";
         if(menu.page==Page::Zombies) footer="Controller rehearsal ready. Native actors pending.";
@@ -566,12 +570,10 @@ void Overlay::frame() {
             static constexpr const char* hints[]={
                 "GUARDED = other native protection, including noclip.",
                 "FOV can be saved. Player toggles start OFF on launch.",
-                "Maintains reserve ammo; magazines still reload.",
-                "Stops normal gun clip consumption; reload key works.",
-                "WASD + mouse to fly; SPACE up, crouch key down.",
+                                "WASD + mouse to fly; SPACE up, crouch key down.",
                 "LEFT/RIGHT: 1x-5x. ENTER: speed ON/OFF.",
                 "LEFT/RIGHT: 1x-8x. Land before reducing jump.",
-                "Turns player cheats OFF; keeps the saved FOV."
+                "Movement/protection OFF; weapon ammo options remain."
             };
             footer=hints[menu.selected];
             if (menu.selected==0 && !s.client.valid && s.state==LevelState::Ready)
@@ -580,22 +582,24 @@ void Overlay::frame() {
         if (menu.page==Page::Weapons) {
             static constexpr const char* hints[]={
                 "LEFT/RIGHT: Bank. OFF restores inventory and ammo.",
-                "Linked to PLAYER No Reload. Frag/flash grenades.",
+                "Maintains reserve ammo; magazines still reload.",
+                "Stops normal gun clip consumption; reload key works.",
+                "Linked to No Reload above. Frag/flash grenades.",
                 "Halves gun delay (20ms min); AI sharing gun too.",
                 "All bullet weapons, including AI. Try with God ON.",
                 "COMPAT: normal animations. BUILD: native hand setup.",
                 "Records current weapon and new controls in latest.log.",
-                "Weapon cheats OFF, including linked PLAYER No Reload."
+                "Weapon cheats OFF, including ammo, reload and grenade sustain."
             };
             footer=hints[menu.selected];
             if (menu.selected==0 && weaponMode.needsBaseline) footer="Restart mission once for a clean inventory baseline.";
-            if(menu.selected==4 && extraPreferences.wanted(ExtraFeature::ForceDualWield) && !weaponMode.dualReady) {
+            if(menu.selected==6 && extraPreferences.wanted(ExtraFeature::ForceDualWield) && !weaponMode.dualReady) {
                 std::snprintf(line,sizeof(line),"Dual pending: %s",DualBlockedText(weaponMode.dualBlocked)); footer=line;
-            } else if(menu.selected==4 && extraPreferences.wanted(ExtraFeature::ForceDualWield) && weaponMode.dualFallback) {
+            } else if(menu.selected==6 && extraPreferences.wanted(ExtraFeature::ForceDualWield) && weaponMode.dualFallback) {
                 footer=weaponMode.nativeHandsReady?"Distinct native hand definitions ready; normal animations.":
                     weaponMode.nativeHandState==NativeHandBuildState::Failed?"Native hand setup failed; compatibility definitions remain.":
-                    weaponMode.nativeHandState==NativeHandBuildState::Queued?"Native hand setup queued; needs an unfrozen actor callback.":
-                    "Compatibility active; native hand setup awaits a live actor.";
+                    weaponMode.nativeHandState==NativeHandBuildState::Queued?"Native hand setup queued; awaits the next native server frame.":
+                    "Compatibility active; native hand setup awaits the next native server frame.";
             }
         }
         if (menu.page==Page::World) {
@@ -603,7 +607,7 @@ void Overlay::frame() {
                 "LEFT/RIGHT: 0.25x-1x. ENTER: ON/OFF; whole game.",
                 "Pauses all actor thinking. Player and scripts continue.",
                 "LEFT/RIGHT: 100-1600. Player + projectile gravity.",
-                "Pending verified enemy filter and engine-thread death.",
+                "Native damage to hostile NPCs; allies/player excluded.",
                 "Restores world overrides; player/FOV choices remain."
             };
             footer=hints[menu.selected];
@@ -613,18 +617,20 @@ void Overlay::frame() {
                 "Nearest point, clearance retries, then advance to you.",
                 "Clear nearby ground; ally follows and fights enemies.",
                 "LEFT/RIGHT: model. Spawn point stays automatic.",
-                "LEFT/RIGHT: model. Converted enemy model if needed.",
+                "LEFT/RIGHT: Soldier / Ghost / Price / Soap / Roach.",
                 "Native spawn gate; existing actors still think.",
                 "Linked to WORLD Freeze AI. Spawn gate is separate.",
                 "Verified live axis/allies actors; other teams excluded.",
                 "No eight-actor cap. Native pool capacity still applies.",
-                "Only our generation-matched living actor entities.",
+                "Our NPCs and corpses; original mission NPCs remain.",
                 "Logs placement, team, goal and native hand-tree results.",
                 "IW4 has 32 active actor slots, including campaign NPCs."
             };
             footer=hints[menu.selected];
-            if(menu.selected==3 && aiStatus.friendlyFallback)
-                footer="CONVERTED: enemy model; native ally team and follow goal.";
+            if(menu.selected==3 && !aiStatus.characterLoaded)
+                footer="Character assets are not loaded in this mission; choose Soldier.";
+            else if(menu.selected==3 && aiStatus.friendlyFallback)
+                footer="Soldier uses a loaded human model with native ally AI.";
             if((menu.selected==0 || menu.selected==1) && aiStatus.lastResult==AiRequestResult::NativeRefused)
                 footer="Native creation refused; see diagnostic log.";
             if((menu.selected==0 || menu.selected==1) && aiStatus.lastResult==AiRequestResult::NoClearPosition)
@@ -637,7 +643,7 @@ void Overlay::frame() {
             else if (settingsResult[0]) footer=settingsResult;
             else footer="Save keeps this FOV for future launches.";
         }
-        text(40,438,kAccent,footer,.7f);
+        text(40,divider+55,kAccent,footer,.7f);
     }
     state->Apply();
     if (SUCCEEDED(worldResult)) device->SetTransform(D3DTS_WORLD,&world);
@@ -647,6 +653,6 @@ void Overlay::frame() {
     state->Release();
     ++draws;
     if (draws==1) Log("DRAW first overlay frame backbuffer=%ux%u font=%d menu_scale=%.2f panel=%.0fx%.0f visible_rows=%d",size.Width,size.Height,font!=nullptr,
-        scale,500*scale,410*scale,kVisibleMenuRows);
+        scale,660*scale,panelHeight*scale,menu.count());
 }
 } // namespace mod

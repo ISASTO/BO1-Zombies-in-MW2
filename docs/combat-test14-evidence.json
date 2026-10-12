@@ -1,0 +1,44 @@
+{
+  "executable_sha256": "fb7e8a987c371dea7b666091b0b9e2011c0cd9cd277b191ad453d11d557dd777",
+  "calls": {
+    "FrameClock": {
+      "call_rva": "0x2344b8",
+      "function_rva": "0x174d00",
+      "atomic_block_rva": "0x2344b0"
+    },
+    "SaveRead": {
+      "call_rva": "0x17f3f3",
+      "function_rva": "0x17f8e0",
+      "atomic_block_rva": "0x17f3f0"
+    },
+    "SaveWrite": {
+      "call_rva": "0x181b45",
+      "function_rva": "0x180cf0",
+      "atomic_block_rva": "0x181b40"
+    }
+  },
+  "actor_init_rva": "0x12ce20",
+  "copied_prologue_bytes": 15,
+  "copied_prologue_instructions": 5,
+  "damage_rva": "0x167d30",
+  "kill_argument_count": 12,
+  "kill_damage": 1073741823,
+  "kill_weapon": -1,
+  "dobj_update_rva": "0x19ee10",
+  "model_field": "0x284",
+  "sentient_ignoreme": "0x14",
+  "sentient_ignoreall": "0x15",
+  "default_combat_mode": 0,
+  "appearance_attachment_models": "0x208",
+  "appearance_attachment_tags": "0x246",
+  "appearance_attachment_flags": "0x148",
+  "appearance_attachment_count": 31,
+  "enemy_sight_override_flag": "0x309",
+  "enemy_sight_override_position": "0x30c",
+  "enemy_handle_field": "sentient+0x44, low WORD native entity-number+1",
+  "hook_publication": "Clock call publishes first; remaining hooks publish on the next server-clock callback.",
+  "native_reentrancy": "Recursive ownership lock, snapshot iteration and deferred cleanup prevent NPC freeing during active native mod calls.",
+  "retail_execution": "Not executed in this Linux environment; owner test required.",
+  "actor_capacity": 32,
+  "actor_capacity_expansion": "Not implemented: snapshot, save, scratch and perception dependencies remain."
+}

@@ -39,12 +39,12 @@ int main() {
     m.input(Input::Down); Check(m.input(Input::Select)==Action::None,"live FOV output is read-only");
     m.input(Input::Down); Check(m.input(Input::Select)==Action::None,"saved FOV output is read-only");
     m.input(Input::Back); Check(m.page==Page::Player && m.selected==1,"FOV back remembers parent row");
-    const std::array<Action,6> playerActions={Action::ToggleInfiniteAmmo,Action::ToggleNoReload,Action::ToggleNoclip,
+    const std::array<Action,4> playerActions={Action::ToggleNoclip,
         Action::ToggleSuperSpeed,Action::ToggleSuperJump,Action::ResetPlayer};
     for(const auto action:playerActions) { m.input(Input::Down); Check(m.input(Input::Select)==action,"player control action routing");
-        Check(m.firstVisibleRow()==0,"all eight player rows fit without scrolling"); }
-    Check(m.selected==7 && m.count()==8 && kVisibleMenuRows==8,"reset row and compact player viewport");
-    m.input(Input::Down); Check(m.selected==0 && m.firstVisibleRow()==0,"player menu wraps after eight rows");
+        Check(m.firstVisibleRow()==0,"all player rows fit without scrolling"); }
+    Check(m.selected==5 && m.count()==6 && kVisibleMenuRows==12,"reset row and compact player viewport");
+    m.input(Input::Down); Check(m.selected==0 && m.firstVisibleRow()==0,"player menu wraps after six rows");
     m.input(Input::Back); m.input(Input::Back);
     Check(!m.visible, "back from home closes menu");
     m.input(Input::Toggle); m.input(Input::Toggle); Check(!m.visible, "two toggle events cancel");
@@ -79,7 +79,7 @@ int main() {
     for(const auto action:rehearsalActions) { m.input(Input::Down); Check(m.input(Input::Select)==action,"debug adapter routing"); }
     for(int i=0;i<5;++i) { m.input(Input::Down); Check(m.input(Input::Select)==Action::None,"controller diagnostic rows are read-only"); }
     m.input(Input::Down);
-    Check(m.selected==11 && m.firstVisibleRow()==4 && m.input(Input::Select)==Action::WriteRehearsal,"controller scroll reaches final row");
+    Check(m.selected==11 && m.firstVisibleRow()==0 && m.input(Input::Select)==Action::WriteRehearsal,"controller shows final row without scrolling");
     m.input(Input::Back);
     Check(m.page==Page::Zombies && m.selected==1,"controller back returns to parent row");
     m.input(Input::Down); Check(m.input(Input::Select)==Action::None,"playable Zombies remains locked");
@@ -94,8 +94,13 @@ int main() {
     m.input(Input::Down); Check(m.input(Input::Select)==Action::ToggleFreezeAI,"shared AI freeze state");
     m.input(Input::Down); Check(m.input(Input::Select)==Action::None,"native actor counts read-only");
     m.input(Input::Down); Check(m.input(Input::Select)==Action::None,"ownership count read-only");
-    m.input(Input::Down); Check(m.input(Input::Select)==Action::RemoveSpawnedAi && m.firstVisibleRow()==1,"scrolled owned-only cleanup routing");
-    m.input(Input::Down); Check(m.input(Input::Select)==Action::WriteAiState && m.firstVisibleRow()==2,"last AI diagnostics row accessible");
-    m.input(Input::Down); Check(m.input(Input::Select)==Action::None && m.firstVisibleRow()==3,"native engine capacity read-only row accessible");
+    m.input(Input::Down); Check(m.input(Input::Select)==Action::RemoveSpawnedAi && m.firstVisibleRow()==0,"owned-only cleanup routing");
+    m.input(Input::Down); Check(m.input(Input::Select)==Action::WriteAiState && m.firstVisibleRow()==0,"last AI diagnostics row accessible");
+    m.input(Input::Down); Check(m.input(Input::Select)==Action::None && m.firstVisibleRow()==0,"native engine capacity read-only row accessible");
+    m.page=Page::Weapons;
+    m.selected=1;Check(m.input(Input::Select)==Action::ToggleInfiniteAmmo,"ammo moved to weapons");
+    m.selected=2;Check(m.input(Input::Select)==Action::ToggleNoReload,"reload moved to weapons");
+    m.page=Page::World;m.selected=3;Check(m.input(Input::Select)==Action::KillAllEnemies,"native kill-all action");
+    for(int rows=2;rows<=12;++rows) Check(MenuPanelHeight(rows)>=170.f+rows*26.f+80.f-54.f,"full list and footer fit panel");
     std::cout << "All signature and menu tests passed\n";
 }

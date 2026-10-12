@@ -57,14 +57,14 @@ int main() {
     std::strcpy(w.name,"different_rifle"); Check(!rapid.canRestore(w), "name changes invalidate reused addresses"); std::strcpy(w.name,"test_rifle");
     w.fireTime=90; Check(!rapid.canRestore(w), "native timing edits survive cleanup");
 
-    MenuState menu; menu.visible=true; menu.page=Page::Player; menu.selected=5;
+    MenuState menu; menu.visible=true; menu.page=Page::Player; menu.selected=3;
     Check(menu.input(Input::Right)==Action::IncreaseSpeed && menu.input(Input::Left)==Action::DecreaseSpeed, "speed arrows route to strength adjustment");
-    Check(menu.input(Input::Select)==Action::ToggleSuperSpeed, "Enter still toggles speed"); menu.selected=6;
+    Check(menu.input(Input::Select)==Action::ToggleSuperSpeed, "Enter still toggles speed"); menu.selected=4;
     Check(menu.input(Input::Left)==Action::DecreaseJump, "jump left arrow routes correctly");
-    menu.page=Page::Weapons; menu.selected=1;
+    menu.page=Page::Weapons; menu.selected=3;
     Check(menu.input(Input::Select)==Action::ToggleNoReload, "grenade row explicitly shares native ammo sustain");
     menu.page=Page::World; menu.selected=0;
     Check(menu.input(Input::Left)==Action::DecreaseTimeScale, "time scale slider routes correctly");
-    menu.selected=3; Check(menu.input(Input::Select)==Action::None, "unverified enemy kill never queues an action");
+    menu.selected=3; Check(menu.input(Input::Select)==Action::KillAllEnemies, "enemy kill routes to the native service");
     std::cout << "Adjustment bounds, scoped reset, ownership and weapon identity tests passed\n";
 }

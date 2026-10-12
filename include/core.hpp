@@ -8,7 +8,7 @@
 #include "fov_preferences.hpp"
 
 namespace mod {
-inline constexpr const char* kVersion = "0.1.12-spawn-test13";
+inline constexpr const char* kVersion = "0.1.13-combat-test14";
 inline constexpr const char* kExeSha256 = "fb7e8a987c371dea7b666091b0b9e2011c0cd9cd277b191ad453d11d557dd777";
 
 // -1 is a wildcard. Reject malformed patterns rather than matching everything.
@@ -284,7 +284,8 @@ inline constexpr const char* kAiEnemySetterStartPattern =
 inline constexpr const char* kAiSpawnTargetnamePattern =
     "49 8D 8E 46 01 00 00 8B D3 E8 ?? ?? ?? ?? 41 83 A6 4C 01 00 00 FE";
 
-inline constexpr int kVisibleMenuRows = 8;
+inline constexpr int kVisibleMenuRows = 12;
+inline constexpr float MenuPanelHeight(int rows) { return 200.f+26.f*rows; }
 enum class Page { Home, Player, Weapons, World, AI, Zombies, Diagnostics, ZombieRules, View, ZombieController };
 enum class Input { Toggle, Up, Down, Select, Back, Left, Right };
 enum class Action { None, ToggleGod, ToggleHud, WriteSnapshot, WriteRoundPreview, ChangeFov, SaveFov, ResetFov,
@@ -296,7 +297,7 @@ enum class Action { None, ToggleGod, ToggleHud, WriteSnapshot, WriteRoundPreview
     ToggleRehearsal, ChangeRehearsalRound, ToggleRehearsalAutoClear, ToggleRehearsalSpawning,
     KillRehearsalActor, ClearRehearsalActors, WriteRehearsal,
     SpawnAiEnemy, SpawnAiFriendly, PreviousEnemySpawner, NextEnemySpawner, PreviousFriendlySpawner, NextFriendlySpawner,
-    ToggleAiSpawnPause, RemoveSpawnedAi, WriteAiState };
+    ToggleAiSpawnPause, RemoveSpawnedAi, WriteAiState, KillAllEnemies };
 inline bool IsRehearsalAction(Action action) {
     return action>=Action::ToggleRehearsal && action<=Action::WriteRehearsal;
 }
@@ -312,8 +313,8 @@ struct MenuState {
     int count() const {
         switch (page) {
             case Page::Home: return 6;
-            case Page::Player: return 8;
-            case Page::Weapons: return 7;
+            case Page::Player: return 6;
+            case Page::Weapons: return 9;
             case Page::World: return 5;
             case Page::AI: return 11;
             case Page::Zombies: return 3;
@@ -324,15 +325,15 @@ struct MenuState {
         }
         return 0;
     }
-    int firstVisibleRow() const { return selected>=kVisibleMenuRows ? selected-kVisibleMenuRows+1 : 0; }
+    int firstVisibleRow() const { return 0; }
     Action input(Input key) {
         if (key == Input::Toggle) { visible = !visible; return Action::None; }
         if (!visible) return Action::None;
         if (key==Input::Left || key==Input::Right) {
             const bool right=key==Input::Right;
             if (page==Page::Weapons && selected==0) return right?Action::NextWeaponBank:Action::PreviousWeaponBank;
-            if (page==Page::Player && selected==5) return right?Action::IncreaseSpeed:Action::DecreaseSpeed;
-            if (page==Page::Player && selected==6) return right?Action::IncreaseJump:Action::DecreaseJump;
+            if (page==Page::Player && selected==3) return right?Action::IncreaseSpeed:Action::DecreaseSpeed;
+            if (page==Page::Player && selected==4) return right?Action::IncreaseJump:Action::DecreaseJump;
             if (page==Page::World && selected==0) return right?Action::IncreaseTimeScale:Action::DecreaseTimeScale;
             if (page==Page::World && selected==2) return right?Action::IncreaseGravity:Action::DecreaseGravity;
             if(page==Page::AI && selected==2) return right?Action::NextEnemySpawner:Action::PreviousEnemySpawner;
@@ -370,22 +371,22 @@ struct MenuState {
                 selected = 0;
             } else if (page == Page::Player && selected == 0) return Action::ToggleGod;
             else if (page == Page::Player && selected == 1) { page=Page::View; selected=0; }
-            else if (page == Page::Player && selected == 2) return Action::ToggleInfiniteAmmo;
-            else if (page == Page::Player && selected == 3) return Action::ToggleNoReload;
-            else if (page == Page::Player && selected == 4) return Action::ToggleNoclip;
-            else if (page == Page::Player && selected == 5) return Action::ToggleSuperSpeed;
-            else if (page == Page::Player && selected == 6) return Action::ToggleSuperJump;
-            else if (page == Page::Player && selected == 7) return Action::ResetPlayer;
+            else if (page == Page::Player && selected == 2) return Action::ToggleNoclip;
+            else if (page == Page::Player && selected == 3) return Action::ToggleSuperSpeed;
+            else if (page == Page::Player && selected == 4) return Action::ToggleSuperJump;
+            else if (page == Page::Player && selected == 5) return Action::ResetPlayer;
             else if (page == Page::Weapons && selected == 0) return Action::ToggleGiveAll;
-            else if (page == Page::Weapons && selected == 1) return Action::ToggleNoReload;
-            else if (page == Page::Weapons && selected == 2) return Action::ToggleRapidFire;
-            else if (page == Page::Weapons && selected == 3) return Action::ToggleExplosiveBullets;
-            else if (page == Page::Weapons && selected == 4) return Action::ToggleDualWield;
-            else if (page == Page::Weapons && selected == 5) return Action::WriteSnapshot;
-            else if (page == Page::Weapons && selected == 6) return Action::ResetWeapons;
+            else if (page == Page::Weapons && selected == 1) return Action::ToggleInfiniteAmmo;
+            else if (page == Page::Weapons && (selected == 2 || selected == 3)) return Action::ToggleNoReload;
+            else if (page == Page::Weapons && selected == 4) return Action::ToggleRapidFire;
+            else if (page == Page::Weapons && selected == 5) return Action::ToggleExplosiveBullets;
+            else if (page == Page::Weapons && selected == 6) return Action::ToggleDualWield;
+            else if (page == Page::Weapons && selected == 7) return Action::WriteSnapshot;
+            else if (page == Page::Weapons && selected == 8) return Action::ResetWeapons;
             else if (page == Page::World && selected == 0) return Action::ToggleSlowMotion;
             else if (page == Page::World && selected == 1) return Action::ToggleFreezeAI;
             else if (page == Page::World && selected == 2) return Action::ToggleGravity;
+            else if (page == Page::World && selected == 3) return Action::KillAllEnemies;
             else if (page == Page::World && selected == 4) return Action::ResetWorld;
             else if(page==Page::AI) {
                 if(selected==0) return Action::SpawnAiEnemy;

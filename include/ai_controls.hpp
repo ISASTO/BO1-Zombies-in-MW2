@@ -90,10 +90,32 @@ struct AiIdentity {
             && actor==e.actor && sentient==e.sentient;
     }
 };
-enum class AiOperation { SpawnEnemy, SpawnFriendly, RemoveOwned };
+inline bool HumanSpawner(const AiEntity& e) {
+    // Live actors contain runtime VM/animation state, not safe spawner data.
+    auto copy=e;copy.flags&=~2u;
+    std::string name=e.classname;std::transform(name.begin(),name.end(),name.begin(),[](unsigned char c){return c>='A' && c<='Z'?c+('a'-'A'):c;});
+    return e.type==kActorSpawnerType && EligibleSpawner(copy,e.team)
+        && name.find("dog")==std::string::npos && name.find("animal")==std::string::npos;
+}
+struct AiAllocation {
+    bool valid=false,inUse=false,client=false;
+    std::uint32_t serial=0;std::uint16_t number=0;std::uint8_t type=0;
+};
+template<class Reader> AiAllocation ReadAiAllocation(const AiIdentity& identity,Reader read) {
+    AiAllocation a;std::uintptr_t client=0;std::uint8_t active=0;
+    a.valid=identity.address && read(identity.address+kAiUseCount,&a.serial,4)
+        && read(identity.address+kAiNumber,&a.number,2) && read(identity.address+kAiType,&a.type,1)
+        && read(identity.address+kAiInUse,&active,1) && active<=1
+        && read(identity.address+kAiClient,&client,sizeof(client));
+    a.inUse=active!=0;a.client=client!=0;return a;
+}
+inline bool SameAiAllocation(const AiIdentity& identity,const AiAllocation& a) {
+    return a.valid && a.inUse && !a.client && a.number==identity.number && a.serial==identity.serial;
+}
+enum class AiOperation { SpawnEnemy, SpawnFriendly, RemoveOwned, KillEnemies };
 enum class AiRequestResult { None, Queued, Ready, NotReady, Busy, NoSpawner, SpawnPaused, NativeRefused,
     Created, Deleted, LifetimeChanged, Expired, IdentityChanged, Protected, HookUnavailable, NativeReturnedInvalid, Limit,
-    NoClearPosition };
+    NoClearPosition, ModelUnavailable, Killed };
 inline const char* AiResultText(AiRequestResult value) {
     switch(value) {
         case AiRequestResult::None: return "NONE";
@@ -114,6 +136,8 @@ inline const char* AiResultText(AiRequestResult value) {
         case AiRequestResult::NativeReturnedInvalid: return "NATIVE_INVALID";
         case AiRequestResult::Limit: return "AT_LIMIT";
         case AiRequestResult::NoClearPosition: return "NO_CLEAR_POSITION";
+        case AiRequestResult::ModelUnavailable: return "MODEL_NOT_LOADED";
+        case AiRequestResult::Killed: return "KILLED";
     }
     return "UNKNOWN";
 }
@@ -121,6 +145,7 @@ struct AiScope { bool ready=false; std::uintptr_t client=0,pool=0; int commandTi
 struct AiRequest {
     AiOperation operation=AiOperation::SpawnEnemy;
     AiIdentity source;
+    AiIdentity appearance;
     std::uintptr_t client=0,pool=0;
     int commandTime=0;
     std::array<char,96> map{};
@@ -129,10 +154,10 @@ class AiRequestQueue {
 public:
     bool pending() const { return request_.has_value(); }
     AiRequestResult reason() const { return result_; }
-    bool enqueue(AiOperation op,const AiIdentity& source,const AiScope& scope) {
+    bool enqueue(AiOperation op,const AiIdentity& source,const AiScope& scope,const AiIdentity& appearance={}) {
         if(!valid(scope)) { result_=AiRequestResult::NotReady; return false; }
         if(request_) { result_=AiRequestResult::Busy; return false; }
-        AiRequest r; r.operation=op; r.source=source; r.client=scope.client; r.pool=scope.pool; r.commandTime=scope.commandTime;
+        AiRequest r; r.operation=op; r.source=source; r.appearance=appearance; r.client=scope.client; r.pool=scope.pool; r.commandTime=scope.commandTime;
         std::strcpy(r.map.data(),scope.map); request_=r; result_=AiRequestResult::Queued; return true;
     }
     std::optional<AiRequest> take(const AiScope& scope) {
@@ -172,7 +197,8 @@ struct AiStatus {
     unsigned lastEntity=0;
     int lastTeam=0,placementAttempts=0;
     AiRequestResult lastResult=AiRequestResult::None;
-    unsigned long long callbacks=0,created=0,deleted=0;
+    unsigned long long callbacks=0,created=0,deleted=0,killed=0,reclaimed=0;
+    bool characterLoaded=true;
     unsigned long nativeThread=0;
 };
 } // namespace mod
