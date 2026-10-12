@@ -60,4 +60,9 @@ template<class Trace> std::optional<AiPlacement> FindSpawnPlacement(const AiPoin
     }
     return {};
 }
+template<class Trace> std::optional<AiPlacement> FindRecoveryPlacement(const AiPoint& previous,const AiPoint& player,Trace trace) {
+    if(FinitePoint(previous) && FinitePoint(player) && PointDistanceSquared(previous,player)<=2048.f*2048.f)
+        if(const auto result=FindSpawnPlacement(previous,false,trace))return result;
+    return FindSpawnPlacement(player,true,trace);
+}
 } // namespace mod

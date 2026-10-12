@@ -8,7 +8,7 @@
 #include "fov_preferences.hpp"
 
 namespace mod {
-inline constexpr const char* kVersion = "0.1.15-performance-test16";
+inline constexpr const char* kVersion = "0.1.16-squad-test17";
 inline constexpr const char* kExeSha256 = "fb7e8a987c371dea7b666091b0b9e2011c0cd9cd277b191ad453d11d557dd777";
 
 // -1 is a wildcard. Reject malformed patterns rather than matching everything.
@@ -293,7 +293,7 @@ enum class Action { None, ToggleGod, ToggleHud, WriteSnapshot, WriteRoundPreview
     DecreaseSpeed, IncreaseSpeed, DecreaseJump, IncreaseJump,
     ToggleGiveAll, ToggleRapidFire, ToggleExplosiveBullets, ResetWeapons, ToggleDualWield, PreviousWeaponBank, NextWeaponBank,
     DecreaseRapidFire, IncreaseRapidFire, ToggleNoRecoil,
-    ToggleSlowMotion, ToggleFreezeAI, ToggleGravity, ResetWorld,
+    ToggleSlowMotion, ToggleFreezeAI, ToggleGravity, ToggleFriendlyFire, ResetWorld,
     DecreaseTimeScale, IncreaseTimeScale, DecreaseGravity, IncreaseGravity,
     ToggleRehearsal, ChangeRehearsalRound, ToggleRehearsalAutoClear, ToggleRehearsalSpawning,
     KillRehearsalActor, ClearRehearsalActors, WriteRehearsal,
@@ -316,7 +316,7 @@ struct MenuState {
             case Page::Home: return 6;
             case Page::Player: return 6;
             case Page::Weapons: return 10;
-            case Page::World: return 5;
+            case Page::World: return 6;
             case Page::AI: return 11;
             case Page::Zombies: return 3;
             case Page::Diagnostics: return 2;
@@ -390,7 +390,8 @@ struct MenuState {
             else if (page == Page::World && selected == 1) return Action::ToggleFreezeAI;
             else if (page == Page::World && selected == 2) return Action::ToggleGravity;
             else if (page == Page::World && selected == 3) return Action::KillAllEnemies;
-            else if (page == Page::World && selected == 4) return Action::ResetWorld;
+            else if (page == Page::World && selected == 4) return Action::ToggleFriendlyFire;
+            else if (page == Page::World && selected == 5) return Action::ResetWorld;
             else if(page==Page::AI) {
                 if(selected==0) return Action::SpawnAiEnemy;
                 if(selected==1) return Action::SpawnAiFriendly;

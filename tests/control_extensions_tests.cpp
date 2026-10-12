@@ -33,6 +33,9 @@ int main() {
     extras.toggle(ExtraFeature::ExplosiveBullets); extras.toggle(ExtraFeature::FreezeAI);
     extras.resetWeapons(); Check(!extras.wanted(ExtraFeature::ExplosiveBullets) && extras.wanted(ExtraFeature::FreezeAI), "weapon reset preserves world state");
     extras.resetWorld(); Check(!extras.wanted(ExtraFeature::FreezeAI) && extras.timeScale==.5f && extras.gravity==400, "world reset clears only its group");
+    extras.toggle(ExtraFeature::FriendlyFire);extras.resetWeapons();
+    Check(extras.wanted(ExtraFeature::FriendlyFire),"weapon reset preserves friendly fire in the World group");
+    extras.resetWorld();Check(!extras.wanted(ExtraFeature::FriendlyFire),"World reset disables the friendly-fire override");
 
     ScalarOwnership<int> speed;
     speed.applied(0x2000,190,380);
@@ -77,5 +80,7 @@ int main() {
     menu.page=Page::World; menu.selected=0;
     Check(menu.input(Input::Left)==Action::DecreaseTimeScale, "time scale slider routes correctly");
     menu.selected=3; Check(menu.input(Input::Select)==Action::KillAllEnemies, "enemy kill routes to the native service");
+    menu.selected=4;Check(menu.input(Input::Select)==Action::ToggleFriendlyFire && menu.count()==6,"friendly fire occupies its own World row");
+    menu.selected=5;Check(menu.input(Input::Select)==Action::ResetWorld,"World reset remains accessible after adding friendly fire");
     std::cout << "Adjustment bounds, scoped reset, ownership and weapon identity tests passed\n";
 }

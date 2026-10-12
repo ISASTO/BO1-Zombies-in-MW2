@@ -16,7 +16,7 @@ try {
         $source = Join-Path (Split-Path $PSScriptRoot -Parent) $relative
     }
     if (-not (Test-Path -LiteralPath $source)) { throw 'd3d9.dll was not found. Extract the full test ZIP first.' }
-    $version = if ($Build -eq 'startup') { '0.1.1-startup-test2' } else { '0.1.15-performance-test16' }
+    $version = if ($Build -eq 'startup') { '0.1.1-startup-test2' } else { '0.1.16-squad-test17' }
     $payloadPath = Join-Path $PSScriptRoot 'payload.json'
     if (Test-Path -LiteralPath $payloadPath) {
         $payload = Get-Content -LiteralPath $payloadPath -Raw | ConvertFrom-Json
@@ -29,6 +29,13 @@ try {
     if (Test-Path -LiteralPath $dest) { throw 'A d3d9.dll already exists here. Run Uninstall.cmd for our previous build first. This installer will not overwrite an existing wrapper.' }
     $logs = Join-Path $root 'bo1mw2\logs'
     New-Item -ItemType Directory -Force -Path $logs | Out-Null
+    $players = Join-Path $root 'players'
+    if ($Build -eq 'menu' -and (Test-Path -LiteralPath $players -PathType Container)) {
+        $saveBackup = Join-Path $root ('bo1mw2\backups\before-test17-' + [DateTime]::UtcNow.ToString('yyyyMMdd-HHmmss-fff'))
+        New-Item -ItemType Directory -Path $saveBackup | Out-Null
+        Copy-Item -LiteralPath $players -Destination $saveBackup -Recurse
+        Write-Host "Local player/save backup: $saveBackup"
+    }
     Copy-Item -LiteralPath $source -Destination $dest
     @{
         project = 'BO1MW2'; version = $version; build = $Build; executable_sha256 = $hash;

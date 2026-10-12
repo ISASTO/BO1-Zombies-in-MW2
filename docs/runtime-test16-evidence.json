@@ -1,0 +1,36 @@
+{
+  "tested_version": "0.1.15-performance-test16",
+  "diagnostic_zip_sha256": "9991c08c9e58b99c1c4a604ef45f882a1abd1797fc605f196bab58c5bcc77425",
+  "owner_report": {
+    "performance": "fixed",
+    "squad": "capacity reclamation and autosaves cause disappear/reappear near player",
+    "new_request": "Allow Friendly Fire and attempt capacity 256"
+  },
+  "last_logged_timing": {
+    "service_updates": 8121,
+    "service_average_us": 595.0,
+    "service_peak_us": 21804.5,
+    "world_reads": 1158,
+    "world_average_us": 388.0,
+    "world_peak_us": 942.1,
+    "max_npcs_per_tick": 4,
+    "recovery_pending": 0,
+    "reassertions": 2209,
+    "render_world_reads": 0
+  },
+  "last_logged_scan": {
+    "last_pool_us": 69.7,
+    "last_decode_us": 180.7,
+    "last_sort_us": 58.2,
+    "kernel_reads_per_scan": 0.0,
+    "image_reads_per_scan": 81.2,
+    "name_cache_hits": 424804,
+    "name_cache_misses": 1687
+  },
+  "model_capture_ready": 256,
+  "model_applies": 225,
+  "campaign_slot_reclaims": 40,
+  "checkpoint_write_cleanup_events": 25,
+  "interpretation": "Timing supports the scan performance fix. Explicit mod cleanup/recovery paths explain jarring squad rebuilding. Model-apply logs do not alone prove rendered character appearance.",
+  "measurement_boundary": "Test16 retail diagnostics. Test17 native checkpoint/friendly-fire gameplay is not executed in Linux."
+}

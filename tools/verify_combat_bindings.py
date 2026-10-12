@@ -114,7 +114,7 @@ def verify(path, header):
             'hook_publication':'Clock call publishes first; remaining hooks publish on the next server-clock callback.',
             'native_reentrancy':'Recursive ownership lock, snapshot iteration and deferred cleanup prevent NPC freeing during active native mod calls.',
             'retail_execution':'Not executed in this Linux environment; owner test required.',
-            'actor_capacity':32,'actor_capacity_expansion':'Not implemented: snapshot, save, scratch and perception dependencies remain.'}
+            'actor_capacity':32,'actor_capacity_expansion':'Test17 256-slot preflight is blocked; see actor-capacity-test17-evidence.json.'}
 
 
 if __name__=='__main__':

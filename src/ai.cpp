@@ -8,6 +8,7 @@
 #include "ai_behavior.hpp"
 #include "checked_memory.hpp"
 #include "script_text.hpp"
+#include "ai_persistence.hpp"
 
 namespace mod {
 namespace {
@@ -23,6 +24,7 @@ using GoalFn=void(*)(std::uintptr_t,const float*,std::uintptr_t);
 using EnemyFn=void(*)(std::uintptr_t,std::uintptr_t,int,int);
 using AnimationFn=std::uintptr_t(*)(std::uintptr_t,std::uintptr_t);
 using ScriptStringFn=void(*)(std::uintptr_t,unsigned);
+using InternStringFn=unsigned(*)(const char*);
 using ClockFn=void(*)();
 using InitFn=int(*)(std::uintptr_t);
 using SaveReadFn=void(*)(std::uintptr_t);
@@ -52,6 +54,7 @@ struct RecoveryAi {
     int team=0,health=100;
     AiAppearance appearance;
     bool tagsHeld=false;
+    AiPoint position{};
 };
 struct HandBuild {
     std::uint64_t ticket=0; WeaponFields weapon;
@@ -72,13 +75,14 @@ struct AiRuntime {
     int enemyIndex=0,friendlyIndex=0;
     int nextWorldTime=-1,nextRecoveryTime=-1,allyTeam=kAlliesTeam;
     std::size_t followCursor=0;
-    bool detailed=false,recoverDeferred=false;
+    bool detailed=false,adoptPending=true;
     std::vector<std::uint8_t> worldPool,worldActive;
     struct Names {bool valid=false;std::uint32_t serial=0;std::uint16_t classname=0,targetname=0;std::string classText,targetText;};
     std::array<Names,kAiEntityCapacity> names{};
     double worldTotalUs=0,serviceTotalUs=0;
     bool pauseWanted=false,scopeActive=false;
     bool cleanupDeferred=false;
+    std::atomic<std::uint64_t> checkpointEpoch{0};
     ScalarOwnership<std::uint8_t> pause;
     ScalarOwnership<int> capacity;
     HandBuild hands;
@@ -99,6 +103,7 @@ std::atomic<DWORD> nativeThread{0};
 thread_local bool servicing=false;
 thread_local bool spawningOwned=false;
 thread_local bool cleaningOwned=false;
+thread_local unsigned checkpointReadDepth=0;
 thread_local int traceIgnoreEntity=-1;
 
 bool ReadAi(std::uintptr_t at,void* out,std::size_t length) {
@@ -133,6 +138,15 @@ bool ScriptText(std::uint16_t id,std::string& out) {
     return DecodeScriptText(text,sizeof(text),out);
 }
 std::string ClassName(std::uint16_t id) {std::string out;ScriptText(id,out);return out;}
+bool MarkOwned(std::uintptr_t entity,const std::string& marker) {
+    const auto id=reinterpret_cast<InternStringFn>(aiProfile.base+kAiInternStringRva)(marker.c_str());
+    if(!id || id>0xffff)return false;
+    auto reference=static_cast<std::uint16_t>(id);
+    reinterpret_cast<ScriptStringFn>(aiProfile.setString)(entity+kAiTargetname,id);
+    reinterpret_cast<ScriptStringFn>(aiProfile.setString)(reinterpret_cast<std::uintptr_t>(&reference),0);
+    std::uint16_t current=0;std::string text;
+    return Value(entity+kAiTargetname,current) && ScriptText(current,text) && text==marker;
+}
 std::uintptr_t Rip(std::uintptr_t at,int offset,int displacement,int length) {
     std::int32_t rel=0;
     return Value(at+offset+displacement,rel)?at+offset+length+rel:0;
@@ -246,6 +260,15 @@ bool EntityFields() {
     }
     return found==1;
 }
+bool PersistenceFields() {
+    std::array<std::uint8_t,10> intern{};
+    std::uint64_t offset=0;std::uint32_t kind=0;
+    return ReadAi(aiProfile.base+kAiInternStringRva,intern.data(),intern.size())
+        && intern[0]==0xba && intern[1]==1 && intern[2]==0 && intern[3]==0 && intern[4]==0
+        && Jump(aiProfile.base+kAiInternStringRva,5)==aiProfile.base+0x21ac70
+        && Value(aiProfile.base+kAiEntitySaveFieldsRva+11*16,offset) && offset==kAiTargetname
+        && Value(aiProfile.base+kAiEntitySaveFieldsRva+11*16+8,kind) && kind==1;
+}
 struct DvarRead { bool valid=false; std::uintptr_t address=0; std::uint8_t current=0; };
 DvarRead Bool(std::uintptr_t slot,const char* expected) {
     DvarRead out; std::uintptr_t name=0; std::uint8_t type=255; char text[64]{};
@@ -306,31 +329,34 @@ void ClockHook() {
         nativePending=!ai.owned.empty();Log("AI_SERVICE C++ failure on server clock; queued work canceled");
     }
 }
-void BeforeSave(const char* reason,bool write) {
+void BeforeLoad(const char* reason) {
     std::lock_guard<std::recursive_mutex> lock(aiMutex);
     if(servicing || cleaningOwned) {
-        // Never free an NPC while a native damage/model/spawn call has that
-        // NPC on its stack. Complete the cleanup at the following clock boundary.
-        ai.cleanupDeferred=true;ai.recoverDeferred=write;nativePending=true;
-        Log("AI_CLEANUP deferred=1 reason=%s",reason);return;
+        // Native read replaces the world. Keep active iteration tickets stable
+        // until its caller returns, but release DLL-held refs before VM reset.
+        // The following clock discards metadata; it must not delete restored
+        // entities which may have exactly the old address/useCount again.
+        for(auto& owned:ai.owned)if(owned.tagsHeld) {ReleaseAppearance(owned.appearance);owned.tagsHeld=false;}
+        ClearRecovery(true);ai.queue.cancel(AiRequestResult::LifetimeChanged);ai.hands.pending=false;
+        ai.cleanupDeferred=true;nativePending=true;
+        Log("AI_CLEANUP deferred=1 metadata_only=1 reason=%s",reason);return;
     }
     ai.queue.cancel(AiRequestResult::LifetimeChanged);
     ai.hands.pending=false;ai.handCache.clear();
-    if(write)CaptureRecovery();else ClearRecovery(true);
+    ClearRecovery(true);
     const auto count=CleanupOwned(reason);
-    // A protected/refused allocation stays alive; do not create a duplicate.
-    for(auto it=ai.recovery.begin();it!=ai.recovery.end();) {
-        if(SameAiAllocation(it->previous,ReadAiAllocation(it->previous,ReadAi))) {
-            if(it->tagsHeld)for(auto& tag:it->appearance.tags)reinterpret_cast<ScriptStringFn>(aiProfile.setString)(reinterpret_cast<std::uintptr_t>(&tag),0);
-            it=ai.recovery.erase(it);
-        } else ++it;
-    }
-    ai.nextRecoveryTime=-1;nativePending=nativePending || !ai.recovery.empty();
+    // Even a protected/refused actor is replaced by native load. Detach the
+    // tracking data and release extra references before that VM replacement.
+    for(auto& owned:ai.owned)if(owned.tagsHeld)ReleaseAppearance(owned.appearance);
+    ai.owned.clear();ai.capacity.clear();ai.status.owned=0;
+    ai.nextRecoveryTime=-1;
     if(count) {ai.status.lastResult=AiRequestResult::Deleted;ai.nextWorldTime=0;}
 }
 void SaveReadHook(std::uintptr_t save) {
-    BeforeSave("CHECKPOINT_READ",false);
-    {std::lock_guard<std::recursive_mutex> lock(aiMutex);ai.names={};ai.nextWorldTime=0;}
+    {std::lock_guard<std::recursive_mutex> lock(aiMutex);++ai.checkpointEpoch;}
+    BeforeLoad("CHECKPOINT_READ");
+    {std::lock_guard<std::recursive_mutex> lock(aiMutex);ai.names={};ai.nextWorldTime=0;ai.adoptPending=true;nativePending=true;}
+    struct ReadScope {ReadScope(){++checkpointReadDepth;}~ReadScope(){--checkpointReadDepth;}} readScope;
     originalSaveRead(save);
 }
 void SaveWriteHook(bool flag,std::uintptr_t save) {
@@ -339,10 +365,16 @@ void SaveWriteHook(bool flag,std::uintptr_t save) {
     const bool suspend=!servicing && !cleaningOwned;
     if(suspend)SuspendRecoilForCheckpoint(true);
     struct Resume {bool active;~Resume(){if(active)SuspendRecoilForCheckpoint(false);}} resume{suspend};
-    BeforeSave("CHECKPOINT_WRITE",true);originalSaveWrite(flag,save);
+    // Actors created through a real human spawner have native actor, sentient,
+    // animation and VM state. Let the unchanged native save writer persist them.
+    // Registered targetname strings recover ownership after load or relaunch.
+    {std::lock_guard<std::recursive_mutex> lock(aiMutex);
+        Log("AI_CHECKPOINT_WRITE retained=%llu recovery_pending=%llu mode=NATIVE_SAVE",static_cast<unsigned long long>(ai.owned.size()),static_cast<unsigned long long>(ai.recovery.size()));}
+    originalSaveWrite(flag,save);
 }
 int ActorInitHook(std::uintptr_t entity) {
-    if(!spawningOwned) {
+    const auto epoch=ai.checkpointEpoch.load();
+    if(!spawningOwned && !checkpointReadDepth) {
         std::lock_guard<std::recursive_mutex> lock(aiMutex);
         int count=0,limit=kAiNativeActorCapacity;std::uintptr_t dvar=0;
         if(Value(aiProfile.actorLimitSlot,dvar) && dvar)Value(dvar+0x10,limit);
@@ -352,6 +384,7 @@ int ActorInitHook(std::uintptr_t entity) {
         }
         while(limit>0 && limit<=kAiNativeActorCapacity && Value(aiProfile.actorCountSlot,count) && count>=limit && !ai.owned.empty()) {
             const auto removed=CleanupOwned("CAMPAIGN_NEEDS_SLOT",true);
+            if(epoch!=ai.checkpointEpoch)return 0;
             ai.status.reclaimed+=removed;
             if(!removed)break;
         }
@@ -451,7 +484,7 @@ int PlayerTeam(const Snapshot& s) {
         && Value(sentient+8,team) && (team==kAxisTeam || team==kAlliesTeam)) return team;
     return kAlliesTeam;
 }
-void WorkWanted() { ai.status.recovering=static_cast<int>(ai.recovery.size());nativePending=ai.queue.pending() || ai.hands.pending || !ai.owned.empty() || !ai.recovery.empty() || ai.cleanupDeferred || ai.detailed || ai.pauseWanted || ai.pause.owned; }
+void WorkWanted() { ai.status.recovering=static_cast<int>(ai.recovery.size());nativePending=ai.queue.pending() || ai.hands.pending || !ai.owned.empty() || !ai.recovery.empty() || ai.cleanupDeferred || ai.adoptPending || ai.detailed || ai.pauseWanted || ai.pause.owned; }
 void RestoreCapacity();
 void Lifetime(const AiScope& s) {
     const bool changed=!s.ready || (ai.scopeActive && (ai.client!=s.client || ai.pool!=s.pool || std::strcmp(ai.map,s.map)
@@ -465,6 +498,7 @@ void Lifetime(const AiScope& s) {
         ai.status.ready=false;ai.status.owned=0;ai.status.enemySpawners=0;ai.status.friendlySpawners=0;ai.status.enemyName={};ai.status.friendlyName={};
         ai.nextWorldTime=-1;ai.nextRecoveryTime=-1;ai.followCursor=0;
         ai.names={};
+        ai.adoptPending=true;
         ai.status.lastEntity=0;ai.status.lastPosition={};ai.status.lastName={};ai.status.placementAttempts=0;ai.status.lastSpawnDistance=0.f;
         ai.hands.pending=false; ai.hands.result.state=NativeHandBuildState::Canceled; ai.handCache.clear();
     }
@@ -501,6 +535,7 @@ unsigned CleanupOwned(const char* reason,bool one) {
     cleaningOwned=true;
     struct ClearCleanupFlag {~ClearCleanupFlag(){cleaningOwned=false;}} cleanupFlag;
     unsigned removed=0;
+    const auto epoch=ai.checkpointEpoch.load();
     if(one) {
         // Reserve campaign slots by retiring corpses/hostiles before allies.
         auto priority=[&](const OwnedAi& x) {
@@ -520,6 +555,7 @@ unsigned CleanupOwned(const char* reason,bool one) {
             if(one && it->team==ai.allyTeam)CaptureRecovery(&it->identity);
             // Native delete sends notifications and performs brain/sentient/VM cleanup.
             reinterpret_cast<DeleteFn>(aiProfile.remove)(raw.number);
+            if(epoch!=ai.checkpointEpoch)return removed;
             const auto after=ReadAiAllocation(it->identity,ReadAi);
             if(SameAiAllocation(it->identity,after)) {Log("AI_DELETE refused entity=%u",raw.number);++it;continue;}
             ++removed;++ai.status.deleted;
@@ -527,6 +563,7 @@ unsigned CleanupOwned(const char* reason,bool one) {
         const auto helper=ReadAiAllocation(it->spawner,ReadAi);
         if(SameAiAllocation(it->spawner,helper) && helper.type==kActorSpawnerType)
             reinterpret_cast<EntityFn>(aiProfile.freeEntity)(it->spawner.address);
+        if(epoch!=ai.checkpointEpoch)return removed;
         if(it->tagsHeld)ReleaseAppearance(it->appearance);
         it=ai.owned.erase(it);
         if(one && removed)break;
@@ -577,7 +614,7 @@ void CaptureRecovery(const AiIdentity* only) {
         if(std::any_of(ai.recovery.begin(),ai.recovery.end(),[&](const auto& r){return r.previous.address==owned.identity.address && r.previous.serial==owned.identity.serial;}))continue;
         const auto e=Entity(owned.identity,ai.pool,false);
         if(!owned.identity.matches(e) || e.health<=0)continue;
-        RecoveryAi r;r.previous=owned.identity;r.sourceName=owned.sourceName;r.team=owned.team;r.health=e.health;
+        RecoveryAi r;r.previous=owned.identity;r.sourceName=owned.sourceName;r.team=owned.team;r.health=e.health;r.position=e.origin;
         if(owned.appearance.model) {
             r.appearance=owned.appearance;
             if(owned.modelApplied && !ReadAppearance(e,r.appearance))continue;
@@ -636,7 +673,11 @@ void ServiceHands(const AiScope& scope) {
     // The exact native registration caller uses (WeaponDef*, names**). Keep the
     // known loaded normal table; do not resolve unverified authored asset names.
     const auto build=reinterpret_cast<AnimationFn>(aiProfile.animationBuilder);
-    const auto right=build(h.weapon.definition,h.names),left=build(h.weapon.definition,h.names);
+    const auto epoch=ai.checkpointEpoch.load();
+    const auto right=build(h.weapon.definition,h.names);
+    if(epoch!=ai.checkpointEpoch) {h.result.state=NativeHandBuildState::Canceled;return;}
+    const auto left=build(h.weapon.definition,h.names);
+    if(epoch!=ai.checkpointEpoch) {h.result.state=NativeHandBuildState::Canceled;return;}
     MEMORY_BASIC_INFORMATION r{},l{};
     if(!right || !left || right==left || right==h.normal || left==h.normal
         || !VirtualQuery(reinterpret_cast<void*>(right),&r,sizeof(r)) || r.State!=MEM_COMMIT
@@ -653,6 +694,7 @@ void FollowOwned(const Snapshot& s,const AiScope& scope,int time) {
     AiPoint player{};
     if(!scope.ready || !ReadAi(s.entity+kAiOrigin,player.data(),sizeof(player)) || !FinitePoint(player))return;
     const int ally=PlayerTeam(s);
+    const auto epoch=ai.checkpointEpoch.load();
     // Native notifications may re-enter checkpoint cleanup. Iterate a snapshot,
     // then commit only to a still-owned allocation instead of keeping iterators
     // across engine calls that can erase ownership records.
@@ -664,7 +706,7 @@ void FollowOwned(const Snapshot& s,const AiScope& scope,int time) {
     for(const auto& original:ownedSnapshot) {
         auto update=original;
         auto* it=&update;
-        auto tracked=[&]() {return std::any_of(ai.owned.begin(),ai.owned.end(),[&](const auto& x){return x.identity.address==it->identity.address && x.identity.serial==it->identity.serial;});};
+        auto tracked=[&]() {return epoch==ai.checkpointEpoch && std::any_of(ai.owned.begin(),ai.owned.end(),[&](const auto& x){return x.identity.address==it->identity.address && x.identity.serial==it->identity.serial;});};
         if(!tracked())continue;
         const auto raw=ReadAiAllocation(it->identity,ReadAi);
         if(raw.valid && !SameAiAllocation(it->identity,raw)) {
@@ -751,9 +793,9 @@ void FollowOwned(const Snapshot& s,const AiScope& scope,int time) {
                 Log("AI_MODEL entity=%u model_index=%u attachment_slots=%u",e.number,it->appearance.model,static_cast<unsigned>(kAiAttachmentCount));
             }
         }
-        for(auto& live:ai.owned)if(live.identity.address==it->identity.address && live.identity.serial==it->identity.serial) {live=std::move(update);break;}
+        if(epoch==ai.checkpointEpoch)for(auto& live:ai.owned)if(live.identity.address==it->identity.address && live.identity.serial==it->identity.serial) {live=std::move(update);break;}
     }
-    if(ai.owned.empty() && ai.recovery.empty())RestoreCapacity();
+    if(epoch==ai.checkpointEpoch && ai.owned.empty() && ai.recovery.empty())RestoreCapacity();
 }
 struct AiMeasure {
     LARGE_INTEGER start{},frequency{};bool world=false;
@@ -781,8 +823,8 @@ void Service() {
     const auto s=ReadSnapshot(); const auto scope=Scope(s);
     Lifetime(scope);
     if(ai.cleanupDeferred && scope.ready) {
-        ai.cleanupDeferred=false;if(ai.recoverDeferred)CaptureRecovery();else ClearRecovery(true);
-        ai.recoverDeferred=false;CleanupOwned("DEFERRED_CHECKPOINT");
+        ai.cleanupDeferred=false;ai.owned.clear();ai.capacity.clear();ai.adoptPending=true;
+        ai.nextWorldTime=0;
         ai.queue.cancel(AiRequestResult::LifetimeChanged);ai.hands.pending=false;ai.handCache.clear();WorkWanted();
     }
     if(s.state==LevelState::PlayerDead && scope.ready) {
@@ -794,7 +836,9 @@ void Service() {
     if(!scope.ready) {Pause(s);WorkWanted();return;}
     ai.lastServiceTime=time;
     if(ai.nextWorldTime<0 || time>=ai.nextWorldTime || ai.queue.pending()) {ai.nextWorldTime=time+500;ReadWorld(s,scope);}
-    Pause(s);ServiceHands(scope);FollowOwned(s,scope,time);
+    const auto epoch=ai.checkpointEpoch.load();
+    Pause(s);ServiceHands(scope);if(epoch==ai.checkpointEpoch)FollowOwned(s,scope,time);
+    if(epoch!=ai.checkpointEpoch) {ai.lastServiceTime=-1;WorkWanted();return;}
     if(!ai.queue.pending()) {
         if(!ai.recovery.empty() && (ai.nextRecoveryTime<0 || time>=ai.nextRecoveryTime)) {
             auto& r=ai.recovery.front();
@@ -838,6 +882,7 @@ void Service() {
             std::uint8_t damage=0;if(!Value(e.address+0x139,damage) || damage>1 || !SetByte(e.address+0x139,damage,1))continue;
             // Same native damage call and neutral arguments as the retail kill builtin.
             const bool hit=reinterpret_cast<DamageFn>(aiProfile.damage)(e.address,0,0,nullptr,e.origin.data(),0x3fffffff,0,0,-1,0,0,0);
+            if(epoch!=ai.checkpointEpoch) {Finish(AiRequestResult::LifetimeChanged);return;}
             int health=1;if(hit && Value(e.address+kAiHealth,health) && health<=0)++killed;
             const auto after=Entity(identity,scope.pool,false);
             if(identity.matches(after)) {std::uint8_t current=0;if(Value(e.address+0x139,current) && current==1)SetByte(e.address+0x139,current,damage);}
@@ -848,6 +893,7 @@ void Service() {
     SpawnOwned(*request,s,scope,time);
 }
 void SpawnOwned(const AiRequest& input,const Snapshot& s,const AiScope& scope,int time,const RecoveryAi* recovery) {
+    const auto epoch=ai.checkpointEpoch.load();
     const auto* request=&input;
     const auto source=Entity(request->source,scope.pool);
     const bool friendly=request->operation==AiOperation::SpawnFriendly;
@@ -885,15 +931,16 @@ void SpawnOwned(const AiRequest& input,const Snapshot& s,const AiScope& scope,in
         const auto hero=Entity(request->appearance,scope.pool);
         if(!SameAiAllocation(request->appearance,ReadAiAllocation(request->appearance,ReadAi)) || !ReadAppearance(hero,appearance)) {Finish(AiRequestResult::ModelUnavailable);return;}
     }
-    const auto placement=FindSpawnPlacement(center,nearPlayer,Trace);
+    const auto placement=recovery?FindRecoveryPlacement(recovery->position,player,Trace):FindSpawnPlacement(center,nearPlayer,Trace);
     if(!placement) {Finish(AiRequestResult::NoClearPosition);return;}
     // Allocate a real engine entity and copy registered fields/VM vars through
     // native helpers. Original mission spawners, origins and budgets stay intact.
     const auto temporary=reinterpret_cast<AllocateFn>(aiProfile.allocate)();
     if(!temporary || temporary<scope.pool || (temporary-scope.pool)%kAiEntityStride) {Finish(AiRequestResult::NativeReturnedInvalid);return;}
-    struct Temporary {std::uintptr_t pointer;bool keep=false;~Temporary(){if(!keep)reinterpret_cast<EntityFn>(aiProfile.freeEntity)(pointer);}} cleanup{temporary};
+    struct Temporary {std::uintptr_t pointer;std::uint64_t epoch;bool keep=false;~Temporary(){if(!keep && epoch==ai.checkpointEpoch)reinterpret_cast<EntityFn>(aiProfile.freeEntity)(pointer);}} cleanup{temporary,epoch};
     reinterpret_cast<CopyFn>(aiProfile.copyFields)(temporary,source.address);
     reinterpret_cast<CopyFn>(aiProfile.copyDynamic)(temporary,source.address);
+    if(epoch!=ai.checkpointEpoch) {Finish(AiRequestResult::LifetimeChanged);return;}
     // Persistent helper spawners must not duplicate a mission targetname or
     // inherit an encounter's scripted target. Native setter maintains refcounts.
     reinterpret_cast<ScriptStringFn>(aiProfile.setString)(temporary+kAiTargetname,0);
@@ -904,6 +951,7 @@ void SpawnOwned(const AiRequest& input,const Snapshot& s,const AiScope& scope,in
         || !Value(temporary+kAiSpawnCount,count) || !SetCount(temporary+kAiSpawnCount,count,1)
         || !Value(temporary+kAiSpawnerTeam,oldTeam) || !SetCount(temporary+kAiSpawnerTeam,oldTeam,team)) {Finish(AiRequestResult::NativeReturnedInvalid);return;}
     reinterpret_cast<OriginFn>(aiProfile.setOrigin)(temporary,placement->position.data());
+    if(epoch!=ai.checkpointEpoch) {Finish(AiRequestResult::LifetimeChanged);return;}
     Log("AI_SPAWN_BEGIN team=%d source=%u serial=%u classname=%s point=%u placement_attempts=%d position=%.1f,%.1f,%.1f native_thread=%lu",
         team,source.number,source.serial,source.classname.c_str(),pointNumber,placement->attempts,
         placement->position[0],placement->position[1],placement->position[2],GetCurrentThreadId());
@@ -911,15 +959,16 @@ void SpawnOwned(const AiRequest& input,const Snapshot& s,const AiScope& scope,in
     // The separate eviction spawnflag2 is cleared; physical clearance was traced.
     struct SpawnScope {SpawnScope(){spawningOwned=true;}~SpawnScope(){spawningOwned=false;}};
     std::uintptr_t spawned=0;{SpawnScope spawnScope;spawned=reinterpret_cast<SpawnFn>(aiProfile.spawn)(temporary,0,1,0);}
+    if(epoch!=ai.checkpointEpoch) {Finish(AiRequestResult::LifetimeChanged);return;}
     if(!spawned) {Finish(AiRequestResult::NativeRefused);return;}
     if(spawned<scope.pool || (spawned-scope.pool)%kAiEntityStride
         || (spawned-scope.pool)/kAiEntityStride>=static_cast<std::uintptr_t>(kAiEntityCapacity-2)) {Finish(AiRequestResult::NativeReturnedInvalid);return;}
     // Roll back an allocated NPC before its helper if initialization/validation
     // fails. Otherwise a living NPC can retain a dangling self.spawner reference.
     struct SpawnedRollback {
-        AiIdentity identity;bool keep=false;
+        AiIdentity identity;std::uint64_t epoch=ai.checkpointEpoch.load();bool keep=false;
         ~SpawnedRollback() {
-            if(keep)return;
+            if(keep || epoch!=ai.checkpointEpoch)return;
             const auto raw=ReadAiAllocation(identity,ReadAi);
             if(SameAiAllocation(identity,raw) && raw.number>1 && (raw.type==kActorType || raw.type==kActorCorpseType)) {
                 int protectedNumber=-1;
@@ -933,12 +982,17 @@ void SpawnOwned(const AiRequest& input,const Snapshot& s,const AiScope& scope,in
     auto actor=ReadAiEntity(spawned,static_cast<int>((spawned-scope.pool)/kAiEntityStride),ReadAi);
     if(!actor.valid || actor.type!=kActorType) {Finish(AiRequestResult::NativeReturnedInvalid);return;}
     reinterpret_cast<TeamFn>(aiProfile.setTeam)(actor.sentient,team);
+    if(epoch!=ai.checkpointEpoch) {Finish(AiRequestResult::LifetimeChanged);return;}
     reinterpret_cast<EnemyFn>(aiProfile.setEnemy)(actor.sentient,friendly?0:s.entity,1,0);
+    if(epoch!=ai.checkpointEpoch) {Finish(AiRequestResult::LifetimeChanged);return;}
     actor=ReadAiEntity(spawned,actor.number,ReadAi);
     if(!actor.valid || actor.team!=team) {Finish(AiRequestResult::NativeReturnedInvalid);return;}
     if(recovery && actor.health!=recovery->health)SetCount(actor.address+kAiHealth,actor.health,recovery->health);
     const auto temp=ReadAiEntity(temporary,static_cast<int>((temporary-scope.pool)/kAiEntityStride),ReadAi);
     if(!temp.valid) {Finish(AiRequestResult::NativeReturnedInvalid);return;}
+    if(!MarkOwned(temporary,kOwnedSpawnerTag) || !MarkOwned(spawned,OwnedActorTag(temp.number))) {
+        Finish(AiRequestResult::NativeReturnedInvalid);return;
+    }
     ai.combatants.push_back(actor);
     ai.owned.push_back({AiIdentity::capture(actor),AiIdentity::capture(temp),team,-1,0,{},false,appearance,time+1000,false,source.classname});cleanup.keep=true;rollback.keep=true;++ai.status.created;
     if(appearance.model) {HoldAppearance(ai.owned.back().appearance);ai.owned.back().tagsHeld=true;}
@@ -986,6 +1040,44 @@ float Distance(const AiEntity& e,const std::array<float,3>& origin) {
     for(int n=0;n<3;++n) { const float delta=e.origin[n]-origin[n]; squared+=delta*delta; }
     return std::sqrt(squared);
 }
+template<class Reader> void AdoptSavedOwned(const AiScope& scope,int count,const std::vector<std::uint8_t>& active,Reader read) {
+    unsigned restored=0;
+    // A native corpse may copy an actor's string fields. Prefer a living actor
+    // and never attach the same helper allocation to two ownership tickets.
+    for(int pass=0;pass<2;++pass)for(int n=2;n<count;++n) {
+        if(!active[n])continue;
+        const auto address=scope.pool+static_cast<std::uintptr_t>(n)*kAiEntityStride;
+        std::uint8_t type=0;if(!read(address,&type,1) || type!=(pass?kActorCorpseType:kActorType))continue;
+        std::uint16_t tag=0;
+        if(!read(address+kAiTargetname,&tag,2) || !tag)continue;
+        std::string text;if(!ScriptText(tag,text))continue;
+        const auto helperNumber=OwnedActorHelper(text);if(!helperNumber)continue;
+        const auto helperAddress=scope.pool+static_cast<std::uintptr_t>(*helperNumber)*kAiEntityStride;
+        if(std::any_of(ai.owned.begin(),ai.owned.end(),[&](const auto& x){return x.spawner.address==helperAddress;}))continue;
+        auto helper=ReadAiEntity(helperAddress,static_cast<int>(*helperNumber),read);
+        helper.classname=ClassName(helper.classnameId);
+        std::uint16_t helperTag=0;std::string helperText;
+        if(!helper.valid || !read(helperAddress+kAiTargetname,&helperTag,2) || !ScriptText(helperTag,helperText)
+            || helperText!=kOwnedSpawnerTag || !HumanSpawner(helper))continue;
+        AiIdentity identity;identity.address=address;identity.number=static_cast<std::uint16_t>(n);
+        const auto raw=ReadAiAllocation(identity,read);
+        if(!raw.valid || !raw.inUse || raw.client || raw.number!=n)continue;
+        identity.serial=raw.serial;identity.type=raw.type;
+        if(std::any_of(ai.owned.begin(),ai.owned.end(),[&](const auto& x){return x.identity.address==address && x.identity.serial==raw.serial;}))continue;
+        OwnedAi owned;owned.identity=identity;owned.spawner=AiIdentity::capture(helper);
+        owned.team=helper.team;owned.sourceName=helper.classname;owned.modelApplied=true;
+        if(raw.type==kActorType) {
+            const auto actor=ReadAiEntity(address,n,read);
+            if(!RestorableOwnedActor(actor,helper,text,helperText))continue;
+            owned.identity=AiIdentity::capture(actor);
+            if(ReadAppearance(actor,owned.appearance)) {HoldAppearance(owned.appearance);owned.tagsHeld=true;}
+        } else if(raw.type!=kActorCorpseType)continue;
+        ai.owned.push_back(std::move(owned));++restored;
+        Log("AI_CHECKPOINT_ADOPT entity=%d serial=%u helper=%u team=%d type=%u",n,raw.serial,*helperNumber,helper.team,raw.type);
+    }
+    ai.adoptPending=false;
+    Log("AI_CHECKPOINT_OWNERSHIP restored=%u owned=%llu",restored,static_cast<unsigned long long>(ai.owned.size()));
+}
 void ReadWorld(const Snapshot& s,const AiScope& scope) {
     AiMeasure measure(true);
     const auto readBefore=GetMemoryReadCounts();
@@ -999,6 +1091,10 @@ void ReadWorld(const Snapshot& s,const AiScope& scope) {
     AiPoint player{};
     if(!ReadAi(s.entity+kAiOrigin,player.data(),sizeof(player)) || !FinitePoint(player)) {ai.status.ready=false;return;}
     const int friendlyTeam=PlayerTeam(s),enemyTeam=friendlyTeam==kAlliesTeam?kAxisTeam:kAlliesTeam;
+    auto snapshotRead=[&](std::uintptr_t at,void* out,std::size_t size) {
+        return ReadArena(scope.pool,pool.data(),pool.size(),at,out,size,ReadAi);
+    };
+    if(ai.adoptPending)AdoptSavedOwned(scope,count,active,snapshotRead);
     ai.allyTeam=friendlyTeam;
     const std::string oldEnemy=ai.enemies.empty()?"":ai.enemies[ai.enemyIndex].classname;
     ai.appearances={};
@@ -1010,9 +1106,6 @@ void ReadWorld(const Snapshot& s,const AiScope& scope) {
         const auto type=pool[static_cast<std::size_t>(n)*kAiEntityStride];
         if(type!=kActorType && type!=kActorSpawnerType) continue;
         const auto address=scope.pool+static_cast<std::uintptr_t>(n)*kAiEntityStride;
-        auto snapshotRead=[&](std::uintptr_t at,void* out,std::size_t size) {
-            return ReadArena(scope.pool,pool.data(),pool.size(),at,out,size,ReadAi);
-        };
         auto e=ReadAiEntity(address,n,snapshotRead);if(!e.valid)continue;
         auto& names=ai.names[n];
         if(!names.valid || names.serial!=e.serial || names.classname!=e.classnameId) {
@@ -1157,7 +1250,7 @@ void InitializeAiEngine(std::uintptr_t base,std::size_t size,std::uintptr_t text
         && InHost(aiProfile.poolSlot,8) && InHost(aiProfile.countSlot,4) && InHost(aiProfile.activeArray,kAiEntityCapacity)
         && InHost(aiProfile.timeSlot,4) && InHost(aiProfile.stringPoolSlot,8) && InHost(aiProfile.protectedSlot,4)
         && InHost(aiProfile.fixedPool,kAiEntityStride*kAiEntityCapacity) && MethodEntry("delete",remove) && MethodEntry("dospawn",methodEntry)
-        && TeamNames() && EntityFields()
+        && TeamNames() && EntityFields() && PersistenceFields()
         && Call(copyCalls,14)==copyFields && Call(copyCalls,25)==copyDynamic
         && Call(traceCall,38)==trace && Call(positionCall,8)==position && Jump(teamCall,33)==team
         && Call(goalCall,23)==goal && InHost(aiProfile.allocate,1) && InHost(aiProfile.freeEntity,1)
@@ -1166,6 +1259,7 @@ void InitializeAiEngine(std::uintptr_t base,std::size_t size,std::uintptr_t text
         && boundsMatch && Call(actorTrace,50)==trace && Call(handsCall,7)==builder && Call(handsCall,24)==builder
         && aiProfile.setEnemy==enemyStart && InHost(aiProfile.setString,1);
     ai.status.resolved=aiProfile.resolved;
+    Log("AI_CAPACITY_EXPANSION requested=256 enabled=0 runtime_capacity=%d blocked=PERCEPTION_SNAPSHOT_SAVE_LAYOUT",kAiNativeActorCapacity);
     Log("AI_PROFILE resolved=%d callback_slot_rva=0x%llx spawn_rva=0x%llx delete_rva=0x%llx pool_slot_rva=0x%llx clock_rva=0x%llx",
         aiProfile.resolved,static_cast<unsigned long long>(aiProfile.thinkSlot-base),static_cast<unsigned long long>(spawn-base),
         static_cast<unsigned long long>(remove-base),static_cast<unsigned long long>(aiProfile.poolSlot-base),static_cast<unsigned long long>(aiProfile.timeSlot-base));
@@ -1175,7 +1269,7 @@ void UpdateAiControls(const Snapshot& s,ULONGLONG,bool detailed) {
     if(!lock.owns_lock())return;
     if(!aiProfile.resolved) return;
     ai.detailed=detailed;
-    if(detailed && s.state==LevelState::Ready && !clockInstalled)InstallService();
+    if(s.state==LevelState::Ready && !clockInstalled)InstallService();
     WorkWanted();
 }
 void RequestAiOperation(AiOperation op,const Snapshot& s) {

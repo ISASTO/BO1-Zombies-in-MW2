@@ -16,6 +16,8 @@ inline constexpr std::size_t kAiModelIndex=0x284,kSentientIgnoreMe=0x14,kSentien
 inline constexpr std::size_t kAiAttachmentModels=0x208,kAiAttachmentTags=0x246,kAiAttachmentFlags=0x148;
 inline constexpr std::size_t kAiAttachmentCount=31;
 inline constexpr std::uintptr_t kAiEmptyAttachmentTagRva=0x1157900;
+inline constexpr std::uintptr_t kAiInternStringRva=0x18f440;
+inline constexpr std::uintptr_t kAiEntitySaveFieldsRva=0x3405b0;
 inline constexpr std::size_t kAiEnemySightValid=0x309,kAiEnemySightPosition=0x30c;
 struct AiAppearance {
     std::uint16_t model=0;

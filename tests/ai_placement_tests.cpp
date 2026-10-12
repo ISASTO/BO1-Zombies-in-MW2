@@ -28,6 +28,18 @@ int main() {
     Check(!FindSpawnPlacement(player,true,farFloor),"friendly cannot spawn on another floor far below the player");
     AiPoint bad=player;bad[0]=std::numeric_limits<float>::quiet_NaN();
     Check(SpawnCandidates(bad,true).empty(),"invalid world coordinates cannot enter native traces");
+    auto floor=[](const AiPoint& start,const AiPoint& end,const AiBounds& bounds) {
+        AiTraceResult r;r.valid=true;r.normal={0,0,1};
+        r.fraction=bounds.halfSize[2]==0?(start[2]-10)/(start[2]-end[2]):1.f;return r;
+    };
+    const AiPoint previous{800,200,10};
+    auto recovered=FindRecoveryPlacement(previous,player,floor);
+    Check(recovered && recovered->position[0]==previous[0] && recovered->position[1]==previous[1],"reclaimed squad member returns at its previous clear location");
+    recovered=FindRecoveryPlacement(AiPoint{9000,200,10},player,floor);
+    Check(recovered && PointDistanceSquared(recovered->position,player)<200.f*200.f,"distant retired location falls back near the current player");
+    recovered=FindRecoveryPlacement(bad,player,floor);
+    Check(recovered && recovered->position!=bad,"invalid recovery coordinates never enter native traces");
+    Check(!FindRecoveryPlacement(previous,player,solid),"recovery cannot bypass collision clearance at either old or fallback location");
     std::array<std::uint8_t,48> raw{};float fraction=.25f;std::memcpy(raw.data(),&fraction,4);float normal=1;std::memcpy(raw.data()+12,&normal,4);
     Check(DecodeAiTrace(raw).valid && DecodeAiTrace(raw).normal[2]==1,"native fraction/normal decode");
     raw[0x2d]=1;Check(DecodeAiTrace(raw).startSolid,"native actor initializer's confirmed startsolid field");

@@ -151,7 +151,7 @@ const char* Row(Page page, int n) {
     static constexpr const char* home[] = {"PLAYER", "WEAPONS", "WORLD", "AI", "ZOMBIE MODE", "DIAGNOSTICS"};
     static constexpr const char* player[] = {"God Mode", "FOV settings", "Noclip", "Super Speed", "Super Jump", "Reset player toggles"};
     static constexpr const char* weapons[] = {"Give All (usable banks)", "Infinite Ammo", "No Reload", "Infinite Grenades (linked)", "Rapid Fire", "Explosive Bullets", "Force Dual Wield", "No Recoil", "Weapon info to log", "Reset weapon toggles"};
-    static constexpr const char* world[] = {"Slow Motion", "Freeze AI", "Gravity", "Kill All Enemies", "Reset world toggles"};
+    static constexpr const char* world[] = {"Slow Motion", "Freeze AI", "Gravity", "Kill All Enemies", "Allow Friendly Fire", "Reset world toggles"};
     static constexpr const char* ai[] = {"Spawn Enemy (nearest point)", "Spawn Friendly (near you)", "Enemy model", "Friendly model", "Pause AI spawning", "Freeze AI (linked)", "Alive enemy / friendly", "Our spawned actors", "Remove our spawned actors", "AI info to log", "Engine actor slots"};
     static constexpr const char* zombies[] = {"Round rules preview", "Controller rehearsal", "Playable Zombies / actors"};
     static constexpr const char* diag[] = {"Status HUD", "Write State to Log"};
@@ -279,6 +279,7 @@ void Overlay::frame() {
         else if (action == Action::ToggleSlowMotion) ToggleExtraFeature(ExtraFeature::SlowMotion);
         else if (action == Action::ToggleFreezeAI) ToggleExtraFeature(ExtraFeature::FreezeAI);
         else if (action == Action::ToggleGravity) ToggleExtraFeature(ExtraFeature::Gravity);
+        else if (action == Action::ToggleFriendlyFire) ToggleExtraFeature(ExtraFeature::FriendlyFire);
         else if (action == Action::ResetWorld) ResetWorldFeatures();
         else if(action==Action::SpawnAiEnemy) RequestAiOperation(AiOperation::SpawnEnemy,ReadSnapshot());
         else if(action==Action::SpawnAiFriendly) RequestAiOperation(AiOperation::SpawnFriendly,ReadSnapshot());
@@ -513,6 +514,7 @@ void Overlay::frame() {
                     if (!ExtraAvailable(s,ExtraFeature::Gravity)) status="LOCKED";
                     else { std::snprintf(value,sizeof(value),"%s %d",wanted?(s.gravityLiteral==extraPreferences.gravity+.5f && s.gravity.current==extraPreferences.gravity?"ON":"WAIT"):"OFF",extraPreferences.gravity); status=value; }
                 } else if (n==3) status=!aiStatus.ready?"LOCKED":aiStatus.pending?"QUEUED":aiStatus.enemyAlive?"ENTER":"EMPTY";
+                else if(n==4) status=!ExtraAvailable(s,ExtraFeature::FriendlyFire)?"LOCKED":extraPreferences.wanted(ExtraFeature::FriendlyFire)?(s.friendlyFireDistance.current==0.f && s.friendlyFireScale.current==1.f?"ON":"WAIT"):"OFF";
                 else status="ENTER";
             }
             else if(menu.page==Page::AI) {

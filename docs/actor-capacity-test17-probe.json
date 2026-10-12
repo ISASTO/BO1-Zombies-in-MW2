@@ -1,0 +1,18 @@
+{
+  "probe": "isolated exact-native allocator/iterator/perception",
+  "native_allocator_slots_verified": 256,
+  "native_257th_allocation_refused": true,
+  "pool_boundary_guards_intact": true,
+  "native_iterator_slots_visited": 256,
+  "native_iterator_last_slot": 255,
+  "native_sentient_49_tail_guard_intact": true,
+  "native_sentient_50_actor_tail_corruption_bytes": 48,
+  "runtime_capacity_expansion_enabled": false,
+  "scope": "Three routines in a private Linux MS-ABI harness; MW2/Windows gameplay, animation, snapshots and save/reload are not executed.",
+  "executable_sha256": "fb7e8a987c371dea7b666091b0b9e2011c0cd9cd277b191ad453d11d557dd777",
+  "substituted_dependencies": [
+    "memset MS-ABI REP STOSB stub",
+    "iteration predicate records visits and returns false; native callbacks skipped",
+    "perception callback replaced by jump to the original epilogue"
+  ]
+}

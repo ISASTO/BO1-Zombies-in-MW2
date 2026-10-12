@@ -35,6 +35,8 @@ struct Profile {
     std::uintptr_t dualSlot=0;
     bool dualResolved=false,inventoryResolved=false,dualAnimResolved=false;
     bool recoilResolved=false;
+    bool friendlyFireResolved=false;
+    std::uintptr_t friendlyFireDistanceSlot=0,friendlyFireScaleSlot=0;
     std::uintptr_t weaponAnimCache=0;
 } profile;
 struct DualAssetOwnership {
@@ -60,7 +62,7 @@ struct FeatureRuntime {
     bool jumpOwned=false;
     ExtraPreferences extra;
     ScalarOwnership<std::uint8_t> giveAll, explosive, ai;
-    ScalarOwnership<float> time, gravity;
+    ScalarOwnership<float> time, gravity, friendlyFireDistance, friendlyFireScale;
     ScalarOwnership<float> gravityLiteral;
     RapidOwnership rapid;
     ScalarOwnership<int> recoilScale;
@@ -782,6 +784,8 @@ void RestoreExtras() {
     ApplyBool(features.ai,ReadBoolDvar(profile.aiSlot,profile.aiResolved,"g_ai"),false,0,"FREEZE_AI");
     ApplyFloat(features.time,ReadFloatDvar(profile.timeSlot,profile.timeResolved,"timescale",.001f,1000.f),false,1.f,"SLOW_MOTION");
     ApplyFloat(features.gravity,ReadFloatDvar(profile.gravitySlot,profile.gravityResolved,"g_gravity",0.f,10000.f),false,800.f,"GRAVITY");
+    ApplyFloat(features.friendlyFireDistance,ReadFloatDvar(profile.friendlyFireDistanceSlot,profile.friendlyFireResolved,"g_friendlyfireDist",0.f,100000.f),false,0.f,"FRIENDLY_FIRE_AIM_BLOCK");
+    ApplyFloat(features.friendlyFireScale,ReadFloatDvar(profile.friendlyFireScaleSlot,profile.friendlyFireResolved,"g_friendlyfireDamageScale",0.f,1.f),false,1.f,"FRIENDLY_FIRE_DAMAGE_SCALE");
     RestoreGravityLiteral();
     RestoreRapid();
     features.recoilScale.clear();features.recoilFlag.clear();
@@ -945,6 +949,17 @@ void InitializeEngine() {
                 && ReadValue(ResolveScalarRip(gravity,0),defaultGravity) && defaultGravity==800.f
                 && ReadValue(profile.gravityLiteral,playerDefault) && playerDefault==kDefaultGravityLiteral;
         }
+        profile.friendlyFireDistanceSlot=ResolveRip(profile.base+0x1735e8,0);
+        profile.friendlyFireScaleSlot=ResolveRip(profile.base+0x17361a,0);
+        profile.friendlyFireResolved=profile.friendlyFireDistanceSlot==profile.base+kFriendlyFireDistanceSlotRva
+            && profile.friendlyFireScaleSlot==profile.base+kFriendlyFireScaleSlotRva
+            && Anchor(profile.base+0x1735bb,0,"g_friendlyfireDist")
+            && Anchor(profile.base+0x1735ef,0,"g_friendlyfireDamageScale")
+            && profile.friendlyFireDistanceSlot==ResolveRip(profile.base+0x1acc97,0)
+            && profile.friendlyFireScaleSlot==ResolveRip(profile.base+0x167f13,0);
+        Log("FRIENDLY_FIRE_PROFILE resolved=%d aim_block_slot=0x%llx damage_scale_slot=0x%llx",
+            profile.friendlyFireResolved,static_cast<unsigned long long>(profile.friendlyFireDistanceSlot-profile.base),
+            static_cast<unsigned long long>(profile.friendlyFireScaleSlot-profile.base));
         const auto catalog=Unique(text,start,"weapon catalog capacity",kWeaponCatalogPattern);
         const auto count=Unique(text,start,"weapon catalog last index",kWeaponCountPattern);
         const auto pointers=Unique(text,start,"complete/definition table lookups",kWeaponPointersPattern);
@@ -1024,6 +1039,8 @@ Snapshot ReadSnapshot() {
     s.ai=ReadBoolDvar(profile.aiSlot,profile.aiResolved,"g_ai");
     s.timeScale=ReadFloatDvar(profile.timeSlot,profile.timeResolved,"timescale",.001f,1000.f);
     s.gravity=ReadFloatDvar(profile.gravitySlot,profile.gravityResolved,"g_gravity",0.f,10000.f);
+    s.friendlyFireDistance=ReadFloatDvar(profile.friendlyFireDistanceSlot,profile.friendlyFireResolved,"g_friendlyfireDist",0.f,100000.f);
+    s.friendlyFireScale=ReadFloatDvar(profile.friendlyFireScaleSlot,profile.friendlyFireResolved,"g_friendlyfireDamageScale",0.f,1.f);
     s.gravityLiteralValid=profile.gravityResolved && ReadValue(profile.gravityLiteral,s.gravityLiteral) && ValidGravityLiteral(s.gravityLiteral);
     s.weaponResolved=profile.weaponResolved; s.grenadeSustainResolved=profile.grenadeSustainResolved;
     if (s.weaponResolved) ReadValue(profile.weaponCount,s.weaponCount);
@@ -1129,6 +1146,7 @@ bool ExtraAvailable(const Snapshot& s,ExtraFeature feature) {
         case ExtraFeature::GiveAll: return s.giveAll.valid && s.inventoryValid;
         case ExtraFeature::RapidFire: return s.weapon.valid && s.weapon.type==0 && s.weapon.fireTime>=1 && s.weapon.fireTime<=4000;
         case ExtraFeature::NoRecoil: return s.recoilValid;
+        case ExtraFeature::FriendlyFire: return s.friendlyFireDistance.valid && s.friendlyFireScale.valid;
         case ExtraFeature::ExplosiveBullets: return s.explosive.valid;
         case ExtraFeature::SlowMotion: return s.timeScale.valid;
         case ExtraFeature::FreezeAI: return s.ai.valid;
@@ -1308,6 +1326,9 @@ void UpdatePlayerFeatures(ULONGLONG now) {
     ApplyBool(features.explosive,s.explosive,features.extra.wanted(ExtraFeature::ExplosiveBullets),1,"EXPLOSIVE_BULLETS");
     ApplyBool(features.ai,s.ai,features.extra.wanted(ExtraFeature::FreezeAI),0,"FREEZE_AI");
     ApplyFloat(features.time,s.timeScale,features.extra.wanted(ExtraFeature::SlowMotion),features.extra.timeScale,"SLOW_MOTION");
+    const bool friendlyFire=features.extra.wanted(ExtraFeature::FriendlyFire);
+    ApplyFloat(features.friendlyFireDistance,s.friendlyFireDistance,friendlyFire,0.f,"FRIENDLY_FIRE_AIM_BLOCK");
+    ApplyFloat(features.friendlyFireScale,s.friendlyFireScale,friendlyFire,1.f,"FRIENDLY_FIRE_DAMAGE_SCALE");
     if (ExtraAvailable(s,ExtraFeature::Gravity)) {
         const bool enabled=features.extra.wanted(ExtraFeature::Gravity);
         ApplyFloat(features.gravity,s.gravity,enabled,static_cast<float>(features.extra.gravity),"GRAVITY");

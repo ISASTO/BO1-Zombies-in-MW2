@@ -1,0 +1,39 @@
+{
+  "version": "0.1.16-squad-test17",
+  "dll_sha256": "f1242603343ed26aab675c6cd4bd2d9106fed27dc446e3314bb7ec48198642ba",
+  "dll_size": 4437448,
+  "machine": "AMD64 PE32+",
+  "aslr_nx": true,
+  "imports": [
+    "bcrypt.dll",
+    "dbghelp.dll",
+    "gdi32.dll",
+    "kernel32.dll",
+    "msvcrt.dll",
+    "user32.dll"
+  ],
+  "exports": [
+    "D3DPERF_BeginEvent",
+    "D3DPERF_EndEvent",
+    "D3DPERF_GetStatus",
+    "D3DPERF_QueryRepeatFrame",
+    "D3DPERF_SetMarker",
+    "D3DPERF_SetOptions",
+    "D3DPERF_SetRegion",
+    "DebugSetMute",
+    "Direct3DCreate9",
+    "Direct3DCreate9Ex"
+  ],
+  "cpp_suites_passed": 15,
+  "python_fixtures_passed": 28,
+  "existing_exact_profile_anchors": 97,
+  "native_squad_bindings": "squad-test17-evidence.json",
+  "native_capacity_preflight": "actor-capacity-test17-evidence.json",
+  "isolated_native_probe": "actor-capacity-test17-probe.json",
+  "runtime_capacity": 32,
+  "expanded_population_enabled": false,
+  "checkpoint_format": "Unchanged stock 32-actor/50-sentient format; ownership via existing targetname strings",
+  "checkpoint_reentry": "Independent generation cancels active mod work and stale rollback; deferred load discards metadata rather than deleting restored allocations",
+  "performance": "Test16 arena snapshot/name-cache/image reads retained; follow updates remain at most four actors per native tick",
+  "retail_execution": "Test17 autosaves/death/relaunch/friendly fire not executed in this Linux workspace; owner checklist required"
+}

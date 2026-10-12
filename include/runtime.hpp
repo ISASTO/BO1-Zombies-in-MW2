@@ -53,6 +53,7 @@ struct Snapshot {
     BoolDvarSnapshot ai;
     FloatDvarSnapshot timeScale;
     FloatDvarSnapshot gravity;
+    FloatDvarSnapshot friendlyFireDistance,friendlyFireScale;
     bool gravityLiteralValid=false;
     float gravityLiteral=0.f;
     bool playerGravityRead=false;

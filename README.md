@@ -1,25 +1,33 @@
 # BO1 Zombies in MW2
 
 Incremental mod framework for **retail Modern Warfare 2 (2009), single player**.
-Current build: **0.1.15-performance-test16**. Test15 did not fix the owner's
-stutter or Ghost spawning. Its timing data measured world scans averaging 61.6 ms
-with a 152.9 ms peak. Test16 removes repeated field/name reads from those scans:
-all entity fields use the existing arena snapshot, names cache by allocation
-serial/string id, and readable permanent main-EXE pages use validated local
-copies. Heap/asset pointers retain checked kernel reads. Scan-phase and kernel
-read counters expose remaining costs. Ghost capture now accepts the native empty
-attachment tag; the executable's initializer/default-tag path is independently
-verified. **The native 32-actor ceiling is not expanded.**
-Test15's 1x-10x Rapid Fire, No Recoil, named model rows and live autosave recovery
-remain included. The owner confirms No Recoil works.
+Current build: **0.1.16-squad-test17**. The owner confirms Test16's performance
+fix. Its returned world scans average 388 microseconds and peak at 942.1
+microseconds, compared with Test15's 61.6 ms average/152.9 ms peak. Test16's
+snapshot reads, name cache and checked permanent-image reads remain unchanged.
+See [Test16 runtime evidence](docs/runtime-test16-evidence.json).
+
+Test17 adds **WORLD > Allow Friendly Fire**, retains live spawned actors during
+native autosaves, and stores ownership tags through the existing native
+targetname save field. Validated actor/helper pairs can recover ownership after
+checkpoint reload or a process restart. A friendly reclaimed for a campaign slot
+tries its previous clear location before falling back near the player.
+These checkpoint and friendly-fire changes require Windows retail testing.
+
+**The 256-actor attempt is blocked; the game still uses 32 actor slots.**
+An isolated exact-native probe allocated/iterated all 256 slots successfully,
+but the unchanged perception code overwrote 48 bytes of actor state at sentient
+slot 50. Snapshot indices and checkpoint pointer bounds also require coordinated
+rewrites. The partial probe is tooling, not an enabled DLL patch. See
+[capacity audit](docs/actor-capacity-audit.md) and [Test17 checks](docs/squad-test17.md).
+The 1x-10x Rapid Fire, No Recoil and named model rows remain included.
+The owner confirms No Recoil and Kill All Enemies work.
 Ghost/Price/Soap/Roach require a matching loaded character in the current mission;
 Soldier uses a loaded human spawner. Universal character asset loading is pending.
 
-The owner's test15 run rejects Ghost entity 246's first attachment repeatedly:
-model 113, tag id 1. An empty successfully loaded tag was incorrectly classified
-as unavailable. Test16 distinguishes lookup failure from empty text and recognizes
-the native empty-tag constant. Actual frame pacing and Ghost rendering still need
-the owner's retail test. Start with [the test16 checklist](docs/performance-test16.md).
+Test16's returned logs now capture/apply the loaded Ghost appearance, including
+the native empty attachment tag. Model application in a log is not visual
+acceptance of the character's rendering.
 G18's overlapping dual-wield models remain deferred. BO1 gameplay remains a
 simulated controller rehearsal.
 
@@ -121,18 +129,19 @@ An executable hash mismatch disables game-state access and memory writes.
 The installer rejects a mismatched build. A manually installed proxy can still
 show its diagnostic menu in an unknown AMD64 `iw4sp.exe`.
 
-## Current scan/Ghost test16
+## Current squad/checkpoint test17
 
-1. Close MW2 and extract the entire `BO1MW2-performance-test16.zip` outside the game folder.
+1. Close MW2 and extract the entire `BO1MW2-squad-test17.zip` outside the game folder.
 2. Run `Uninstall.cmd`, then `Install.cmd`, selecting the folder containing
    `iw4sp.exe`. Saved FOV and logs are preserved.
 3. Launch through Steam and **restart the mission once for this upgrade**.
    Avoid starting with NPCs saved by test13. Wait for player control, press F4,
    and test an enemy plus a Soldier helper before increasing population.
-4. Follow [performance-test16.md](docs/performance-test16.md): frame pacing first,
-   then Ghost and a quick check of the existing weapon/recovery controls.
-   Live autosaves rebuild spawned NPCs in the same session. Death/checkpoint
-   reload clears them; spawned populations are not embedded in checkpoint files.
+4. Follow [squad-test17.md](docs/squad-test17.md): confirm allies stay in place at
+   an autosave, test death/reload and relaunch ownership, and check friendly fire
+   ON/OFF. The installer backs up a local `players` folder if present. Saves
+   stored elsewhere are outside that automatic backup.
+   Campaign slot reclamation can still occur at the unchanged 32-slot limit.
 5. Close MW2 and run `Diagnose.cmd` before another launch replaces `latest.log`.
    Return its ZIP and the checklist observations. Saved FOV persists; other
    toggles and character/model selection are session-only.
@@ -169,9 +178,9 @@ Copy the log immediately after a failing run: `latest.log` is replaced on launch
 | BO1 controller rehearsal | Test11 owner-accepted; simulated actors only, source-derived normal solo lifecycle and game-clock guards |
 | FOV selector and saved preference | Owner confirms test6 behavior; matching logs show load/selection/save/reset |
 | WEAPONS | Owner confirms No Recoil works in Test15. 1x-10x Rapid Fire is retained. G18 dual appearance is deferred. |
-| WORLD | Adjustable time/gravity, actor-think freeze, reset; test8 logs confirm several apply/restore paths; broader gameplay coverage pending |
-| AI | Test16 repairs scan memory/name reads and native empty-tag capture. Test15 recovery and combat controls remain. Frame pacing/Ghost need retail verification; physical capacity remains 32. |
-| Kill All Enemies | Test14 native damage call for hostile actor entities; allies, clients and protected entities excluded. Retail check pending. |
+| WORLD | Adjustable time/gravity, actor-think freeze, reset; Test17 adds Allow Friendly Fire with guarded native-value restoration. |
+| AI | Owner confirms Test16 performance. Test17 removes autosave rebuilding and adds saved ownership/recovery placement; retail checkpoint testing pending. 256-slot preflight blocked; active capacity remains 32. |
+| Kill All Enemies | Owner-confirmed working native damage call for hostile actors; allies, clients and protected entities excluded. |
 | BO1 Zombies gameplay | Planned; normal MW2 AI is not a BO1 behavior/animation/assets port. |
 
 ## Architecture

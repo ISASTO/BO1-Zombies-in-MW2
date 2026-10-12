@@ -5,7 +5,7 @@
 #include <cstring>
 
 namespace mod {
-enum class ExtraFeature { GiveAll, RapidFire, ExplosiveBullets, SlowMotion, FreezeAI, Gravity, ForceDualWield, NoRecoil, Count };
+enum class ExtraFeature { GiveAll, RapidFire, ExplosiveBullets, SlowMotion, FreezeAI, Gravity, ForceDualWield, NoRecoil, FriendlyFire, Count };
 inline const char* ExtraName(ExtraFeature feature) {
     switch (feature) {
         case ExtraFeature::GiveAll: return "GIVE_ALL_LOADED";
@@ -16,6 +16,7 @@ inline const char* ExtraName(ExtraFeature feature) {
         case ExtraFeature::Gravity: return "GRAVITY";
         case ExtraFeature::ForceDualWield: return "FORCE_DUAL_WIELD";
         case ExtraFeature::NoRecoil: return "NO_RECOIL";
+        case ExtraFeature::FriendlyFire: return "ALLOW_FRIENDLY_FIRE";
         case ExtraFeature::Count: break;
     }
     return "UNKNOWN";
@@ -48,7 +49,7 @@ struct ExtraPreferences {
         rapidFireMultiplier=2;
     }
     void resetWorld() {
-        for (const auto f:{ExtraFeature::SlowMotion,ExtraFeature::FreezeAI,ExtraFeature::Gravity}) enabled[static_cast<std::size_t>(f)]=false;
+        for (const auto f:{ExtraFeature::SlowMotion,ExtraFeature::FreezeAI,ExtraFeature::Gravity,ExtraFeature::FriendlyFire}) enabled[static_cast<std::size_t>(f)]=false;
         timeScale=.5f; gravity=400;
     }
 };
@@ -81,6 +82,11 @@ inline int RapidFireTime(int milliseconds,int multiplier=2) { return std::max(1,
 // Independently checked against the native player_recoilscaleon/off methods.
 inline constexpr std::size_t kClientWeaponFlags=0x2bc,kClientRecoilScale=0xac98;
 inline constexpr unsigned kRecoilScaleFlag=0x400;
+// SHA256-gated registration and independent consumer bindings, checked by
+// tools/verify_squad_bindings.py. The distance controls the friendly aim block;
+// the damage scale controls damage to a player from a client-bearing attacker.
+inline constexpr std::uintptr_t kFriendlyFireDistanceSlotRva=0xd9c4e8;
+inline constexpr std::uintptr_t kFriendlyFireScaleSlotRva=0xd9c4f0;
 struct WeaponFields {
     bool valid=false;
     unsigned index=0;
