@@ -21,6 +21,28 @@ def verify(path,include=Path('include')):
         return at+7+struct.unpack_from('<i',b,3)[0]
     def literal(at):return pe.get_data(at,100).split(b'\0')[0]
     distance=value(controls,'kFriendlyFireDistanceSlotRva');scale=value(controls,'kFriendlyFireScaleSlotRva')
+    parameters=value(hooks,'kScriptParametersRva');depth=value(hooks,'kScriptExecuteDepthRva')
+    def operand(at,offset,length):return at+length+struct.unpack('<i',pe.get_data(at+offset,4))[0]
+    if pe.get_data(0x223180,2)!=bytes.fromhex('8b 05') or operand(0x223180,2,6)!=parameters+12:
+        raise ValueError('Native builtin outgoing parameter counter differs')
+    if pe.get_data(0x223994,3)!=bytes.fromhex('48 8b 05') or operand(0x223994,3,7)!=parameters:
+        raise ValueError('Native notification stack-top pointer differs')
+    if operand(0x22398a,2,7)!=parameters+12 or operand(0x2239c8,2,6)!=parameters+8:
+        raise ValueError('Native notification incoming/outgoing counters differ')
+    if operand(0x224934,2,6)!=depth or operand(0x223910,2,10)!=depth or pe.get_data(0x223916,4)!=bytes.fromhex('ff ff ff ff'):
+        raise ValueError('Native execution depth/idle value differs')
+    if value(hooks,'kScriptNotifyRva')!=0x223970:
+        raise ValueError('Native notification routine differs')
+    damage=value(hooks,'kDamageRva')
+    prologue=bytes(int(n,16) for n in re.search(r'kDamagePrologue=\{([^}]+)',hooks)[1].split(',') if n.strip())
+    if pe.get_data(damage,len(prologue))!=prologue or len(prologue)!=15 or damage&15:
+        raise ValueError('Damage hook prologue/alignment differs')
+    # Both null attribution arguments are replaced with the native world
+    # entity before any damage notification or actor pain/death callback.
+    if pe.get_data(0x167d99,3)!=bytes.fromhex('48 8d 35') or operand(0x167d99,3,7)!=0xd9e070+2046*0x2a0:
+        raise ValueError('Native world-entity damage attribution differs')
+    if pe.get_data(0x167da0,17)!=bytes.fromhex('48 85 ed 4c 8b ee 4c 0f 45 ed 48 85 ff 48 0f 45 f7'):
+        raise ValueError('Native null inflictor/attacker substitutions differ')
     if literal(rip(0x1735bb))!=b'g_friendlyfireDist' or rip(0x1735e8)!=distance or rip(0x1acc97)!=distance:
         raise ValueError('Friendly aim-block registration/consumer slot mismatch')
     if literal(rip(0x1735ef))!=b'g_friendlyfireDamageScale' or rip(0x17361a)!=scale or rip(0x167f13)!=scale:
@@ -53,7 +75,11 @@ def verify(path,include=Path('include')):
         raise ValueError('Native checkpoint text writer differs')
     return {'executable_sha256':expected,'friendly_aim_block_slot_rva':hex(distance),
         'friendly_damage_scale_slot_rva':hex(scale),'enabled_aim_block_distance':0,
-        'enabled_client_damage_scale':1,'off_behavior':'Guarded restoration of pre-override native values',
+        'enabled_client_damage_scale':1,'off_behavior':'Guarded restoration of pre-override native values and normal player damage attribution',
+        'enabled_allied_damage_attribution':'Native world entity instead of player; damage/death callbacks retain native processing',
+        'script_parameters_rva':hex(parameters),'script_execute_depth_rva':hex(depth),'idle_script_execute_depth':-1,
+        'cleanup_parameter_isolation':'Preserve caller stack/refcounts; hide incoming/outgoing counts only for the hidden native operation',
+        'damage_hook_rva':hex(damage),'damage_trampoline_bytes':len(prologue),
         'native_string_factory_rva':hex(intern),'native_entity_save_fields_rva':hex(table),
         'targetname_save_kind':1,'targetname_saved_as':'Text through SL_ConvertToString/MemFile_WriteCString',
         'checkpoint_write_behavior':'Keep live native actors/helpers; do not delete or enqueue save recovery',

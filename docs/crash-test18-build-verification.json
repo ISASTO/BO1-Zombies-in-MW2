@@ -1,0 +1,37 @@
+{
+  "version": "0.1.17-crash-test18",
+  "dll_sha256": "98ca1522878d1ea230e4371a8ba95da785fa583555adfea9435c8f4874a7ffe8",
+  "dll_size": 4535998,
+  "machine": "AMD64 PE32+",
+  "aslr_nx": true,
+  "imports": [
+    "bcrypt.dll",
+    "dbghelp.dll",
+    "gdi32.dll",
+    "kernel32.dll",
+    "msvcrt.dll",
+    "user32.dll"
+  ],
+  "exports": [
+    "D3DPERF_BeginEvent",
+    "D3DPERF_EndEvent",
+    "D3DPERF_GetStatus",
+    "D3DPERF_QueryRepeatFrame",
+    "D3DPERF_SetMarker",
+    "D3DPERF_SetOptions",
+    "D3DPERF_SetRegion",
+    "DebugSetMute",
+    "Direct3DCreate9",
+    "Direct3DCreate9Ex"
+  ],
+  "cpp_suites_passed": 16,
+  "python_fixtures_passed": 28,
+  "existing_exact_profile_anchors": 97,
+  "native_squad_bindings": "crash-test18-native-bindings.json",
+  "isolated_script_parameter_probe": "script-parameters-test18-probe.json",
+  "runtime_capacity": 32,
+  "expanded_population_enabled": false,
+  "checkpoint_format": "Unchanged stock 32-actor/50-sentient format; ownership via existing targetname strings",
+  "performance": "Cached arena/name/image reads and four-actor follow batch retained. Bounded operation journal is memory-only during gameplay.",
+  "retail_execution": "Menu, crowded-squad crash resolution and friendly-fire endscreen bypass require owner Windows retest."
+}

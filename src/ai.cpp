@@ -9,6 +9,8 @@
 #include "checked_memory.hpp"
 #include "script_text.hpp"
 #include "ai_persistence.hpp"
+#include "script_parameters.hpp"
+#include "friendly_fire.hpp"
 
 namespace mod {
 namespace {
@@ -97,6 +99,8 @@ ClockFn originalClock=nullptr;
 InitFn originalInit=nullptr;
 SaveReadFn originalSaveRead=nullptr;
 SaveWriteFn originalSaveWrite=nullptr;
+DamageFn originalDamage=nullptr;
+std::atomic<bool> allowFriendlyFire{false},friendlyFireHookReady{false};
 std::atomic<bool> nativePending{false};
 std::atomic<unsigned long long> nativeCallbacks{0};
 std::atomic<DWORD> nativeThread{0};
@@ -105,6 +109,32 @@ thread_local bool spawningOwned=false;
 thread_local bool cleaningOwned=false;
 thread_local unsigned checkpointReadDepth=0;
 thread_local int traceIgnoreEntity=-1;
+
+bool DamageHook(std::uintptr_t target,std::uintptr_t inflictor,std::uintptr_t attacker,const float* direction,const float* point,
+    int damage,int flags,int mod,int weapon,int hitloc,int time,int surface) {
+    if(allowFriendlyFire.load(std::memory_order_relaxed) && target && attacker) {
+        const auto pool=aiProfile.fixedPool;
+        const auto inPool=[&](std::uintptr_t at) {return at>=pool && (at-pool)%kAiEntityStride==0 && (at-pool)/kAiEntityStride<kAiEntityCapacity;};
+        if(inPool(target) && inPool(attacker) && target!=attacker) {
+            const auto e=ReadAiEntity(target,static_cast<int>((target-pool)/kAiEntityStride),[](auto at,auto out,auto size){return CheckedReadMemory(at,out,size);});
+            std::uintptr_t client=0,sentient=0,self=0;int team=0;std::uint8_t active=0;
+            const bool player=CheckedReadMemory(attacker+kAiInUse,&active,1) && active==1
+                && CheckedReadMemory(attacker+kAiClient,&client,8) && client
+                && CheckedReadMemory(attacker+kAiSentient,&sentient,8) && sentient
+                && CheckedReadMemory(sentient,&self,8) && self==attacker
+                && CheckedReadMemory(sentient+8,&team,4);
+            if(BypassFriendlyFirePenalty(true,e,player,team)) {
+                // The native damage dispatcher substitutes the world entity
+                // for null attribution. Campaign damage/death callbacks then
+                // cannot count the hit as a player attack on an ally. Damage,
+                // hit location, weapon and native actor reactions still run.
+                inflictor=0;attacker=0;
+                RecordNativeOperation("FRIENDLY_DAMAGE_NEUTRAL",e.number);
+            }
+        }
+    }
+    return originalDamage(target,inflictor,attacker,direction,point,damage,flags,mod,weapon,hitloc,time,surface);
+}
 
 bool ReadAi(std::uintptr_t at,void* out,std::size_t length) {
     return CheckedReadMemory(at,out,length);
@@ -353,13 +383,16 @@ void BeforeLoad(const char* reason) {
     if(count) {ai.status.lastResult=AiRequestResult::Deleted;ai.nextWorldTime=0;}
 }
 void SaveReadHook(std::uintptr_t save) {
+    RecordNativeOperation("CHECKPOINT_READ_BEGIN");
     {std::lock_guard<std::recursive_mutex> lock(aiMutex);++ai.checkpointEpoch;}
     BeforeLoad("CHECKPOINT_READ");
     {std::lock_guard<std::recursive_mutex> lock(aiMutex);ai.names={};ai.nextWorldTime=0;ai.adoptPending=true;nativePending=true;}
     struct ReadScope {ReadScope(){++checkpointReadDepth;}~ReadScope(){--checkpointReadDepth;}} readScope;
     originalSaveRead(save);
+    RecordNativeOperation("CHECKPOINT_READ_END");
 }
 void SaveWriteHook(bool flag,std::uintptr_t save) {
+    RecordNativeOperation("CHECKPOINT_WRITE_BEGIN");
     // Player feature code takes its lock before the AI lock. Keep that order;
     // a save nested inside an active native AI call defers its AI cleanup.
     const bool suspend=!servicing && !cleaningOwned;
@@ -371,6 +404,7 @@ void SaveWriteHook(bool flag,std::uintptr_t save) {
     {std::lock_guard<std::recursive_mutex> lock(aiMutex);
         Log("AI_CHECKPOINT_WRITE retained=%llu recovery_pending=%llu mode=NATIVE_SAVE",static_cast<unsigned long long>(ai.owned.size()),static_cast<unsigned long long>(ai.recovery.size()));}
     originalSaveWrite(flag,save);
+    RecordNativeOperation("CHECKPOINT_WRITE_END");
 }
 int ActorInitHook(std::uintptr_t entity) {
     const auto epoch=ai.checkpointEpoch.load();
@@ -383,10 +417,12 @@ int ActorInitHook(std::uintptr_t entity) {
             ai.capacity.applied(dvar,limit,kAiNativeActorCapacity);limit=kAiNativeActorCapacity;
         }
         while(limit>0 && limit<=kAiNativeActorCapacity && Value(aiProfile.actorCountSlot,count) && count>=limit && !ai.owned.empty()) {
+            RecordNativeOperation("CAMPAIGN_RECLAIM_BEGIN",0,count);
             const auto removed=CleanupOwned("CAMPAIGN_NEEDS_SLOT",true);
             if(epoch!=ai.checkpointEpoch)return 0;
             ai.status.reclaimed+=removed;
             if(!removed)break;
+            RecordNativeOperation("CAMPAIGN_RECLAIM_END",0,count-static_cast<int>(removed));
         }
     }
     return originalInit(entity);
@@ -438,19 +474,19 @@ bool PlanCall(std::uintptr_t rva,std::uintptr_t targetRva,std::uintptr_t replace
     if(call-edit.at+code.size()>16 || !ReadAi(edit.at,edit.before.data(),16))return false;
     edit.after=edit.before;std::memcpy(edit.after.data()+call-edit.at,code.data(),code.size());serviceEdits.push_back(edit);return true;
 }
-bool PlanActorInit() {
-    const auto at=aiProfile.base+kActorInitRva;
+bool PlanEntry(std::uintptr_t rva,const std::array<std::uint8_t,15>& expected,std::uintptr_t replacement,void*& original) {
+    const auto at=aiProfile.base+rva;
     std::array<std::uint8_t,15> observed{};
-    if(!ReadAi(at,observed.data(),observed.size()) || observed!=kActorInitPrologue)return false;
+    if(!ReadAi(at,observed.data(),observed.size()) || observed!=expected || (at&15))return false;
     auto* trampoline=static_cast<std::uint8_t*>(VirtualAlloc(nullptr,4096,MEM_RESERVE|MEM_COMMIT,PAGE_READWRITE));
     if(!trampoline)return false;
     std::memcpy(trampoline,observed.data(),observed.size());
     const auto tail=AbsoluteJump(at+observed.size());std::memcpy(trampoline+observed.size(),tail.data(),tail.size());
     DWORD old=0;if(!VirtualProtect(trampoline,4096,PAGE_EXECUTE_READ,&old)){VirtualFree(trampoline,0,MEM_RELEASE);return false;}
     FlushInstructionCache(GetCurrentProcess(),trampoline,29);serviceMemory.push_back(trampoline);
-    originalInit=reinterpret_cast<InitFn>(trampoline);
+    original=trampoline;
     CodeEdit edit;edit.at=at;if(!ReadAi(at,edit.before.data(),16))return false;edit.after=edit.before;
-    const auto jump=AbsoluteJump(reinterpret_cast<std::uintptr_t>(&ActorInitHook));
+    const auto jump=AbsoluteJump(replacement);
     std::memcpy(edit.after.data(),jump.data(),jump.size());edit.after[14]=0x90;serviceEdits.push_back(edit);return true;
 }
 void Pause(const Snapshot& s) {
@@ -532,6 +568,26 @@ void RestoreCapacity() {
 }
 unsigned CleanupOwned(const char* reason,bool one) {
     if(cleaningOwned)return 0;
+    NativeScriptParameters parameters{};
+    const auto parameterAddress=aiProfile.base+kScriptParametersRva;
+    if(!ReadAi(parameterAddress,&parameters,sizeof(parameters)))return 0;
+    NativeScriptParameterFrame frame(*reinterpret_cast<volatile NativeScriptParameters*>(parameterAddress));
+    if(!frame.valid()) {Log("AI_DELETE refused=SCRIPT_PARAMETER_FRAME_INVALID reason=%s",reason);return 0;}
+    const auto parameterEpoch=ai.checkpointEpoch.load();
+    struct RestoreParameters {
+        NativeScriptParameterFrame& frame;std::uint64_t epoch;
+        ~RestoreParameters() {
+            if(epoch!=ai.checkpointEpoch)frame.abandon();
+            else if(!frame.close()) {
+                RecordNativeOperation("SCRIPT_PARAMETER_FRAME_UNBALANCED");
+                Log("AI_DELETE parameter frame changed unexpectedly; caller counters were not restored");
+            }
+        }
+    } restoreParameters{frame,parameterEpoch};
+    if(parameters.incoming || parameters.outgoing) {
+        RecordNativeOperation("SCRIPT_PARAMETER_FRAME_ISOLATED");
+        Log("AI_DELETE isolated_caller_params incoming=%u outgoing=%u reason=%s",parameters.incoming,parameters.outgoing,reason);
+    }
     cleaningOwned=true;
     struct ClearCleanupFlag {~ClearCleanupFlag(){cleaningOwned=false;}} cleanupFlag;
     unsigned removed=0;
@@ -552,9 +608,11 @@ unsigned CleanupOwned(const char* reason,bool one) {
             int protectedNumber=-1;
             if(!Value(aiProfile.protectedSlot,protectedNumber) || protectedNumber==raw.number) {++it;continue;}
             Log("AI_DELETE_BEGIN entity=%u serial=%u type=%u reason=%s",raw.number,raw.serial,raw.type,reason);
+            RecordNativeOperation("DELETE_BEGIN",raw.number);
             if(one && it->team==ai.allyTeam)CaptureRecovery(&it->identity);
             // Native delete sends notifications and performs brain/sentient/VM cleanup.
             reinterpret_cast<DeleteFn>(aiProfile.remove)(raw.number);
+            RecordNativeOperation("DELETE_END",raw.number);
             if(epoch!=ai.checkpointEpoch)return removed;
             const auto after=ReadAiAllocation(it->identity,ReadAi);
             if(SameAiAllocation(it->identity,after)) {Log("AI_DELETE refused entity=%u",raw.number);++it;continue;}
@@ -741,7 +799,9 @@ void FollowOwned(const Snapshot& s,const AiScope& scope,int time) {
         const auto desiredEnemy=target?static_cast<std::uint16_t>((target-scope.pool)/kAiEntityStride+1):0;
         const bool enemyRead=Value(e.sentient+0x44,currentEnemy);
         if(target!=it->target || (target && enemyRead && currentEnemy!=desiredEnemy)) {
+            RecordNativeOperation("SET_ENEMY_BEGIN",e.number);
             reinterpret_cast<EnemyFn>(aiProfile.setEnemy)(e.sentient,target,1,0);
+            RecordNativeOperation("SET_ENEMY_END",e.number);
             if(target!=it->target)Log("AI_COMBAT entity=%u team=%d target=%u",e.number,it->team,target?static_cast<unsigned>((target-scope.pool)/kAiEntityStride):0);
             else ++ai.status.combatReassertions;
             it->target=target;
@@ -771,7 +831,9 @@ void FollowOwned(const Snapshot& s,const AiScope& scope,int time) {
         const bool nativeGoalRead=ReadAi(e.actor+0x1498,nativeGoal.data(),sizeof(nativeGoal)) && FinitePoint(nativeGoal);
         const bool redirected=nativeGoalRead && PointDistanceSquared(nativeGoal,goal)>96.f*96.f;
         if((follow || advance) && (NeedsAiGoal(it->hasGoal,it->goal,goal) || redirected)) {
+            RecordNativeOperation("SET_GOAL_BEGIN",e.number);
             reinterpret_cast<GoalFn>(aiProfile.setGoal)(e.actor,goal.data(),0);
+            RecordNativeOperation("SET_GOAL_END",e.number);
             it->goal=goal;it->hasGoal=true;it->lastGoalTime=time;
         }
         if(!tracked() || !it->identity.matches(Entity(it->identity,scope.pool,false)))continue;
@@ -813,6 +875,11 @@ void Service() {
     servicing=true;
     struct ClearServiceFlag { ~ClearServiceFlag() { servicing=false; } } clearServiceFlag;
     std::lock_guard<std::recursive_mutex> lock(aiMutex);
+    NativeScriptParameters parameters{};int executeDepth=0;
+    // The clock may be called recursively by campaign scripts. Only run mod
+    // work when the VM is idle and no builtin owns stack parameters.
+    if(!Value(aiProfile.base+kScriptExecuteDepthRva,executeDepth) || executeDepth!=-1
+        || !Value(aiProfile.base+kScriptParametersRva,parameters) || parameters.incoming || parameters.outgoing)return;
     if(!CompleteServiceInstall()) {
         ai.queue.cancel(AiRequestResult::HookUnavailable);ai.hands.pending=false;ai.hands.result.state=NativeHandBuildState::Failed;
         Finish(AiRequestResult::HookUnavailable);return;
@@ -955,10 +1022,12 @@ void SpawnOwned(const AiRequest& input,const Snapshot& s,const AiScope& scope,in
     Log("AI_SPAWN_BEGIN team=%d source=%u serial=%u classname=%s point=%u placement_attempts=%d position=%.1f,%.1f,%.1f native_thread=%lu",
         team,source.number,source.serial,source.classname.c_str(),pointNumber,placement->attempts,
         placement->position[0],placement->position[1],placement->position[2],GetCurrentThreadId());
+    RecordNativeOperation("SPAWN_BEGIN",source.number,actorCount);
     // Argument three skips the factory's visibility/player-distance refusal.
     // The separate eviction spawnflag2 is cleared; physical clearance was traced.
     struct SpawnScope {SpawnScope(){spawningOwned=true;}~SpawnScope(){spawningOwned=false;}};
     std::uintptr_t spawned=0;{SpawnScope spawnScope;spawned=reinterpret_cast<SpawnFn>(aiProfile.spawn)(temporary,0,1,0);}
+    RecordNativeOperation("SPAWN_END",source.number,actorCount+static_cast<int>(spawned!=0));
     if(epoch!=ai.checkpointEpoch) {Finish(AiRequestResult::LifetimeChanged);return;}
     if(!spawned) {Finish(AiRequestResult::NativeRefused);return;}
     if(spawned<scope.pool || (spawned-scope.pool)%kAiEntityStride
@@ -1010,11 +1079,14 @@ bool InstallService() {
     originalClock=reinterpret_cast<ClockFn>(aiProfile.base+kFrameClockRva);
     originalSaveRead=reinterpret_cast<SaveReadFn>(aiProfile.base+kSaveReadRva);
     originalSaveWrite=reinterpret_cast<SaveWriteFn>(aiProfile.base+kSaveWriteRva);
+    void* initEntry=nullptr;void* damageEntry=nullptr;
     serviceEdits.clear();
     if(!PlanCall(kFrameClockCallRva,kFrameClockRva,reinterpret_cast<std::uintptr_t>(&ClockHook))
         || !PlanCall(kSaveReadCallRva,kSaveReadRva,reinterpret_cast<std::uintptr_t>(&SaveReadHook))
         || !PlanCall(kSaveWriteCallRva,kSaveWriteRva,reinterpret_cast<std::uintptr_t>(&SaveWriteHook))
-        || !PlanActorInit()) {Log("AI_SERVICE profile/code planning failed; no hooks published");return false;}
+        || !PlanEntry(kActorInitRva,kActorInitPrologue,reinterpret_cast<std::uintptr_t>(&ActorInitHook),initEntry)
+        || !PlanEntry(kDamageRva,kDamagePrologue,reinterpret_cast<std::uintptr_t>(&DamageHook),damageEntry)) {Log("AI_SERVICE profile/code planning failed; no hooks published");return false;}
+    originalInit=reinterpret_cast<InitFn>(initEntry);originalDamage=reinterpret_cast<DamageFn>(damageEntry);
     // Publish only the intact CALL instruction from the rendering thread.
     // The actor prologue is changed at the following server-clock callback,
     // outside ActorInit execution on the game's actor/VM thread.
@@ -1024,7 +1096,7 @@ bool InstallService() {
 }
 bool CompleteServiceInstall() {
     if(ai.status.hookInstalled)return true;
-    if(!clockInstalled || serviceEdits.size()!=4)return false;
+    if(!clockInstalled || serviceEdits.size()!=5)return false;
     std::size_t installed=1;
     for(;installed<serviceEdits.size();++installed)if(!ExchangeCode(serviceEdits[installed],true))break;
     if(installed!=serviceEdits.size()) {
@@ -1032,7 +1104,8 @@ bool CompleteServiceInstall() {
         Log("AI_SERVICE lifecycle hook transaction rolled back on native thread");return false;
     }
     ai.status.hookInstalled=true;
-    Log("AI_SERVICE installed=1 scheduler=SERVER_CLOCK checkpoint_read=1 checkpoint_write=1 mission_slot_reclaim=1 atomic_code_width=16");
+    friendlyFireHookReady.store(true,std::memory_order_release);
+    Log("AI_SERVICE installed=1 scheduler=SERVER_CLOCK checkpoint_read=1 checkpoint_write=1 mission_slot_reclaim=1 script_parameter_isolation=1 friendly_damage_hook=1 atomic_code_width=16");
     return true;
 }
 float Distance(const AiEntity& e,const std::array<float,3>& origin) {
@@ -1176,6 +1249,9 @@ void ReadWorld(const Snapshot& s,const AiScope& scope) {
 
 } // namespace
 
+bool FriendlyFireHookReady() {return friendlyFireHookReady.load(std::memory_order_acquire);}
+void SetAllowFriendlyFire(bool enabled) {allowFriendlyFire.store(enabled && FriendlyFireHookReady(),std::memory_order_release);}
+
 void InitializeAiEngine(std::uintptr_t base,std::size_t size,std::uintptr_t text,std::size_t textSize,bool supported) {
     std::lock_guard<std::recursive_mutex> lock(aiMutex);
     aiProfile.base=base; aiProfile.size=size;
@@ -1258,6 +1334,12 @@ void InitializeAiEngine(std::uintptr_t base,std::size_t size,std::uintptr_t text
         && InHost(aiProfile.completeTable,kWeaponCapacity*8) && InHost(aiProfile.definitionTable,kWeaponCapacity*8)
         && boundsMatch && Call(actorTrace,50)==trace && Call(handsCall,7)==builder && Call(handsCall,24)==builder
         && aiProfile.setEnemy==enemyStart && InHost(aiProfile.setString,1);
+    std::array<std::uint8_t,15> damageStart{};
+    aiProfile.resolved=aiProfile.resolved && InHost(base+kScriptParametersRva,sizeof(NativeScriptParameters))
+        && InHost(base+kScriptExecuteDepthRva,4) && ReadAi(base+kDamageRva,damageStart.data(),damageStart.size()) && damageStart==kDamagePrologue
+        && Rip(base+0x223180,0,2,6)==base+kScriptParametersRva+12
+        && Rip(base+0x223994,0,3,7)==base+kScriptParametersRva
+        && Rip(base+0x224934,0,2,6)==base+kScriptExecuteDepthRva;
     ai.status.resolved=aiProfile.resolved;
     Log("AI_CAPACITY_EXPANSION requested=256 enabled=0 runtime_capacity=%d blocked=PERCEPTION_SNAPSHOT_SAVE_LAYOUT",kAiNativeActorCapacity);
     Log("AI_PROFILE resolved=%d callback_slot_rva=0x%llx spawn_rva=0x%llx delete_rva=0x%llx pool_slot_rva=0x%llx clock_rva=0x%llx",

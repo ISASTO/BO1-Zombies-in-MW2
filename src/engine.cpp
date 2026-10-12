@@ -777,6 +777,7 @@ void ApplyFloat(ScalarOwnership<float>& owned,const FloatDvarSnapshot& s,bool en
     }
 }
 void RestoreExtras() {
+    SetAllowFriendlyFire(false);
     RestoreDualAsset(); features.dualReady=false;
     ApplyBool(features.giveAll,ReadBoolDvar(profile.giveAllSlot,profile.giveAllResolved,"g_giveAll"),false,1,"GIVE_ALL_LOADED");
     ApplyBool(features.dual,ReadBoolDvar(profile.dualSlot,profile.dualResolved,"bg_forceDualWield"),false,1,"FORCE_DUAL_WIELD");
@@ -1146,7 +1147,7 @@ bool ExtraAvailable(const Snapshot& s,ExtraFeature feature) {
         case ExtraFeature::GiveAll: return s.giveAll.valid && s.inventoryValid;
         case ExtraFeature::RapidFire: return s.weapon.valid && s.weapon.type==0 && s.weapon.fireTime>=1 && s.weapon.fireTime<=4000;
         case ExtraFeature::NoRecoil: return s.recoilValid;
-        case ExtraFeature::FriendlyFire: return s.friendlyFireDistance.valid && s.friendlyFireScale.valid;
+        case ExtraFeature::FriendlyFire: return s.friendlyFireDistance.valid && s.friendlyFireScale.valid && FriendlyFireHookReady();
         case ExtraFeature::ExplosiveBullets: return s.explosive.valid;
         case ExtraFeature::SlowMotion: return s.timeScale.valid;
         case ExtraFeature::FreezeAI: return s.ai.valid;
@@ -1167,6 +1168,7 @@ bool ToggleExtraFeature(ExtraFeature feature) {
         Log("EXTRA_REQUEST %s blocked",ExtraName(feature)); return false;
     }
     features.extra.toggle(feature); features.nextUpdate=0;
+    if(feature==ExtraFeature::FriendlyFire)SetAllowFriendlyFire(features.extra.wanted(feature));
     if (feature==ExtraFeature::GiveAll) features.inventoryNeedsBaseline=false;
     Log("EXTRA_REQUEST %s %s",ExtraName(feature),features.extra.wanted(feature)?"ON":"OFF"); return true;
 }
@@ -1187,6 +1189,7 @@ void ResetWeaponFeatures() {
 void ResetWorldFeatures() {
     std::lock_guard<std::mutex> lock(featuresMutex);
     features.extra.resetWorld(); features.nextUpdate=0;
+    SetAllowFriendlyFire(false);
     Log("EXTRA_REQUEST RESET_WORLD saved_fov_unchanged=1");
 }
 void SuspendRecoilForCheckpoint(bool suspend) {
@@ -1326,7 +1329,8 @@ void UpdatePlayerFeatures(ULONGLONG now) {
     ApplyBool(features.explosive,s.explosive,features.extra.wanted(ExtraFeature::ExplosiveBullets),1,"EXPLOSIVE_BULLETS");
     ApplyBool(features.ai,s.ai,features.extra.wanted(ExtraFeature::FreezeAI),0,"FREEZE_AI");
     ApplyFloat(features.time,s.timeScale,features.extra.wanted(ExtraFeature::SlowMotion),features.extra.timeScale,"SLOW_MOTION");
-    const bool friendlyFire=features.extra.wanted(ExtraFeature::FriendlyFire);
+    const bool friendlyFire=features.extra.wanted(ExtraFeature::FriendlyFire) && ExtraAvailable(s,ExtraFeature::FriendlyFire);
+    SetAllowFriendlyFire(friendlyFire);
     ApplyFloat(features.friendlyFireDistance,s.friendlyFireDistance,friendlyFire,0.f,"FRIENDLY_FIRE_AIM_BLOCK");
     ApplyFloat(features.friendlyFireScale,s.friendlyFireScale,friendlyFire,1.f,"FRIENDLY_FIRE_DAMAGE_SCALE");
     if (ExtraAvailable(s,ExtraFeature::Gravity)) {

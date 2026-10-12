@@ -159,13 +159,13 @@ const char* Row(Page page, int n) {
     static constexpr const char* view[] = {"Base FOV", "Save for next launch", "Restore default / clear saved", "Live base FOV", "Saved base FOV"};
     static constexpr const char* controller[] = {"Start / End rehearsal", "Starting round", "Auto-clear simulated actors", "Pause spawn queue", "Simulate one kill", "Clear simulated alive", "Current round", "Simulated alive", "Unspawned queue", "Phase / timer", "Zombie health", "Controller info to log"};
     switch (page) {
-        case Page::Home: return home[n]; case Page::Player: return player[n];
-        case Page::Weapons: return weapons[n]; case Page::World: return world[n];
-        case Page::AI: return ai[n]; case Page::Zombies: return zombies[n];
-        case Page::Diagnostics: return diag[n];
-        case Page::ZombieRules: return rules[n];
-        case Page::View: return view[n];
-        case Page::ZombieController: return controller[n];
+        case Page::Home: return MenuText<Page::Home>(home,n); case Page::Player: return MenuText<Page::Player>(player,n);
+        case Page::Weapons: return MenuText<Page::Weapons>(weapons,n); case Page::World: return MenuText<Page::World>(world,n);
+        case Page::AI: return MenuText<Page::AI>(ai,n); case Page::Zombies: return MenuText<Page::Zombies>(zombies,n);
+        case Page::Diagnostics: return MenuText<Page::Diagnostics>(diag,n);
+        case Page::ZombieRules: return MenuText<Page::ZombieRules>(rules,n);
+        case Page::View: return MenuText<Page::View>(view,n);
+        case Page::ZombieController: return MenuText<Page::ZombieController>(controller,n);
     }
     return "";
 }
@@ -581,7 +581,7 @@ void Overlay::frame() {
                 "Recovered normal CSV + patched BO1 health calculation.",
                 "Logs counts, timers, callbacks and budget invariant."
             };
-            footer=hints[menu.selected];
+            footer=MenuText<Page::ZombieController>(hints,menu.selected);
         }
         if (menu.page==Page::Player) {
             static constexpr const char* hints[]={
@@ -592,7 +592,7 @@ void Overlay::frame() {
                 "LEFT/RIGHT: 1x-8x. Land before reducing jump.",
                 "Movement/protection OFF; weapon ammo options remain."
             };
-            footer=hints[menu.selected];
+            footer=MenuText<Page::Player>(hints,menu.selected);
             if (menu.selected==0 && !s.client.valid && s.state==LevelState::Ready)
                 footer="OFF* = additional protection fields unavailable.";
         }
@@ -609,7 +609,7 @@ void Overlay::frame() {
                 "Records current weapon and new controls in latest.log.",
                 "Weapon cheats OFF, including ammo, reload and grenade sustain."
             };
-            footer=hints[menu.selected];
+            footer=MenuText<Page::Weapons>(hints,menu.selected);
             if (menu.selected==0 && weaponMode.needsBaseline) footer="Restart mission once for a clean inventory baseline.";
             if(menu.selected==6 && extraPreferences.wanted(ExtraFeature::ForceDualWield) && !weaponMode.dualReady) {
                 std::snprintf(line,sizeof(line),"Dual pending: %s",DualBlockedText(weaponMode.dualBlocked)); footer=line;
@@ -626,9 +626,10 @@ void Overlay::frame() {
                 "Pauses all actor thinking. Player and scripts continue.",
                 "LEFT/RIGHT: 100-1600. Player + projectile gravity.",
                 "Native damage to hostile NPCs; allies/player excluded.",
+                "Allied hits bypass the player friendly-fire penalty.",
                 "Restores world overrides; player/FOV choices remain."
             };
-            footer=hints[menu.selected];
+            footer=MenuText<Page::World>(hints,menu.selected);
         }
         if(menu.page==Page::AI) {
             static constexpr const char* hints[]={
@@ -644,7 +645,7 @@ void Overlay::frame() {
                 "Logs placement, team, goal and native hand-tree results.",
                 "IW4 has 32 active actor slots, including campaign NPCs."
             };
-            footer=hints[menu.selected];
+            footer=MenuText<Page::AI>(hints,menu.selected);
             if(menu.selected==3 && !aiStatus.characterLoaded)
                 footer="Character assets are not loaded in this mission; choose Soldier.";
             else if(menu.selected==3 && aiStatus.friendlyFallback)

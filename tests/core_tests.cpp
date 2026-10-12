@@ -101,6 +101,14 @@ int main() {
     m.selected=1;Check(m.input(Input::Select)==Action::ToggleInfiniteAmmo,"ammo moved to weapons");
     m.selected=2;Check(m.input(Input::Select)==Action::ToggleNoReload,"reload moved to weapons");
     m.page=Page::World;m.selected=3;Check(m.input(Input::Select)==Action::KillAllEnemies,"native kill-all action");
+    const char* const worldText[]={"slow","freeze","gravity","kill","friendly fire","reset"};
+    m.selected=4;
+    Check(std::string(MenuText<Page::World>(worldText,m.selected))=="friendly fire","friendly-fire highlight has its own valid text entry");
+    m.input(Input::Down);
+    Check(std::string(MenuText<Page::World>(worldText,m.selected))=="reset","last World row stays inside the text table");
+    m.input(Input::Down);Check(m.selected==0,"World wraps safely after reset");
+    Check(!*MenuText<Page::World>(worldText,-1) && !*MenuText<Page::World>(worldText,6)
+        && !*MenuText<Page::World>(worldText,2147483647),"invalid text indices return an empty string without dereferencing memory");
     for(int rows=2;rows<=12;++rows) Check(MenuPanelHeight(rows)>=170.f+rows*26.f+80.f-54.f,"full list and footer fit panel");
     std::cout << "All signature and menu tests passed\n";
 }

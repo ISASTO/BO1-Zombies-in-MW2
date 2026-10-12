@@ -1,18 +1,26 @@
 # BO1 Zombies in MW2
 
 Incremental mod framework for **retail Modern Warfare 2 (2009), single player**.
-Current build: **0.1.16-squad-test17**. The owner confirms Test16's performance
+Current build: **0.1.17-crash-test18**. The owner confirms Test16's performance
 fix. Its returned world scans average 388 microseconds and peak at 942.1
 microseconds, compared with Test15's 61.6 ms average/152.9 ms peak. Test16's
 snapshot reads, name cache and checked permanent-image reads remain unchanged.
 See [Test16 runtime evidence](docs/runtime-test16-evidence.json).
 
-Test17 adds **WORLD > Allow Friendly Fire**, retains live spawned actors during
-native autosaves, and stores ownership tags through the existing native
-targetname save field. Validated actor/helper pairs can recover ownership after
-checkpoint reload or a process restart. A friendly reclaimed for a campaign slot
-tries its previous clear location before falling back near the player.
-These checkpoint and friendly-fire changes require Windows retail testing.
+Test18 fixes the World help-text overflow that crashes menu navigation and
+isolates the script parameters of a campaign spawn before reclaiming a mod NPC.
+An isolated run of the exact native notification routine reproduces the old
+parameter/reference consumption and verifies the fix. **Allow Friendly Fire**
+now removes player attribution from allied hits, preserving native damage and
+reactions while bypassing the player friendly-fire penalty. OFF restores ordinary
+attribution. Each crash retains its own log and recent native operations.
+The crowded-squad crash and mission-failure bypass still require an in-game
+retest; its returned dump alone cannot establish the entire corruption chain.
+See [Test18 findings and checks](docs/crash-test18.md).
+
+Test17's native autosaves, saved ownership tags, validated actor/helper adoption
+after load, and recovery placement remain in place. The later returned run
+retained and restored ten spawned actors, then removed all ten successfully.
 
 **The 256-actor attempt is blocked; the game still uses 32 actor slots.**
 An isolated exact-native probe allocated/iterated all 256 slots successfully,
@@ -178,8 +186,8 @@ Copy the log immediately after a failing run: `latest.log` is replaced on launch
 | BO1 controller rehearsal | Test11 owner-accepted; simulated actors only, source-derived normal solo lifecycle and game-clock guards |
 | FOV selector and saved preference | Owner confirms test6 behavior; matching logs show load/selection/save/reset |
 | WEAPONS | Owner confirms No Recoil works in Test15. 1x-10x Rapid Fire is retained. G18 dual appearance is deferred. |
-| WORLD | Adjustable time/gravity, actor-think freeze, reset; Test17 adds Allow Friendly Fire with guarded native-value restoration. |
-| AI | Owner confirms Test16 performance. Test17 removes autosave rebuilding and adds saved ownership/recovery placement; retail checkpoint testing pending. 256-slot preflight blocked; active capacity remains 32. |
+| WORLD | Test18 fixes help-text bounds and adds player friendly-fire penalty bypass; native damage/mission behavior needs retail retest. |
+| AI | Test18 isolates caller script parameters during NPC reclamation. Exact-native parameter regression passes; crowded-squad retail retest pending. Saved ownership remains; active capacity is 32. |
 | Kill All Enemies | Owner-confirmed working native damage call for hostile actors; allies, clients and protected entities excluded. |
 | BO1 Zombies gameplay | Planned; normal MW2 AI is not a BO1 behavior/animation/assets port. |
 

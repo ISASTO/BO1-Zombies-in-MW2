@@ -1,0 +1,11 @@
+{
+  "probe": "exact-native script parameter isolation",
+  "unprotected_caller_parameters_consumed": 3,
+  "unprotected_vector_reference_decremented": true,
+  "isolated_caller_stack_and_references_preserved": true,
+  "nested_parameters_restored": true,
+  "checkpoint_reset_preserved": true,
+  "native_dependencies_substituted": false,
+  "scope": "Scr_Notify with no notification object, and native scalar/vector reference cleanup; no campaign scripts or Windows gameplay.",
+  "executable_sha256": "fb7e8a987c371dea7b666091b0b9e2011c0cd9cd277b191ad453d11d557dd777"
+}

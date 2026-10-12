@@ -18,6 +18,8 @@ inline constexpr std::size_t kAiAttachmentCount=31;
 inline constexpr std::uintptr_t kAiEmptyAttachmentTagRva=0x1157900;
 inline constexpr std::uintptr_t kAiInternStringRva=0x18f440;
 inline constexpr std::uintptr_t kAiEntitySaveFieldsRva=0x3405b0;
+inline constexpr std::uintptr_t kScriptParametersRva=0x18f44b0,kScriptExecuteDepthRva=0x18fca44;
+inline constexpr std::uintptr_t kScriptNotifyRva=0x223970;
 inline constexpr std::size_t kAiEnemySightValid=0x309,kAiEnemySightPosition=0x30c;
 struct AiAppearance {
     std::uint16_t model=0;
@@ -38,6 +40,8 @@ inline constexpr const char* kFriendlyCharacters[]={"Soldier","Ghost","Price","S
 inline constexpr int kFriendlyCharacterCount=5;
 inline constexpr std::array<std::uint8_t,15> kActorInitPrologue={
     0x40,0x56,0x57,0x41,0x57,0x48,0x81,0xec,0xa0,0,0,0,0x45,0x33,0xff};
+inline constexpr std::array<std::uint8_t,15> kDamagePrologue={
+    0x48,0x8b,0xc4,0x48,0x89,0x58,0x08,0x48,0x89,0x68,0x10,0x48,0x89,0x70,0x18};
 inline std::array<std::uint8_t,14> AbsoluteJump(std::uintptr_t target) {
     std::array<std::uint8_t,14> code{0xff,0x25,0,0,0,0};
     std::memcpy(code.data()+6,&target,8); return code;

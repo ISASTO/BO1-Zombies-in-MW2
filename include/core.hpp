@@ -8,7 +8,7 @@
 #include "fov_preferences.hpp"
 
 namespace mod {
-inline constexpr const char* kVersion = "0.1.16-squad-test17";
+inline constexpr const char* kVersion = "0.1.17-crash-test18";
 inline constexpr const char* kExeSha256 = "fb7e8a987c371dea7b666091b0b9e2011c0cd9cd277b191ad453d11d557dd777";
 
 // -1 is a wildcard. Reject malformed patterns rather than matching everything.
@@ -287,6 +287,23 @@ inline constexpr const char* kAiSpawnTargetnamePattern =
 inline constexpr int kVisibleMenuRows = 12;
 inline constexpr float MenuPanelHeight(int rows) { return 200.f+26.f*rows; }
 enum class Page { Home, Player, Weapons, World, AI, Zombies, Diagnostics, ZombieRules, View, ZombieController };
+inline constexpr int MenuRowCount(Page page) {
+    switch(page) {
+        case Page::Home: case Page::Player: case Page::World: case Page::ZombieRules: return 6;
+        case Page::Weapons: return 10;
+        case Page::AI: return 11;
+        case Page::Zombies: return 3;
+        case Page::Diagnostics: return 2;
+        case Page::View: return 5;
+        case Page::ZombieController: return 12;
+    }
+    return 0;
+}
+template<Page P,std::size_t N>
+inline constexpr const char* MenuText(const char* const (&rows)[N],int selected) {
+    static_assert(N==static_cast<std::size_t>(MenuRowCount(P)),"Menu text count must match navigable rows");
+    return selected>=0 && static_cast<std::size_t>(selected)<N && rows[selected]?rows[selected]:"";
+}
 enum class Input { Toggle, Up, Down, Select, Back, Left, Right };
 enum class Action { None, ToggleGod, ToggleHud, WriteSnapshot, WriteRoundPreview, ChangeFov, SaveFov, ResetFov,
     ToggleInfiniteAmmo, ToggleNoReload, ToggleNoclip, ToggleSuperSpeed, ToggleSuperJump, ResetPlayer,
@@ -311,21 +328,7 @@ struct MenuState {
     int previewRound = bo1::kPreviewMinRound;
     int rehearsalRound = bo1::kPreviewMinRound;
     FovPreference fov;
-    int count() const {
-        switch (page) {
-            case Page::Home: return 6;
-            case Page::Player: return 6;
-            case Page::Weapons: return 10;
-            case Page::World: return 6;
-            case Page::AI: return 11;
-            case Page::Zombies: return 3;
-            case Page::Diagnostics: return 2;
-            case Page::ZombieRules: return 6;
-            case Page::View: return 5;
-            case Page::ZombieController: return 12;
-        }
-        return 0;
-    }
+    int count() const { return MenuRowCount(page); }
     int firstVisibleRow() const { return 0; }
     Action input(Input key) {
         if (key == Input::Toggle) { visible = !visible; return Action::None; }

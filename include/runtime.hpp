@@ -17,6 +17,7 @@ namespace mod {
 void InitializeLog();
 void Log(const char* format, ...);
 void InstallCrashHandler();
+void RecordNativeOperation(const char* operation,unsigned entity=0,int actorCount=-1);
 const wchar_t* LogDirectory();
 
 enum class LevelState { Unsupported, Unresolved, NoLevel, Transition, PlayerDead, Ready };
@@ -106,6 +107,8 @@ void UpdateAiControls(const Snapshot& snapshot,ULONGLONG now,bool detailed=false
 void RequestAiOperation(AiOperation operation,const Snapshot& snapshot);
 void AdjustAiSpawner(bool friendly,int direction);
 void ToggleAiSpawnPause();
+bool FriendlyFireHookReady();
+void SetAllowFriendlyFire(bool enabled);
 AiStatus GetAiStatus();
 void LogAiState();
 std::uint64_t RequestNativeHandDefinitions(const WeaponFields&,std::uintptr_t names,std::uintptr_t normalTree,
