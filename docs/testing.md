@@ -1,41 +1,47 @@
-# Current test12 owner checks
+# Current test13 owner checks
 
-Install **BO1MW2-ai-test12.zip**: close MW2, extract outside the game folder,
-run **Uninstall.cmd**, then **Install.cmd**, and select the folder containing
-`iw4sp.exe`. Launch through Steam and **restart the mission once** for a clean
-initial inventory. Saved FOV is preserved. Follow [ai-test12.md](ai-test12.md).
+Install **BO1MW2-spawn-test13.zip**: close MW2, extract outside the game folder,
+run **Uninstall.cmd**, then **Install.cmd** and select the directory containing
+`iw4sp.exe`. Launch through Steam and **restart the mission once**. Saved FOV
+is preserved. Follow [spawn-test13.md](spawn-test13.md).
+
+Start in live estate combat with existing NPCs, Freeze AI and spawn pause OFF.
+Test weapons first, turn them OFF, then one enemy/cleanup and one friendly/cleanup
+before increasing population. Keep the controller rehearsal ended for AI tests.
 
 ```text
 Build / map / resolution:
-Give All label before first toggle or arrow:
-Give ON -> bank2 -> checkpoint -> label BEFORE any arrow:
-All four banks reachable; Give OFF inventory/ammo result:
-Beretta Dual ON/OFF: status, both models/fire inputs/reload/ammo:
-G18/glock Dual ON/OFF: same checks:
-Any WAIT: exact gun and selected-row footer reason:
-Fixed-view FPS for 10s each: Dual OFF / ON / OFF:
-Give/Dual both OFF orders and checkpoint behavior:
-AI page: initial alive counts and enemy/friendly template counts:
-Selected enemy classname / distance / approximate location:
-One enemy spawn result / new NPC behavior / owned and alive counts:
-Remove our spawned actors result; original campaign NPCs unaffected:
-Selected friendly classname and same spawn/remove observations:
-Pause AI spawning ON/OFF: new-spawn gate vs existing NPC behavior:
-Linked Freeze AI ON/OFF:
-F4 close/reopen and scrolling to final diagnostics row:
-After removing debug NPCs: checkpoint/menu transition and stale queue/counts:
+Give All label before input and immediately after checkpoint:
+All banks reachable; Give OFF restores inventory/ammo:
+G18/glock Dual: BUILD/COMPAT/footer; both models/fire/reload/OFF:
+Beretta and previously working rifle: same checks:
+Other previously failed gun and exact selected-row footer:
+Fixed-view FPS for 10s each: OFF / ON / OFF:
+Give/Dual both OFF orders; reset weapon toggles:
+AI initial enemy/friendly models, alive counts and Engine actor slots:
+Enemy: selected model, nearest-point distance, created entity/distance/tries:
+Enemy actual spawn location and whether it advances after you move:
+Remove ours: owned count0 and original campaign NPCs remain:
+Friendly in estate (CONVERTED if needed): near-player position/team/combat/follow:
+Friendly on another active map: same observations:
+Near-wall/occupied-point spawn: retries or NO_CLEAR_POSITION; exact collision error:
+Repeated spawns past8: highest owned count and Engine actor slots/result:
+Pause spawning ON/OFF; existing behavior vs new requests:
+Freeze AI ON/OFF; queued work resumes after OFF:
+After cleanup: checkpoint/menu transition, fresh counts/header, F4 scrolling:
 God/health/saved FOV/Rapid Fire/controller rehearsal regressions:
-Crash or script error: exact text/module/offset and last action:
+Crash or script error: exact text/module/offset, last action and current gun/model:
 ```
 
-For AI, start with weapon modes, rehearsal, Freeze AI and spawn pause OFF.
-Use a combat section with native NPCs; select an existing mission spawn point
-and look away if normal visibility checks refuse. A NONE/LOCKED/refused result
-is useful evidence: record it and the template/location, rather than assuming
-the engine has a universal spawnable actor for every map.
+The mod's eight-NPC cap is removed. The exact native pool still has **32 active
+actor slots including campaign NPCs**; a full physical pool is a separate limit.
+Ordinary loaded actor models are required; friendly placement no longer depends
+on a friendly mission spawn point. This service still needs an existing unfrozen
+actor callback. Pending work in an empty level is useful evidence, not acceptance
+of universal asset-free spawning.
 
 Turn Give/Dual OFF and **remove debug actors before saving/reloading/quitting**.
-Ownership/undo history is in-process and guarded by detected level lifetime.
-Close MW2 and run **Diagnose.cmd** before another launch replaces its log; attach
-the ZIP. Static/build/portable checks pass; new dual behavior and native AI
-execution need this retail test. Native mission NPCs are not BO1 zombies.
+Ownership/undo history is session-local. Close MW2 and run **Diagnose.cmd before
+another launch** replaces the log. Attach its ZIP and observations above.
+The new native paths have static/build/portable checks; retail behavior remains
+an acceptance gate. These campaign NPCs do not implement BO1 zombie behavior.

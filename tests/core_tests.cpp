@@ -86,7 +86,7 @@ int main() {
     m.input(Input::Back);
     Check(m.page==Page::Home && m.selected==4, "second back returns to remembered home category");
     m.page=Page::AI; m.selected=0;
-    Check(m.count()==10 && m.input(Input::Select)==Action::SpawnAiEnemy,"native enemy request routing");
+    Check(m.count()==11 && m.input(Input::Select)==Action::SpawnAiEnemy,"native enemy request routing");
     m.input(Input::Down); Check(m.input(Input::Select)==Action::SpawnAiFriendly,"native friendly request routing");
     m.input(Input::Down); Check(m.input(Input::Right)==Action::NextEnemySpawner && m.input(Input::Left)==Action::PreviousEnemySpawner,"enemy template arrows");
     m.input(Input::Down); Check(m.input(Input::Right)==Action::NextFriendlySpawner,"friendly template arrows");
@@ -96,5 +96,6 @@ int main() {
     m.input(Input::Down); Check(m.input(Input::Select)==Action::None,"ownership count read-only");
     m.input(Input::Down); Check(m.input(Input::Select)==Action::RemoveSpawnedAi && m.firstVisibleRow()==1,"scrolled owned-only cleanup routing");
     m.input(Input::Down); Check(m.input(Input::Select)==Action::WriteAiState && m.firstVisibleRow()==2,"last AI diagnostics row accessible");
+    m.input(Input::Down); Check(m.input(Input::Select)==Action::None && m.firstVisibleRow()==3,"native engine capacity read-only row accessible");
     std::cout << "All signature and menu tests passed\n";
 }

@@ -8,6 +8,7 @@ from pathlib import Path
 import pefile
 from pattern_scan import pattern_matches
 from verify_ai_bindings import verify_ai_bindings
+from verify_spawn_bindings import verify_spawn_bindings
 
 # Instruction layouts of the additional exact-build references, never addresses.
 EXTRA_REFERENCES = {
@@ -77,6 +78,30 @@ EXTRA_REFERENCES.update({
     'kAiActorTypePattern': [],
     'kAiActorSelfPattern': [],
 })
+EXTRA_REFERENCES.update({
+    'kAiSpawnCopyCallsPattern': [],
+    'kAiCopyFieldsStartPattern': [[10, 3, 8], [35, 3, 7]],
+    'kAiCopyDynamicStartPattern': [],
+    'kAiTraceStartPattern': [],
+    'kAiTraceScriptCallPattern': [[0, 3, 7]],
+    'kAiTraceLayoutPattern': [],
+    'kAiPositionSetterPattern': [],
+    'kAiPositionMethodCallPattern': [],
+    'kAiTeamChangePattern': [],
+    'kAiTeamScriptSetterPattern': [],
+    'kAiGoalPositionPattern': [],
+    'kAiGoalScriptCallPattern': [],
+    'kAiActorCapacityPattern': [[10, 3, 7], [17, 2, 6], [28, 3, 7]],
+    'kAiClearEnemyTailPattern': [],
+    'kWeaponAnimBuildStartPattern': [[29, 3, 7], [41, 3, 7]],
+})
+EXTRA_REFERENCES.update({
+    'kAiActorBoundsPattern': [[0, 3, 7], [14, 4, 8]],
+    'kAiActorTraceResultPattern': [[18, 4, 8], [32, 3, 7]],
+    'kNativeWeaponHandsCallsPattern': [],
+    'kAiEnemySetterStartPattern': [],
+})
+EXTRA_REFERENCES['kAiSpawnTargetnamePattern'] = []
 EXTRA_NAMES.update({
     'kAiSpawnEnabledRegistrationPattern': [6, 'g_spawnai'],
     'kAiSpawnDisabledRegistrationPattern': [2, 'ai_disableSpawn'],
@@ -390,6 +415,7 @@ def verify(path, header):
             'compatibility':'Infinite Grenades is explicitly linked to No Reload; both use player_sustainAmmo.'},
         'limits':'Static evidence. Test9 confirms catalog resolution and Rapid Fire; test11 owner feedback confirms checkpoint-bank recovery, while initial page count and dual still failed. Test12 changes animation validation/page preview and adds native AI controls; new retail animation/FPS/AI checks are pending. Kill All Enemies remains unimplemented.'}
     result['native_ai'] = verify_ai_bindings(pe, result['signatures'], header.with_name('ai_controls.hpp'), result['entity_number'])
+    result['native_spawn'] = verify_spawn_bindings(pe, result['signatures'], header.with_name('ai_controls.hpp'), header.with_name('ai_placement.hpp'))
     return result
 
 

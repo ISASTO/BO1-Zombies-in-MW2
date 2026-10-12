@@ -152,7 +152,7 @@ const char* Row(Page page, int n) {
     static constexpr const char* player[] = {"God Mode", "FOV settings", "Infinite Ammo", "No Reload", "Noclip", "Super Speed", "Super Jump", "Reset player toggles"};
     static constexpr const char* weapons[] = {"Give All (usable banks)", "Infinite Grenades (linked)", "Rapid Fire", "Explosive Bullets", "Force Dual Wield", "Weapon info to log", "Reset weapon toggles"};
     static constexpr const char* world[] = {"Slow Motion", "Freeze AI", "Gravity", "Kill All Enemies", "Reset world toggles"};
-    static constexpr const char* ai[] = {"Spawn Enemy", "Spawn Friendly", "Enemy template", "Friendly template", "Pause AI spawning", "Freeze AI (linked)", "Alive enemy / friendly", "Our spawned actors", "Remove our spawned actors", "AI info to log"};
+    static constexpr const char* ai[] = {"Spawn Enemy (nearest point)", "Spawn Friendly (near you)", "Enemy model", "Friendly model", "Pause AI spawning", "Freeze AI (linked)", "Alive enemy / friendly", "Our spawned actors", "Remove our spawned actors", "AI info to log", "Engine actor slots"};
     static constexpr const char* zombies[] = {"Round rules preview", "Controller rehearsal", "Playable Zombies / actors"};
     static constexpr const char* diag[] = {"Status HUD", "Write State to Log"};
     static constexpr const char* rules[] = {"Preview round", "Total zombies", "Zombie health", "Simultaneous cap", "Spawn interval", "Between rounds"};
@@ -398,10 +398,12 @@ void Overlay::frame() {
             std::snprintf(line,sizeof(line),"Native mission AI | Result: %s",AiResultText(aiStatus.lastResult));
             text(40,121,kMuted,line,.7f);
             const bool friendly=menu.selected==1 || menu.selected==3;
-            if(friendly && aiStatus.friendlySpawners)
-                std::snprintf(line,sizeof(line),"%.48s | %.0f units",aiStatus.friendlyName.data(),aiStatus.friendlyDistance);
+            if(aiStatus.lastEntity)
+                std::snprintf(line,sizeof(line),"Last spawn #%u | %.0f units away | %d tries",aiStatus.lastEntity,aiStatus.lastSpawnDistance,aiStatus.placementAttempts);
+            else if(friendly && aiStatus.friendlySpawners)
+                std::snprintf(line,sizeof(line),"Near you | %.38s",aiStatus.friendlyName.data());
             else if(aiStatus.enemySpawners)
-                std::snprintf(line,sizeof(line),"%.48s | %.0f units",aiStatus.enemyName.data(),aiStatus.enemyDistance);
+                std::snprintf(line,sizeof(line),"Nearest point %.0f units | %.28s",aiStatus.enemyDistance,aiStatus.enemyName.data());
             else std::snprintf(line,sizeof(line),"No eligible loaded mission templates");
             text(40,143,kMuted,line,.7f);
         } else if (menu.page==Page::View) {
@@ -415,7 +417,7 @@ void Overlay::frame() {
             text(40,143,kMuted,line,.7f);
         } else {
             text(40,121,kMuted,StateText(s.state),.7f);
-            text(40,143,kMuted,"Test 12 | Native AI controls + weapon repairs",.7f);
+            text(40,143,kMuted,"Test 13 | Placement, goals + native hand trees",.7f);
         }
         const auto preview = menu.page == Page::ZombieRules
             ? bo1::EvaluateNormalSoloRound(menu.previewRound, menu.previewRound == 1) : std::nullopt;
@@ -479,7 +481,7 @@ void Overlay::frame() {
                 else if (n==1) status=!s.grenadeSustainResolved || !FeatureAvailable(s,PlayerFeature::NoReload)?"LOCKED":s.sustain.current?(playerPreferences.wanted(PlayerFeature::NoReload)?"ON":"NATIVE"):(playerPreferences.wanted(PlayerFeature::NoReload)?"WAIT":"OFF");
                 else if (n==2) status=!ExtraAvailable(s,ExtraFeature::RapidFire)?"LOCKED":extraPreferences.wanted(ExtraFeature::RapidFire)?(RapidFireApplied(s.weapon)?"ON":s.weapon.fireTime==20?"AT MIN":"WAIT"):"OFF";
                 else if (n==3) status=!ExtraAvailable(s,ExtraFeature::ExplosiveBullets)?"LOCKED":s.explosive.current?(extraPreferences.wanted(ExtraFeature::ExplosiveBullets)?"ON":"NATIVE"):(extraPreferences.wanted(ExtraFeature::ExplosiveBullets)?"WAIT":"OFF");
-                else if (n==4) status=!ExtraAvailable(s,ExtraFeature::ForceDualWield)?"LOCKED":extraPreferences.wanted(ExtraFeature::ForceDualWield)?(weaponMode.dualReady && s.dualWield.current && s.lastWeaponHand==1?(weaponMode.dualFallback?"COMPAT":"ON"):s.dualCurrentSupported?"WAIT":"ON*"):weaponMode.dualOwned?"UNDO":s.dualWield.current?"NATIVE":"OFF";
+                else if (n==4) status=!ExtraAvailable(s,ExtraFeature::ForceDualWield)?"LOCKED":extraPreferences.wanted(ExtraFeature::ForceDualWield)?(weaponMode.dualReady && s.dualWield.current && s.lastWeaponHand==1?(weaponMode.dualFallback?(weaponMode.nativeHandState==NativeHandBuildState::Queued?"BUILD":"COMPAT"):"ON"):s.dualCurrentSupported?"WAIT":"ON*"):weaponMode.dualOwned?"UNDO":s.dualWield.current?"NATIVE":"OFF";
                 else status="ENTER";
             }
             else if (menu.page==Page::World) {
@@ -497,14 +499,15 @@ void Overlay::frame() {
             }
             else if(menu.page==Page::AI) {
                 if(n==0 || n==1) status=!aiStatus.ready || !aiStatus.nativeCount?"LOCKED":aiStatus.pending?"QUEUED":
-                    !(n==1?aiStatus.friendlySpawners:aiStatus.enemySpawners)?"NONE":aiStatus.spawnPaused?"PAUSED":aiStatus.owned>=kAiOwnedLimit?"AT LIMIT":"ENTER";
+                    !(n==1?aiStatus.friendlySpawners:aiStatus.enemySpawners)?"NONE":aiStatus.spawnPaused?"PAUSED":aiStatus.engineActors>=kAiNativeActorCapacity?"ENGINE FULL":"ENTER";
                 else if(n==2) { std::snprintf(value,sizeof(value),"%d/%d",aiStatus.enemySpawner,aiStatus.enemySpawners); status=value; }
                 else if(n==3) { std::snprintf(value,sizeof(value),"%d/%d",aiStatus.friendlySpawner,aiStatus.friendlySpawners); status=value; }
                 else if(n==4) status=!aiStatus.ready?"LOCKED":aiStatus.spawnPaused?(aiStatus.pauseWanted?"ON":"NATIVE"):(aiStatus.pauseWanted?"WAIT":"OFF");
                 else if(n==5) status=!ExtraAvailable(s,ExtraFeature::FreezeAI)?"LOCKED":!s.ai.current?"ON":"OFF";
                 else if(n==6) { std::snprintf(value,sizeof(value),"%d / %d",aiStatus.enemyAlive,aiStatus.friendlyAlive); status=aiStatus.ready?value:"UNKNOWN"; }
-                else if(n==7) { std::snprintf(value,sizeof(value),"%d / %d",aiStatus.owned,kAiOwnedLimit); status=value; }
+                else if(n==7) { std::snprintf(value,sizeof(value),"%d",aiStatus.owned); status=value; }
                 else if(n==8) status=aiStatus.pending?"QUEUED":aiStatus.owned?"ENTER":"EMPTY";
+                else if(n==10) { std::snprintf(value,sizeof(value),"%d / %d",aiStatus.engineActors,kAiNativeActorCapacity); status=value; }
                 else status="ENTER";
             }
             else if (menu.page==Page::View) {
@@ -580,7 +583,7 @@ void Overlay::frame() {
                 "Linked to PLAYER No Reload. Frag/flash grenades.",
                 "Halves gun delay (20ms min); AI sharing gun too.",
                 "All bullet weapons, including AI. Try with God ON.",
-                "COMPAT: normal anim fallback. ON*: unsupported gun.",
+                "COMPAT: normal animations. BUILD: native hand setup.",
                 "Records current weapon and new controls in latest.log.",
                 "Weapon cheats OFF, including linked PLAYER No Reload."
             };
@@ -588,6 +591,11 @@ void Overlay::frame() {
             if (menu.selected==0 && weaponMode.needsBaseline) footer="Restart mission once for a clean inventory baseline.";
             if(menu.selected==4 && extraPreferences.wanted(ExtraFeature::ForceDualWield) && !weaponMode.dualReady) {
                 std::snprintf(line,sizeof(line),"Dual pending: %s",DualBlockedText(weaponMode.dualBlocked)); footer=line;
+            } else if(menu.selected==4 && extraPreferences.wanted(ExtraFeature::ForceDualWield) && weaponMode.dualFallback) {
+                footer=weaponMode.nativeHandsReady?"Distinct native hand definitions ready; normal animations.":
+                    weaponMode.nativeHandState==NativeHandBuildState::Failed?"Native hand setup failed; compatibility definitions remain.":
+                    weaponMode.nativeHandState==NativeHandBuildState::Queued?"Native hand setup queued; needs an unfrozen actor callback.":
+                    "Compatibility active; native hand setup awaits a live actor.";
             }
         }
         if (menu.page==Page::World) {
@@ -602,20 +610,25 @@ void Overlay::frame() {
         }
         if(menu.page==Page::AI) {
             static constexpr const char* hints[]={
-                "One native enemy at the selected mission spawn point.",
-                "One native friendly at the selected mission spawn point.",
-                "LEFT/RIGHT: nearest eligible enemy templates.",
-                "LEFT/RIGHT: nearest eligible friendly templates.",
+                "Nearest point, clearance retries, then advance to you.",
+                "Clear nearby ground; ally follows and fights enemies.",
+                "LEFT/RIGHT: model. Spawn point stays automatic.",
+                "LEFT/RIGHT: model. Converted enemy model if needed.",
                 "Native spawn gate; existing actors still think.",
                 "Linked to WORLD Freeze AI. Spawn gate is separate.",
                 "Verified live axis/allies actors; other teams excluded.",
-                "Eight debug actors max; allocation generations checked.",
+                "No eight-actor cap. Native pool capacity still applies.",
                 "Only our generation-matched living actor entities.",
-                "Logs bindings, callback thread, templates and results."
+                "Logs placement, team, goal and native hand-tree results.",
+                "IW4 has 32 active actor slots, including campaign NPCs."
             };
             footer=hints[menu.selected];
+            if(menu.selected==3 && aiStatus.friendlyFallback)
+                footer="CONVERTED: enemy model; native ally team and follow goal.";
             if((menu.selected==0 || menu.selected==1) && aiStatus.lastResult==AiRequestResult::NativeRefused)
-                footer="Native visibility/collision/capacity gate refused spawn.";
+                footer="Native creation refused; see diagnostic log.";
+            if((menu.selected==0 || menu.selected==1) && aiStatus.lastResult==AiRequestResult::NoClearPosition)
+                footer="No clear nearby ground; move or choose another model.";
             if(!aiStatus.resolved) footer="Exact native AI profile unavailable; see log.";
         }
         if (menu.page==Page::View) {

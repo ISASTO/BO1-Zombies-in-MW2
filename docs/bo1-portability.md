@@ -88,7 +88,9 @@ copying their implementation into ours.
 
 Test12 now implements an independently verified IW4 SP callback-thread service,
 partial actor/sentient identities and native mission spawn/init/delete requests;
-the first retail fixture is pending. These are class-B lifecycle prerequisites,
+the owner run confirms enemy creation/owned cleanup. Test13 adds native ground/
+Bounds traces, cloned helper-spawner lifetime, team transfer, advance/follow
+goals and dynamic ownership. Their first retail fixture is pending. These are class-B lifecycle prerequisites,
 with normal campaign AI behavior. They do not translate BO1 find_flesh/pathing,
 animation-controlled attacks or damage/death. Do not connect the accepted class-A
 round controller to those soldiers and describe it as Zombies.
@@ -100,3 +102,9 @@ Class-C T5 asset/runtime differences still need explicit compatibility tools;
 no target asset loader/schema is assumed from these new actor fields.
 Converted/original assets, scripts, audio and executables stay outside Git and
 the distributable package; own source/tooling expects user-owned installations.
+
+The new startup/drop/helper-revive/purchase contract and source audit are in
+[bo1-mode-design.md](bo1-mode-design.md). Clearing all campaign actors requires
+an independent game-thread service, because the current actor callbacks would
+stop. The 32-slot IW4 pool, T5 player-to-NPC last-stand translation, score-driven
+drop eligibility and map-specific play areas are explicit compatibility gates.

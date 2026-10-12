@@ -538,6 +538,124 @@
       "match_count": 1,
       "match_rva": "0x12d0f1",
       "rip_targets": {}
+    },
+    "kAiSpawnCopyCallsPattern": {
+      "match_count": 1,
+      "match_rva": "0x152ee0",
+      "rip_targets": {}
+    },
+    "kAiCopyFieldsStartPattern": {
+      "match_count": 1,
+      "match_rva": "0x19a2c0",
+      "rip_targets": {
+        "10": "0x346460",
+        "35": "0x346468"
+      }
+    },
+    "kAiCopyDynamicStartPattern": {
+      "match_count": 1,
+      "match_rva": "0x19a3c0",
+      "rip_targets": {}
+    },
+    "kAiTraceStartPattern": {
+      "match_count": 1,
+      "match_rva": "0x175280",
+      "rip_targets": {}
+    },
+    "kAiTraceScriptCallPattern": {
+      "match_count": 1,
+      "match_rva": "0x189722",
+      "rip_targets": {
+        "0": "0x355818"
+      }
+    },
+    "kAiTraceLayoutPattern": {
+      "match_count": 1,
+      "match_rva": "0x1f8140",
+      "rip_targets": {}
+    },
+    "kAiPositionSetterPattern": {
+      "match_count": 1,
+      "match_rva": "0x1a05c0",
+      "rip_targets": {}
+    },
+    "kAiPositionMethodCallPattern": {
+      "match_count": 1,
+      "match_rva": "0x1908ad",
+      "rip_targets": {}
+    },
+    "kAiTeamChangePattern": {
+      "match_count": 1,
+      "match_rva": "0x1b1f50",
+      "rip_targets": {}
+    },
+    "kAiTeamScriptSetterPattern": {
+      "match_count": 1,
+      "match_rva": "0x1b2090",
+      "rip_targets": {}
+    },
+    "kAiGoalPositionPattern": {
+      "match_count": 1,
+      "match_rva": "0x1504e0",
+      "rip_targets": {}
+    },
+    "kAiGoalScriptCallPattern": {
+      "match_count": 1,
+      "match_rva": "0x14f041",
+      "rip_targets": {}
+    },
+    "kAiActorCapacityPattern": {
+      "match_count": 1,
+      "match_rva": "0x123950",
+      "rip_targets": {
+        "10": "0xd9c0e0",
+        "17": "0xd96ee0",
+        "28": "0xd96ea0"
+      }
+    },
+    "kAiClearEnemyTailPattern": {
+      "match_count": 1,
+      "match_rva": "0x14f8fc",
+      "rip_targets": {}
+    },
+    "kWeaponAnimBuildStartPattern": {
+      "match_count": 1,
+      "match_rva": "0xc2c70",
+      "rip_targets": {
+        "29": "0xa9730",
+        "41": "0x32e088"
+      }
+    },
+    "kAiActorBoundsPattern": {
+      "match_count": 1,
+      "match_rva": "0x12cf71",
+      "rip_targets": {
+        "0": "0x334538",
+        "14": "0x334548"
+      }
+    },
+    "kAiActorTraceResultPattern": {
+      "match_count": 1,
+      "match_rva": "0x12d045",
+      "rip_targets": {
+        "18": "0x385b60",
+        "32": "0x31fd30"
+      }
+    },
+    "kNativeWeaponHandsCallsPattern": {
+      "match_count": 1,
+      "match_rva": "0xc4c99",
+      "rip_targets": {}
+    },
+    "kAiEnemySetterStartPattern": {
+      "match_count": 1,
+      "match_rva": "0x1b1cb0",
+      "rip_targets": {}
+    },
+    "kAiSpawnTargetnamePattern": {
+      "match_count": 1,
+      "match_rva": "0x152efe",
+      "rip_targets": {}
     }
   },
   "fov": {
@@ -930,8 +1048,8 @@
     "limits": "Static evidence. Test9 confirms catalog resolution and Rapid Fire; test11 owner feedback confirms checkpoint-bank recovery, while initial page count and dual still failed. Test12 changes animation validation/page preview and adds native AI controls; new retail animation/FPS/AI checks are pending. Kill All Enemies remains unimplemented."
   },
   "native_ai": {
-    "status": "Static exact-build cross-checks passed; first retail actor test pending",
-    "calling_convention": "Windows AMD64; think(RCX entity), spawn(RCX spawner, EDX targetname=0, R8D force=0, R9D ignorechecks=0), delete(ECX packed class-0 entity number)",
+    "status": "Static exact-build cross-checks passed; retail observations are recorded separately by iteration.",
+    "calling_convention": "Windows AMD64; think(RCX entity), spawn(RCX spawner, EDX targetname, R8D visibility/distance bypass, R9D additional check flag), delete(ECX packed class-0 entity number). Test13 submits (spawner,0,1,0) after independent clearance traces.",
     "graph": {
       "callback_slot_value": "0x12a690",
       "actor_think": "0x12a690",
@@ -1064,6 +1182,52 @@
     },
     "in_use_writer_rva": "0x1a091b",
     "lifetime": "Native useCount DWORD increments when G_FreeEntity clears the slot; also require matching number/type/actor/sentient/self links and level identity.",
-    "limits": "Native mission NPC debugging, not BO1 zombie AI. Hook installs on first request, needs an existing actor callback, retains collision/visibility/capacity refusal and script notifications. Cleanup owns at most eight same-process generation tickets."
+    "limits": "Native mission NPC debugging, not BO1 zombie AI. Hook installs on first request and needs an existing actor callback. Test13 uses independently traced placement, temporary native spawners, team/goal adapters and dynamic generation ownership. Physical actor capacity32 remains; the mod does not impose eight."
+  },
+  "native_spawn": {
+    "graph": {
+      "copy_static_call": "0x19a2c0",
+      "copy_static": "0x19a2c0",
+      "copy_dynamic_call": "0x19a3c0",
+      "copy_dynamic": "0x19a3c0",
+      "physics_trace_call": "0x175280",
+      "bounds_trace": "0x175280",
+      "actor_trace_call": "0x175280",
+      "origin_set_call": "0x1a05c0",
+      "origin_set": "0x1a05c0",
+      "team_script_tail": "0x1b1f50",
+      "team_set": "0x1b1f50",
+      "goal_script_call": "0x1504e0",
+      "goal_set": "0x1504e0",
+      "enemy_script_tail": "0x1b1cb0",
+      "enemy_set": "0x1b1cb0",
+      "right_hand_call": "0xc2c70",
+      "left_hand_call": "0xc2c70",
+      "animation_builder": "0xc2c70"
+    },
+    "g_spawn_rva": "0x1a0870",
+    "g_free_entity_rva": "0x19f900",
+    "script_string_setter_rva": "0x21ad70",
+    "actor_used_count_slot_rva": "0xd96ee0",
+    "actor_soft_limit_slot_rva": "0xd9c0e0",
+    "actor_pool_slot_rva": "0xd96ea0",
+    "physical_actor_capacity": 32,
+    "actor_stride": "0x1560",
+    "bounds_midpoint_halfsize": [
+      0.0,
+      0.0,
+      36.0,
+      15.0,
+      15.0,
+      36.0
+    ],
+    "placement_mask": "0x2820015",
+    "trace_output_bytes": 48,
+    "trace_fraction_offset": 0,
+    "trace_startsolid_offset": "0x2d",
+    "team_transfer": "Native helper writes sentient team+8 and actor team mirror+0x1378.",
+    "goal": "Native setgoalpos caller uses actor pointer, Vec3 pointer, optional node=null; helper has no boolean success return.",
+    "animation": "Native caller builds each hand with (WeaponDef*, names**) returning distinct arena-owned opaque definitions. Runtime requests use already validated/loaded normal names, not guessed asset names.",
+    "scope": "First retail test pending for temporary helper spawners, forced-visibility bypass with independent collision traces, team conversion, goals and queued hand creation."
   }
 }

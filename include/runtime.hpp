@@ -6,6 +6,7 @@
 #include "weapon_inventory.hpp"
 #include "zombie_rehearsal.hpp"
 #include "ai_controls.hpp"
+#include "native_animation.hpp"
 #include <windows.h>
 #include <d3d9.h>
 #include <atomic>
@@ -86,6 +87,8 @@ struct WeaponModeStatus {
     bool owned=false; int page=0,pages=1,added=0;
     bool dualOwned=false,dualReady=false,dualFallback=false,reconciling=false,needsBaseline=false;
     DualBlocked dualBlocked=DualBlocked::None;
+    bool nativeHandsReady=false;
+    NativeHandBuildState nativeHandState=NativeHandBuildState::Unknown;
 };
 WeaponModeStatus GetWeaponModeStatus();
 bool AdjustWeaponBank(int direction);
@@ -100,6 +103,9 @@ void AdjustAiSpawner(bool friendly,int direction);
 void ToggleAiSpawnPause();
 AiStatus GetAiStatus();
 void LogAiState();
+std::uint64_t RequestNativeHandDefinitions(const WeaponFields&,std::uintptr_t names,std::uintptr_t normalTree,
+    std::uintptr_t cache,const Snapshot&);
+NativeHandBuildResult GetNativeHandBuild(std::uint64_t ticket);
 bool SetFov(int value);
 void LogSnapshot();
 void LoadFovPreference(FovPreference& preference);

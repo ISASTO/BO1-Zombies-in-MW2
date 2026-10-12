@@ -8,7 +8,7 @@
 #include "fov_preferences.hpp"
 
 namespace mod {
-inline constexpr const char* kVersion = "0.1.11-ai-test12";
+inline constexpr const char* kVersion = "0.1.12-spawn-test13";
 inline constexpr const char* kExeSha256 = "fb7e8a987c371dea7b666091b0b9e2011c0cd9cd277b191ad453d11d557dd777";
 
 // -1 is a wildcard. Reject malformed patterns rather than matching everything.
@@ -224,6 +224,66 @@ inline constexpr const char* kAiActorTypePattern =
 inline constexpr const char* kAiActorSelfPattern =
     "48 89 3E 33 D2 48 89 6E 08 41 B8 0C 01 00 00 E8 ?? ?? ?? ?? 48 8B 0E 4C 89 BE 84 0E 00 00";
 
+inline constexpr const char* kAiSpawnCopyCallsPattern =
+    "E8 ?? ?? ?? ?? 48 8B D5 48 8B C8 4C 8B F0 E8 ?? ?? ?? ?? 48 8B D5 49 8B CE E8 ?? ?? ?? ?? 49 8D 8E 46 01 00 00";
+
+inline constexpr const char* kAiCopyFieldsStartPattern =
+    "48 89 74 24 18 57 48 83 EC 20 48 83 3D ?? ?? ?? ?? 00 48 8B FA 48 8B F1 0F 84 91 00 00 00 48 89 5C 24 30 48 8D 1D ?? ?? ?? ?? 48 89 6C 24 38 48";
+
+inline constexpr const char* kAiCopyDynamicStartPattern =
+    "48 8B C2 45 33 C0 0F B7 51 7E 0F B7 48 7E E9 ?? ?? ?? ??";
+
+inline constexpr const char* kAiTraceStartPattern =
+    "48 89 5C 24 08 48 89 6C 24 10 48 89 74 24 18 57 48 83 EC 60 48 8B F2 48 8B E9 8B 94 24 90 00 00 00 48 8D 4C 24 50 49 8B D9 49 8B F8 E8 ?? ?? ?? ??";
+
+inline constexpr const char* kAiTraceScriptCallPattern =
+    "4C 8D 0D ?? ?? ?? ?? C7 44 24 28 15 00 82 00 4C 8D 44 24 30 C7 44 24 20 FF 07 00 00 48 8D 54 24 40 48 8D 4C 24 60 E8 ?? ?? ?? ??";
+
+inline constexpr const char* kAiTraceLayoutPattern =
+    "48 83 EC 48 48 8B 44 24 78 0F 57 C0 0F 11 01 48 89 44 24 30 8B 44 24 70 0F 11 41 10 89 44 24 28 0F 11 41 20 C7 01 00 00 80 3F C7 44 24 20 00 00 00 00 E8 ?? ?? ?? ??";
+
+inline constexpr const char* kAiPositionSetterPattern =
+    "8B 02 89 41 1C 8B 42 04 89 41 20 8B 42 08 89 41 24 33 C0 48 89 41 10 89 41 18 48 89 41 28 89 41 30 8B 02 89 81 E8 00 00 00 8B 42 04 89 81 EC 00 00 00 8B 42 08 89 81 F0 00 00 00 C3";
+
+inline constexpr const char* kAiPositionMethodCallPattern =
+    "48 8D 54 24 20 48 8B CB E8 ?? ?? ?? ?? 48 8B 8B 18 01 00 00 48 85 C9 74 05 E8 05 11 02";
+
+inline constexpr const char* kAiTeamChangePattern =
+    "48 8B 01 89 51 08 48 85 C0 74 12 48 8B 80 10 01 00 00 48 85 C0 74 06 89 90 78 13 00 00 C3";
+
+inline constexpr const char* kAiTeamScriptSetterPattern =
+    "40 53 48 83 EC 20 48 8B D9 33 C9 E8 ?? ?? ?? ?? 8B C8 E8 ?? ?? ?? ?? 8B D0 48 8B CB 48 83 C4 20 5B E9 ?? ?? ?? ??";
+
+inline constexpr const char* kAiGoalPositionPattern =
+    "48 89 5C 24 08 48 89 74 24 10 57 48 83 EC 20 48 8B FA 48 8B D9 48 81 C1 C0 14 00 00 33 D2 49 8B F0 E8 ?? ?? ?? ??";
+
+inline constexpr const char* kAiGoalScriptCallPattern =
+    "48 8D 54 24 20 33 C9 E8 ?? ?? ?? ?? 45 33 C0 48 8D 54 24 20 48 8B CB E8 ?? ?? ?? ?? 48 83 C4 30 5B C3";
+
+inline constexpr const char* kAiActorCapacityPattern =
+    "48 89 5C 24 08 57 48 83 EC 20 48 8B 05 ?? ?? ?? ?? 8B 0D ?? ?? ?? ?? 3B 48 10 7D 24 48 8B 1D ?? ?? ?? ?? 33 FF 8B C7 40 38 BB FF 14 00 00 74 1D 48 FF C0 48 81 C3 60 15 00 00 48 83 F8 20 7C E7 33 C0";
+
+inline constexpr const char* kAiClearEnemyTailPattern =
+    "48 8B 4B 08 45 33 C9 33 D2 45 8D 41 01 48 8B 5C 24 30 48 8B 74 24 38 48 83 C4 20 5F E9 ?? ?? ?? ??";
+
+inline constexpr const char* kWeaponAnimBuildStartPattern =
+    "48 89 5C 24 08 48 89 6C 24 10 48 89 74 24 18 48 89 7C 24 20 41 56 48 83 EC 30 48 8B EA 4C 8D 05 ?? ?? ?? ?? BA 26 00 00 00 48 8D 0D ?? ?? ?? ?? E8 ?? ?? ?? ??";
+
+inline constexpr const char* kAiActorBoundsPattern =
+    "0F 10 05 ?? ?? ?? ?? 0F 11 87 B4 00 00 00 F2 0F 10 0D ?? ?? ?? ?? F2 0F 11 8F C4 00 00 00 C7 87 54 01 00 00 15 00 82 02 C7 87 CC 00 00 00 00 40 00 00";
+
+inline constexpr const char* kAiActorTraceResultPattern =
+    "48 8D 54 24 40 89 5C 24 20 48 8D 4C 24 68 F3 0F 58 C2 F3 0F 5C 15 ?? ?? ?? ?? F3 0F 11 44 24 48 0F 28 05 ?? ?? ?? ?? 0F 11 44 24 50 F3 0F 11 54 24 38 E8 ?? ?? ?? ?? 44 38 BC 24 95 00 00 00";
+
+inline constexpr const char* kNativeWeaponHandsCallsPattern =
+    "48 8B 53 18 48 8B CB E8 ?? ?? ?? ?? 49 89 44 24 08 48 8B CB 48 8B 53 20 E8 ?? ?? ?? ?? EB ?? 33 C0 49 89 44 24 08";
+
+inline constexpr const char* kAiEnemySetterStartPattern =
+    "48 89 5C 24 08 48 89 6C 24 10 48 89 74 24 18 57 41 54 41 55 41 56 41 57 48 83 EC 20 48 8B 01 45 33 F6 45 8B E9 45 8B F8 48 8B FA 48 8B F1 41 8B EE 48";
+
+inline constexpr const char* kAiSpawnTargetnamePattern =
+    "49 8D 8E 46 01 00 00 8B D3 E8 ?? ?? ?? ?? 41 83 A6 4C 01 00 00 FE";
+
 inline constexpr int kVisibleMenuRows = 8;
 enum class Page { Home, Player, Weapons, World, AI, Zombies, Diagnostics, ZombieRules, View, ZombieController };
 enum class Input { Toggle, Up, Down, Select, Back, Left, Right };
@@ -255,7 +315,7 @@ struct MenuState {
             case Page::Player: return 8;
             case Page::Weapons: return 7;
             case Page::World: return 5;
-            case Page::AI: return 10;
+            case Page::AI: return 11;
             case Page::Zombies: return 3;
             case Page::Diagnostics: return 2;
             case Page::ZombieRules: return 6;

@@ -22,6 +22,10 @@ int main() {
     e.classname="actor_ally_hero_test"; Check(!EligibleSpawner(e,kAlliesTeam),"hero templates excluded from debug controls");
     e.classname="vehicle_test"; Check(!EligibleSpawner(e,kAlliesTeam),"actor type alone cannot admit a vehicle/script template");
     e.classname="actor_ally_test"; e.type=kActorType; e.actor=0x2000; e.sentient=0x3000; e.handler=2; e.health=100;
+    Check(EligibleAiTemplate(e),"live ordinary ally can supply a model without a friendly spawner");
+    e.team=kAxisTeam;Check(EligibleAiTemplate(e),"loaded enemy model can be converted to a friendly through native team transfer");
+    e.health=0;Check(!EligibleAiTemplate(e),"dead actor cannot seed a new native template");e.health=100;
+    e.classname="actor_ally_hero_test";Check(!EligibleAiTemplate(e),"hero VM state cannot be cloned for generic helpers");e.classname="actor_ally_test";
     const auto owned=AiIdentity::capture(e);
     Check(owned.matches(e),"own spawned identity records native serial and actor/sentient pointers");
     ++e.serial; Check(!owned.matches(e),"same entity slot with a new native allocation generation is excluded");

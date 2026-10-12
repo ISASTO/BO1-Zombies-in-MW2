@@ -2,12 +2,12 @@
 
 Incremental mod framework for **retail Modern Warfare 2 (2009), single player**.
 The first deliverable is an AMD64 D3D9 DLL that renders a keyboard menu in the
-game. BO1 Zombies gameplay is a future mode. The current test12 package repairs
-the bank-count preview and weapon animation validator, then adds actual native
-mission AI controls: enemy/friendly spawn requests, template selection, a spawn
-pause, live counts and removal of our own debug actors. The owner has accepted
-the source-derived BO1 controller rehearsal and checkpoint-bank recovery.
-Native spawning and the new dual-wield fix await their first retail test.
+game. BO1 Zombies gameplay is a future mode. The current test13 package improves
+native AI placement, collision retries, nearby helpers, advance/follow goals,
+population ownership and the remaining dual-wield rendering path. The owner has
+accepted the source-derived BO1 controller rehearsal, checkpoint-bank recovery,
+test12 enemy creation/cleanup and generic dual on several guns. The new native
+paths, including G18's distinct hand definitions, need the next retail test.
 
 **Status: Phase 1 core passed in the owner's test4 estate run.** The owner
 confirms correct health, working God ON/OFF and retained God state through
@@ -77,6 +77,16 @@ own callback thread; normal MW2 NPCs retain native initialization and behavior.
 See [test12 checks](docs/ai-test12.md), [test11 feedback](docs/runtime-test11-evidence.json)
 and [exact AI binding evidence](docs/ai-test12-evidence.json).
 
+`0.1.12-spawn-test13` follows the owner's test12 enemy-spawn and working-dual
+evidence. It removes the mod's eight-actor cap, places enemies at the nearest
+eligible point with clearance retries, creates friendlies near the player using
+loaded templates/team conversion, and requests native advance/follow goals.
+For remaining G18/other dual failures it builds distinct native hand definitions
+from loaded normal animation names on the engine callback thread. These new
+native paths need owner testing. The physical actor pool remains 32 slots.
+See [test13 instructions](docs/spawn-test13.md), [test12 runtime evidence](docs/runtime-test12-evidence.json)
+and [BO1 mode design](docs/bo1-mode-design.md).
+
 The supplied BO1 `common_zombie.ff` resolves the normal tuning CSV. Recovered
 values match the preview, so its numbers are unchanged. Special rounds and
 final map/runtime overrides remain outside that preview.
@@ -95,9 +105,9 @@ An executable hash mismatch disables game-state access and memory writes.
 The installer rejects a mismatched build. A manually installed proxy can still
 show its diagnostic menu in an unknown AMD64 `iw4sp.exe`.
 
-## Current combined test12
+## Current combined test13
 
-1. Close MW2 and extract the entire `BO1MW2-ai-test12.zip` outside the game folder.
+1. Close MW2 and extract the entire `BO1MW2-spawn-test13.zip` outside the game folder.
 2. Run `Uninstall.cmd` to remove the earlier project build, then `Install.cmd`
    and select the folder containing `iw4sp.exe`. Find it through Steam:
    MW2 Single Player > Properties > Installed Files > Browse.
@@ -106,14 +116,14 @@ show its diagnostic menu in an unknown AMD64 `iw4sp.exe`.
    then press **F4**. Up/Down selects, Enter toggles/opens, Left/Right changes
    the Give All bank or speed/jump/time/gravity, Backspace/Esc goes back.
    F4 closes the menu.
-4. Check the Give All label before touching its arrows and after checkpoint
-   reload; test G18/Beretta Dual ON/OFF and fixed-camera FPS. Then open **AI**,
-   select a loaded enemy/friendly template with Left/Right and request one
-   spawn with Enter. It appears at the mission spawner, not at your crosshair.
-   Test **Remove our spawned actors**, spawn pause and counts. Native visibility,
-   collision or capacity rules may refuse a spawn. Use a live estate combat
-   section with existing NPCs: this first callback adapter needs a native actor
-   already present. Follow [the staged test12 sequence](docs/ai-test12.md).
+4. Check Give All's label before touching arrows and after a checkpoint. Hold
+   G18, enable Dual and inspect the selected-row native hand-setup footer, both
+   models/fire inputs/reload/OFF and fixed-camera FPS. Then open **AI** and test
+   one enemy (nearest point, clearance offsets, advance goal), cleanup, then one
+   friendly (clear ground near you, converted loaded model if needed, ally team
+   and follow goal), cleanup. Repeat beyond eight if native slots are available.
+   Use a live estate combat section: the callback service still needs an existing
+   unfrozen NPC. Follow [the staged test13 sequence](docs/spawn-test13.md).
    Turn weapon modes OFF and remove debug actors before saving/quitting;
    ownership/undo history is limited to this process and detected level lifetime.
 5. Close MW2 and run `Diagnose.cmd` before another launch replaces the log.
@@ -151,9 +161,9 @@ Copy the log immediately after a failing run: `latest.log` is replaced on launch
 | BO1 round-rules preview | Owner test5 front-end navigation passed; normal CSV values now recovered locally and match the preview |
 | BO1 controller rehearsal | Test11 owner-accepted; simulated actors only, source-derived normal solo lifecycle and game-clock guards |
 | FOV selector and saved preference | Owner confirms test6 behavior; matching logs show load/selection/save/reset |
-| WEAPONS | Owner confirms checkpoint-bank recovery; test12 fixes initial page preview and native animation-name validation; dual/FPS/undo combinations still need retail checks |
+| WEAPONS | Owner confirms test12 dual compatibility on several guns; G18/others still fail. Test13 adds distinct native hand definitions and setup diagnostics; appearance/FPS/undo need retail checks |
 | WORLD | Adjustable time/gravity, actor-think freeze, reset; test8 logs confirm several apply/restore paths; broader gameplay coverage pending |
-| AI | Test12 real native mission enemy/friendly spawning, template selection, spawn pause, live counts, owned-only removal and diagnostics; static/portable checks pass, first retail test pending |
+| AI | Test12 native enemy creation/removal confirmed. Test13 adds nearest-point/near-player placement, collision retries, friendly team conversion, advance/follow goals and dynamic ownership; new native paths await retail testing. Physical actor slots32 |
 | Kill All Enemies, BO1 Zombies gameplay | Planned; native AI debugging does not implement BO1 targeting/pursuit/melee or assets |
 
 ## Architecture
@@ -196,16 +206,21 @@ name and camera pointer slot. Sixteen optional player signatures validate
 partial client/ammo fields, native dvar consumers, noclip and fixed jump data.
 Thirty-four optional weapon/world/inventory/animation signatures corroborate native dvar
 consumers, weapon tables/timing, owned slots/model/ammo/dual fields, grenade
-bypasses and the sole player gravity literal. The offline verifier and runtime
-scanner both count overlapping matches. The corrected catalog pattern includes
+bypasses and the sole player gravity literal. Forty additional actor/spawn/
+placement/team/goal/hand-builder anchors bring the current total to 97 unique
+signatures. The offline verifier and runtime scanner both count overlapping
+matches. The corrected catalog pattern includes
 the initializer prologue instead of matching repeated adjacent memset blocks.
 Weapon banks use bounded data writes and conditional rollback; no native
 grant/allocation routine is called. OFF uses the captured original inventory
 only with a validated player/map/asset scope. Introduced weapon/pool IDs persist
 through bank changes and same-process checkpoints; slot reorder and older banks
 do not replace the original baseline. Invalid reads defer recovery. Native
-normal animation names/arena definitions can be loaned to the two hand slots,
-with conditional restoration; no native allocator or actor method is called.
+normal animation names/arena definitions can initially be loaned to the two hand
+slots with conditional restoration. Test13 queues separate native hand-definition
+construction on the verified actor callback thread and publishes results through
+the same ownership baseline. Actor allocation/copy/team/goal/removal calls also
+run only on that thread; rendering does not execute those native methods.
 Each new feature fails closed independently of the core patterns. Reserve
 edits compare ID/count together; speed restores its captured baseline. The
 verified 39/78 jump float pair uses bounded selected heights only in this process; its data
@@ -285,7 +300,10 @@ Original games remain user-supplied inputs and must never be added to this repo.
 - [WEAPONS/WORLD test8](docs/world-weapons-test8.md): adjustable controls, precise scopes and owner checks.
 - [WEAPONS test9](docs/weapons-test9.md): historical first bank/dual prototype.
 - [WEAPONS test10](docs/weapons-test10.md): checkpoint/undo repair, animation compatibility, performance and final owner checks.
-- [Native AI test12](docs/ai-test12.md): current weapon fixes, staged native enemy/friendly spawning and cleanup tests.
+- [Native AI test12](docs/ai-test12.md): historical first native spawn/cleanup iteration.
+- [Spawn test13](docs/spawn-test13.md): current placement, friendly fallback, goals, native hand setup and owner tests.
+- [Test12 evidence](docs/runtime-test12-evidence.json): confirmed native enemy lifecycle, working generic dual and remaining failures.
+- [BO1 mode design](docs/bo1-mode-design.md): clear/USP/round-one requirements, source-derived drops/revive, purchases and box-last order.
 - [Test11 evidence](docs/runtime-test11-evidence.json): accepted checkpoint recovery/rehearsal, remaining UI and dual failures.
 - [BO1 tuning evidence](docs/bo1-normal-tuning-evidence.json): selected local CSV values and pointer-resolution limits.
 - [Roadmap](docs/roadmap.md): incremental gates and persistent FOV request.
@@ -293,10 +311,10 @@ Original games remain user-supplied inputs and must never be added to this repo.
 - [Input hashes](docs/input-manifest.json) and [profile checks](docs/profile-checks.json).
 
 The core foundation, PLAYER and BO1 controller rehearsal are accepted in their
-observed sessions. Test12 needs retail evidence for the page-preview/dual fix
-and native actor spawn/init/cleanup before live BO1 behavior is attached. Audit
-remaining BO1 overrides/dependencies and validate one pursuit/melee/animation
-fixture, then connect source-derived round population logic. Broader campaign-
+observed sessions. Test13 needs retail evidence for placement, friendly team/goal,
+collision retries and distinct hand definitions. Verify independent game-thread
+scheduling before clearing all actors, then validate one BO1 pursuit/melee/
+animation fixture before connecting live round population. Broader campaign-
 map/reset coverage and asset import remain separate checks.
 AI and asset injection need separate compatibility and behavior tests; shared
 engine ancestry does not imply compatible binary layouts or actor behavior.

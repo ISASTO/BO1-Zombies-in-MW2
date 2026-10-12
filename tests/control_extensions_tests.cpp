@@ -40,6 +40,13 @@ int main() {
     Check(speed.original==190 && speed.injected==475 && speed.canRestore(0x2000,475), "strength adjustments retain the pre-override baseline");
     Check(!speed.canRestore(0x2000,200) && !speed.canRestore(0x3000,475), "engine changes or recycled dvars prevent stale restores");
     speed.applied(0x2000,200,570); Check(speed.original==200, "capture an intervening native value as the new baseline");
+    ScalarOwnership<std::uintptr_t> handDefinition;
+    handDefinition.applied(0x3008,0,0x4000);
+    handDefinition.applied(0x3008,0x4000,0x5000);
+    Check(handDefinition.original==0 && handDefinition.canRestore(0x3008,0x5000),
+        "upgrading compatibility hand to a distinct native definition retains original empty cache for OFF");
+    Check(!handDefinition.canRestore(0x3008,0x6000),
+        "foreign hand-definition replacement cannot be claimed for upgrade or undo");
     Check(RapidFireTime(100)==50 && RapidFireTime(25)==20, "rapid fire halves normal timing with a positive floor");
     WeaponFields w; w.valid=true; w.index=12; w.complete=0x4000; w.definition=0x5000; w.type=0; w.fireTime=100;
     std::strcpy(w.name,"test_rifle");

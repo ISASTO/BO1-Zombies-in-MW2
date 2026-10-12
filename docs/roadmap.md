@@ -41,22 +41,41 @@ Updated 2026-10-12. Complete one useful, testable change at a time.
    returned estate run shows rounds 1–3 and the debug round 10 profile with valid
    accounting. The owner confirms expected rehearsal behavior. No native actor,
    damage or asset calls were added in test11.
-9. **Current test12, first native actor controls:** fix the pre-toggle bank
+9. **Test12, first native actor controls:** fix the pre-toggle bank
    preview and follow the native animation-name builder's consumed slots/idle
    fallback. Independently verify the IW4 actor callback, normal factory,
    delete method, entity serial, teams and partial fields. Add actual mission
    enemy/friendly requests, loaded template selection, spawn pause, live counts
    and owned-only cleanup. Eleven C++ suites, 22 Python fixtures, 77 exact
    signatures, AMD64 build and isolated test11-to-test12 upgrade pass. New
-   dual/FPS and native actor execution await their first retail test.
-10. Use native spawn/init/cleanup evidence before connecting the BO1 controller.
+   runtime evidence now confirms 45 enemy creations, owned cleanup and dual
+   compatibility on several guns. G18/others still fail visually; friendly
+   templates were absent, with collision refusals and the artificial eight cap.
+10. **Current test13:** independent native Bounds/trace/copy/team/goal/string-setter
+   and animation-builder checks. Remove the eight-actor mod ceiling; keep the
+   actual 32-slot physical pool visible. Nearest enemy point with nearby clearance
+   retries, near-player friendly placement from loaded templates or converted
+   enemy models, native advance/follow goals, generation-owned helper-spawner
+   lifetime and distinct native hand definitions. Twelve C++ suites, 24 Python
+   fixtures, 97 anchors, clean AMD64 build and actual-test12 upgrade pass;
+   new native behaviors await owner testing.
+11. Verify independent game-thread scheduling before clear/start: the existing
+   actor-callback service stops if every actor is removed. Suppress campaign
+   replacement spawns, audit protected actors/mission failure dependencies,
+   validate mode ownership and USP-only inventory, then separately test setup.
+12. Use native spawn/init/cleanup evidence before connecting the BO1 controller.
    Translate source-derived target selection, native goal/path/collision,
    animation-notetrack damage and death semantics for one actor fixture. A
    campaign soldier's native combat is not BO1 zombie behavior. Keep live round
    population disabled until the behavior adapter is validated.
-11. Audit/import one local asset type at a time with versioned conversion tools.
+13. Audit/import one local asset type at a time with versioned conversion tools.
    Validate zombie behavior against BO1 observations before expanding gameplay,
    special rounds, weapon features, or a native IW4 menu.
+14. Implement one source-derived powerup at a time after native damage/death and
+   the score-event ledger. Drops/Double Points need that ledger even if points
+   presentation is deferred. Translate helper downing/held-use revival and add
+   per-map wall-buy anchors. Keep Mystery Box last as requested. Detailed source
+   facts, compatibility classes and acceptance gates: [bo1-mode-design.md](bo1-mode-design.md).
 
 Source and tooling belong in GitHub. Original assets, extracted original scripts,
 executables, crash dumps, and complete returned logs remain private local inputs.

@@ -1,0 +1,52 @@
+{
+  "version": "0.1.11-ai-test12",
+  "reviewed": "2026-10-12",
+  "source_bundle": {
+    "filename": "BO1MW2-startup-results-20261012-082851-040566d3.zip",
+    "bytes": 137147,
+    "sha256": "d2378fba0f6f1afeeb09ae5933ccefa188b4453ddc909dadefea63eed9b12a1e",
+    "entries": 21
+  },
+  "log": {
+    "bytes": 603499,
+    "sha256": "cff9de9991825d433e309059b37a61f1a8c33aff33f068ab206978f8a91ad0cd",
+    "records": 5690
+  },
+  "installed_dll_sha256": "15b89723fcdeaa8c0e0d4fb6e7a7f2c5c30bb6d3fa612ded7bbacaf61198c59d",
+  "owner_report": [
+    "Dual works on several guns, including rifles; G18 and some others still fail.",
+    "Enemy spawning works but position/selection is unclear; nearest point and advance behavior requested.",
+    "Friendly testing is blocked by population/template limits; near-player spawning and repeated requests requested.",
+    "Occasional enemy collision errors; retry nearby clear locations requested."
+  ],
+  "confirmed_runtime": {
+    "map": "estate",
+    "ai_result_counts": {
+      "CREATED": 45,
+      "AT_LIMIT": 19,
+      "NO_SPAWNER": 8,
+      "NATIVE_REFUSED": 44,
+      "DELETED": 1,
+      "IDENTITY_CHANGED": 1
+    },
+    "native_delete_begin_calls": 7,
+    "native_service_thread": 34148,
+    "render_request_thread": 37052,
+    "actor_creation": "45 CREATED responses with immediately valid native actor/sentient/team1/health150 records. Seven generation-owned native deletes observed.",
+    "friendly": "Returned screenshot shows friendly0/0 NONE. Eight NO_SPAWNER results; independent of the eight-owned cap.",
+    "population": "19 AT_LIMIT results from the test12 artificial eight-owned-actor guard; physical native capacity separately established in test13.",
+    "dual_asset_apply_count": 56,
+    "g18": "Index33 glock reached DUAL_ASSET, native veto1->0, player metadata dual1 and hand1. Remaining reported appearance failure is beyond the old admission gate.",
+    "loader_probes": "Both exit0; saved FOV preference retained.",
+    "new_crash_evidence": false,
+    "dump_scope": "Bundle retains the same three historical test1 dumps; no new dump identified.",
+    "fps_scope": "One returned working-rifle screenshot shows495 FPS, but no controlled OFF/ON/OFF sample; performance cannot be quantitatively accepted from it."
+  },
+  "test13_response": [
+    "Distinct main-thread native hand definitions from loaded normal names; specific setup/footer diagnostics.",
+    "Nearest enemy spawn point recomputed at execution; traced offset retries and explicit last-position feedback.",
+    "Near-player friendly placement, loaded-model fallback and native team/target transfer.",
+    "Native advance/follow goals, dynamic ownership, real32-slot status and reversible soft ceiling."
+  ],
+  "limits": "Owner observations and logs confirm only their tested native paths/maps. No blanket dual, FPS, friendly, collision or BO1 zombie acceptance is inferred. Original screenshots/logs/dumps remain private."
+}

@@ -1,6 +1,7 @@
 # Primary technical references
 
-Reviewed 2026-10-11. External code is research material; current runtime code is
+Reviewed 2026-10-11; primary MisaDev4 and OAT project/asset-support pages revisited
+2026-10-12. External code is research material; current runtime code is
 original and targets only the supplied retail executable. BO1 behavior claims
 are grounded first in the extracted local scripts, not forum memories.
 
@@ -96,3 +97,15 @@ the same executable; it is not inferred from an asset schema. Native campaign
 spawning is a class-B IW4 lifecycle prerequisite. It does not satisfy BO1 target,
 state-machine, attack, notetrack or class-C asset conversion requirements in
 the prior source/portability audit.
+
+## Test13 exact-build and owned-source audit
+
+Native actor Bounds/trace layout, field/VM-variable copy, script-string ownership,
+team/goal/target calls, physical pool limit and per-hand animation allocation
+are checked against the exact supplied executable and independent native callers.
+`verify_spawn_bindings.py`, `spawn-test13-evidence.json` and the ledger record
+derived findings; no upstream implementation or disassembly listing is included.
+The common BO1 patch scripts provide the new drop/revive/purchase rules in
+`bo1-mechanics-test13-evidence.json`; their original bodies remain local.
+Current project documentation remains reference material, not permission to
+assume ABI compatibility or complete T5 sound/model/animation import.

@@ -1,0 +1,271 @@
+{
+  "version": "0.1.12-spawn-test13",
+  "reviewed": "2026-10-12",
+  "executable_sha256": "fb7e8a987c371dea7b666091b0b9e2011c0cd9cd277b191ad453d11d557dd777",
+  "authority": "Exact supplied retail AMD64 executable; independently matched native callers, descriptors, data literals and graph targets. Assigned names are ours.",
+  "anchors": {
+    "kAiSpawnCopyCallsPattern": {
+      "match_count": 1,
+      "match_rva": "0x152ee0",
+      "rip_targets": {}
+    },
+    "kAiCopyFieldsStartPattern": {
+      "match_count": 1,
+      "match_rva": "0x19a2c0",
+      "rip_targets": {
+        "10": "0x346460",
+        "35": "0x346468"
+      }
+    },
+    "kAiCopyDynamicStartPattern": {
+      "match_count": 1,
+      "match_rva": "0x19a3c0",
+      "rip_targets": {}
+    },
+    "kAiTraceStartPattern": {
+      "match_count": 1,
+      "match_rva": "0x175280",
+      "rip_targets": {}
+    },
+    "kAiTraceScriptCallPattern": {
+      "match_count": 1,
+      "match_rva": "0x189722",
+      "rip_targets": {
+        "0": "0x355818"
+      }
+    },
+    "kAiTraceLayoutPattern": {
+      "match_count": 1,
+      "match_rva": "0x1f8140",
+      "rip_targets": {}
+    },
+    "kAiPositionSetterPattern": {
+      "match_count": 1,
+      "match_rva": "0x1a05c0",
+      "rip_targets": {}
+    },
+    "kAiPositionMethodCallPattern": {
+      "match_count": 1,
+      "match_rva": "0x1908ad",
+      "rip_targets": {}
+    },
+    "kAiTeamChangePattern": {
+      "match_count": 1,
+      "match_rva": "0x1b1f50",
+      "rip_targets": {}
+    },
+    "kAiTeamScriptSetterPattern": {
+      "match_count": 1,
+      "match_rva": "0x1b2090",
+      "rip_targets": {}
+    },
+    "kAiGoalPositionPattern": {
+      "match_count": 1,
+      "match_rva": "0x1504e0",
+      "rip_targets": {}
+    },
+    "kAiGoalScriptCallPattern": {
+      "match_count": 1,
+      "match_rva": "0x14f041",
+      "rip_targets": {}
+    },
+    "kAiActorCapacityPattern": {
+      "match_count": 1,
+      "match_rva": "0x123950",
+      "rip_targets": {
+        "10": "0xd9c0e0",
+        "17": "0xd96ee0",
+        "28": "0xd96ea0"
+      }
+    },
+    "kAiClearEnemyTailPattern": {
+      "match_count": 1,
+      "match_rva": "0x14f8fc",
+      "rip_targets": {}
+    },
+    "kWeaponAnimBuildStartPattern": {
+      "match_count": 1,
+      "match_rva": "0xc2c70",
+      "rip_targets": {
+        "29": "0xa9730",
+        "41": "0x32e088"
+      }
+    },
+    "kAiActorBoundsPattern": {
+      "match_count": 1,
+      "match_rva": "0x12cf71",
+      "rip_targets": {
+        "0": "0x334538",
+        "14": "0x334548"
+      }
+    },
+    "kAiActorTraceResultPattern": {
+      "match_count": 1,
+      "match_rva": "0x12d045",
+      "rip_targets": {
+        "18": "0x385b60",
+        "32": "0x31fd30"
+      }
+    },
+    "kNativeWeaponHandsCallsPattern": {
+      "match_count": 1,
+      "match_rva": "0xc4c99",
+      "rip_targets": {}
+    },
+    "kAiEnemySetterStartPattern": {
+      "match_count": 1,
+      "match_rva": "0x1b1cb0",
+      "rip_targets": {}
+    },
+    "kAiSpawnTargetnamePattern": {
+      "match_count": 1,
+      "match_rva": "0x152efe",
+      "rip_targets": {}
+    }
+  },
+  "native_spawn": {
+    "graph": {
+      "copy_static_call": "0x19a2c0",
+      "copy_static": "0x19a2c0",
+      "copy_dynamic_call": "0x19a3c0",
+      "copy_dynamic": "0x19a3c0",
+      "physics_trace_call": "0x175280",
+      "bounds_trace": "0x175280",
+      "actor_trace_call": "0x175280",
+      "origin_set_call": "0x1a05c0",
+      "origin_set": "0x1a05c0",
+      "team_script_tail": "0x1b1f50",
+      "team_set": "0x1b1f50",
+      "goal_script_call": "0x1504e0",
+      "goal_set": "0x1504e0",
+      "enemy_script_tail": "0x1b1cb0",
+      "enemy_set": "0x1b1cb0",
+      "right_hand_call": "0xc2c70",
+      "left_hand_call": "0xc2c70",
+      "animation_builder": "0xc2c70"
+    },
+    "g_spawn_rva": "0x1a0870",
+    "g_free_entity_rva": "0x19f900",
+    "script_string_setter_rva": "0x21ad70",
+    "actor_used_count_slot_rva": "0xd96ee0",
+    "actor_soft_limit_slot_rva": "0xd9c0e0",
+    "actor_pool_slot_rva": "0xd96ea0",
+    "physical_actor_capacity": 32,
+    "actor_stride": "0x1560",
+    "bounds_midpoint_halfsize": [
+      0.0,
+      0.0,
+      36.0,
+      15.0,
+      15.0,
+      36.0
+    ],
+    "placement_mask": "0x2820015",
+    "trace_output_bytes": 48,
+    "trace_fraction_offset": 0,
+    "trace_startsolid_offset": "0x2d",
+    "team_transfer": "Native helper writes sentient team+8 and actor team mirror+0x1378.",
+    "goal": "Native setgoalpos caller uses actor pointer, Vec3 pointer, optional node=null; helper has no boolean success return.",
+    "animation": "Native caller builds each hand with (WeaponDef*, names**) returning distinct arena-owned opaque definitions. Runtime requests use already validated/loaded normal names, not guessed asset names.",
+    "scope": "First retail test pending for temporary helper spawners, forced-visibility bypass with independent collision traces, team conversion, goals and queued hand creation."
+  },
+  "calling_convention": "Windows AMD64: RCX/RDX/R8/R9 then stack arguments. Opaque engine objects, no T5 or historical complete structure casts.",
+  "functions": [
+    {
+      "name": "G_Spawn",
+      "rva": "0x1a0870",
+      "prototype": "Gentity*()"
+    },
+    {
+      "name": "G_CopyRegisteredFields",
+      "rva": "0x19a2c0",
+      "prototype": "void(destination entity*, source entity*)",
+      "table_rva": "0x346460"
+    },
+    {
+      "name": "G_CopyScriptVariables",
+      "rva": "0x19a3c0",
+      "prototype": "void(destination entity*, source entity*)",
+      "note": "Copies native class-0 entity VM variables, not raw pointers or VM argument emulation."
+    },
+    {
+      "name": "G_FreeEntity",
+      "rva": "0x19f900",
+      "prototype": "void(entity*)"
+    },
+    {
+      "name": "G_BoundsTrace",
+      "rva": "0x175280",
+      "prototype": "void(TraceOut*, startVec*, endVec*, Bounds*, passEntityNumber, contentMask)"
+    },
+    {
+      "name": "G_SetOrigin",
+      "rva": "0x1a05c0",
+      "prototype": "void(entity*, Vec3*)"
+    },
+    {
+      "name": "Sentient_TransferTeam",
+      "rva": "0x1b1f50",
+      "prototype": "void(sentient*, team int)",
+      "writes": [
+        "sentient+0x8",
+        "actor+0x1378"
+      ]
+    },
+    {
+      "name": "Actor_SetScriptGoalPosition",
+      "rva": "0x1504e0",
+      "prototype": "void(actor*, Vec3*, optional path-node pointer=null)",
+      "writes": [
+        "goal+0x1498..0x14a0",
+        "goal node+0x14b0",
+        "clears goal entity+0x14c0"
+      ],
+      "note": "No boolean success return; native path invalidation is a separate internal call."
+    },
+    {
+      "name": "Sentient_SetEnemy",
+      "rva": "0x1b1cb0",
+      "prototype": "void(sentient*, target Gentity* or null, flag1 int, flag2 int)",
+      "note": "Maintains native enemy handles/notifications. Enemy target is the player; friendly target is null."
+    },
+    {
+      "name": "Weapon_BuildAnimationDefinition",
+      "rva": "0xc2c70",
+      "prototype": "opaque definition*(WeaponDef*, animation-name table**)",
+      "note": "Native right/left caller at0xc4c99 passes definition+0x18/+0x20. Requests here reuse loaded normal names, allocate separate arena objects and leave normal cache0 intact."
+    },
+    {
+      "name": "Scr_SetString",
+      "rva": "0x21ad70",
+      "prototype": "void(script-string WORD*, unsigned string id)",
+      "note": "Clears helper target/targetname with native string reference ownership."
+    }
+  ],
+  "partial_fields": {
+    "entity_target": "0x144 WORD",
+    "entity_targetname": "0x146 WORD",
+    "bounds": "24 bytes: midpoint Vec3 + halfsize Vec3",
+    "trace": "48 bytes; fraction0, normal4, startsolid0x2d; allsolid0x2c retained as layout hypothesis with plausibility guards."
+  },
+  "physical_capacity": {
+    "actor_slots": 32,
+    "actor_stride": "0x1560",
+    "actor_pool_pointer_slot": "0xd96ea0",
+    "active_count_slot": "0xd96ee0",
+    "ai_count_dvar_slot": "0xd9c0e0",
+    "note": "Map soft ceiling can rise to32. No eight-owned-NPC ceiling. More than32 active actors requires verified pool/consumer expansion, not an isolated loop/dvar patch."
+  },
+  "runtime_scope": "New temp-spawner, trace, team/target/goal and native hand-build calls have static/portable validation only; first retail test13 observations pending.",
+  "hypotheses": [
+    "G18 remaining rendering failure may depend on separately constructed hand definitions; test12 flags/admission already succeeded.",
+    "Trace allsolid+0x2c is consistent with the 48-byte native layout, but has not been independently tied to an actor consumer as startsolid+0x2d has.",
+    "Live-actor template VM-variable copying and mission script side effects require map-specific observations."
+  ],
+  "limitations": [
+    "Loaded mission templates/assets and an unfrozen native actor callback are still required.",
+    "Goals request native movement; human cover/combat remains native MW2 behavior.",
+    "Generation ownership is discarded on detected level lifetime change and is not serialized.",
+    "T5 player/actor/asset ABI is unrelated to these exact AMD64 fields."
+  ]
+}

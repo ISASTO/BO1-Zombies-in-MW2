@@ -6,6 +6,7 @@
 #include <optional>
 #include <string>
 #include <algorithm>
+#include "ai_placement.hpp"
 
 namespace mod {
 // Partial exact-retail AMD64 fields. No historical IW4/T5 actor struct casts.
@@ -16,9 +17,10 @@ inline constexpr std::size_t kAiOrigin=0xe8,kAiClient=0x108,kAiActor=0x110,kAiSe
 // The script-visible classname is at 0x13e. The internal name at 0x13c is distinct.
 inline constexpr std::size_t kAiHandler=0x13b,kAiClassname=0x13e,kAiSpawnFlags=0x14c,kAiHealth=0x164;
 inline constexpr std::size_t kAiSpawnerTeam=0x178,kAiLastSpawn=0x17c,kAiSpawnCount=0x184;
+inline constexpr std::size_t kAiTarget=0x144,kAiTargetname=0x146;
 inline constexpr std::uint8_t kActorType=13,kActorSpawnerType=14,kActorCorpseType=15,kActorHandler=2;
 inline constexpr int kAxisTeam=1,kAlliesTeam=2;
-inline constexpr int kAiOwnedLimit=8,kAiSpawnerListLimit=32,kAiRequestExpiryMilliseconds=10000;
+inline constexpr int kAiNativeActorCapacity=32,kAiSpawnerListLimit=kAiEntityCapacity,kAiRequestExpiryMilliseconds=10000;
 struct AiEntity {
     bool valid=false,inUse=false;
     std::uintptr_t address=0,actor=0,sentient=0;
@@ -64,6 +66,12 @@ inline bool EligibleSpawner(const AiEntity& e,int team) {
         && (team==kAxisTeam || team==kAlliesTeam) && !(e.flags&2)
         && name.rfind("actor_",0)==0 && name.find("_hero")==std::string::npos;
 }
+inline bool EligibleAiTemplate(const AiEntity& e) {
+    if(e.type==kActorSpawnerType) return EligibleSpawner(e,e.team);
+    return e.valid && e.inUse && e.type==kActorType && e.number>1 && e.health>0
+        && (e.team==kAxisTeam || e.team==kAlliesTeam) && e.classname.rfind("actor_",0)==0
+        && e.classname.find("_hero")==std::string::npos;
+}
 struct SpawnerBudgetLease {
     int original=0,submitted=0;
     static SpawnerBudgetLease plan(int count) { return {count,count==0?1:count}; }
@@ -84,7 +92,8 @@ struct AiIdentity {
 };
 enum class AiOperation { SpawnEnemy, SpawnFriendly, RemoveOwned };
 enum class AiRequestResult { None, Queued, Ready, NotReady, Busy, NoSpawner, SpawnPaused, NativeRefused,
-    Created, Deleted, LifetimeChanged, Expired, IdentityChanged, Protected, HookUnavailable, NativeReturnedInvalid, Limit };
+    Created, Deleted, LifetimeChanged, Expired, IdentityChanged, Protected, HookUnavailable, NativeReturnedInvalid, Limit,
+    NoClearPosition };
 inline const char* AiResultText(AiRequestResult value) {
     switch(value) {
         case AiRequestResult::None: return "NONE";
@@ -104,6 +113,7 @@ inline const char* AiResultText(AiRequestResult value) {
         case AiRequestResult::HookUnavailable: return "HOOK_UNAVAILABLE";
         case AiRequestResult::NativeReturnedInvalid: return "NATIVE_INVALID";
         case AiRequestResult::Limit: return "AT_LIMIT";
+        case AiRequestResult::NoClearPosition: return "NO_CLEAR_POSITION";
     }
     return "UNKNOWN";
 }
@@ -154,6 +164,13 @@ struct AiStatus {
     int enemySpawner=0,enemySpawners=0,friendlySpawner=0,friendlySpawners=0;
     std::array<char,96> enemyName{},friendlyName{};
     float enemyDistance=0.f,friendlyDistance=0.f;
+    bool friendlyFallback=false;
+    int engineActors=0,engineLimit=kAiNativeActorCapacity;
+    std::array<char,96> lastName{};
+    AiPoint lastPosition{};
+    float lastSpawnDistance=0.f;
+    unsigned lastEntity=0;
+    int lastTeam=0,placementAttempts=0;
     AiRequestResult lastResult=AiRequestResult::None;
     unsigned long long callbacks=0,created=0,deleted=0;
     unsigned long nativeThread=0;

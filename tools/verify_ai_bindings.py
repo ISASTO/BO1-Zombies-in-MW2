@@ -182,8 +182,8 @@ def verify_ai_bindings(pe, signatures, header, entity_number):
     if (member('kAxisTeam'), member('kAlliesTeam')) != (1, 2):
         raise ValueError('AI controls disagree with verified axis/allies name order')
     return {
-        'status': 'Static exact-build cross-checks passed; first retail actor test pending',
-        'calling_convention': 'Windows AMD64; think(RCX entity), spawn(RCX spawner, EDX targetname=0, R8D force=0, R9D ignorechecks=0), delete(ECX packed class-0 entity number)',
+        'status': 'Static exact-build cross-checks passed; retail observations are recorded separately by iteration.',
+        'calling_convention': 'Windows AMD64; think(RCX entity), spawn(RCX spawner, EDX targetname, R8D visibility/distance bypass, R9D additional check flag), delete(ECX packed class-0 entity number). Test13 submits (spawner,0,1,0) after independent clearance traces.',
         'graph': {name: hex(value) for name, value in graph.items()},
         'think_callback_slot_rva': hex(callback_slot), 'entity_pool_rva': hex(fixed_pool),
         'entity_count_slot_rva': hex(rip(array, 0)), 'active_bitmap_rva': hex(rip(array, 24)),
@@ -194,5 +194,5 @@ def verify_ai_bindings(pe, signatures, header, entity_number):
         'entity_stride': hex(member('kAiEntityStride')), 'entity_capacity': member('kAiEntityCapacity'),
         'partial_field_evidence': partial, 'in_use_writer_rva': hex(alloc_rva),
         'lifetime': 'Native useCount DWORD increments when G_FreeEntity clears the slot; also require matching number/type/actor/sentient/self links and level identity.',
-        'limits': 'Native mission NPC debugging, not BO1 zombie AI. Hook installs on first request, needs an existing actor callback, retains collision/visibility/capacity refusal and script notifications. Cleanup owns at most eight same-process generation tickets.'
+        'limits': 'Native mission NPC debugging, not BO1 zombie AI. Hook installs on first request and needs an existing actor callback. Test13 uses independently traced placement, temporary native spawners, team/goal adapters and dynamic generation ownership. Physical actor capacity32 remains; the mod does not impose eight.'
     }

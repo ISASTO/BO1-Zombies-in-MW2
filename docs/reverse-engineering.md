@@ -742,14 +742,94 @@ generic compatibility, not authored paired animation or BO1 XAnim conversion.
 | 2026-10-11 / test 9 | First banks/dual prototype and corrected Rapid Fire | Matching estate run and owner feedback | Checkpoint baseline contamination; failed OFF cleanup; G18 veto/dual FPS loss. Other controls owner-accepted |
 | 2026-10-11 / test 10 | Checkpoint provenance, selective undo, held-gun normal-animation fallback, caching and performance diagnostics | Eight C++ suites, 12 Python fixtures, 57 native anchors, AMD64 PE, actual-test9 upgrade | Test11 owner confirms checkpoint-bank recovery; dual still blocked |
 | 2026-10-11 / test 11 | BO1 source-derived simulated controller, scoped ordinary-player melee admission and local dependency auditor | Ten C++ suites, 17 Python fixtures, 57 native anchors, AMD64 PE, actual-test10 upgrade | Owner accepts rehearsal; estate rounds 1–3/debug 10 observed with valid accounting; initial Give label and dual still fail |
-| 2026-10-12 / test 12 | Bank preview/native animation validation plus real mission enemy/friendly controls, callback-thread spawn and owned-only cleanup | Eleven C++ suites, 22 Python fixtures, 77 native anchors and independent binding/field tables, AMD64 PE, actual-test11 upgrade | First new retail dual/AI run pending |
+| 2026-10-12 / test 12 | Bank preview/native animation validation plus real mission enemy/friendly controls, callback-thread spawn and owned-only cleanup | Eleven C++ suites, 22 Python fixtures, 77 native anchors and independent binding/field tables, AMD64 PE, actual-test11 upgrade | Owner confirms dual on several guns and enemies; matching run has45 creations/seven native deletes, absent friendlies, artificial8 cap and refusals; G18 still fails visually |
+| 2026-10-12 / test 13 | Nearest enemy/near-player friendly placement, native Bounds traces/offsets, helper-spawner lifetime, team/target/goal APIs, dynamic population and native hand definitions | Twelve C++ suites, 24 Python fixtures, 97 anchors, independent graph/data checks, clean AMD64 PE and actual-test12 upgrade | New native calls await owner test |
 
 Returned owner evidence is redacted into the versioned runtime JSON files; full
 logs/dumps stay private. No retail game is executed in this Linux workspace.
-The next acceptance gate is test12: correct bank label before input, dual
-appearance/firing/reload/FPS, both OFF orders, and native actor creation/removal
-with untouched campaign NPCs. History is session-local; cross-process saved-
+The next acceptance gate is test13: G18/native hand setup, dual undo/FPS, nearest
+enemy placement/approach, near-player friendly team/follow, collision retries,
+population beyond8 and owned-only cleanup. History is session-local; cross-process saved-
 checkpoint ownership requires a separate design and is not implemented.
 The accepted BO1 controller stays simulated until the actor behavior/animation
 adapter is validated. Saved FOV remains a regression check. Second-map/reset
 coverage and native BO1 actor/asset compatibility remain separate gates.
+
+## Test13 exact native placement, teams, goals and hand definitions
+
+Authority is the same exact SHA256-gated AMD64 `iw4sp.exe`, not a historical
+IW4x or T5 structure. Twenty new unique anchors bring the total to97. Derived
+graphs, literal data checks and assigned prototypes are in
+[spawn-test13-evidence.json](spawn-test13-evidence.json) and current
+[profile-checks.json](profile-checks.json). No original code listing is included.
+
+| Assigned function/data | RVA | Verified convention or partial structure |
+| --- | --- | --- |
+| G_Spawn | `0x1a0870` | No arguments; returns a real native Gentity*. |
+| G_CopyRegisteredFields | `0x19a2c0` | RCX destination, RDX source; native registered descriptor table at `0x346460`. |
+| G_CopyScriptVariables | `0x19a3c0` | RCX destination, RDX source; native class0 variable copier using entity WORD number `+0x7e`. No VM parameter emulation. |
+| G_FreeEntity | `0x19f900` | RCX entity; derived independently from the guarded delete tail. Native serial advances when freed. |
+| G_BoundsTrace | `0x175280` | RCX TraceOut*, RDX start*, R8 end*, R9 Bounds*, stack pass entity/mask. Independent script and actor-init callers agree. |
+| Bounds / clip mask | literal `0x334538`; native actor-init stores | 24bytes, midpoint `(0,0,36)` and halfsize `(15,15,36)`, native mask `0x02820015`. Point trace uses native zero Bounds. These are not min/max vectors. |
+| Trace output | initializer `0x1f8140`; actor consumer `0x12d045` | Clears48bytes; fraction0, normal+4. Actor output address/read establishes startsolid+`0x2d`. Allsolid+`0x2c` is still a layout hypothesis with validity guards. |
+| G_SetOrigin | `0x1a05c0` | RCX entity, RDX Vec3*; native trajectory and origin updates. |
+| Sentient_TransferTeam | `0x1b1f50` | RCX sentient, EDX team; native sentient+8 and actor mirror+`0x1378`, independently named by script field setter. |
+| Sentient_SetEnemy | `0x1b1cb0` | RCX sentient, RDX target entity/null, R8D1, R9D0 in scoped calls; native handles/threat/notifications. Player target for enemy; null for ally. |
+| Actor_SetScriptGoalPosition | `0x1504e0` | RCX actor, RDX Vec3*, R8 optional node=null. Writes goal+`0x1498..0x14a0`, node+`0x14b0`, clears goal entity+`0x14c0` and invalidates path. Void, not bool. |
+| Actor allocation bounds | `0x123950` | Named int dvar slot `0xd9c0e0` (`ai_count`), used-count `0xd96ee0`, pool pointer `0xd96ea0`; actor stride`0x1560`, fixed32 bound, active byte+`0x14ff`. Distinct from Gentity stride`0x2a0`/capacity2048. |
+| Weapon_BuildAnimationDefinition | `0xc2c70` | Native caller at`0xc4c99` passes RCX WeaponDef*, RDX right/left names** and stores distinct opaque definitions. Builder uses arena allocation and native XAnim constructor. |
+| Scr_SetString | `0x21ad70` | RCX script-string WORD*, EDX unsigned ID; clears Gentity target+`0x144` and targetname+`0x146` with reference ownership. Native descriptor/caller agree. |
+
+Runtime resolution follows signatures/caller edges and validates names, data,
+image bounds, literal Bounds, independent tables and unique matches. RVAs above
+are reproducible evidence, not scattered absolute pointers in runtime code.
+No instructions, source executable bytes or T5 structures are rewritten.
+
+Enemy point selection is separate from model choice and recomputed from current
+player/point identities at execution. Trace the point or nearby offsets, then
+clone a separate native spawner; retain it through NPC life because initialization
+can preserve script references. Source mission budgets/origins stay intact. Clear
+cloned mission target strings, force only the verified visibility/distance bypass
+argument `(spawner,0,1,0)`, clear eviction flag2, and use native team/target APIs.
+Friendlies use 96–192-unit nearby rings, floor proximity and loaded template/model
+fallback. Generation-matched cleanup frees NPC/helper pairs on the native thread.
+
+Dynamic owned tickets remove our8 cap. Temporarily raising the named soft dvar
+to32 does not expand the32-slot pool. More active actors needs allocation/storage,
+every index/bitmask/consumer and stress-test verification before relocation.
+Owned goals update every500ms of native level time; the callback service skips
+snapshot/goal work between scheduled intervals unless a command/hand job is
+queued. Native campaign combat can still choose cover/routes.
+
+Test12 confirms G18/glock index33 enters dual setup, clears its veto and has
+native metadata/hand/global state enabled. Test13's distinct native definitions
+address a plausible later rendering dependency; the cause/fix remains a
+hypothesis until retail comparison. Normal names are already loaded/validated;
+do not probe guessed authored assets or zero normal cache0 (the native viewmodel
+path requires it). Cache constructed hand definitions per weapon/lifetime and
+publish with compare/exchange under the original OFF baseline. Native arena
+objects belong to the engine; no guessed free or struct copy is used.
+
+Unresolved: first retail trace/team/goal/hand-builder calls, loaded live-actor
+template VM state and mission callback side effects, universal empty-level
+scheduling, protected-actor cleanup, actor-pool expansion, cross-save ownership,
+actual BO1 adapters and full G18/FPS/undo coverage. Original test12 logs/screenshots
+remain private; derived findings are in [runtime-test12-evidence.json](runtime-test12-evidence.json).
+
+## BO1 startup/drop/revive/purchase source audit, test13
+
+The owned common patch gives score-threshold/drop-budget logic, ordinary drop
+gates/playable-volume rollback, exact pickup flashing/timer sequence, reserve-only
+Max Ammo, timed Double Points/Insta-Kill, Nuke damage/death/score events,
+last-stand/revive progress and wall-weapon pricing/interaction. Hashes and
+function anchors: [bo1-mechanics-test13-evidence.json](bo1-mechanics-test13-evidence.json).
+The A/B/C contract and source facts are in [bo1-mode-design.md](bo1-mode-design.md).
+Final map overrides, include lists, CSV costs, rare/special drops, native event
+semantics and presentation remain open. Helper NPC downing/revive is an
+intentional adaptation of BO1 player rules, not evidence of shared structures.
+
+Clearing all NPCs stops the current actor-callback service. Verify a general
+engine-frame/controller service before clear/USP/round-one startup. Faithful
+score-triggered drops and Double Points require an event ledger even if a points
+display is deferred. Wall buys use our own map coordinates/interaction tooling;
+Mystery Box remains last. No original GSC, model, animation, sound or FF ships.

@@ -1,0 +1,42 @@
+{
+  "version": "0.1.12-spawn-test13",
+  "dll_size": 3378327,
+  "dll_sha256": "ee5f74eb5fdd34b0c8732bb0ea5d0d0fb3e5fc6279f1638dd23d75d861b62034",
+  "loader_probe_sha256": "5b017153aeeb36c112041aab60a673a1a0c6be254cece5232aa39f01941abc83",
+  "loader_probe_code_same_as_test12": true,
+  "imports": [
+    "bcrypt.dll",
+    "dbghelp.dll",
+    "gdi32.dll",
+    "kernel32.dll",
+    "msvcrt.dll",
+    "user32.dll"
+  ],
+  "exports": [
+    "D3DPERF_BeginEvent",
+    "D3DPERF_EndEvent",
+    "D3DPERF_GetStatus",
+    "D3DPERF_QueryRepeatFrame",
+    "D3DPERF_SetMarker",
+    "D3DPERF_SetOptions",
+    "D3DPERF_SetRegion",
+    "DebugSetMute",
+    "Direct3DCreate9",
+    "Direct3DCreate9Ex"
+  ],
+  "architecture": "AMD64",
+  "signature_count": 97,
+  "aslr_and_nx": true,
+  "compiler": "MinGW-w64 GCC13-posix, RelWithDebInfo, static runtime",
+  "checks": {
+    "native_cpp_tests": "12 suites passed. Native trace/placement occupancy retries, missing ground, slope/wrong-floor/NaN rejection; template/player/hero/generation/lifetime fixtures; two-stage hand ownership/foreign edit guards and existing weapon/controller/player tests.",
+    "python_tests": "24 fixtures passed; two new invented spawn graph fixtures reject mismatched independent copy/trace/origin/team/goal/enemy/hand-builder targets. No original game data in fixtures.",
+    "exact_profile": "97 unique overlap-aware anchors against the exact AMD64 hash; independent native methods, consumers/callers, descriptors, literal Bounds/mask, trace layout, actor capacity/stride and pointer graphs agree.",
+    "powershell_scripts": "Four scripts parsed with PowerShell7.6.6; actual-test12-to-test13 isolated uninstall/install, payload/receipt/hash, saved-FOV and log collection, diagnostics selection, removal and unchanged EXE/settings/logs pass on Linux. Windows probes are not executed here.",
+    "pe": "AMD64 PE32+, ASLR/NX, six system import DLLs and ten proxy exports. Static C++ runtime. Rebuilt LoaderProbe .text is byte-identical to test12; PE metadata hash differs.",
+    "retail_runtime": "Test12 enemy lifecycle and several dual compatibility guns confirmed in owner estate run. All new test13 temp-spawner/placement/team/goals/hand-builder native paths await owner observations.",
+    "original_game_assets_in_distribution": "none"
+  },
+  "change": "Dynamic owned-NPC population; nearest enemy point/near-player friendly placement with traced offsets; native team/target/advance/follow adapters and persistent helper spawners; distinct native hand definitions from loaded normal names with guarded OFF ownership.",
+  "limits": "32 physical active actor slots includes campaign NPCs; existing unfrozen actor callback and loaded templates still required. No cross-save ownership, universal asset-free spawn or playable BO1 zombie behavior claimed."
+}

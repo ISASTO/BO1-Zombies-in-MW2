@@ -1,0 +1,214 @@
+{
+  "reviewed": "2026-10-12",
+  "authority": "User-owned locally extracted T5v473 common base/patch; patch precedence. No original bodies included.",
+  "scripts": [
+    {
+      "zone": "common_zombie_patch.ff",
+      "path": "maps/_zombiemode_powerups.gsc",
+      "sha256": "20ade2a741eafd6d92771835097dd991f5ebe834a6428577dce6091f00202de8",
+      "bytes": 81250,
+      "functions": [
+        {
+          "name": "init",
+          "start_line": 7,
+          "end_line": 65
+        },
+        {
+          "name": "init_powerups",
+          "start_line": 69,
+          "end_line": 158
+        },
+        {
+          "name": "watch_for_drop",
+          "start_line": 523,
+          "end_line": 552
+        },
+        {
+          "name": "powerup_round_start",
+          "start_line": 610,
+          "end_line": 613
+        },
+        {
+          "name": "powerup_drop",
+          "start_line": 615,
+          "end_line": 704
+        },
+        {
+          "name": "powerup_setup",
+          "start_line": 907,
+          "end_line": 989
+        },
+        {
+          "name": "powerup_timeout",
+          "start_line": 1626,
+          "end_line": 1674
+        },
+        {
+          "name": "nuke_powerup",
+          "start_line": 1677,
+          "end_line": 1755
+        },
+        {
+          "name": "double_points_powerup",
+          "start_line": 1792,
+          "end_line": 1805
+        },
+        {
+          "name": "full_ammo_powerup",
+          "start_line": 1807,
+          "end_line": 1834
+        },
+        {
+          "name": "insta_kill_powerup",
+          "start_line": 1836,
+          "end_line": 1855
+        }
+      ]
+    },
+    {
+      "zone": "common_zombie_patch.ff",
+      "path": "maps/_laststand.gsc",
+      "sha256": "20eb146a27ef5ed3be1b5fb0278b0791dae82d612327e2548379c820c3320d0f",
+      "bytes": 25277,
+      "functions": [
+        {
+          "name": "init",
+          "start_line": 4,
+          "end_line": 42
+        },
+        {
+          "name": "Laststand_Bleedout",
+          "start_line": 366,
+          "end_line": 427
+        },
+        {
+          "name": "revive_trigger_spawn",
+          "start_line": 431,
+          "end_line": 449
+        },
+        {
+          "name": "revive_do_revive",
+          "start_line": 642,
+          "end_line": 751
+        },
+        {
+          "name": "revive_success",
+          "start_line": 833,
+          "end_line": 870
+        }
+      ]
+    },
+    {
+      "zone": "common_zombie_patch.ff",
+      "path": "maps/_zombiemode_score.gsc",
+      "sha256": "af2c8b769026c84f03bb83b8840051abac0bd4e878c76ba68b53603cd89c8529",
+      "bytes": 14924,
+      "functions": [
+        {
+          "name": "player_add_points",
+          "start_line": 11,
+          "end_line": 140
+        },
+        {
+          "name": "get_points_multiplier",
+          "start_line": 142,
+          "end_line": 152
+        },
+        {
+          "name": "get_zombie_death_player_points",
+          "start_line": 155,
+          "end_line": 175
+        }
+      ]
+    },
+    {
+      "zone": "common_zombie_patch.ff",
+      "path": "maps/_zombiemode_weapons.gsc",
+      "sha256": "2398ccf2a9595a8dd883d6c6e06f2a764da7bd157a0ab388a8ccbda1680304ea",
+      "bytes": 80734,
+      "functions": [
+        {
+          "name": "add_zombie_weapon",
+          "start_line": 28,
+          "end_line": 76
+        },
+        {
+          "name": "weapon_spawn_think",
+          "start_line": 2649,
+          "end_line": 2796
+        }
+      ]
+    },
+    {
+      "zone": "common_zombie_patch.ff",
+      "path": "maps/_zombiemode.gsc",
+      "sha256": "39ede844d034f9e8dd4af2e34fc2d70a142017750166e2dc8797a36020750a15",
+      "bytes": 183546,
+      "functions": []
+    }
+  ],
+  "config_line_anchors": {
+    "maps/_zombiemode_powerups.gsc": [
+      20,
+      32,
+      33
+    ],
+    "maps/_zombiemode.gsc": [
+      779,
+      780
+    ]
+  },
+  "derived_rules": {
+    "drop_score_increment_default": 2000,
+    "ordinary_successful_drops_per_round_default": 4,
+    "drop_score_increment_multiplier": 1.14,
+    "score_watch_interval_seconds": 0.5,
+    "random_gate_bypass_values": [
+      0,
+      1,
+      2
+    ],
+    "random_domain": "RandomInt(100), still subject to budget/pool/playable-area gates",
+    "double_points_duration_seconds": 30,
+    "insta_kill_duration_seconds": 30,
+    "pickup_timeout_nominal_seconds": 26.5,
+    "pickup_timeout_components_seconds": [
+      15,
+      7.5,
+      2.5,
+      1.5
+    ],
+    "revive_seconds": 3,
+    "quick_revive_seconds": 1.5,
+    "revive_poll_seconds": 0.05,
+    "revive_radius_default": 75,
+    "bleedout_seconds_default": 45,
+    "bleedout_defers_final_death_while_reviving": true,
+    "max_ammo_refills_magazines": false,
+    "nuke_base_point_event": 400,
+    "nuke_uses_damage_death_not_immediate_delete": true,
+    "wall_ammo_price_fallback": "Int(cost*0.5) then source round_up_to_ten; owned CSV overrides if present"
+  },
+  "scope": "Derived common-script logic, not final Kino/map runtime configuration. Map powerup includes/callbacks, rare drops, CSV prices, perks, equipment, native engine semantics and runtime delays remain explicit dependencies.",
+  "port_classes": {
+    "A": [
+      "drop eligibility/accounting/timers",
+      "score decisions",
+      "revive countdown/progress",
+      "purchase debit rules"
+    ],
+    "B": [
+      "damage/death/events",
+      "pickups/touch/use/HUD",
+      "player-to-helper state and target adapters",
+      "native inventory/interaction/goal/frame service"
+    ],
+    "C": [
+      "direct T5 player/actor/VM/FF layout transplantation",
+      "missing animation/audio/material/native feature support",
+      "MW2 USP and weapon mapping substitutions",
+      "absent barricades/box mechanics"
+    ]
+  },
+  "implementation_status": "Requirements and source audit recorded. No playable powerups/helper revival/wall-buys/box in test13; score ledger precedes faithful drop/DoublePoints implementations. Mystery Box last."
+}

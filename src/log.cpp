@@ -85,7 +85,7 @@ void InitializeLog() {
         }
     }
     Log("BO1MW2 %s | AMD64 | log=%ls", kVersion, file);
-    Log("AI test 12: bank preview, native animation-name validation, mission actor/spawner catalog, queued native spawn and owned-actor cleanup. BO1 controller rehearsal retained; live BO1 zombie behavior is pending.");
+    Log("Spawn test13: closest-point enemies, near-player allies, traced clearance/retries, native movement/team control, dynamic ownership and independent native hand definitions. BO1 live behavior remains staged.");
 }
 void Log(const char* format, ...) {
     char body[4096]{};

@@ -39,6 +39,8 @@ struct DualAssetOwnership {
     WeaponFields identity;
     std::uintptr_t normalTree=0;
     bool active=false,fallback=false;
+    std::uint64_t nativeTicket=0;
+    bool nativeHandsReady=false;
     ScalarOwnership<std::uint8_t> veto;
     std::array<ScalarOwnership<std::uintptr_t>,4> pointers{};
 };
@@ -441,6 +443,28 @@ bool ConfigureDualAsset(const WeaponCandidate& w) {
     auto& a=features.dualAsset;
     if (a.active) {
         if(!SameAsset(w.weapon,a.identity) || trees[0]!=a.normalTree) return blocked(DualBlocked::ChangedAsset);
+        if(a.fallback && !a.nativeHandsReady) {
+            std::uintptr_t names=0;
+            if(!ReadValue(w.weapon.complete+kNormalWeaponAnims,names))return blocked(DualBlocked::InvalidNames);
+            if(a.nativeTicket) {
+                const auto result=GetNativeHandBuild(a.nativeTicket);
+                if(result.state==NativeHandBuildState::Ready) {
+                    auto publish=[&](int n,std::uintptr_t before,std::uintptr_t target) {
+                        const auto field=at+static_cast<std::uintptr_t>(n-1)*8;
+                        if(a.pointers[n].owned && !a.pointers[n].canRestore(field,before))return false;
+                        if(!SetPointer(field,before,target))return false;
+                        a.pointers[n].applied(field,before,target);return true;
+                    };
+                    if(publish(2,trees[1],result.right) && publish(3,trees[2],result.left)) {
+                        a.nativeHandsReady=true;
+                        Log("DUAL_NATIVE_APPLY index=%u right=%p left=%p",w.weapon.index,
+                            reinterpret_cast<void*>(result.right),reinterpret_cast<void*>(result.left));
+                    }
+                } else if(result.state==NativeHandBuildState::Canceled || result.state==NativeHandBuildState::Unknown)
+                    a.nativeTicket=0;
+            }
+            if(!a.nativeTicket)a.nativeTicket=RequestNativeHandDefinitions(w.weapon,names,a.normalTree,at,ReadSnapshot());
+        }
         features.dualBlocked=DualBlocked::None; return true;
     }
     std::uintptr_t normal=0,right=0,left=0;
@@ -459,8 +483,8 @@ bool ConfigureDualAsset(const WeaponCandidate& w) {
     };
     bool ok=true;
     if (plan.fallback) {
-        // Arena-owned XAnim definitions are shared; the engine creates a
-        // distinct playback tree for each hand. No native allocation/call.
+        // Start with loaded normal definitions, then request distinct native
+        // hand definitions on the actor callback thread. Never clear cache[0].
         ok=pointer(0,w.weapon.definition+kRightWeaponAnims,right,normal)
             && pointer(1,w.weapon.definition+kLeftWeaponAnims,left,normal)
             && pointer(2,at+8,trees[1],trees[0]) && pointer(3,at+16,trees[2],trees[0]);
@@ -471,6 +495,7 @@ bool ConfigureDualAsset(const WeaponCandidate& w) {
     }
     if (!ok) { RestoreDualAsset(); return blocked(DualBlocked::WriteFailed); }
     features.dualBlocked=DualBlocked::None;
+    if(plan.fallback)a.nativeTicket=RequestNativeHandDefinitions(w.weapon,normal,a.normalTree,at,ReadSnapshot());
     Log("WEAPON_APPLY DUAL_ASSET index=%u name=%s veto_before=%u animation_fallback=%d",w.weapon.index,w.weapon.name,veto,plan.fallback);
     return true;
 }
@@ -1048,7 +1073,8 @@ WeaponModeStatus GetWeaponModeStatus() {
     std::lock_guard<std::mutex> lock(featuresMutex);
     const bool dualOwned=features.dual.owned || features.dualAsset.active || HasDualPlayerEdits(features.dualSlots,features.dualAmmo,features.lastHand.owned);
     return {features.inventory.owned,features.weaponBank,features.weaponPages,features.inventory.added,dualOwned,features.dualReady,features.dualAsset.fallback,
-        features.inventoryReconcilePending,features.inventoryNeedsBaseline,features.dualBlocked};
+        features.inventoryReconcilePending,features.inventoryNeedsBaseline,features.dualBlocked,features.dualAsset.nativeHandsReady,
+        GetNativeHandBuild(features.dualAsset.nativeTicket).state};
 }
 bool AdjustWeaponBank(int direction) {
     std::lock_guard<std::mutex> lock(featuresMutex);
