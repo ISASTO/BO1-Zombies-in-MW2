@@ -86,10 +86,17 @@ copying their implementation into ours.
 | Materials / images | Techsets/shader bytecode, texture encodings/semantics, sampler/state constants. Current OAT T5 image export is partial for some encodings; T5 image/techset import not supported in its matrix. | Decode textures locally, preserve alpha/normal semantics, author target-compatible material/techset mapping, verify in IW4 renderer. Direct T5 shader reuse is unproven. |
 | Sound / aliases | T5 SndBank/SndPatch, alias IDs/index and pack references; alias volumes/pitches/contexts are differently encoded from IW4's alias lists/SoundFile/LoadedSound and curves. | Resolve locally owned pack/locale audio and codecs, normalize sample rate/channels, convert spatialization/volume/pitch/loop/context semantics. OAT T5 bank/patch dump/load is currently unsupported; sound is a separate pipeline, not solved by model/animation export. |
 
-Next useful live step after tomorrow's evidence: identify an exact IW4 SP
-engine-thread scheduling point and read-only actor/sentient/asset identities;
-then one validated spawn/init/cleanup fixture. Pair one normal BO1 zombie mesh
-and one locomotion/melee animation with a typed local converter before calling
-the result a zombie. Record notetrack events and compare BO1 observations.
+Test12 now implements an independently verified IW4 SP callback-thread service,
+partial actor/sentient identities and native mission spawn/init/delete requests;
+the first retail fixture is pending. These are class-B lifecycle prerequisites,
+with normal campaign AI behavior. They do not translate BO1 find_flesh/pathing,
+animation-controlled attacks or damage/death. Do not connect the accepted class-A
+round controller to those soldiers and describe it as Zombies.
+
+After spawn/init/cleanup validation, pair one normal BO1 zombie mesh and one
+locomotion/melee animation with a typed local converter, bind the source-derived
+target/pursuit/melee sequence, record notetrack events and compare BO1 behavior.
+Class-C T5 asset/runtime differences still need explicit compatibility tools;
+no target asset loader/schema is assumed from these new actor fields.
 Converted/original assets, scripts, audio and executables stay outside Git and
 the distributable package; own source/tooling expects user-owned installations.

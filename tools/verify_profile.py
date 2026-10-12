@@ -7,6 +7,7 @@ import struct
 from pathlib import Path
 import pefile
 from pattern_scan import pattern_matches
+from verify_ai_bindings import verify_ai_bindings
 
 # Instruction layouts of the additional exact-build references, never addresses.
 EXTRA_REFERENCES = {
@@ -53,6 +54,33 @@ EXTRA_NAMES = {
     'kGravityRegistrationPattern': [8, 'g_gravity'],
     'kDualRegistrationPattern': [7, 'bg_forceDualWield'],
 }
+
+EXTRA_REFERENCES.update({
+    'kAiActorThinkStartPattern': [[9, 3, 7], [25, 2, 6]],
+    'kAiThinkDispatchPattern': [[12, 3, 7], [45, 3, 7]],
+    'kAiSpawnerArrayPattern': [[0, 2, 6], [12, 3, 7], [24, 3, 7]],
+    'kAiSpawnerFieldsPattern': [],
+    'kAiNormalSpawnMethodPattern': [[31, 2, 6]],
+    'kAiSpawnCorePattern': [[13, 3, 7], [56, 3, 7]],
+    'kAiActorInitPattern': [[26, 3, 7]],
+    'kAiActorLinksPattern': [[21, 2, 6]],
+    'kAiActorHandlerPattern': [],
+    'kAiDeleteMethodPattern': [[51, 3, 7]],
+    'kAiDeleteGuardPattern': [[4, 2, 6], [17, 3, 7]],
+    'kAiEntitySerialPattern': [[22, 3, 7]],
+    'kAiEntitySerialCommitPattern': [],
+    'kAiStringConvertPattern': [[4, 3, 7]],
+    'kAiSpawnEnabledRegistrationPattern': [[6, 3, 7], [20, 3, 7], [27, 3, 7]],
+    'kAiSpawnDisabledRegistrationPattern': [[2, 3, 7], [20, 5, 9], [29, 3, 7], [36, 3, 7]],
+    'kAiNormalSpawnEntryPattern': [[24, 2, 6]],
+    'kAiSentientLinksPattern': [],
+    'kAiActorTypePattern': [],
+    'kAiActorSelfPattern': [],
+})
+EXTRA_NAMES.update({
+    'kAiSpawnEnabledRegistrationPattern': [6, 'g_spawnai'],
+    'kAiSpawnDisabledRegistrationPattern': [2, 'ai_disableSpawn'],
+})
 
 
 def verify(path, header):
@@ -110,7 +138,7 @@ def verify(path, header):
                        'kSpeedConsumerPattern','kJumpRegistrationPattern','kJumpImpulsePattern',
                        'kJumpClampPattern','kJumpStepPattern','kJumpCeilingPattern'}
     if set(result['signatures']) != wanted_patterns | set(EXTRA_REFERENCES):
-        raise ValueError('Expected five core, two FOV, sixteen player and eighteen weapon/world signatures')
+        raise ValueError('The supported profile has missing or unexpected signature definitions')
     # Independent registration constants and the native camera's four-byte read.
     fov_layout = header.with_name('fov_preferences.hpp').read_text()
     default = int(re.search(r'kDefaultFov = (\d+)', fov_layout)[1])
@@ -360,7 +388,8 @@ def verify(path, header):
             'compatibility':'Selected gravity + 0.5 in the sole player constant; native g_gravity float covers trajectories.'},
         'grenade_sustain':{'aliases':['fraggrenade','flash_grenade'],'bypass_target_rva':hex(grenade_targets[0]),
             'compatibility':'Infinite Grenades is explicitly linked to No Reload; both use player_sustainAmmo.'},
-        'limits':'Static evidence. Test8 runtime confirms the ambiguous old catalog pattern; test9 confirms catalog resolution and Rapid Fire; new checkpoint/undo/animation/FPS behavior requires test10 owner validation. Kill All Enemies remains unimplemented.'}
+        'limits':'Static evidence. Test9 confirms catalog resolution and Rapid Fire; test11 owner feedback confirms checkpoint-bank recovery, while initial page count and dual still failed. Test12 changes animation validation/page preview and adds native AI controls; new retail animation/FPS/AI checks are pending. Kill All Enemies remains unimplemented.'}
+    result['native_ai'] = verify_ai_bindings(pe, result['signatures'], header.with_name('ai_controls.hpp'), result['entity_number'])
     return result
 
 

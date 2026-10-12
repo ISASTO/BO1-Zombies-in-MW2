@@ -54,6 +54,19 @@ template<class Pool> inline int PoolSlot(const std::array<Pool,15>& pools,unsign
     return -1;
 }
 struct WeaponBank { InventoryData data; int pages=1,page=0,added=0,eligible=0; };
+struct WeaponBankPreview {
+    bool known=false;
+    int pages=0;
+    std::uint64_t generation=0;
+    std::array<std::uint32_t,15> weapons{};
+    bool needsRefresh(const InventoryData& basis,std::uint64_t revision) const {
+        return !known || generation!=revision || weapons!=basis.weapons;
+    }
+    void publish(const InventoryData& basis,std::uint64_t revision,int count) {
+        known=true; weapons=basis.weapons; generation=revision; pages=std::max(1,count);
+    }
+    void clear() { *this={}; }
+};
 inline WeaponBank BuildWeaponBank(const InventoryData& original,const std::vector<WeaponCandidate>& catalog,int requested) {
     WeaponBank bank; bank.data=original;
     std::vector<WeaponCandidate> available;
@@ -143,6 +156,30 @@ inline InventoryData BuildInventoryRestore(const InventoryOwnership& lease,const
     return result;
 }
 struct DualCompatibilityPlan { bool ready=false,fallback=false; };
+// The exact native builder iterates slots 1..36, substitutes idle (1) for
+// empty optional names, and never reads unused slot 0.
+template<class StringReader>
+bool UsableAnimationNames(const std::array<std::uintptr_t,kWeaponAnimCount>& names,StringReader read) {
+    char text[128]{};
+    for(std::size_t n=1;n<names.size();++n) {
+        if(!read(names[n],text,sizeof(text)) || (n==1 && !text[0])) return false;
+    }
+    return true;
+}
+enum class DualBlocked { None, UnsupportedGun, CacheUnreadable, MissingDefinition, InvalidNames, InvalidFields, ChangedAsset, WriteFailed };
+inline const char* DualBlockedText(DualBlocked value) {
+    switch(value) {
+        case DualBlocked::None: return "NONE";
+        case DualBlocked::UnsupportedGun: return "UNSUPPORTED_GUN";
+        case DualBlocked::CacheUnreadable: return "CACHE_UNREADABLE";
+        case DualBlocked::MissingDefinition: return "MISSING_NATIVE_TREE";
+        case DualBlocked::InvalidNames: return "ANIMATION_NAMES";
+        case DualBlocked::InvalidFields: return "ASSET_FIELDS";
+        case DualBlocked::ChangedAsset: return "ASSET_CHANGED";
+        case DualBlocked::WriteFailed: return "WRITE_FAILED";
+    }
+    return "UNKNOWN";
+}
 inline DualCompatibilityPlan DualPlan(bool primary,bool normalAnims,bool registered,bool authored,bool pairedRegistered) {
     const bool ready=primary && normalAnims && registered;
     return {ready,ready && (!authored || !pairedRegistered)};

@@ -1,0 +1,42 @@
+{
+  "version": "0.1.11-ai-test12",
+  "dll_size": 3146541,
+  "dll_sha256": "15b89723fcdeaa8c0e0d4fb6e7a7f2c5c30bb6d3fa612ded7bbacaf61198c59d",
+  "imports": [
+    "bcrypt.dll",
+    "dbghelp.dll",
+    "gdi32.dll",
+    "kernel32.dll",
+    "msvcrt.dll",
+    "user32.dll"
+  ],
+  "exports": [
+    "D3DPERF_BeginEvent",
+    "D3DPERF_EndEvent",
+    "D3DPERF_GetStatus",
+    "D3DPERF_QueryRepeatFrame",
+    "D3DPERF_SetMarker",
+    "D3DPERF_SetOptions",
+    "D3DPERF_SetRegion",
+    "DebugSetMute",
+    "Direct3DCreate9",
+    "Direct3DCreate9Ex"
+  ],
+  "loader_probe_sha256": "9fffb5e9a028be30be5cbc8fa3555a6f48178208ba978e800c2e38b5b637a447",
+  "architecture": "AMD64",
+  "signature_count": 77,
+  "probe_unchanged_from_test11": true,
+  "aslr_and_nx": true,
+  "compiler": "MinGW-w64 GCC 13-posix, RelWithDebInfo, static runtime",
+  "checks": {
+    "native_cpp_tests": "11 suites passed; new spawner eligibility/budget, entity generation/self-links, client exclusion, queued lifetime/expiry and AI menu routing fixtures plus existing weapon/controller/player coverage.",
+    "python_tests": "22 fixtures passed, including five invented native method/team/field-table/graph rejection fixtures. No original game data in fixtures.",
+    "exact_profile": "77 unique overlap-aware anchors against the supplied exact AMD64 hash; independent native method names, callback target, spawn caller, DVAR pairs, allocation serial, team order, field descriptors and partial access widths agree.",
+    "powershell_scripts": "Four scripts parsed with PowerShell 7.6.6. Isolated actual-test11-to-test12 uninstall/install, receipt/hash, diagnostic selection, saved FOV collection, removal and EXE/log/settings preservation pass on Linux.",
+    "pe": "AMD64 PE32+, ASLR/NX, unchanged six system import DLLs and ten proxy exports. LoaderProbe byte-identical to test11.",
+    "retail_runtime": "No local Windows game/probe execution. First test12 native AI and new dual/page-preview behavior await owner observations.",
+    "original_game_assets_in_distribution": "none"
+  },
+  "change": "Fix initial bank-page preview and native animation-name admission; add bounded native mission enemy/friendly spawning, loaded template selectors, named spawn-gate pause, live counts, lazy original-first actor callback service and generation-owned delete cleanup.",
+  "limits": "Native mission NPC controls are not BO1 zombie behavior. Needs an existing actor callback; no forced spawning or cross-save ownership. Native script callbacks, actual dual animations/FPS and first spawn/delete remain retail-test questions."
+}

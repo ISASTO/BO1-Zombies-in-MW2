@@ -2,11 +2,12 @@
 
 Incremental mod framework for **retail Modern Warfare 2 (2009), single player**.
 The first deliverable is an AMD64 D3D9 DLL that renders a keyboard menu in the
-game. BO1 Zombies gameplay is a future mode. The current test11 package combines
-test10 checkpoint/undo/dual/performance repairs with an in-game BO1 controller
-rehearsal. It tracks simulated actors using source-derived round rules; it does
-not spawn native zombies. The compact menu, PLAYER/WORLD controls, saved FOV and
-round preview remain available. New retail checks are pending.
+game. BO1 Zombies gameplay is a future mode. The current test12 package repairs
+the bank-count preview and weapon animation validator, then adds actual native
+mission AI controls: enemy/friendly spawn requests, template selection, a spawn
+pause, live counts and removal of our own debug actors. The owner has accepted
+the source-derived BO1 controller rehearsal and checkpoint-bank recovery.
+Native spawning and the new dual-wield fix await their first retail test.
 
 **Status: Phase 1 core passed in the owner's test4 estate run.** The owner
 confirms correct health, working God ON/OFF and retained God state through
@@ -54,16 +55,27 @@ G18 dual failure and reduced FPS. See [test9 evidence](docs/runtime-test9-eviden
 checkpoints/banks, removes introduced guns by identity, validates equipment
 without firing-time assumptions, caches metadata and updates only the held gun.
 A reversible normal-animation fallback bypasses the verified campaign veto
-where assets are available. New retail animation/undo/FPS results are pending.
+where assets are available. Test11 feedback confirms checkpoint-bank recovery;
+its dual validator was still rejecting native animation arrays before applying.
 
 `0.1.10-zombies-controller-test11` adds source-derived normal-solo round lifecycle,
 budget/capacity accounting, paced request/confirmation callbacks, lifecycle
 guards and a simulated adapter inside the menu. A scoped BO1 player-melee
 admission rule and local dependency/asset-reference auditor are tested in source.
-The owner authorized proceeding before test10 execution and will test the
-combined package. No actor/damage/asset adapter or full Zombies mode is enabled.
+The owner now confirms the rehearsal behaves correctly. Matching estate logs
+show rounds 1, 2, 3 and the debug round 10 profile with valid accounting. No live
+BO1 zombie behavior, damage or asset adapter is enabled.
 See [test11 instructions](docs/zombies-controller-test11.md) and
 [portability audit](docs/bo1-portability.md).
+
+`0.1.11-ai-test12` computes bank counts before enabling/cycling Give All, and
+validates the animation entries actually consumed by the native builder:
+1..36, a required idle, and optional empty names using the idle fallback.
+Dual failures now report their specific gate. A separately verified native
+actor-think callback services bounded spawn/delete requests on the engine's
+own callback thread; normal MW2 NPCs retain native initialization and behavior.
+See [test12 checks](docs/ai-test12.md), [test11 feedback](docs/runtime-test11-evidence.json)
+and [exact AI binding evidence](docs/ai-test12-evidence.json).
 
 The supplied BO1 `common_zombie.ff` resolves the normal tuning CSV. Recovered
 values match the preview, so its numbers are unchanged. Special rounds and
@@ -83,9 +95,9 @@ An executable hash mismatch disables game-state access and memory writes.
 The installer rejects a mismatched build. A manually installed proxy can still
 show its diagnostic menu in an unknown AMD64 `iw4sp.exe`.
 
-## Current combined test11
+## Current combined test12
 
-1. Close MW2 and extract the entire `BO1MW2-zombies-controller-test11.zip` outside the game folder.
+1. Close MW2 and extract the entire `BO1MW2-ai-test12.zip` outside the game folder.
 2. Run `Uninstall.cmd` to remove the earlier project build, then `Install.cmd`
    and select the folder containing `iw4sp.exe`. Find it through Steam:
    MW2 Single Player > Properties > Installed Files > Browse.
@@ -94,13 +106,16 @@ show its diagnostic menu in an unknown AMD64 `iw4sp.exe`.
    then press **F4**. Up/Down selects, Enter toggles/opens, Left/Right changes
    the Give All bank or speed/jump/time/gravity, Backspace/Esc goes back.
    F4 closes the menu.
-4. Test checkpoint banks, actual weapon removal on OFF, G18 Dual ON/OFF, fixed-camera
-   FPS and both OFF orders. Then open ZOMBIE MODE → Controller rehearsal and
-   test round 1, round 10 capacity, queue pause, auto-clear, scrolling, game-clock
-   timers and lifetime stops. Follow [the combined sequence](docs/zombies-controller-test11.md).
-   Keep Infinite Ammo and No Reload OFF
-   for initial ammo checks. Turn Give All and Dual Wield OFF before saving or
-   quitting: their undo snapshots are in-process, with lifetime/identity guards.
+4. Check the Give All label before touching its arrows and after checkpoint
+   reload; test G18/Beretta Dual ON/OFF and fixed-camera FPS. Then open **AI**,
+   select a loaded enemy/friendly template with Left/Right and request one
+   spawn with Enter. It appears at the mission spawner, not at your crosshair.
+   Test **Remove our spawned actors**, spawn pause and counts. Native visibility,
+   collision or capacity rules may refuse a spawn. Use a live estate combat
+   section with existing NPCs: this first callback adapter needs a native actor
+   already present. Follow [the staged test12 sequence](docs/ai-test12.md).
+   Turn weapon modes OFF and remove debug actors before saving/quitting;
+   ownership/undo history is limited to this process and detected level lifetime.
 5. Close MW2 and run `Diagnose.cmd` before another launch replaces the log.
    Return its ZIP and [testing.md](docs/testing.md) observations. Saved FOV
    should persist; other requests/selections reset on a full process restart.
@@ -134,11 +149,12 @@ Copy the log immediately after a failing run: `latest.log` is replaced on launch
 | Reset player toggles | Requests every player cheat OFF and keeps saved FOV |
 | Status HUD toggle and state-log action | Implemented |
 | BO1 round-rules preview | Owner test5 front-end navigation passed; normal CSV values now recovered locally and match the preview |
-| BO1 controller rehearsal | Test11 simulated actors only; normal solo lifecycle, cap/queue/confirmation accounting and game-clock guards; portable fixtures passed, retail pending |
+| BO1 controller rehearsal | Test11 owner-accepted; simulated actors only, source-derived normal solo lifecycle and game-clock guards |
 | FOV selector and saved preference | Owner confirms test6 behavior; matching logs show load/selection/save/reset |
-| WEAPONS | Test10 checkpoint/provenance-based undo, held-gun dual animation fallback, cached metadata/performance diagnostics; Rapid Fire and previous controls retained; new retail test pending |
+| WEAPONS | Owner confirms checkpoint-bank recovery; test12 fixes initial page preview and native animation-name validation; dual/FPS/undo combinations still need retail checks |
 | WORLD | Adjustable time/gravity, actor-think freeze, reset; test8 logs confirm several apply/restore paths; broader gameplay coverage pending |
-| Kill All Enemies, AI spawning, Zombies gameplay | Planned; no action |
+| AI | Test12 real native mission enemy/friendly spawning, template selection, spawn pause, live counts, owned-only removal and diagnostics; static/portable checks pass, first retail test pending |
+| Kill All Enemies, BO1 Zombies gameplay | Planned; native AI debugging does not implement BO1 targeting/pursuit/melee or assets |
 
 ## Architecture
 
@@ -269,15 +285,18 @@ Original games remain user-supplied inputs and must never be added to this repo.
 - [WEAPONS/WORLD test8](docs/world-weapons-test8.md): adjustable controls, precise scopes and owner checks.
 - [WEAPONS test9](docs/weapons-test9.md): historical first bank/dual prototype.
 - [WEAPONS test10](docs/weapons-test10.md): checkpoint/undo repair, animation compatibility, performance and final owner checks.
+- [Native AI test12](docs/ai-test12.md): current weapon fixes, staged native enemy/friendly spawning and cleanup tests.
+- [Test11 evidence](docs/runtime-test11-evidence.json): accepted checkpoint recovery/rehearsal, remaining UI and dual failures.
 - [BO1 tuning evidence](docs/bo1-normal-tuning-evidence.json): selected local CSV values and pointer-resolution limits.
 - [Roadmap](docs/roadmap.md): incremental gates and persistent FOV request.
 - [Reference projects](docs/references.md): upstream sources and limits of reuse.
 - [Input hashes](docs/input-manifest.json) and [profile checks](docs/profile-checks.json).
 
-The core foundation and test5 front-end preview are accepted in their observed
-sessions. PLAYER test7 is owner-accepted following the God-state fix. Next test
-test10 checkpoint/undo/dual/FPS acceptance, then prioritize the BO1 round/spawn
-controller and IW4 actor adapter while auditing remaining
-BO1 overrides/dependencies and broaden campaign-map/reset coverage.
+The core foundation, PLAYER and BO1 controller rehearsal are accepted in their
+observed sessions. Test12 needs retail evidence for the page-preview/dual fix
+and native actor spawn/init/cleanup before live BO1 behavior is attached. Audit
+remaining BO1 overrides/dependencies and validate one pursuit/melee/animation
+fixture, then connect source-derived round population logic. Broader campaign-
+map/reset coverage and asset import remain separate checks.
 AI and asset injection need separate compatibility and behavior tests; shared
 engine ancestry does not imply compatible binary layouts or actor behavior.

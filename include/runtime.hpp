@@ -5,6 +5,7 @@
 #include "control_extensions.hpp"
 #include "weapon_inventory.hpp"
 #include "zombie_rehearsal.hpp"
+#include "ai_controls.hpp"
 #include <windows.h>
 #include <d3d9.h>
 #include <atomic>
@@ -84,6 +85,7 @@ bool RapidFireApplied(const WeaponFields& weapon);
 struct WeaponModeStatus {
     bool owned=false; int page=0,pages=1,added=0;
     bool dualOwned=false,dualReady=false,dualFallback=false,reconciling=false,needsBaseline=false;
+    DualBlocked dualBlocked=DualBlocked::None;
 };
 WeaponModeStatus GetWeaponModeStatus();
 bool AdjustWeaponBank(int direction);
@@ -91,6 +93,13 @@ void UpdateZombieRehearsal(const Snapshot& snapshot);
 void HandleZombieRehearsal(Action action,const Snapshot& snapshot,int startingRound);
 ZombieRehearsalStatus GetZombieRehearsalStatus();
 void LogZombieRehearsal();
+void InitializeAiEngine(std::uintptr_t base,std::size_t size,std::uintptr_t text,std::size_t textSize,bool supported);
+void UpdateAiControls(const Snapshot& snapshot,ULONGLONG now);
+void RequestAiOperation(AiOperation operation,const Snapshot& snapshot);
+void AdjustAiSpawner(bool friendly,int direction);
+void ToggleAiSpawnPause();
+AiStatus GetAiStatus();
+void LogAiState();
 bool SetFov(int value);
 void LogSnapshot();
 void LoadFovPreference(FovPreference& preference);

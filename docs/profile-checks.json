@@ -397,6 +397,147 @@
       "match_count": 1,
       "match_rva": "0xc2ccf",
       "rip_targets": {}
+    },
+    "kAiActorThinkStartPattern": {
+      "match_count": 1,
+      "match_rva": "0x12a690",
+      "rip_targets": {
+        "9": "0xd9c0b8",
+        "25": "0xd96ec8"
+      }
+    },
+    "kAiThinkDispatchPattern": {
+      "match_count": 1,
+      "match_rva": "0x174dfb",
+      "rip_targets": {
+        "12": "0x3c0aa0",
+        "45": "0x33f590"
+      }
+    },
+    "kAiSpawnerArrayPattern": {
+      "match_count": 1,
+      "match_rva": "0x191239",
+      "rip_targets": {
+        "0": "0xd96e80",
+        "12": "0xd96e78",
+        "24": "0xd9b820"
+      }
+    },
+    "kAiSpawnerFieldsPattern": {
+      "match_count": 1,
+      "match_rva": "0x1912f7",
+      "rip_targets": {}
+    },
+    "kAiNormalSpawnMethodPattern": {
+      "match_count": 1,
+      "match_rva": "0x19186d",
+      "rip_targets": {
+        "31": "0xd96ec8"
+      }
+    },
+    "kAiSpawnCorePattern": {
+      "match_count": 1,
+      "match_rva": "0x152e60",
+      "rip_targets": {
+        "13": "0xd9c170",
+        "56": "0xd97be8"
+      }
+    },
+    "kAiActorInitPattern": {
+      "match_count": 1,
+      "match_rva": "0x12ce20",
+      "rip_targets": {
+        "26": "0xd9c0c0"
+      }
+    },
+    "kAiActorLinksPattern": {
+      "match_count": 1,
+      "match_rva": "0x12cefa",
+      "rip_targets": {
+        "21": "0xd96ec8"
+      }
+    },
+    "kAiActorHandlerPattern": {
+      "match_count": 1,
+      "match_rva": "0x12cf33",
+      "rip_targets": {}
+    },
+    "kAiDeleteMethodPattern": {
+      "match_count": 1,
+      "match_rva": "0x189240",
+      "rip_targets": {
+        "51": "0xd9e070"
+      }
+    },
+    "kAiDeleteGuardPattern": {
+      "match_count": 1,
+      "match_rva": "0x189295",
+      "rip_targets": {
+        "4": "0xd97c00",
+        "17": "0x115792e"
+      }
+    },
+    "kAiEntitySerialPattern": {
+      "match_count": 1,
+      "match_rva": "0x19fbef",
+      "rip_targets": {
+        "22": "0xd96e78"
+      }
+    },
+    "kAiEntitySerialCommitPattern": {
+      "match_count": 1,
+      "match_rva": "0x19fc3e",
+      "rip_targets": {}
+    },
+    "kAiStringConvertPattern": {
+      "match_count": 1,
+      "match_rva": "0x21a370",
+      "rip_targets": {
+        "4": "0x1466008"
+      }
+    },
+    "kAiSpawnEnabledRegistrationPattern": {
+      "match_count": 1,
+      "match_rva": "0x172c27",
+      "rip_targets": {
+        "6": "0x33c1f0",
+        "20": "0x33c200",
+        "27": "0xd9c0c0"
+      },
+      "name_anchor": "g_spawnai"
+    },
+    "kAiSpawnDisabledRegistrationPattern": {
+      "match_count": 1,
+      "match_rva": "0x17348e",
+      "rip_targets": {
+        "2": "0x33d180",
+        "20": "0x385ba0",
+        "29": "0x33d1b0",
+        "36": "0xd9c170"
+      },
+      "name_anchor": "ai_disableSpawn"
+    },
+    "kAiNormalSpawnEntryPattern": {
+      "match_count": 1,
+      "match_rva": "0x191810",
+      "rip_targets": {
+        "24": "0xd96ec8"
+      }
+    },
+    "kAiSentientLinksPattern": {
+      "match_count": 1,
+      "match_rva": "0x1b1970",
+      "rip_targets": {}
+    },
+    "kAiActorTypePattern": {
+      "match_count": 1,
+      "match_rva": "0x12cfa3",
+      "rip_targets": {}
+    },
+    "kAiActorSelfPattern": {
+      "match_count": 1,
+      "match_rva": "0x12d0f1",
+      "rip_targets": {}
     }
   },
   "fov": {
@@ -786,6 +927,143 @@
       "bypass_target_rva": "0x84fff",
       "compatibility": "Infinite Grenades is explicitly linked to No Reload; both use player_sustainAmmo."
     },
-    "limits": "Static evidence. Test8 runtime confirms the ambiguous old catalog pattern; test9 confirms catalog resolution and Rapid Fire; new checkpoint/undo/animation/FPS behavior requires test10 owner validation. Kill All Enemies remains unimplemented."
+    "limits": "Static evidence. Test9 confirms catalog resolution and Rapid Fire; test11 owner feedback confirms checkpoint-bank recovery, while initial page count and dual still failed. Test12 changes animation validation/page preview and adds native AI controls; new retail animation/FPS/AI checks are pending. Kill All Enemies remains unimplemented."
+  },
+  "native_ai": {
+    "status": "Static exact-build cross-checks passed; first retail actor test pending",
+    "calling_convention": "Windows AMD64; think(RCX entity), spawn(RCX spawner, EDX targetname=0, R8D force=0, R9D ignorechecks=0), delete(ECX packed class-0 entity number)",
+    "graph": {
+      "callback_slot_value": "0x12a690",
+      "actor_think": "0x12a690",
+      "spawn_call_target": "0x152e60",
+      "spawn_core": "0x152e60",
+      "spawn_enabled_consumer": "0xd9c0c0",
+      "spawn_enabled_registration": "0xd9c0c0",
+      "spawn_disabled_consumer": "0xd9c170",
+      "spawn_disabled_registration": "0xd9c170",
+      "entity_pool_reader": "0xd96e78",
+      "entity_pool_free_reader": "0xd96e78",
+      "level_time": "0xd96ec8",
+      "spawn_time_read": "0xd96ec8",
+      "spawn_time_write": "0xd96ec8",
+      "actor_init_time": "0xd96ec8",
+      "think_ai_gate": "0xd9c0b8",
+      "world_ai_gate": "0xd9c0b8"
+    },
+    "think_callback_slot_rva": "0x3c0b40",
+    "entity_pool_rva": "0xd9e070",
+    "entity_count_slot_rva": "0xd96e80",
+    "active_bitmap_rva": "0xd9b820",
+    "script_string_pool_slot_rva": "0x1466008",
+    "protected_entity_number_rva": "0xd97c00",
+    "compiled_method_entries": {
+      "delete": "0x342e68",
+      "dospawn": "0x345488"
+    },
+    "team_name_table_rva": "0x3c36b0",
+    "team_names": [
+      "invalid",
+      "axis",
+      "allies",
+      "neutral",
+      "team3",
+      "dead"
+    ],
+    "entity_field_descriptors_rva": "0x346480",
+    "script_classname_offset": "0x13e",
+    "entity_stride": "0x2a0",
+    "entity_capacity": 2048,
+    "partial_field_evidence": {
+      "kAiHandler": [
+        {
+          "offset": "0x13b",
+          "signature": "kAiThinkDispatchPattern",
+          "encoded_rva": "0x174dfe"
+        },
+        {
+          "offset": "0x13b",
+          "signature": "kAiActorHandlerPattern",
+          "encoded_rva": "0x12cf35"
+        }
+      ],
+      "kAiSpawnerTeam": [
+        {
+          "offset": "0x178",
+          "signature": "kAiSpawnerFieldsPattern",
+          "encoded_rva": "0x191305"
+        }
+      ],
+      "kAiEntityStride": [
+        {
+          "offset": "0x2a0",
+          "signature": "kAiSpawnerFieldsPattern",
+          "encoded_rva": "0x191314"
+        }
+      ],
+      "kAiSpawnCount": [
+        {
+          "offset": "0x184",
+          "signature": "kAiSpawnCorePattern",
+          "encoded_rva": "0x152e88"
+        }
+      ],
+      "kAiLastSpawn": [
+        {
+          "offset": "0x17c",
+          "signature": "kAiNormalSpawnMethodPattern",
+          "encoded_rva": "0x191894"
+        }
+      ],
+      "kAiActor": [
+        {
+          "offset": "0x110",
+          "signature": "kAiActorLinksPattern",
+          "encoded_rva": "0x12cefd"
+        }
+      ],
+      "kAiSentient": [
+        {
+          "offset": "0x118",
+          "signature": "kAiActorLinksPattern",
+          "encoded_rva": "0x12cf04"
+        }
+      ],
+      "kAiHealth": [
+        {
+          "offset": "0x164",
+          "signature": "kAiActorHandlerPattern",
+          "encoded_rva": "0x12cf4d"
+        }
+      ],
+      "kAiClient": [
+        {
+          "offset": "0x108",
+          "signature": "kAiDeleteMethodPattern",
+          "encoded_rva": "0x189289"
+        }
+      ],
+      "kAiNumber": [
+        {
+          "offset": "0x7e",
+          "signature": "kAiDeleteGuardPattern",
+          "encoded_rva": "0x189298"
+        }
+      ],
+      "kAiUseCount": [
+        {
+          "offset": "0x78",
+          "signature": "kAiEntitySerialPattern",
+          "encoded_rva": "0x19fbf1"
+        },
+        {
+          "offset": "0x78",
+          "signature": "kAiEntitySerialCommitPattern",
+          "encoded_rva": "0x19fc48"
+        }
+      ]
+    },
+    "in_use_writer_rva": "0x1a091b",
+    "lifetime": "Native useCount DWORD increments when G_FreeEntity clears the slot; also require matching number/type/actor/sentient/self links and level identity.",
+    "limits": "Native mission NPC debugging, not BO1 zombie AI. Hook installs on first request, needs an existing actor callback, retains collision/visibility/capacity refusal and script notifications. Cleanup owns at most eight same-process generation tickets."
   }
 }

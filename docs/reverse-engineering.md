@@ -412,7 +412,7 @@ below is invoked by the DLL, and no whole asset/player structure is cast.
 | PS reserve +0x2d8 | 15 entries, stride8 | ID/count compared together in aligned QWORD CAS |
 | PS clips +0x350 | 15 entries, stride12 | DWORD ID, right count, left count. Publish new ID after counts; retain foreign pool identities |
 | WeaponDef gun models +8 | pointer to indexed XModel pointer array | Verify model0 and readable model name; no opaque asset edits |
-| WeaponDef class +0x58 / inventory +0x60 | DWORDs | New grants require class0..7 and inventory0 |
+| WeaponDef class +0x58 / inventory +0x60 | DWORDs | New grants require class 0..7 and inventory0 |
 | WeaponDef ammo ID +0x348 / clip ID +0x358 | DWORDs | Require nonzero IDs below200; never substitute weapon index for pool ID |
 | WeaponDef noDualWield +0x873 | byte0/1 | Do not force incompatible gun metadata or manufacture akimbo animation assets |
 | CompleteDef clipSize +0x34 / alternate +0x58 | DWORDs | Magazine1..1000; exclude unsupported new alternate chains |
@@ -658,6 +658,74 @@ T5 XModel, XAnimParts, material/technique/shader, skeleton, and sound structures
 are not accepted as IW4 structures. Nor does the new x64 engine prove a serialized
 IW4 zone uses 64-bit pointer records. Asset conversion is unimplemented.
 
+## Test12 native IW4 SP actor adapter
+
+Authority: the same supplied AMD64 executable/hash; no historical IW4 or T5
+actor structure/address is imported. The assigned names below describe observed
+roles, not recovered symbols. All runtime bindings resolve unique instruction
+patterns and independent compiled table relationships. See
+`ai-test12-evidence.json` and `tools/verify_ai_bindings.py` for reproducible proof.
+There are now 77 unique profile anchors (57 previous + 20 native AI anchors).
+
+| Assigned role | Exact RVA / field | Evidence and convention |
+| --- | --- | --- |
+| ActorThink | `0x12a690` | Win64 `void(entity*)`; native g_ai pointer slot `0xd9c0b8`, level.time DWORD `0xd96ec8`. Existing world freeze gate is independently the same slot. |
+| G_RunThink dispatch | anchor `0x174dfb` | Reads handler BYTE at entity+`0x13b`; callback table `0x3c0aa0`, stride 80. Handler 2 think slot `0x3c0b40` initially points at ActorThink. |
+| Normal DoSpawn GSC builtin | `0x191810`, method entry `0x345488` | Requires native spawner type 14, last-spawn time before current level time. Native factory call at `0x191878` supplies RCX spawner, EDX targetname, R8D force=0, R9D ignorechecks default0; stamps+`0x17c` after success. |
+| ActorSpawn factory | `0x152e60` | Win64 pointer return with those four arguments. Consumes named `ai_disableSpawn`, budget+`0x184`, native player visibility/overlap checks, allocation/copy/init and script notifications. DLL requests retain no-force/default checks. |
+| ActorInit | `0x12ce20` | Consumes named `g_spawnai` slot `0xd9c0c0`; attaches actor+`0x110` and sentient+`0x118`, writes handler 2, actor type 13 and health 100. Native path initializes a sentient on team 4 before asynchronous actor script setup. |
+| Script entity delete | `0x189240`, method entry `0x342e68` | ECX packed class 0/lower-WORD entity number. Refuses client-bearing entities and protected special entity number at `0xd97c00`; emits delete notify and calls G_FreeEntity. |
+| G_FreeEntity | `0x19f900` | Native brain/sentient/script cleanup; preserves DWORD useCount+`0x78`, zeroes full `0x2a0` entity and stores useCount+1 at `0x19fc46`. Do not clear an actor structure manually. |
+| Entity pool / live set | pool `0xd9e070`; pointer slot `0xd96e78`; count `0xd96e80`; bitmap `0xd9b820` | Native spawner enumeration and free path agree. Stride `0x2a0`, bound 2048; ordinary allocator excludes last two special slots. Number is WORD+`0x7e`, in-use BYTE+`0xb0`. |
+| Team names | pointer array `0x3c36b0` | Ordered invalid 0 / axis 1 / allies 2 / neutral 3 / team3 4 / dead 5, independently scanned in runtime. Not assumed from engine ancestry. |
+| Entity script field descriptors | `0x346480` | Compiled 32-byte entries independently bind script-visible classname WORD+`0x13e`, origin float[3]+`0xe8`, spawnflags DWORD+`0x14c`. The internal name+`0x13c` is distinct. |
+| Spawner tagged fields | team DWORD+`0x178`, lastSpawn DWORD+`0x17c`, budget DWORD+`0x184` | Verified native enum/filter, normal-method store and factory read. Actor+`0x178` has a different union meaning; never read it as an actor team. |
+| Actor/sentient partial links | actor[0]=entity, actor+8=sentient; sentient[0]=entity, sentient+8=team | Native writers at `0x12d0f1` and `0x1b1970`; reader requires both self links and native allocation serial. Health is int+`0x164`, client pointer+`0x108` must be zero. |
+| ScriptStringToCString | `0x21a370`, pool pointer slot `0x1466008` | Nonzero WORD ID resolves to pool+4+ID*16; bounded readable ASCII string only. IDs are never reused as BO1 script-string IDs. |
+| Native spawn gate | `ai_disableSpawn`, slot `0xd9c170`, Boolean current+`0x10` | Named registration and native factory consumer agree. Reversible guarded pause is separate from `g_ai`. |
+
+The lazy service changes one aligned callback QWORD, records the original,
+restores page protection and invokes the original before consuming a queued
+command. No startup native calls, stolen-instruction trampoline, render-thread
+script calls, force-spawn request or fake actor allocation. Runtime actor thread
+identity and before/after native calls are logged for the first retail test.
+Only one request is pending, one per server timestamp; cap eight owned actors;
+expiry 10 seconds of game command time. Same-slot reuse is rejected by native
+serial plus entity/type/actor/sentient identity. Detected map/client/pool/clock
+rewind drops the queue and ownership history.
+
+Spawner budget 0 can temporarily become 1 for a debug clone. Positive budgets
+are preserved after native success only if the field still matches the submitted
+value or expected decrement. Unrelated script changes are retained. Native
+`spawned` and `delete` callbacks remain active, so mission side effects are a
+retail-test question. Cleanup owns only our current-generation actor tickets;
+it does not reclaim corpses, deleted/recycled slots, original campaign NPCs or
+actors loaded from an earlier process/save.
+
+Confirmed statically: binding graph, partial field widths, native initialization,
+team mapping, generation increment and cleanup path. Unresolved until retail:
+spawn visibility outcomes on each map, template availability, script callbacks,
+post-factory team/animation initialization and native execution/crash behavior.
+The callback requires an existing native actor; empty maps need a future
+general engine-frame service. This is IW4 mission AI debugging; BO1 pursuit,
+melee execution/notetracks, damage/death and asset conversion remain separate.
+
+### Test12 weapon validation and returned test11 evidence
+
+The owner confirms checkpoint bank recovery and the BO1 controller rehearsal.
+Derived log facts are in `runtime-test11-evidence.json`. The remaining initial
+1/1 label came from page state initialized only by an applied bank or arrow.
+The new preview uses the clean restore basis and catalog generation before
+either input. Inventory IDs/catalog changes invalidate it; ammo use does not.
+
+Native animation builder at `0xc2c70` begins at index 1, reads through 36, and
+substitutes idle[1] for optional empty names. It never consumes slot 0. Test10/11
+incorrectly required every slot/name nonempty, which could block valid native
+arrays. Test12 follows the native rule and reports each remaining dual gate.
+Old logs confirm dual_ready0 throughout but cannot prove the failed gate per
+gun. Animation/FPS results remain pending; the existing normal-tree fallback is
+generic compatibility, not authored paired animation or BO1 XAnim conversion.
+
 ## Iteration log
 
 | Iteration | Change | Verification | Retail result |
@@ -672,14 +740,16 @@ IW4 zone uses 64-bit pointer records. Asset conversion is unimplemented.
 | 2026-10-11 / test 7 | Session God fix, expanded PLAYER and compact menu | Matching build/logs: valid fields, God OFF/death/recovery, saved FOV and navigation | Owner accepts overall behavior; returned run does not instrument each toggle |
 | 2026-10-11 / test 8 | Adjustable movement; loaded weapons, linked grenades, Rapid Fire, explosive bullets, clock/AI/gravity | Returned log plus owner feedback; old 41-unique claim corrected after overlap discovery | Invisible/empty Give All and LOCKED Rapid; movement/world option paths observed; no new dump |
 | 2026-10-11 / test 9 | First banks/dual prototype and corrected Rapid Fire | Matching estate run and owner feedback | Checkpoint baseline contamination; failed OFF cleanup; G18 veto/dual FPS loss. Other controls owner-accepted |
-| 2026-10-11 / test 10 | Checkpoint provenance, selective undo, held-gun normal-animation fallback, caching and performance diagnostics | Eight C++ suites, 12 Python fixtures, 57 native anchors, AMD64 PE, actual-test9 upgrade | Owner retail acceptance pending |
+| 2026-10-11 / test 10 | Checkpoint provenance, selective undo, held-gun normal-animation fallback, caching and performance diagnostics | Eight C++ suites, 12 Python fixtures, 57 native anchors, AMD64 PE, actual-test9 upgrade | Test11 owner confirms checkpoint-bank recovery; dual still blocked |
+| 2026-10-11 / test 11 | BO1 source-derived simulated controller, scoped ordinary-player melee admission and local dependency auditor | Ten C++ suites, 17 Python fixtures, 57 native anchors, AMD64 PE, actual-test10 upgrade | Owner accepts rehearsal; estate rounds 1–3/debug 10 observed with valid accounting; initial Give label and dual still fail |
+| 2026-10-12 / test 12 | Bank preview/native animation validation plus real mission enemy/friendly controls, callback-thread spawn and owned-only cleanup | Eleven C++ suites, 22 Python fixtures, 77 native anchors and independent binding/field tables, AMD64 PE, actual-test11 upgrade | First new retail dual/AI run pending |
 
 Returned owner evidence is redacted into the versioned runtime JSON files; full
 logs/dumps stay private. No retail game is executed in this Linux workspace.
-The next acceptance gate is test10: banks after an earlier-bank checkpoint, actual
-OFF removal, G18/other dual appearance/firing/reload, fixed-camera FPS and both
-OFF orders. History is session-local; cross-process saved-checkpoint cleanup
-requires an original baseline and is not implemented. After acceptance, move
-to the BO1 controller and verified actor adapter.
-Saved FOV remains a regression check. Second-map/reset
+The next acceptance gate is test12: correct bank label before input, dual
+appearance/firing/reload/FPS, both OFF orders, and native actor creation/removal
+with untouched campaign NPCs. History is session-local; cross-process saved-
+checkpoint ownership requires a separate design and is not implemented.
+The accepted BO1 controller stays simulated until the actor behavior/animation
+adapter is validated. Saved FOV remains a regression check. Second-map/reset
 coverage and native BO1 actor/asset compatibility remain separate gates.

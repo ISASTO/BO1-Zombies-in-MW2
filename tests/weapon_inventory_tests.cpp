@@ -70,6 +70,27 @@ int main() {
         "missing animation names or unregistered native definition cannot force dual");
     Check(DualPlan(true,true,true,true,true).ready && !DualPlan(true,true,true,true,true).fallback,
         "authored paired animations remain the preferred path");
+    std::array<std::uintptr_t,kWeaponAnimCount> nativeNames{};
+    nativeNames.fill(0x2000); nativeNames[0]=0; nativeNames[1]=0x1000;
+    auto names=[](std::uintptr_t at,char* out,std::size_t) {
+        if(!at) return false;
+        out[0]=at==0x1000?'i':'\0'; out[1]='\0'; return true;
+    };
+    Check(UsableAnimationNames(nativeNames,names),"native unused zero slot and optional empty names use idle fallback");
+    nativeNames[1]=0x2000;
+    Check(!UsableAnimationNames(nativeNames,names),"native idle name must be present");
+    nativeNames[1]=0x1000; nativeNames[20]=0;
+    Check(!UsableAnimationNames(nativeNames,names),"referenced animation-name pointer must remain readable");
+    WeaponBankPreview display;
+    Check(!display.known && display.needsRefresh(base,1),"initial bank display starts unknown instead of publishing one fake page");
+    const auto initialPlan=BuildWeaponBank(base,guns,0);
+    display.publish(base,1,initialPlan.pages);
+    Check(display.pages==3 && !display.needsRefresh(base,1),"catalog pages publish before enabling or pressing an arrow");
+    Check(display.needsRefresh(base,2),"map/catalog generation forces page refresh");
+    auto pickup=base; pickup.weapons[1]=20;
+    Check(display.needsRefresh(pickup,1),"inventory slot changes refresh pages without rereading ammo every update");
+    auto ammoOnly=base; ammoOnly.reserve[0].count=4;
+    Check(!display.needsRefresh(ammoOnly,1),"ordinary ammo usage does not trigger a catalog pass");
     InventoryData full=base;
     for (int n=0;n<15;++n) { full.reserve[n]={unsigned(60+n),1}; full.clips[n]={unsigned(80+n),{1,0}}; }
     Check(BuildWeaponBank(full,{gun},0).added==0,"full ammo tables never overwrite slot zero");

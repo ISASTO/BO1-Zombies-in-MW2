@@ -85,7 +85,7 @@ void InitializeLog() {
         }
     }
     Log("BO1MW2 %s | AMD64 | log=%ls", kVersion, file);
-    Log("WEAPONS/WORLD test 8: adjustable speed/jump, loaded weapon access, linked frag/flash sustain, current-gun rapid fire, explosive bullets, time scale, AI think gate and gravity compatibility. Saved FOV retained.");
+    Log("AI test 12: bank preview, native animation-name validation, mission actor/spawner catalog, queued native spawn and owned-actor cleanup. BO1 controller rehearsal retained; live BO1 zombie behavior is pending.");
 }
 void Log(const char* format, ...) {
     char body[4096]{};

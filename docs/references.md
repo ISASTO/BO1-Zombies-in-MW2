@@ -78,3 +78,21 @@ slots, a6392/a93f2 clear200 groups, and a9730/2689a0 establish arena allocation.
 No OAT/GPL structure or implementation is copied. T5 asset/actor layouts remain
 separate; this generic weapon animation fallback does not implement Zombies
 animation conversion or reproduce authentic akimbo asset authoring.
+
+## Test12 actor and animation evidence
+
+All new actor APIs/partial fields are independently derived from the owner's
+exact AMD64 executable. Current upstream historical IW4/T5 headers are useful
+names and concepts, not the authority for these layouts or calling conventions.
+`tools/verify_ai_bindings.py` checks original compiled method-name/function
+entries, independent consumer/registration/caller targets, ordered team names,
+script field descriptors and native allocation-serial writers. No original
+executable, actor structure blob, disassembly listing or upstream implementation
+is distributed. Derived signatures/addresses and limits are documented in
+`ai-test12-evidence.json` and `reverse-engineering.md`.
+
+The animation-builder index1..36/empty-name idle fallback comes directly from
+the same executable; it is not inferred from an asset schema. Native campaign
+spawning is a class-B IW4 lifecycle prerequisite. It does not satisfy BO1 target,
+state-machine, attack, notetrack or class-C asset conversion requirements in
+the prior source/portability audit.

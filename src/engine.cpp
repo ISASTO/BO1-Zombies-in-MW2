@@ -62,7 +62,8 @@ struct FeatureRuntime {
     InventoryOwnership inventory;
     bool inventoryReconcilePending=false;
     bool inventoryNeedsBaseline=false;
-    int weaponBank=0,weaponPages=1;
+    int weaponBank=0,weaponPages=0;
+    WeaponBankPreview bankPreview;
     ScalarOwnership<std::uint8_t> dual;
     std::array<DualSlotOwnership,15> dualSlots{};
     std::array<DualAmmoOwnership,15> dualAmmo{};
@@ -71,6 +72,8 @@ struct FeatureRuntime {
     DualAssetOwnership dualAsset;
     unsigned dualHeld=0;
     bool dualReady=false;
+    DualBlocked dualBlocked=DualBlocked::None;
+    unsigned dualBlockedWeapon=0;
     struct Timing { unsigned long long updates=0,ticks=0,peak=0,reads=0; long long frequency=0; } timing;
     char dualMap[96]{};
     std::uintptr_t dualClient=0;
@@ -78,6 +81,7 @@ struct FeatureRuntime {
 std::mutex featuresMutex;
 struct CandidateCache {
     unsigned count=0;
+    std::uint64_t generation=1;
     std::array<bool,kWeaponCapacity> read{};
     std::array<WeaponCandidate,kWeaponCapacity> candidates{};
     unsigned long long hits=0,misses=0;
@@ -276,13 +280,14 @@ WeaponCandidate ReadCandidate(unsigned index) {
     unsigned count=0;
     if (!profile.inventoryResolved || !ReadValue(profile.weaponCount,count) || !count || count>=kWeaponCapacity || index>count) return {};
     std::lock_guard<std::mutex> lock(candidateMutex);
-    if (candidateCache.count!=count) { candidateCache.count=count; candidateCache.read={}; }
+    if (candidateCache.count!=count) { candidateCache.count=count; candidateCache.read={}; ++candidateCache.generation; }
     if (!candidateCache.read[index]) {
         candidateCache.candidates[index]=ReadCandidateRaw(index); candidateCache.read[index]=true; ++candidateCache.misses;
     } else ++candidateCache.hits;
     return candidateCache.candidates[index];
 }
-void InvalidateCandidates() { std::lock_guard<std::mutex> lock(candidateMutex); candidateCache.read={}; }
+void InvalidateCandidates() { std::lock_guard<std::mutex> lock(candidateMutex); candidateCache.read={}; ++candidateCache.generation; }
+std::uint64_t CandidateGeneration() { std::lock_guard<std::mutex> lock(candidateMutex); return candidateCache.generation; }
 bool SameAsset(const WeaponFields& actual,const WeaponFields& expected) {
     return actual.valid && expected.valid && actual.index==expected.index && actual.complete==expected.complete
         && actual.definition==expected.definition && std::strcmp(actual.name,expected.name)==0;
@@ -420,25 +425,30 @@ void RestoreDualAsset() {
 bool ReadAnimNames(std::uintptr_t table) {
     std::array<std::uintptr_t,kWeaponAnimCount> names{};
     if (!table || !Read(table,names.data(),sizeof(names))) return false;
-    char text[128]{};
-    for (std::size_t n=0;n<names.size();++n) {
-        if (!ReadString(names[n],text,sizeof(text))) return false;
-        if ((n==1 || n==3 || n==9 || n==13) && !text[0]) return false;
-    }
-    return true;
+    return UsableAnimationNames(names,ReadString);
 }
 bool ConfigureDualAsset(const WeaponCandidate& w) {
-    if (!profile.dualAnimResolved || !PrimaryGun(w)) return false;
+    auto blocked=[&](DualBlocked reason) {
+        if(features.dualBlocked!=reason || features.dualBlockedWeapon!=w.weapon.index)
+            Log("DUAL_BLOCK index=%u name=%s reason=%s",w.weapon.index,w.weapon.name,DualBlockedText(reason));
+        features.dualBlocked=reason; features.dualBlockedWeapon=w.weapon.index; return false;
+    };
+    if (!profile.dualAnimResolved || !PrimaryGun(w)) return blocked(DualBlocked::UnsupportedGun);
     const auto at=profile.weaponAnimCache+w.weapon.index*kWeaponAnimCacheStride;
     std::array<std::uintptr_t,3> trees{};
-    if (!Read(at,trees.data(),sizeof(trees)) || !trees[0]) return false;
+    if (!Read(at,trees.data(),sizeof(trees))) return blocked(DualBlocked::CacheUnreadable);
+    if(!trees[0]) return blocked(DualBlocked::MissingDefinition);
     auto& a=features.dualAsset;
-    if (a.active) return SameAsset(w.weapon,a.identity) && trees[0]==a.normalTree;
+    if (a.active) {
+        if(!SameAsset(w.weapon,a.identity) || trees[0]!=a.normalTree) return blocked(DualBlocked::ChangedAsset);
+        features.dualBlocked=DualBlocked::None; return true;
+    }
     std::uintptr_t normal=0,right=0,left=0;
     std::uint8_t veto=255;
-    if (!ReadValue(w.weapon.complete+kNormalWeaponAnims,normal) || !ReadAnimNames(normal)
-        || !ReadValue(w.weapon.definition+kRightWeaponAnims,right) || !ReadValue(w.weapon.definition+kLeftWeaponAnims,left)
-        || !ReadValue(w.weapon.definition+kNoDualWield,veto) || veto>1) return false;
+    if (!ReadValue(w.weapon.complete+kNormalWeaponAnims,normal) || !ReadAnimNames(normal))
+        return blocked(DualBlocked::InvalidNames);
+    if(!ReadValue(w.weapon.definition+kRightWeaponAnims,right) || !ReadValue(w.weapon.definition+kLeftWeaponAnims,left)
+        || !ReadValue(w.weapon.definition+kNoDualWield,veto) || veto>1) return blocked(DualBlocked::InvalidFields);
     const bool authored=right && left && ReadAnimNames(right) && ReadAnimNames(left);
     const auto plan=DualPlan(true,true,true,authored,trees[1] && trees[2]);
     a.active=true; a.identity=ReadWeapon(w.weapon.index,false); a.normalTree=trees[0]; a.fallback=plan.fallback;
@@ -459,7 +469,8 @@ bool ConfigureDualAsset(const WeaponCandidate& w) {
         ok=SetBool(w.weapon.definition+kNoDualWield,veto,0);
         if (ok) a.veto.applied(w.weapon.definition+kNoDualWield,veto,0);
     }
-    if (!ok) { RestoreDualAsset(); return false; }
+    if (!ok) { RestoreDualAsset(); return blocked(DualBlocked::WriteFailed); }
+    features.dualBlocked=DualBlocked::None;
     Log("WEAPON_APPLY DUAL_ASSET index=%u name=%s veto_before=%u animation_fallback=%d",w.weapon.index,w.weapon.name,veto,plan.fallback);
     return true;
 }
@@ -526,6 +537,7 @@ void ApplyBool(ScalarOwnership<std::uint8_t>&,const BoolDvarSnapshot&,bool,std::
 void UpdateWeaponInventory(Snapshot& s) {
     const bool give=features.extra.wanted(ExtraFeature::GiveAll),dual=features.extra.wanted(ExtraFeature::ForceDualWield);
     features.dualReady=false;
+    if(!dual) features.dualBlocked=DualBlocked::None;
     if (!dual) ApplyBool(features.dual,s.dualWield,false,0,"FORCE_DUAL_WIELD");
     if (!dual || features.dualHeld!=s.inventory.current) {
         RestoreDual(s); features.dualHeld=s.inventory.current;
@@ -570,6 +582,19 @@ void UpdateWeaponInventory(Snapshot& s) {
         ApplyDual(s);
     }
     ApplyBool(features.dual,s.dualWield,dual,features.dualReady?1:0,"FORCE_DUAL_WIELD");
+}
+void UpdateBankPreview(const Snapshot& s) {
+    if(!s.inventoryValid || features.inventoryReconcilePending) return;
+    const auto basis=features.inventory.sameScope(s.client.address,s.map)
+        ?BuildInventoryRestore(features.inventory,s.inventory):s.inventory;
+    if(features.bankPreview.needsRefresh(basis,CandidateGeneration())) {
+        const auto plan=BuildWeaponBank(basis,ReadCatalog(),features.weaponBank);
+        features.bankPreview.publish(basis,CandidateGeneration(),plan.pages);
+        if(features.weaponBank>=plan.pages) { features.weaponBank=plan.page; features.nextUpdate=0; }
+        Log("WEAPON_PAGE_PREVIEW bank=%d/%d eligible=%d original_basis=%d",features.weaponBank+1,plan.pages,
+            plan.eligible,features.inventory.baselineValid);
+    }
+    features.weaponPages=features.bankPreview.pages;
 }
 bool SetReserve(std::uintptr_t at, const AmmoPool& before, int target) {
     if ((at&7) || !Writable(at)) return false;
@@ -920,6 +945,7 @@ void InitializeEngine() {
             static_cast<unsigned long long>(profile.gravityLiteral?profile.gravityLiteral-profile.base:0),
             static_cast<unsigned long long>(profile.weaponTable?profile.weaponTable-profile.base:0),
             static_cast<unsigned long long>(profile.weaponCount?profile.weaponCount-profile.base:0));
+        InitializeAiEngine(profile.base,profile.size,start,length,profile.supported && profile.resolved);
         return;
     }
 }
@@ -1022,12 +1048,13 @@ WeaponModeStatus GetWeaponModeStatus() {
     std::lock_guard<std::mutex> lock(featuresMutex);
     const bool dualOwned=features.dual.owned || features.dualAsset.active || HasDualPlayerEdits(features.dualSlots,features.dualAmmo,features.lastHand.owned);
     return {features.inventory.owned,features.weaponBank,features.weaponPages,features.inventory.added,dualOwned,features.dualReady,features.dualAsset.fallback,
-        features.inventoryReconcilePending,features.inventoryNeedsBaseline};
+        features.inventoryReconcilePending,features.inventoryNeedsBaseline,features.dualBlocked};
 }
 bool AdjustWeaponBank(int direction) {
     std::lock_guard<std::mutex> lock(featuresMutex);
     const auto s=ReadSnapshot(); if (!ExtraAvailable(s,ExtraFeature::GiveAll) || !direction) return false;
-    const auto plan=BuildWeaponBank(features.inventory.owned?features.inventory.original:s.inventory,ReadCatalog(),features.weaponBank+(direction>0?1:-1));
+    const auto basis=features.inventory.sameScope(s.client.address,s.map)?BuildInventoryRestore(features.inventory,s.inventory):s.inventory;
+    const auto plan=BuildWeaponBank(basis,ReadCatalog(),features.weaponBank+(direction>0?1:-1));
     features.weaponPages=plan.pages;
     if (plan.page==features.weaponBank) return false;
     features.weaponBank=plan.page; features.nextUpdate=0;
@@ -1091,6 +1118,7 @@ void UpdatePlayerFeatures(ULONGLONG now) {
     MeasureUpdate measure;
     auto s=ReadSnapshot();
     if (s.state!=LevelState::Ready) {
+        features.bankPreview.clear(); features.weaponPages=0;
         features.lifetime.observe(false,0,0,""); features.ammo.clear(); RestoreDvars(); RestoreExtras(); return;
     }
     const bool newLifetime=features.lifetime.observe(true,s.client.address,s.client.commandTime,s.map);
@@ -1196,6 +1224,7 @@ void UpdatePlayerFeatures(ULONGLONG now) {
         SetJump(features.preferences.wanted(PlayerFeature::SuperJump)?static_cast<float>(features.preferences.jump):kDefaultJump);
     // Keep native global catalog bypass OFF while the filtered bank is active.
     ApplyBool(features.giveAll,s.giveAll,features.extra.wanted(ExtraFeature::GiveAll),0,"FILTERED_GIVE_ALL");
+    UpdateBankPreview(s);
     if (!features.inventoryReconcilePending) UpdateWeaponInventory(s);
     else {
         RestoreDual(s); features.dualReady=false;

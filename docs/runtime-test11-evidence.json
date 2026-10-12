@@ -1,0 +1,49 @@
+{
+  "version": "0.1.10-zombies-controller-test11",
+  "reviewed": "2026-10-12",
+  "source_bundle": {
+    "filename": "BO1MW2-startup-results-20261012-050001-b055bba1.zip",
+    "bytes": 113890,
+    "sha256": "439dfa3f723b88f8b2b9afd66645aede07324c567118015464a018e542c7907f",
+    "entries": 21
+  },
+  "log": {
+    "bytes": 275044,
+    "sha256": "108b18fae073dfcc28aef0e914a0a265b7a28f43797612e6951e4d86328d8079",
+    "records": 2663
+  },
+  "installed_dll_sha256": "11cfe3aaf7de05af26c7a20d168da03d1412ccbe5f15184c29a55752e7b483f7",
+  "owner_report": [
+    "Give All banks work after checkpoint reload; initial label is 1/1 until cycling shows banks2/4,3/4,4/4.",
+    "Force Dual Wield stays WAIT and does not work.",
+    "Zombies controller rehearsal behaves as expected."
+  ],
+  "confirmed_runtime": {
+    "map": "estate",
+    "give_all": "Four banks / 34 eligible / nine grants. Same-process checkpoint restores original baseline and reapplies selected bank; OFF restore appears in logs. Full pickup/both-order coverage is not established.",
+    "dual": "Profile resolved, cache RVA0x43f470, stride24. All observed attempts stayed dual_ready0/fallback0; no DUAL_ASSET apply. Observed Beretta/AK/P90/G18. Native hand/veto remained unchanged during failed admission.",
+    "controller": {
+      "starts": 2,
+      "transitions": 11,
+      "kill_one_actions": 18,
+      "clear_actions": 2,
+      "ends": 2,
+      "observed_profiles": {
+        "round1": "six / health150 / pacing2s",
+        "round2": "eight / health250 / pacing1.9s",
+        "round3": "thirteen / health350 / pacing1.805s",
+        "debug_round10": "33 total / health1045 / concurrent cap24"
+      },
+      "invariants": "Observed controller records retain valid accounting; rehearsal remains simulated."
+    },
+    "performance": "Final timed-update record: 16363 updates, mean836.6us, peak69583.5us, reads/update105.7, cache_misses230; FPS cannot be assessed for a working dual mode because dual never became ready.",
+    "loader_probes": "Both exit0. Saved FOV100 retained.",
+    "new_crash_evidence": false,
+    "crash_limit": "The same three historical test1 dumps are included; no new dump identified."
+  },
+  "confirmed_source_mismatches": {
+    "bank_preview": "The page state defaulted to one before an applied bank/arrow. Test12 computes a cached preview from clean inventory/catalog before input.",
+    "animation_names": "Native builder uses slots1..36 and idle[1] for optional empty names. Prior validator required all37/nonempty, including unused slot0. Test12 follows actual consumed names."
+  },
+  "limits": "These source mismatches are repaired but test12 retail effects are pending. The old log cannot prove the exact per-gun dual failure gate. Original inputs/logs/dumps remain private."
+}

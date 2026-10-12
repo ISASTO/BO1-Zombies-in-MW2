@@ -8,7 +8,7 @@
 #include "fov_preferences.hpp"
 
 namespace mod {
-inline constexpr const char* kVersion = "0.1.10-zombies-controller-test11";
+inline constexpr const char* kVersion = "0.1.11-ai-test12";
 inline constexpr const char* kExeSha256 = "fb7e8a987c371dea7b666091b0b9e2011c0cd9cd277b191ad453d11d557dd777";
 
 // -1 is a wildcard. Reject malformed patterns rather than matching everything.
@@ -179,6 +179,51 @@ inline constexpr const char* kDualAnimCacheStridePattern =
 inline constexpr const char* kWeaponAnimBuildPattern =
     "BB 01 00 00 00 48 8D 7D 08 0F 1F 84 00 00 00 00 00 4C 8B 07 41 80 38 00 75 ?? 4C 8B 45 08 8B D3 48 8B CE E8 ?? ?? ?? ?? FF C3 48 83 C7 08 83 FB 25 7C ??";
 
+inline constexpr const char* kAiActorThinkStartPattern =
+    "40 55 48 81 EC A0 00 00 00 48 8B 05 ?? ?? ?? ?? 48 8B E9 80 78 10 00 75 18 8B 05 ?? ?? ?? ?? 83 C0 32 89 81 60 01 00 00 48 81 C4 A0 00 00 00 5D C3";
+inline constexpr const char* kAiThinkDispatchPattern =
+    "0F B6 81 3B 01 00 00 48 89 7C 24 30 48 8D 3D ?? ?? ?? ?? C7 81 60 01 00 00 00 00 00 00 48 8D 14 80 48 03 D2 48 8B 3C D7 48 85 FF 75 0F 48 8D 15 ?? ?? ?? ?? 8D";
+inline constexpr const char* kAiSpawnerArrayPattern =
+    "8B 05 ?? ?? ?? ?? 33 DB 85 C0 7E 64 48 8B 15 ?? ?? ?? ?? 48 89 74 24 30 48 8D 35 ?? ?? ?? ?? 48 89 7C 24 38 8B FB 90 80 3E 00 74 2A 80 3C 17 0E 75 24 48 63 C3 48 69";
+inline constexpr const char* kAiSpawnerFieldsPattern =
+    "80 3F 00 74 36 80 3C 16 0E 75 30 8B 84 16 78 01 00 00 0F A3 C5 73 24 48 63 C3 48 69 C8 A0 02 00 00 48 03 CA E8 90 9A";
+inline constexpr const char* kAiNormalSpawnMethodPattern =
+    "44 8B CE 45 33 C0 8B D7 48 8B CB E8 ?? ?? ?? ?? 48 8B 7C 24 38 48 8B 74 24 30 48 85 C0 74 19 8B 0D ?? ?? ?? ?? 89 8B 7C 01 00 00 48 8B C8 48 83 C4 20 5B E9 0B 95";
+inline constexpr const char* kAiSpawnCorePattern =
+    "48 89 5C 24 18 55 57 41 56 48 83 EC 20 48 8B 05 ?? ?? ?? ?? 41 8B F9 8B DA 48 8B E9 80 78 10 00 0F 85 C4 01 00 00 83 B9 84 01 00 00 00 0F 84 B7 01 00 00 45 85 C0 75 48 44 39 05 ?? ?? ?? ?? 75 3F 48 8B D1 48 8D 0D C5 B1";
+inline constexpr const char* kAiActorInitPattern =
+    "40 56 57 41 57 48 81 EC A0 00 00 00 45 33 FF 48 8B F9 66 44 89 B9 84 02 00 00 48 8B 05 ?? ?? ?? ?? 44 38 78 10 0F 84 A4 05 00 00 F6 81 4C 01 00 00 01";
+inline constexpr const char* kAiActorLinksPattern =
+    "48 89 B7 10 01 00 00 48 89 AF 18 01 00 00 44 89 BF 60 01 00 00 8B 05 ?? ?? ?? ?? 80 8F AE 00 00 00 02 81";
+inline constexpr const char* kAiActorHandlerPattern =
+    "C6 87 3B 01 00 00 02 C6 87 39 01 00 00 01 C7 87 68 01 00 00 64 00 00 00 C7 87 64 01 00 00 64 00 00 00";
+inline constexpr const char* kAiDeleteMethodPattern =
+    "89 4C 24 08 48 83 EC 28 8B C1 C1 E8 10 66 83 F8 05 75 09 48 83 C4 28 E9 ?? ?? ?? ?? 66 83 7C 24 32 00 48 89 5C 24 20 75 16 0F B7 C1 48 69 D8 A0 02 00 00 48 8D 05 ?? ?? ?? ?? 48 03 D8 EB ?? E8 ?? ?? ?? ?? 33 DB";
+inline constexpr const char* kAiDeleteGuardPattern =
+    "0F B7 43 7E 39 05 ?? ?? ?? ?? 75 05 E8 ?? ?? ?? ?? 0F B7 15 ?? ?? ?? ?? 45 33 C0 48 8B CB E8 ?? ?? ?? ?? 48 8B CB 48 8B 5C 24 20 48 83 C4 28 E9 ?? ?? ?? ??";
+inline constexpr const char* kAiEntitySerialPattern =
+    "8B 7B 78 33 D2 41 B8 A0 02 00 00 48 8B CB E8 ?? ?? ?? ?? 48 8B C3 48 2B 05 ?? ?? ?? ?? 48";
+inline constexpr const char* kAiEntitySerialCommitPattern =
+    "8D 47 01 48 8B 7C 24 48 89 43 78 48 8B 5C 24 30 42 88 2C 36 48 8B";
+inline constexpr const char* kAiStringConvertPattern =
+    "85 C9 74 12 48 8B 05 ?? ?? ?? ?? 48 83 C0 04 C1 E1 04 48 03 C1 C3 33 C0 C3";
+inline constexpr const char* kAiSpawnEnabledRegistrationPattern =
+    "41 B8 86 00 00 00 48 8D 0D ?? ?? ?? ?? B2 01 E8 ?? ?? ?? ?? 4C 8D 0D ?? ?? ?? ?? 48 89 05 ?? ?? ?? ??";
+inline constexpr const char* kAiSpawnDisabledRegistrationPattern =
+    "33 D2 48 8D 0D ?? ?? ?? ?? 41 B8 84 00 00 00 E8 ?? ?? ?? ?? F3 44 0F 10 05 ?? ?? ?? ?? 48 8D 0D ?? ?? ?? ?? 48 89 05 ?? ?? ?? ??";
+
+inline constexpr const char* kAiNormalSpawnEntryPattern =
+    "40 53 48 83 EC 20 E8 ?? ?? ?? ?? 48 8B D8 80 38 0E 74 05 E8 ?? ?? ?? ?? 8B 0D ?? ?? ?? ?? 39 8B 7C 01 00 00 7D 6F";
+
+inline constexpr const char* kAiSentientLinksPattern =
+    "48 89 11 44 89 41 08 48 85 D2 74 13 48 8B 82 10 01 00 00 48 85 C0 74 07 44 89 80 78 13 00 00 33 C0";
+
+inline constexpr const char* kAiActorTypePattern =
+    "C6 07 0D 66 89 9F 80 00 00 00 F3 41 0F 10 0E F3 41 0F 10 46 04 F3 41 0F 10 56 08";
+
+inline constexpr const char* kAiActorSelfPattern =
+    "48 89 3E 33 D2 48 89 6E 08 41 B8 0C 01 00 00 E8 ?? ?? ?? ?? 48 8B 0E 4C 89 BE 84 0E 00 00";
+
 inline constexpr int kVisibleMenuRows = 8;
 enum class Page { Home, Player, Weapons, World, AI, Zombies, Diagnostics, ZombieRules, View, ZombieController };
 enum class Input { Toggle, Up, Down, Select, Back, Left, Right };
@@ -189,7 +234,9 @@ enum class Action { None, ToggleGod, ToggleHud, WriteSnapshot, WriteRoundPreview
     ToggleSlowMotion, ToggleFreezeAI, ToggleGravity, ResetWorld,
     DecreaseTimeScale, IncreaseTimeScale, DecreaseGravity, IncreaseGravity,
     ToggleRehearsal, ChangeRehearsalRound, ToggleRehearsalAutoClear, ToggleRehearsalSpawning,
-    KillRehearsalActor, ClearRehearsalActors, WriteRehearsal };
+    KillRehearsalActor, ClearRehearsalActors, WriteRehearsal,
+    SpawnAiEnemy, SpawnAiFriendly, PreviousEnemySpawner, NextEnemySpawner, PreviousFriendlySpawner, NextFriendlySpawner,
+    ToggleAiSpawnPause, RemoveSpawnedAi, WriteAiState };
 inline bool IsRehearsalAction(Action action) {
     return action>=Action::ToggleRehearsal && action<=Action::WriteRehearsal;
 }
@@ -208,7 +255,7 @@ struct MenuState {
             case Page::Player: return 8;
             case Page::Weapons: return 7;
             case Page::World: return 5;
-            case Page::AI: return 3;
+            case Page::AI: return 10;
             case Page::Zombies: return 3;
             case Page::Diagnostics: return 2;
             case Page::ZombieRules: return 6;
@@ -228,6 +275,8 @@ struct MenuState {
             if (page==Page::Player && selected==6) return right?Action::IncreaseJump:Action::DecreaseJump;
             if (page==Page::World && selected==0) return right?Action::IncreaseTimeScale:Action::DecreaseTimeScale;
             if (page==Page::World && selected==2) return right?Action::IncreaseGravity:Action::DecreaseGravity;
+            if(page==Page::AI && selected==2) return right?Action::NextEnemySpawner:Action::PreviousEnemySpawner;
+            if(page==Page::AI && selected==3) return right?Action::NextFriendlySpawner:Action::PreviousFriendlySpawner;
         }
         if (page == Page::View && selected == 0
             && (key == Input::Left || key == Input::Right || key == Input::Select))
@@ -278,6 +327,14 @@ struct MenuState {
             else if (page == Page::World && selected == 1) return Action::ToggleFreezeAI;
             else if (page == Page::World && selected == 2) return Action::ToggleGravity;
             else if (page == Page::World && selected == 4) return Action::ResetWorld;
+            else if(page==Page::AI) {
+                if(selected==0) return Action::SpawnAiEnemy;
+                if(selected==1) return Action::SpawnAiFriendly;
+                if(selected==4) return Action::ToggleAiSpawnPause;
+                if(selected==5) return Action::ToggleFreezeAI;
+                if(selected==8) return Action::RemoveSpawnedAi;
+                if(selected==9) return Action::WriteAiState;
+            }
             else if (page == Page::View && selected == 1) return Action::SaveFov;
             else if (page == Page::View && selected == 2) return Action::ResetFov;
             else if (page == Page::Zombies && selected == 0) {
