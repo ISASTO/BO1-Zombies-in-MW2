@@ -1,0 +1,68 @@
+{
+  "version": "0.1.23-squad-test24",
+  "dll_sha256": "bce61441609d7b5b6949538d685c5c66e829b165517b9c386f0b81f01bc3f6b5",
+  "dll_bytes": 5258774,
+  "architecture": "AMD64",
+  "imports": [
+    "bcrypt.dll",
+    "dbghelp.dll",
+    "gdi32.dll",
+    "kernel32.dll",
+    "msvcrt.dll",
+    "user32.dll",
+    "winmm.dll"
+  ],
+  "exports": [
+    "D3DPERF_BeginEvent",
+    "D3DPERF_EndEvent",
+    "D3DPERF_GetStatus",
+    "D3DPERF_QueryRepeatFrame",
+    "D3DPERF_SetMarker",
+    "D3DPERF_SetOptions",
+    "D3DPERF_SetRegion",
+    "DebugSetMute",
+    "Direct3DCreate9",
+    "Direct3DCreate9Ex"
+  ],
+  "aslr": true,
+  "nx": true,
+  "cpp_suites_passed": 18,
+  "python_tests_passed": 31,
+  "returned_crash_paths_reproduced": [
+    "0x232e68",
+    "0x1a187e"
+  ],
+  "native_history_and_shot_regression": "history-test24-probe.json",
+  "returned_crash_evidence": "runtime-test24-crash-evidence.json",
+  "expanded_runtime_regression": "expanded-runtime-test24-probe.json",
+  "iterator_regression": "iterator-test24-probe.json",
+  "experimental_live_actor_capacity": 256,
+  "native_rewind_history_actor_slots": 32,
+  "higher_actor_collision": "Current server pose, without historical rewind. Live spawning remains at 256 capacity.",
+  "retail_execution": "Corrected Windows mission loading, shooting, friendly poses and crowded battles require owner retesting.",
+  "guarded_native_iterator_cases": 2052,
+  "native_history_regression": {
+    "history_pose_cases": 640,
+    "generation_validation_cases": 2048,
+    "temporal_interpolation_actor_cases": 32,
+    "history_ring_wrap": true,
+    "shot_pose_cases": 516,
+    "live_actor_capacity": 256,
+    "native_history_slots": 32,
+    "guarded_800_byte_shot_scratch": true,
+    "high_actor_poses_preserved": true,
+    "native_interpolation_and_restore": true,
+    "native_weapon_restore_loops_executed": 2,
+    "booted_game_tested": false
+  },
+  "checked_runtime_patches": 244,
+  "installer_fixture": {
+    "powershell_parser": "pass",
+    "packaged_payload_install": "pass",
+    "version_and_sha256": "pass",
+    "player_save_backup": "pass",
+    "mp_iwi_extraction_from_local_fixture": "pass",
+    "retail_executed": false,
+    "packaged_uninstall": "pass"
+  }
+}

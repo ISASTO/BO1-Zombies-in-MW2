@@ -174,7 +174,7 @@ bool InstallExpandedCapacity(std::uintptr_t base,bool exactResolved) {
     for(auto it=protections.rbegin();it!=protections.rend();++it){DWORD ignored;VirtualProtect(reinterpret_cast<void*>(it->write->address),it->write->after.size(),it->old,&ignored);}
     FlushInstructionCache(GetCurrentProcess(),nullptr,0);
     capacity.store(256,std::memory_order_release);
-    Log("AI_CAPACITY_EXPANSION enabled=1 experimental=1 actors=256 sentients=274 stride=0x48c0 snapshot_bytes=17412 temporary_trees=336 patches=%u arena=%p checkpoint=VERSIONED_V1_LEGACY_MIGRATION",static_cast<unsigned>(protections.size()),reinterpret_cast<void*>(arena));
+    Log("AI_CAPACITY_EXPANSION enabled=1 experimental=1 actors=256 sentients=274 stride=0x48c0 snapshot_bytes=17412 temporary_trees=336 patches=%u arena=%p checkpoint=VERSIONED_V1_LEGACY_MIGRATION native_rewind_slots=32 high_actor_collision=CURRENT_SERVER_POSE",static_cast<unsigned>(protections.size()),reinterpret_cast<void*>(arena));
     return true;
 }
 } // namespace mod

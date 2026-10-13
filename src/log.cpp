@@ -183,7 +183,7 @@ void InitializeLog() {
     }
     std::swprintf(logPath,32768,L"%ls",file);
     Log("BO1MW2 %s | AMD64 | log=%ls", kVersion, file);
-    Log("Test23: fixed the mission-load actor-team iterator guard at 0x1286fe; 256/274 expansion and original MP hitmarkers retained. Guarded exact-native regression reproduces Test22 and passes both pointer-sign cases.");
+    Log("Test24: fixes actor-history displacements and bounds native shooting scratch scans to their 32-slot records. Live actor capacity stays 256; higher actors use current server poses during shots. Original MP hitmarkers retained.");
 }
 void Log(const char* format, ...) {
     char body[4096]{};

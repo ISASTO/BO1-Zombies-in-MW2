@@ -16,7 +16,7 @@ try {
         $source = Join-Path (Split-Path $PSScriptRoot -Parent) $relative
     }
     if (-not (Test-Path -LiteralPath $source)) { throw 'd3d9.dll was not found. Extract the full test ZIP first.' }
-    $version = if ($Build -eq 'startup') { '0.1.1-startup-test2' } else { '0.1.22-squad-test23' }
+    $version = if ($Build -eq 'startup') { '0.1.1-startup-test2' } else { '0.1.23-squad-test24' }
     $payloadPath = Join-Path $PSScriptRoot 'payload.json'
     if (Test-Path -LiteralPath $payloadPath) {
         $payload = Get-Content -LiteralPath $payloadPath -Raw | ConvertFrom-Json
@@ -31,7 +31,7 @@ try {
     New-Item -ItemType Directory -Force -Path $logs | Out-Null
     $players = Join-Path $root 'players'
     if ($Build -eq 'menu' -and (Test-Path -LiteralPath $players -PathType Container)) {
-        $saveBackup = Join-Path $root ('bo1mw2\backups\before-test23-' + [DateTime]::UtcNow.ToString('yyyyMMdd-HHmmss-fff'))
+        $saveBackup = Join-Path $root ('bo1mw2\backups\before-test24-' + [DateTime]::UtcNow.ToString('yyyyMMdd-HHmmss-fff'))
         New-Item -ItemType Directory -Path $saveBackup | Out-Null
         Copy-Item -LiteralPath $players -Destination $saveBackup -Recurse
         Write-Host "Local player/save backup: $saveBackup"

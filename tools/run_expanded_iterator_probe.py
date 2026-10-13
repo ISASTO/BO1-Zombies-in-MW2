@@ -13,7 +13,7 @@ def patches(text):
         for off,width,target,end,relative in re.findall(r'\{(\d+),(\d+),0x([0-9a-f]+),0x([0-9a-f]+),(true|false)\}',fixups):
             fixes.append((int(off),int(width),int(target,16),int(end,16),relative=='true'))
         rows.append((int(rva,16),bytes.fromhex(before),bytes.fromhex(after),fixes))
-    if len(rows)!=209:raise ValueError('Unexpected runtime patch inventory')
+    if len(rows)<209 or len({row[0] for row in rows})!=len(rows):raise ValueError('Incomplete or duplicate runtime patch inventory')
     return rows
 
 def fixture(pe,rows):

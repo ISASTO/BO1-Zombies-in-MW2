@@ -1,27 +1,30 @@
 # BO1 Zombies in MW2
 
 Incremental mod framework for **retail Modern Warfare 2 (2009), single player**.
-Current build: **0.1.22-squad-test23**. Test23 fixes the mission-load crash in
-Test22's native actor-team iterator. All three returned dumps reach actor index
-451 beyond the 256-slot pool: a patch started inside a prefixed instruction and
-compared the actor pointer instead of the actor index. The corrected patch keeps
-the complete `CMP R8, 256` guard. The generator also rejects capacity guards
-that begin inside an original instruction.
+Current build: **0.1.23-squad-test24**. The returned Estate/Contingency
+crashes expose two further expansion bugs: unrolled frame-history addresses
+still used the old actor stride, and shooting rewind/restore loops scanned
+256 entries in temporary buffers that hold 32. Test24 corrects every address in
+the affected writer/validator and bounds those scans to their actual buffers.
 
-The regression reproduces the original crash and the alternate address-layout
-bug that skipped later actors. The fix passes **2,052 exact-native guarded
-iterator cases** across both address layouts. All 18 C++ suites, 31 Python tests,
-and expanded population/snapshot/animation checks pass. See [Test23 crash and
-fix evidence](docs/squad-test23.md). Windows mission loading still needs the
-owner's retest.
+**The live capacity remains 256 actors / 274 sentients.** Native historical
+shooting rewind remains 32 slots; higher actors retain their current server pose
+during shots. The original MP hitmarker image, sound and fade, existing menu
+options, performance safeguards and version-1 checkpoints remain included.
 
-The **256-actor / 274-sentient runtime attempt** and original multiplayer
-**damage_feedback** texture, **MP_hit_alert** PCM sound and one-second fade remain
-included. The installer extracts the real image from local `main/*.iwd` archives;
-returned Test22 logs confirm that asset initialization succeeded. The AI page
-shows actual active capacity. Expanded checkpoint layout remains version 1,
-with stock 32-actor checkpoint migration. Test16's performance protections and
-Test20's ownership fix remain included.
+Both old crash locations reproduce in the native regression. Corrected history,
+entity-reuse validation, interpolation, guarded shooting buffers and both weapon
+restore loops pass. The team iterator still passes 2,052 cases, the expanded
+population/animation/snapshot/save checks pass, and all 18 C++ suites and 31
+Python tests pass. See [Test24 findings and test scope](docs/squad-test24.md).
+Windows mission loading, shooting, friendly poses and large battles still need
+the owner's retest; this build is experimental.
+
+Wrong history reads and excess restoration can corrupt actor poses, providing a
+cause for jitter and upward-pointing guns. Corrected visual behavior and AI
+following/combat require retail confirmation. The installer extracts the
+original MP image from local `main/*.iwd`; returned Test23 logs confirm that
+MP image/sound loading succeeded. Stock checkpoints retain migration support.
 
 Test20 fixes a native string-reference bug in squad ownership labels. Repeated
 user-1 intern lookups return a borrowed id, but the old code released it after
@@ -218,7 +221,7 @@ Copy the log immediately after a failing run: `latest.log` is replaced on launch
 | FOV selector and saved preference | Owner confirms test6 behavior; matching logs show load/selection/save/reset |
 | WEAPONS | Hitmarkers and held-fire semi-auto conversion added in Test21. No Recoil and 1x-10x Rapid Fire retained. G18 dual appearance is deferred. |
 | WORLD | Test18 fixes help-text bounds and adds player friendly-fire penalty bypass; native damage/mission behavior needs retail retest. |
-| AI | Test20 crowded-squad retail run is stable. Test21 adds invincible spawned allies and advances native 256/274 cleanup/population serialization. Test22 attempts native 256 capacity at startup; in-game stress testing is pending. |
+| AI | Test20 crowded-squad retail run is stable. Test21 adds invincible spawned allies and advances native 256/274 cleanup/population serialization. Test24 retains native 256 capacity and fixes actor-history/shooting-buffer crashes; corrected retail testing is pending. |
 | Kill All Enemies | Owner-confirmed working native damage call for hostile actors; allies, clients and protected entities excluded. |
 | BO1 Zombies gameplay | Planned; normal MW2 AI is not a BO1 behavior/animation/assets port. |
 

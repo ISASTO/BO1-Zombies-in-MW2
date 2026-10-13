@@ -7,13 +7,17 @@ import struct,json,hashlib,argparse,gc
 from pathlib import Path
 import pefile
 from capstone import Cs,CS_ARCH_X86,CS_MODE_64
-from capstone.x86 import X86_OP_IMM,X86_OP_MEM,X86_REG_RIP
+from capstone.x86 import X86_OP_IMM,X86_OP_MEM,X86_REG_RIP,X86_REG_R8
 from run_expanded_lifecycle_probe import prepare as previous
 from audit_actor_capacity import EXACT_SHA256
 FRAME=0x4510000;CLIENT_FRAME=0x4580000;LOAD_ACTORS=0x4590000;LOAD_SENTIENTS=LOAD_ACTORS+4
 TEMP=0x45a0000;TEMP_COUNT=336;FLAGS=TEMP+TEMP_COUNT*8;CURSOR=FLAGS+TEMP_COUNT
 CALLBACKS=0x47f0000
 SNAPSHOT_BYTES=0x4404
+# These native history and shooting scratch records contain 32 actors. They
+# are independent of the live actor pool's capacity; enlarging a traversal
+# without also enlarging its caller's stack buffers reads/writes past them.
+REWIND_ACTORS=32
 
 def prepare(pe):
  image,meta=previous(pe);base=pe.OPTIONAL_HEADER.ImageBase
@@ -33,6 +37,15 @@ def prepare(pe):
   nonlocal cursor
   where=cursor;put(where,code+jump(where+len(code),at+length),role+' relay')
   put(at,jump(at,where)+b'\x90'*(length-5),role);cursor+=len(code)+5
+ def actor_disp(at,value,role):
+  i=ins(at)
+  if i.disp_size==4:disp(at,value,role);return
+  if i.disp_size!=1 or i.size<5:raise ValueError(f'Unsupported actor displacement at {at:x}')
+  # The old actor-1 active test has a signed-byte displacement. Preserve its
+  # SIB/registers and immediate while widening ModRM to a DWORD displacement.
+  code=bytearray(i.bytes);code[i.modrm_offset]=(code[i.modrm_offset]&0x3f)|0x80
+  code=code[:i.disp_offset]+struct.pack('<i',value)+code[i.disp_offset+1:]
+  relay(at,i.size,bytes(code),role)
  def bound(at,value,role,variable=False):
   i=ins(at);b=ins(at+i.size);assert i.mnemonic=='cmp' and b.mnemonic.startswith('j')
   # EAX is the loop counter at these four population boundaries.
@@ -86,7 +99,38 @@ def prepare(pe):
  relocated[i.disp_offset:i.disp_offset+4]=struct.pack('<i',target-base-(cursor+len(code)+i.size));code+=relocated
  code+=bytes(ins(0x170cfa).bytes) # native two-client counter, indispensable
  relay(0x170ce5,0x170d20-0x170ce5,bytes(code),'full temporary animation occupancy reset')
- return image,{'previous_stage':meta,'stage22_edits':edits,'frame_bytes':SNAPSHOT_BYTES,'temporary_animation_trees':TEMP_COUNT}
+ # The frame-history writer is unrolled eight ways. These are actor-relative
+ # displacements, not immediate stride constants, so the earlier inventory
+ # did not cover them. Keep the original 32-entry history representation.
+ from run_expanded_layout_probe import STRIDE
+ for i in dec.disasm(pe.get_data(0x232de0,0x233154-0x232de0),base+0x232de0):
+  for o in i.operands:
+   if o.type==X86_OP_MEM and o.mem.base==X86_REG_R8:
+    slot,field=divmod(o.mem.disp,0x1560)
+    if not 0<=slot<8 or field not in (0,0x14ff):raise ValueError(f'Unexpected frame-history actor field {i.address-base:x}')
+    if slot:disp(i.address-base,slot*STRIDE+field,'frame-history expanded actor displacement')
+ imm(0x23313b,8*STRIDE,'frame-history eight-actor stride')
+ # History validation similarly biases its cursor to actor 2 and reads
+ # actors -2..5 relative to it. Preserve slot-reuse checks against entity+78.
+ imm(0x1a2ed8,2*STRIDE,'history validation actor cursor bias')
+ for at,slot,field in ((0x1a2f37,-2,0x14ff),(0x1a2f56,-2,0),
+                       (0x1a2f73,-1,0x14ff),(0x1a2f8f,-1,0),
+                       (0x1a2fe3,1,0x14ff),(0x1a3000,1,0),
+                       (0x1a301c,2,0x14ff),(0x1a3039,2,0),
+                       (0x1a3055,3,0x14ff),(0x1a3072,3,0),
+                       (0x1a308e,4,0x14ff),(0x1a30ad,4,0),
+                       (0x1a30ca,5,0x14ff),(0x1a30e7,5,0)):
+  if ins(at).disp!=slot*0x1560+field:raise ValueError(f'Unexpected history validation field {at:x}')
+  actor_disp(at,slot*STRIDE+field,'history validation expanded actor displacement')
+ imm(0x1a30fc,8*STRIDE,'history validation eight-actor stride')
+ # Three restore/rewind loops use byte extents rather than an actor counter.
+ # Their stack records stay 0x320 bytes (32 origins/angles/active flags), and
+ # their companion loops already stop after 32. Match both halves exactly.
+ for at in (0x1a1663,0x1a1945,0x1a34a0):
+  imm(at,REWIND_ACTORS*STRIDE,'bounded native shooting scratch traversal')
+ return image,{'previous_stage':meta,'stage22_edits':edits,'frame_bytes':SNAPSHOT_BYTES,'temporary_animation_trees':TEMP_COUNT,
+               'native_rewind_actor_slots':REWIND_ACTORS,
+               'high_actor_collision':'Actors 32..255 keep their current server pose during shots; live pool capacity stays 256.'}
 
 def flatten(meta):
  rows=[]
@@ -127,7 +171,7 @@ def runtime_plan(pe,image,meta):
  for a,z in merged:
   blob=bytes(image[a:z]);fixups=[]
   parsed=list(dec.disasm(blob,base+a))
-  if sum(i.size for i in parsed)!=len(blob):raise ValueError(f'Incomplete patch disassembly {a:x}')
+  if sum(i.size for i in parsed)!=len(blob) or any(not i.id for i in parsed):raise ValueError(f'Incomplete patch disassembly {a:x}')
   for i in parsed:
    at=i.address-base
    for o in i.operands:
