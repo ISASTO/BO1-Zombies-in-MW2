@@ -1,0 +1,48 @@
+{
+  "archive_sha256": "dc7140800d3cd63b137b708a7c327af4bc550595d911bb05c93c34199b43b7a2",
+  "installed_version": "0.1.23-squad-test24",
+  "installed_dll_sha256": "bce61441609d7b5b6949538d685c5c66e829b165517b9c386f0b81f01bc3f6b5",
+  "executable_sha256": "fb7e8a987c371dea7b666091b0b9e2011c0cd9cd277b191ad453d11d557dd777",
+  "crashes": [
+    {
+      "dump": "crash-20261013-151502.dmp",
+      "fault_instruction_rva": "0x1ef8f0",
+      "last_heartbeat_actors": 41,
+      "latest_spawn_actor_count": 61,
+      "exception_context_source": "exception stream",
+      "path": "command removal during engine error/shutdown",
+      "corrupt_command_link": true,
+      "diagnosis": "The command-list traversal encounters noncanonical data. Its triggering engine error and complete earlier corruption chain are not preserved by these exception contexts."
+    },
+    {
+      "dump": "crash-20261013-151740.dmp",
+      "fault_instruction_rva": "0x2957be",
+      "last_heartbeat_actors": 55,
+      "latest_spawn_actor_count": null,
+      "exception_context_source": "exception stream",
+      "path": "native DObj creation",
+      "animation_tree_pointer": "0x10001000005d7",
+      "pointer_is_noncanonical": true,
+      "faulting_field": "tree+8",
+      "low_word_entity_number": 1495,
+      "diagnosis": "Packed data was supplied as an animation-tree pointer. The unconverted high-slot actor/corpse exchange can produce this exact class of invalid pointer."
+    },
+    {
+      "dump": "crash-20261013-151906.dmp",
+      "fault_instruction_rva": "0x1ef903",
+      "last_heartbeat_actors": 38,
+      "latest_spawn_actor_count": 59,
+      "exception_context_source": "exception stream",
+      "path": "command removal during engine error/shutdown",
+      "corrupt_command_link": true,
+      "diagnosis": "The command-list traversal encounters noncanonical data. Its triggering engine error and complete earlier corruption chain are not preserved by these exception contexts."
+    }
+  ],
+  "screenshots": "All three show severely distorted NPC skeletons; the player weapon and environment appear intact.",
+  "confirmed_patch_defects": [
+    "Final scratch-tree pointer lookup still reads the original ring cursor; two concurrent leases return the same mutable tree.",
+    "Three one-past-end corpse-array markers were incorrectly moved to the temporary-tree arena.",
+    "Actor-to-corpse tree exchange still indexes the original 32-slot array, overlapping corpse records at higher actor indices."
+  ],
+  "fix_validation": "animation-test25-probe.json reproduces all three native addressing/ownership defects and tests their corrections. It does not evaluate real skeleton assets or reproduce the whole engine error/shutdown crash chain."
+}

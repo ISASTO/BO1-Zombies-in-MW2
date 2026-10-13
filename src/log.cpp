@@ -25,6 +25,10 @@ struct NativeEvent {
 };
 std::array<NativeEvent,64> nativeEvents{};
 std::atomic<std::uint64_t> nextNativeEvent{0};
+// Exact supported Com_Error formats a 0x1000-byte message at this address
+// before shutdown. Preserve it if shutdown itself faults, hiding the cause.
+constexpr std::uintptr_t kEngineErrorDepthRva=0x1326134,kEngineErrorMessageRva=0x13261a0;
+constexpr std::size_t kEngineErrorMessageBytes=0x1000;
 struct DumpMemory {std::uintptr_t base=0;unsigned next=0;std::uintptr_t sharedPool=0;ULONG sharedBytes=0;};
 BOOL CALLBACK IncludeNativeVmMemory(PVOID user,const PMINIDUMP_CALLBACK_INPUT input,PMINIDUMP_CALLBACK_OUTPUT output) {
     if(input->CallbackType!=MemoryCallback)return TRUE;
@@ -32,7 +36,8 @@ BOOL CALLBACK IncludeNativeVmMemory(PVOID user,const PMINIDUMP_CALLBACK_INPUT in
     if(memory.next==0) {output->MemoryBase=memory.base+0x18f0000;output->MemorySize=0x20000;++memory.next;return TRUE;}
     if(memory.next==1) {output->MemoryBase=memory.base+0xd96e70;output->MemorySize=0x80;++memory.next;return TRUE;}
     if(memory.next==2) {output->MemoryBase=memory.base+kScriptStringPoolPointerRva;output->MemorySize=8;++memory.next;return TRUE;}
-    if(memory.next==3 && memory.sharedBytes) {output->MemoryBase=memory.sharedPool;output->MemorySize=memory.sharedBytes;++memory.next;return TRUE;}
+    if(memory.next==3) {output->MemoryBase=memory.base+0x1326100;output->MemorySize=0x1100;++memory.next;return TRUE;}
+    if(memory.next==4 && memory.sharedBytes) {output->MemoryBase=memory.sharedPool;output->MemorySize=memory.sharedBytes;++memory.next;return TRUE;}
     return FALSE;
 }
 
@@ -103,6 +108,18 @@ LONG WINAPI CrashFilter(EXCEPTION_POINTERS* info) {
     }
     NativeScriptParameters parameters{};NativeScriptVmState vm{};int executeDepth=0,functionCount=0;std::uintptr_t frame=0;SIZE_T read=0;
     const auto process=GetCurrentProcess();
+    int nativeErrorDepth=0;
+    if(ReadProcessMemory(process,reinterpret_cast<void*>(base+kEngineErrorDepthRva),&nativeErrorDepth,sizeof(nativeErrorDepth),&read)
+        && nativeErrorDepth>0) {
+        char engineError[kEngineErrorMessageBytes]{};
+        if(ReadProcessMemory(process,reinterpret_cast<void*>(base+kEngineErrorMessageRva),engineError,sizeof(engineError),&read)) {
+            engineError[sizeof(engineError)-1]=0;
+            size=std::snprintf(message,sizeof(message),"native_engine_error_depth=%d message=",nativeErrorDepth);
+            if(size>0)RawWrite(report,message,static_cast<DWORD>(size));
+            RawWrite(report,engineError,static_cast<DWORD>(std::strlen(engineError)));
+            RawWrite(report,"\r\n",2);
+        }
+    }
     if(ReadProcessMemory(process,reinterpret_cast<void*>(base+kScriptParametersRva),&parameters,sizeof(parameters),&read)
         && ReadProcessMemory(process,reinterpret_cast<void*>(base+kScriptExecuteDepthRva),&executeDepth,sizeof(executeDepth),&read)
         && ReadProcessMemory(process,reinterpret_cast<void*>(base+kScriptVmStateRva),&vm,sizeof(vm),&read)
@@ -183,7 +200,7 @@ void InitializeLog() {
     }
     std::swprintf(logPath,32768,L"%ls",file);
     Log("BO1MW2 %s | AMD64 | log=%ls", kVersion, file);
-    Log("Test24: fixes actor-history displacements and bounds native shooting scratch scans to their 32-slot records. Live actor capacity stays 256; higher actors use current server poses during shots. Original MP hitmarkers retained.");
+    Log("Test25: fixes shared scratch-tree leases, corpse search end markers and expanded actor/corpse tree ownership. Live capacity stays 256; native history stays 32 slots. Original MP hitmarkers retained.");
 }
 void Log(const char* format, ...) {
     char body[4096]{};

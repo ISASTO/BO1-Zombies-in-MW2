@@ -10,6 +10,7 @@
 #include <iostream>
 #include <vector>
 #include <array>
+#include <set>
 #include <stdexcept>
 #include <cstdio>
 #include <cstdarg>
@@ -84,7 +85,9 @@ int main(int argc,char**argv){if(argc!=2)return 2;rlimit zero{0,0};setrlimit(RLI
  for(auto at:{0x17fe33,0x17fe50}){image[at]=0xe8;Put(image,at+1,int(0x47f0050-at-5));}
  Put(image,0xd96ea0,reinterpret_cast<std::uintptr_t>(image+Pool));Put(image,0xd96e98,reinterpret_cast<std::uintptr_t>(image+Sentients));Put(image,0xd96e78,reinterpret_cast<std::uintptr_t>(image+0xd9e070));Put(image,0xd96e70,reinterpret_cast<std::uintptr_t>(image+0x45d0000));Put(image,0xd96eb0,reinterpret_cast<std::uintptr_t>(image+0x45e0000));Put(image,0xd9c4a8,reinterpret_cast<std::uintptr_t>(image+0x4550200));Put(image,0xd9c0e0,reinterpret_cast<std::uintptr_t>(image+0x4550000));Put(image,0x4550010,int(256));Put(image,0xcf7090,reinterpret_cast<std::uintptr_t>(image+Nodes));Put(image,0xf56484,int(274));Put(image,0x19ada88,reinterpret_cast<std::uintptr_t>(image+0x45b0000));
  phase="full native animation init";reinterpret_cast<Void>(image+0x170b20)();Check(created==658,"Animation init did not create 256+64+336+2 trees");
- phase="temporary tree leases";using Lease=std::uintptr_t(ABI*)();auto lease=reinterpret_cast<Lease>(image+0x12c6d0);for(unsigned n=0;n<336;++n)Check(lease()!=0,"Temporary lease ended early");Check(lease()==0,"Temporary lease crossed capacity");
+ phase="temporary tree leases";using Lease=std::uintptr_t(ABI*)();auto lease=reinterpret_cast<Lease>(image+0x12c6d0);std::vector<std::uintptr_t> leased;
+ for(unsigned n=0;n<336;++n){const auto tree=lease();Check(tree!=0,"Temporary lease ended early");Check(tree==Get<std::uintptr_t>(image,0x45a0000+((n+1)%336)*8),"Temporary lease returned a tree from the wrong cursor");leased.push_back(tree);}Check(lease()==0,"Temporary lease crossed capacity");
+ Check(std::set<std::uintptr_t>(leased.begin(),leased.end()).size()==336,"Temporary leases alias the same mutable tree");
  Put(image,0xd97be8,int(0));phase="animation cleanup";reinterpret_cast<Void>(image+0x1710c0)();Check(cleared==658,"Animation cleanup omitted expanded trees");
  std::memset(image+Sentients,0xa5,274*0x88);phase="sentient startup reset";reinterpret_cast<Void>(image+0x1b0900)();for(unsigned n=0;n<274;++n)Check(!image[Sentients+n*0x88+0x82],"Startup missed high sentient");std::memset(image+Sentients,0,274*0x88);
  auto sa=reinterpret_cast<SAllocate>(image+0x1b0be0);auto aa=reinterpret_cast<Allocate>(image+0x123950);

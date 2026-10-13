@@ -1,30 +1,31 @@
 # BO1 Zombies in MW2
 
 Incremental mod framework for **retail Modern Warfare 2 (2009), single player**.
-Current build: **0.1.23-squad-test24**. The returned Estate/Contingency
-crashes expose two further expansion bugs: unrolled frame-history addresses
-still used the old actor stride, and shooting rewind/restore loops scanned
-256 entries in temporary buffers that hold 32. Test24 corrects every address in
-the affected writer/validator and bounds those scans to their actual buffers.
+Current build: **0.1.24-squad-test25**. The returned Test24 missions load,
+but NPC skeletons distort and crowded runs still fail around 55-61 actors.
+Test25 corrects three animation relocation defects: duplicate mutable scratch
+animation trees, corpse searches with wrongly moved endpoints, and actor-to-corpse
+tree exchanges still indexing the original 32-entry array.
 
-**The live capacity remains 256 actors / 274 sentients.** Native historical
-shooting rewind remains 32 slots; higher actors retain their current server pose
-during shots. The original MP hitmarker image, sound and fade, existing menu
-options, performance safeguards and version-1 checkpoints remain included.
+**Live capacity remains 256 actors / 274 sentients.** The three defects reproduce
+in the native fixture. Corrected checks pass 336 distinct simultaneous scratch
+trees, 1,000 release/reuse cycles, 195 bounded corpse lookup/removal cases and
+ownership exchanges across all 256 actor slots. Existing native population,
+animation lifecycle, snapshots, history, shooting, save/load and iterator checks
+pass, along with all 18 C++ suites and 31 Python tests.
+See [Test25 evidence and test scope](docs/squad-test25.md).
 
-Both old crash locations reproduce in the native regression. Corrected history,
-entity-reuse validation, interpolation, guarded shooting buffers and both weapon
-restore loops pass. The team iterator still passes 2,052 cases, the expanded
-population/animation/snapshot/save checks pass, and all 18 C++ suites and 31
-Python tests pass. See [Test24 findings and test scope](docs/squad-test24.md).
-Windows mission loading, shooting, friendly poses and large battles still need
-the owner's retest; this build is experimental.
+The screenshots show skeletal deformation, and one dump receives packed data
+as a noncanonical animation-tree pointer during DObj creation. These fixes
+address concrete causes of animation interference and invalid tree ownership.
+Real skeleton rendering and crowded Windows gameplay still need an owner retest.
+This is an experimental build. Start fresh missions for that check.
 
-Wrong history reads and excess restoration can corrupt actor poses, providing a
-cause for jitter and upward-pointing guns. Corrected visual behavior and AI
-following/combat require retail confirmation. The installer extracts the
-original MP image from local `main/*.iwd`; returned Test23 logs confirm that
-MP image/sound loading succeeded. Stock checkpoints retain migration support.
+Original MP hitmarker image, sound and fade, menu options, performance safeguards
+and version-1 expanded checkpoints remain included. Historical shot rewind
+remains 32 slots; higher actors keep their current server poses during shots.
+Stock checkpoints retain migration support. The installer extracts the original
+MP image from local main/*.iwd and backs up player/save data before installation.
 
 Test20 fixes a native string-reference bug in squad ownership labels. Repeated
 user-1 intern lookups return a borrowed id, but the old code released it after
@@ -221,7 +222,7 @@ Copy the log immediately after a failing run: `latest.log` is replaced on launch
 | FOV selector and saved preference | Owner confirms test6 behavior; matching logs show load/selection/save/reset |
 | WEAPONS | Hitmarkers and held-fire semi-auto conversion added in Test21. No Recoil and 1x-10x Rapid Fire retained. G18 dual appearance is deferred. |
 | WORLD | Test18 fixes help-text bounds and adds player friendly-fire penalty bypass; native damage/mission behavior needs retail retest. |
-| AI | Test20 crowded-squad retail run is stable. Test21 adds invincible spawned allies and advances native 256/274 cleanup/population serialization. Test24 retains native 256 capacity and fixes actor-history/shooting-buffer crashes; corrected retail testing is pending. |
+| AI | Test20 crowded-squad retail run is stable. Test21 adds invincible spawned allies and advances native 256/274 cleanup/population serialization. Test25 retains native 256 capacity and corrects animation-tree ownership/corpse lookup; corrected retail animation and stress testing is pending. |
 | Kill All Enemies | Owner-confirmed working native damage call for hostile actors; allies, clients and protected entities excluded. |
 | BO1 Zombies gameplay | Planned; normal MW2 AI is not a BO1 behavior/animation/assets port. |
 

@@ -7,7 +7,7 @@ import struct,json,hashlib,argparse,gc
 from pathlib import Path
 import pefile
 from capstone import Cs,CS_ARCH_X86,CS_MODE_64
-from capstone.x86 import X86_OP_IMM,X86_OP_MEM,X86_REG_RIP,X86_REG_R8
+from capstone.x86 import X86_OP_IMM,X86_OP_MEM,X86_REG_RIP,X86_REG_R8,X86_REG_RSI
 from run_expanded_lifecycle_probe import prepare as previous
 from audit_actor_capacity import EXACT_SHA256
 FRAME=0x4510000;CLIENT_FRAME=0x4580000;LOAD_ACTORS=0x4590000;LOAD_SENTIENTS=LOAD_ACTORS+4
@@ -18,6 +18,11 @@ SNAPSHOT_BYTES=0x4404
 # are independent of the live actor pool's capacity; enlarging a traversal
 # without also enlarging its caller's stack buffers reads/writes past them.
 REWIND_ACTORS=32
+ANIMATION_ROOT=0xf4e1a0
+ACTOR_TREES=0x4560000
+# These two references use the native animation-global root, unlike snapshot
+# references based on level. Relocations must preserve that distinct base.
+NON_RIP_BASES={0x132000:ANIMATION_ROOT,0x13201e:ANIMATION_ROOT}
 
 def prepare(pe):
  image,meta=previous(pe);base=pe.OPTIONAL_HEADER.ImageBase
@@ -88,8 +93,14 @@ def prepare(pe):
  for at in (0x12c6d6,0x12c740):rip(at,biased,'expanded temporary animation biased base')
  rip(0x12c747,TEMP,'expanded temporary animation first pointer')
  for at in (0x12c6f5,0x12c70c,0x12c75c):disp(at,FLAGS-biased,'expanded temporary animation occupancy')
- for at in (0x12c6d0,0x12c6ef,0x170cdf):rip(at,CURSOR,'expanded temporary animation ring cursor')
- for at in (0x131eae,0x13229f,0x132dde):rip(at,TEMP+8,'expanded temporary animation users')
+ for at in (0x12c6d0,0x12c6ef,0x12c715,0x170cdf):rip(at,CURSOR,'expanded temporary animation ring cursor')
+ # 0xf50b48 also names the one-past-end entity-number field of the unchanged
+ # 64-corpse array. Its three search bounds are NOT temporary tree users.
+ # Leave 0x131eae, 0x13229f and 0x132dde at their original native addresses.
+ for at in NON_RIP_BASES:
+  i=ins(at)
+  if not any(o.type==X86_OP_MEM and o.mem.base==X86_REG_RSI and o.mem.disp==0x1ea0 for o in i.operands):raise ValueError(f'Unexpected native corpse tree swap {at:x}')
+  disp(at,ACTOR_TREES-ANIMATION_ROOT,'expanded actor-to-corpse animation tree ownership swap')
  for at in (0x170cb3,0x171134,0x17519c):rip(at,TEMP,'expanded temporary animation lifetime')
  for at in (0x170cba,0x17113b,0x1751a3):imm(at,TEMP_COUNT,'expanded temporary animation lifecycle count')
  i=ins(0x12c6e8);relay(0x12c6e5,0x12c6ec-0x12c6e5,b'\x81\xfa'+struct.pack('<I',TEMP_COUNT)+bytes(i.bytes),'expanded temporary animation cursor wrap')
@@ -180,8 +191,9 @@ def runtime_plan(pe,image,meta):
      if target>=0x4000000 or a>=0x4000000:fixups.append({'offset':at-a+i.disp_offset,'width':4,'target':target,'end':at+i.size,'relative':True})
     elif o.type==X86_OP_MEM and o.mem.base!=X86_REG_RIP:
      # level-relative maps/corpse caches and image-relative handle conversion.
-     target=o.mem.disp+(0xd96e70 if 0x3000000<o.mem.disp<0x4000000 else 0)
-     if 0x4000000<=target<0x4800000:fixups.append({'offset':at-a+i.disp_offset,'width':4,'target':target,'end':0xd96e70 if target!=o.mem.disp else 0,'relative':False})
+     root=NON_RIP_BASES.get(at,0xd96e70 if 0x3000000<o.mem.disp<0x4000000 else 0)
+     target=o.mem.disp+root
+     if 0x4000000<=target<0x4800000:fixups.append({'offset':at-a+i.disp_offset,'width':4,'target':target,'end':root,'relative':False})
     elif o.type==X86_OP_IMM and (i.mnemonic=='call' or i.mnemonic.startswith('j')):
      target=o.imm-base
      if target>=0x4000000 or a>=0x4000000:fixups.append({'offset':at-a+i.imm_offset,'width':i.imm_size,'target':target,'end':at+i.size,'relative':True})

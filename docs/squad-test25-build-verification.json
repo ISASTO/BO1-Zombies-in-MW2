@@ -1,0 +1,69 @@
+{
+  "version": "0.1.24-squad-test25",
+  "dll_sha256": "f6501813cdfec98edc4b2fd599ab2249fba75676e6c0521c89fe87827842de6c",
+  "dll_bytes": 5260822,
+  "architecture": "AMD64",
+  "imports": [
+    "bcrypt.dll",
+    "dbghelp.dll",
+    "gdi32.dll",
+    "kernel32.dll",
+    "msvcrt.dll",
+    "user32.dll",
+    "winmm.dll"
+  ],
+  "exports": [
+    "D3DPERF_BeginEvent",
+    "D3DPERF_EndEvent",
+    "D3DPERF_GetStatus",
+    "D3DPERF_QueryRepeatFrame",
+    "D3DPERF_SetMarker",
+    "D3DPERF_SetOptions",
+    "D3DPERF_SetRegion",
+    "DebugSetMute",
+    "Direct3DCreate9",
+    "Direct3DCreate9Ex"
+  ],
+  "aslr": true,
+  "nx": true,
+  "cpp_suites_passed": 18,
+  "python_tests_passed": 31,
+  "experimental_live_actor_capacity": 256,
+  "native_sentient_capacity": 274,
+  "native_corpse_capacity": 64,
+  "checked_runtime_patches": 243,
+  "native_animation_regression": {
+    "distinct_simultaneous_scratch_trees": 336,
+    "native_tree_release_recycles": 1000,
+    "bounded_corpse_search_cases": 195,
+    "native_actor_corpse_tree_swaps": 256,
+    "packed_metadata_not_used_as_tree": true,
+    "unrelated_corpse_metadata_preserved": true,
+    "live_actor_capacity": 256,
+    "corpse_capacity": 64,
+    "booted_renderer_tested": false
+  },
+  "guarded_native_iterator_cases": 2052,
+  "native_rewind_history_actor_slots": 32,
+  "returned_crash_evidence": "runtime-test25-crash-evidence.json",
+  "expanded_runtime_regression": "expanded-runtime-test25-probe.json",
+  "history_regression": "history-test25-probe.json",
+  "iterator_regression": "iterator-test25-probe.json",
+  "retail_execution": "Native addressing and ownership defects reproduce and corrections pass. Real skeleton rendering, complete error/shutdown crash chains and crowded Windows gameplay require owner retesting.",
+  "crash_only_engine_error_capture": {
+    "verified_formatter_destination": "0x13261a0",
+    "verified_formatter_bytes": 4096,
+    "minidump_region": "0x1326100 + 0x1100",
+    "no_new_native_hook": true,
+    "no_per_frame_work": true
+  },
+  "installer_fixture": {
+    "powershell_parser": "pass",
+    "packaged_payload_install": "pass",
+    "version_and_sha256": "pass",
+    "player_save_backup": "pass",
+    "mp_iwi_extraction_from_local_fixture": "pass",
+    "retail_executed": false,
+    "packaged_uninstall": "pass"
+  }
+}
