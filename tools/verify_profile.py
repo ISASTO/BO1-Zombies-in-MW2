@@ -102,6 +102,8 @@ EXTRA_REFERENCES.update({
     'kAiEnemySetterStartPattern': [],
 })
 EXTRA_REFERENCES['kAiSpawnTargetnamePattern'] = []
+EXTRA_REFERENCES['kHeldFireModePattern'] = []
+EXTRA_REFERENCES['kSemiAutoFireGatePattern'] = []
 EXTRA_NAMES.update({
     'kAiSpawnEnabledRegistrationPattern': [6, 'g_spawnai'],
     'kAiSpawnDisabledRegistrationPattern': [2, 'ai_disableSpawn'],
@@ -164,6 +166,9 @@ def verify(path, header):
                        'kJumpClampPattern','kJumpStepPattern','kJumpCeilingPattern'}
     if set(result['signatures']) != wanted_patterns | set(EXTRA_REFERENCES):
         raise ValueError('The supported profile has missing or unexpected signature definitions')
+    for name,rva in (('kHeldFireModePattern',0x83f90),('kSemiAutoFireGatePattern',0x7f49a)):
+        if result['signatures'][name]['match_rva']!=hex(rva):
+            raise ValueError('Native held-shot and semi-auto mode gates disagree')
     # Independent registration constants and the native camera's four-byte read.
     fov_layout = header.with_name('fov_preferences.hpp').read_text()
     default = int(re.search(r'kDefaultFov = (\d+)', fov_layout)[1])

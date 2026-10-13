@@ -2,6 +2,8 @@
 #include <cstdint>
 #include <optional>
 #include <vector>
+#include <array>
+#include <cstring>
 
 namespace mod::expansion {
 // Experimental layout used by the isolated native prototype, not the DLL.
@@ -31,5 +33,28 @@ inline std::vector<SaveField> ExpandedSaveFields(const std::vector<SaveField>& o
     }
     for(std::size_t n=0;n<kSentients;++n)out.push_back({kPerceptionStart+n*kRecordBytes+40,14,0});
     out.push_back({});return out;
+}
+// Discriminator for an expanded population chunk. Engine checkpoint integration
+// must route this chunk separately from stock 32/50 streams before activation.
+struct PopulationChunkHeader {
+    std::array<char,8> magic{'B','O','1','M','W','2','A','I'};
+    std::uint32_t version=1,actors=kActors,sentients=kSentients;
+    std::uint32_t actorStride=kStride,sentientStride=kSentientStride,reserved=0;
+};
+static_assert(sizeof(PopulationChunkHeader)==32);
+inline bool SupportedPopulationChunk(const PopulationChunkHeader& h) {
+    const PopulationChunkHeader expected;
+    return h.magic==expected.magic && h.version==expected.version && h.actors==kActors && h.sentients==kSentients
+        && h.actorStride==kStride && h.sentientStride==kSentientStride && !h.reserved;
+}
+inline bool MigrateLegacyActor(const void* legacy,std::size_t bytes,void* expanded,std::size_t capacity) {
+    if(!legacy || !expanded || bytes<0x1558 || capacity<kStride)return false;
+    const auto source=reinterpret_cast<std::uintptr_t>(legacy),destination=reinterpret_cast<std::uintptr_t>(expanded);
+    if((destination>=source && destination-source<0x1558) || (source>=destination && source-destination<kStride))return false;
+    std::memset(expanded,0,kStride);
+    std::memcpy(expanded,legacy,0x1558);
+    std::memcpy(static_cast<std::uint8_t*>(expanded)+kPerceptionStart,
+        static_cast<const std::uint8_t*>(legacy)+0x348,50*kRecordBytes);
+    return true;
 }
 } // namespace mod::expansion

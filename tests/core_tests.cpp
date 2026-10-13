@@ -86,12 +86,13 @@ int main() {
     m.input(Input::Back);
     Check(m.page==Page::Home && m.selected==4, "second back returns to remembered home category");
     m.page=Page::AI; m.selected=0;
-    Check(m.count()==11 && m.input(Input::Select)==Action::SpawnAiEnemy,"native enemy request routing");
+    Check(m.count()==12 && m.input(Input::Select)==Action::SpawnAiEnemy,"native enemy request routing");
     m.input(Input::Down); Check(m.input(Input::Select)==Action::SpawnAiFriendly,"native friendly request routing");
     m.input(Input::Down); Check(m.input(Input::Right)==Action::NextEnemySpawner && m.input(Input::Left)==Action::PreviousEnemySpawner,"enemy template arrows");
     m.input(Input::Down); Check(m.input(Input::Right)==Action::NextFriendlySpawner,"friendly template arrows");
     m.input(Input::Down); Check(m.input(Input::Select)==Action::ToggleAiSpawnPause,"native spawn pause routing");
     m.input(Input::Down); Check(m.input(Input::Select)==Action::ToggleFreezeAI,"shared AI freeze state");
+    m.input(Input::Down); Check(m.input(Input::Select)==Action::ToggleInvincibleFriendlies,"spawned ally protection has its own AI row");
     m.input(Input::Down); Check(m.input(Input::Select)==Action::None,"native actor counts read-only");
     m.input(Input::Down); Check(m.input(Input::Select)==Action::None,"ownership count read-only");
     m.input(Input::Down); Check(m.input(Input::Select)==Action::RemoveSpawnedAi && m.firstVisibleRow()==0,"owned-only cleanup routing");

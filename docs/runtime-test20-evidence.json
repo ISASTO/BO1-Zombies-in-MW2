@@ -1,0 +1,21 @@
+{
+  "archive_sha256": "9be8abb46f8a52db8ff1a68bf081319c8bef2b68349b89b9d3fffe06ba3152b1",
+  "source_archive": "BO1MW2-startup-results-20261013-080345-d503a8ef.zip",
+  "observed_version": "0.1.19-squad-test20",
+  "installed_dll_sha256": "5cf3073e1573ffa998c4fd3cb7cf91abdde1738d3e14dbd2631daa4894e4276d",
+  "clock_timezone": "America/Chicago",
+  "run_start": "07:49:40.670",
+  "run_last_log": "08:03:32.430",
+  "latest_crash_in_archive": "20261013-070134",
+  "crash_in_observed_test20_run": false,
+  "owner_report": "No more crashes in relatively extreme scenarios",
+  "final_ai_combat": "AI_COMBAT_STATS killed=43 campaign_reclaimed=120 character_loaded=1 scheduler=SERVER_CLOCK",
+  "final_ai_state": "AI_STATE resolved=1 ready=1 hook=1 callbacks=15705 native_thread=41608 enemies=0 friendly=2 other=0 actor_count=2 enemy_spawner=2/11 friendly_spawner=2/5 debug_owned=15 pending=0 spawn_paused=0 requested_pause=0 result=CREATED created=278 deleted=148",
+  "final_ai_performance": "AI_PERF service_updates=14061 service_average_us=759.5 service_peak_us=5746.3 world_reads=1866 world_average_us=381.3 world_peak_us=839.4 max_npcs_per_tick=4 recovery_pending=0 reassertions=3745 render_world_reads=0 disk_flush=CRASH_ONLY",
+  "final_world_scan_performance": "AI_SCAN_PERF last_pool_us=47.5 last_decode_us=194.9 last_sort_us=58.2 kernel_reads_per_scan=0.0 image_reads_per_scan=85.2 name_cache_hits=703233 name_cache_misses=1750",
+  "checkpoint_write_events": 24,
+  "maximum_heartbeat_actor_count": 32,
+  "ownership_marker_assignments_logged": 556,
+  "all_marker_assignments_avoid_temporary_release": true,
+  "captured_crash_scope": "Historical dumps retained in the ZIP; the newest is before the observed Test20 run."
+}

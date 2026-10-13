@@ -75,6 +75,13 @@ def verify(path, header):
     # a percentage/100 multiply using exactly those same fields.
     controls=(header.parent/'control_extensions.hpp').read_text()
     def control(name):return int(re.search(r'\b'+name+r'\s*=\s*(0x[0-9a-f]+|\d+)',controls)[1],0)
+    fire_mode=control('kWeaponFireMode')
+    if pe.get_data(0x83f90,7)!=bytes.fromhex('44 8b 4a')+bytes([fire_mode])+bytes.fromhex('4c 8b d1'):
+        raise ValueError('Native held-shot firing-mode field disagrees')
+    if pe.get_data(0x7f49a,6)!=bytes.fromhex('83 7a')+bytes([fire_mode])+bytes.fromhex('00 74 2a'):
+        raise ValueError('Independent semi-auto repeat gate disagrees')
+    if pe.get_data(0x16833b,7)!=bytes.fromhex('44 8b a3 64 01 00 00') or pe.get_data(0x168355,6)!=bytes.fromhex('89 83 64 01 00 00'):
+        raise ValueError('Native actor damage health field disagrees')
     flags=control('kClientWeaponFlags');scale=control('kClientRecoilScale');mask=control('kRecoilScaleFlag')
     if pe.get_data(0x16355a,16)!=b'\x81\x8b'+struct.pack('<II',flags,mask)+b'\x89\xbb'+struct.pack('<I',scale):
         raise ValueError('Native recoil on setter disagrees')
@@ -110,11 +117,14 @@ def verify(path, header):
             'enemy_handle_field':'sentient+0x44, low WORD native entity-number+1',
             'player_recoil_flags':hex(flags),'player_recoil_scale':hex(scale),'player_recoil_mask':hex(mask),
             'player_recoil_percent_denominator':100.0,'player_recoil_target_percent':0,
+            'weapon_fire_mode_field':hex(fire_mode),'semi_auto_mode':1,'automatic_mode':0,
+            'held_shot_gate_rva':'0x83f90','independent_semi_auto_gate_rva':'0x7f49a',
+            'actor_damage_health_field':'0x164','feedback':'Actual health loss, same allocation and player attacker only',
             'empty_attachment_tag_constant_rva':hex(empty),'empty_attachment_tag_is_valid':True,
             'hook_publication':'Clock call publishes first; remaining hooks publish on the next server-clock callback.',
             'native_reentrancy':'Recursive ownership lock, snapshot iteration and deferred cleanup prevent NPC freeing during active native mod calls.',
             'retail_execution':'Not executed in this Linux environment; owner test required.',
-            'actor_capacity':32,'actor_capacity_expansion':'Test17 256-slot preflight is blocked; see actor-capacity-test17-evidence.json.'}
+            'actor_capacity':32,'actor_capacity_expansion':'Test21 separate 256/274 lifecycle/population probe; snapshot clients and full engine checkpoint routing remain gated.'}
 
 
 if __name__=='__main__':

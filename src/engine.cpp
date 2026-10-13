@@ -34,7 +34,7 @@ struct Profile {
     bool gravityResolved=false, weaponResolved=false, grenadeSustainResolved=false;
     std::uintptr_t dualSlot=0;
     bool dualResolved=false,inventoryResolved=false,dualAnimResolved=false;
-    bool recoilResolved=false;
+    bool recoilResolved=false,fireModeResolved=false;
     bool friendlyFireResolved=false;
     std::uintptr_t friendlyFireDistanceSlot=0,friendlyFireScaleSlot=0;
     std::uintptr_t weaponAnimCache=0;
@@ -65,6 +65,7 @@ struct FeatureRuntime {
     ScalarOwnership<float> time, gravity, friendlyFireDistance, friendlyFireScale;
     ScalarOwnership<float> gravityLiteral;
     RapidOwnership rapid;
+    FireModeOwnership fireMode;
     ScalarOwnership<int> recoilScale;
     ScalarOwnership<unsigned> recoilFlag;
     unsigned recoilSuspensions=0;
@@ -267,6 +268,7 @@ WeaponFields ReadWeapon(unsigned index,bool requireTiming=true) {
         || !ReadValue(w.definition+kWeaponType,w.type) || w.type<0 || w.type>6) return w;
     for (const unsigned char* c=reinterpret_cast<const unsigned char*>(w.name);*c;++c)
         if (*c<32 || *c>126) return w;
+    if(profile.fireModeResolved && (!ReadValue(w.definition+kWeaponFireMode,w.fireMode) || w.fireMode<0 || w.fireMode>5))w.fireMode=-1;
     w.valid=true; return w;
 }
 WeaponCandidate ReadCandidateRaw(unsigned index) {
@@ -569,6 +571,7 @@ void ApplyDual(const Snapshot& s) {
     }
 }
 void RestoreRapid();
+void RestoreFireMode();
 void ApplyBool(ScalarOwnership<std::uint8_t>&,const BoolDvarSnapshot&,bool,std::uint8_t,const char*);
 void UpdateWeaponInventory(Snapshot& s) {
     const bool give=features.extra.wanted(ExtraFeature::GiveAll),dual=features.extra.wanted(ExtraFeature::ForceDualWield);
@@ -587,7 +590,7 @@ void UpdateWeaponInventory(Snapshot& s) {
         s=ReadSnapshot();
     }
     else if (give && s.inventoryValid && (!features.inventory.owned || features.inventory.page!=features.weaponBank)) {
-        RestoreRapid(); RestoreDual(s);
+        RestoreRapid(); RestoreFireMode(); RestoreDual(s);
         if (features.dualAsset.active || HasDualPlayerEdits(features.dualSlots,features.dualAmmo,features.lastHand.owned)) return;
         if (features.inventory.owned && !RestoreInventory(ReadSnapshot())) return;
         s=ReadSnapshot(); if (!s.inventoryValid) return;
@@ -728,6 +731,25 @@ void RestoreRapid() {
         features.rapid.clear();
     }
 }
+void RestoreFireMode() {
+    if(!features.fireMode.owned)return;
+    const auto w=ReadWeapon(features.fireMode.identity.index,false);
+    if(!features.fireMode.canRestore(w))features.fireMode.clear();
+    else if(SetInt(w.definition+kWeaponFireMode,w.fireMode,features.fireMode.original)) {
+        Log("WEAPON_RESTORE SEMI_AUTO_FULL_AUTO index=%u name=%s mode=%d",w.index,w.name,features.fireMode.original);
+        features.fireMode.clear();
+    }
+}
+void UpdateFireMode(const Snapshot& s) {
+    const bool enabled=features.extra.wanted(ExtraFeature::SemiAutoFullAuto) && ExtraAvailable(s,ExtraFeature::SemiAutoFullAuto);
+    if(!enabled || (features.fireMode.owned && !features.fireMode.sameIdentity(s.weapon)))RestoreFireMode();
+    if(enabled && s.weapon.fireMode==kSemiAutomaticFireMode
+        && (!features.fireMode.owned || features.fireMode.sameIdentity(s.weapon))
+        && SetInt(s.weapon.definition+kWeaponFireMode,kSemiAutomaticFireMode,kAutomaticFireMode)) {
+        features.fireMode.applied(s.weapon);
+        Log("WEAPON_APPLY SEMI_AUTO_FULL_AUTO index=%u name=%s mode_before=1 mode_after=0 native_timing=RETAINED",s.weapon.index,s.weapon.name);
+    }
+}
 void UpdateRecoil(const Snapshot& s,bool enabled) {
     auto& scale=features.recoilScale;auto& flag=features.recoilFlag;
     const auto scaleAt=s.client.address+kClientRecoilScale,flagAt=s.client.address+kClientWeaponFlags;
@@ -778,17 +800,20 @@ void ApplyFloat(ScalarOwnership<float>& owned,const FloatDvarSnapshot& s,bool en
 }
 void RestoreExtras() {
     SetAllowFriendlyFire(false);
+    SetHitmarkers(false);
+    SetSpawnedFriendliesInvincible(false);
     RestoreDualAsset(); features.dualReady=false;
     ApplyBool(features.giveAll,ReadBoolDvar(profile.giveAllSlot,profile.giveAllResolved,"g_giveAll"),false,1,"GIVE_ALL_LOADED");
     ApplyBool(features.dual,ReadBoolDvar(profile.dualSlot,profile.dualResolved,"bg_forceDualWield"),false,1,"FORCE_DUAL_WIELD");
     ApplyBool(features.explosive,ReadBoolDvar(profile.explosiveSlot,profile.explosiveResolved,"bg_forceExplosiveBullets"),false,1,"EXPLOSIVE_BULLETS");
     ApplyBool(features.ai,ReadBoolDvar(profile.aiSlot,profile.aiResolved,"g_ai"),false,0,"FREEZE_AI");
-    ApplyFloat(features.time,ReadFloatDvar(profile.timeSlot,profile.timeResolved,"timescale",.001f,1000.f),false,1.f,"SLOW_MOTION");
+    ApplyFloat(features.time,ReadFloatDvar(profile.timeSlot,profile.timeResolved,"timescale",.001f,1000.f),false,1.f,"WORLD_SPEED");
     ApplyFloat(features.gravity,ReadFloatDvar(profile.gravitySlot,profile.gravityResolved,"g_gravity",0.f,10000.f),false,800.f,"GRAVITY");
     ApplyFloat(features.friendlyFireDistance,ReadFloatDvar(profile.friendlyFireDistanceSlot,profile.friendlyFireResolved,"g_friendlyfireDist",0.f,100000.f),false,0.f,"FRIENDLY_FIRE_AIM_BLOCK");
     ApplyFloat(features.friendlyFireScale,ReadFloatDvar(profile.friendlyFireScaleSlot,profile.friendlyFireResolved,"g_friendlyfireDamageScale",0.f,1.f),false,1.f,"FRIENDLY_FIRE_DAMAGE_SCALE");
     RestoreGravityLiteral();
     RestoreRapid();
+    RestoreFireMode();
     features.recoilScale.clear();features.recoilFlag.clear();
 }
 }
@@ -980,6 +1005,10 @@ void InitializeEngine() {
         const auto recoilOn=Unique(text,start,"native recoil scale on","81 8B BC 02 00 00 00 04 00 00 89 BB 98 AC 00 00");
         const auto recoilOff=Unique(text,start,"native recoil scale off","81 A0 BC 02 00 00 FF FB FF FF");
         profile.recoilResolved=recoilOn==profile.base+0x16355a && recoilOff==profile.base+0x1635c3;
+        const auto heldMode=Unique(text,start,"native held-shot mode gate",kHeldFireModePattern);
+        const auto semiGate=Unique(text,start,"independent semi-auto repeat gate",kSemiAutoFireGatePattern);
+        profile.fireModeResolved=profile.weaponResolved && heldMode==profile.base+0x83f90 && semiGate==profile.base+0x7f49a;
+        Log("WEAPON_FIRE_MODE resolved=%d field=0x64 single=1 automatic=0",profile.fireModeResolved);
         const auto dual=Unique(text,start,"dual wield registration",kDualRegistrationPattern);
         const auto dualRead=Unique(text,start,"dual wield hand selection",kDualConsumerPattern);
         if (dual && dualRead && Anchor(dual,7,"bg_forceDualWield")) {
@@ -1124,6 +1153,7 @@ bool AdjustPlayerFeature(PlayerFeature feature,int direction) {
 }
 ExtraPreferences GetExtraPreferences() { std::lock_guard<std::mutex> lock(featuresMutex); return features.extra; }
 bool RapidFireApplied(const WeaponFields& weapon) { std::lock_guard<std::mutex> lock(featuresMutex); return features.rapid.canRestore(weapon); }
+bool SemiAutoApplied(const WeaponFields& weapon) { std::lock_guard<std::mutex> lock(featuresMutex); return features.fireMode.canRestore(weapon); }
 WeaponModeStatus GetWeaponModeStatus() {
     std::lock_guard<std::mutex> lock(featuresMutex);
     const bool dualOwned=features.dual.owned || features.dualAsset.active || HasDualPlayerEdits(features.dualSlots,features.dualAmmo,features.lastHand.owned);
@@ -1147,9 +1177,11 @@ bool ExtraAvailable(const Snapshot& s,ExtraFeature feature) {
         case ExtraFeature::GiveAll: return s.giveAll.valid && s.inventoryValid;
         case ExtraFeature::RapidFire: return s.weapon.valid && s.weapon.type==0 && s.weapon.fireTime>=1 && s.weapon.fireTime<=4000;
         case ExtraFeature::NoRecoil: return s.recoilValid;
+        case ExtraFeature::Hitmarkers: case ExtraFeature::InvincibleFriendlies: return NativeDamageHookReady();
+        case ExtraFeature::SemiAutoFullAuto: return s.weapon.valid && s.weapon.type==0 && s.weapon.fireMode>=0 && s.weapon.fireMode<=5;
         case ExtraFeature::FriendlyFire: return s.friendlyFireDistance.valid && s.friendlyFireScale.valid && FriendlyFireHookReady();
         case ExtraFeature::ExplosiveBullets: return s.explosive.valid;
-        case ExtraFeature::SlowMotion: return s.timeScale.valid;
+        case ExtraFeature::WorldSpeed: return s.timeScale.valid;
         case ExtraFeature::FreezeAI: return s.ai.valid;
         case ExtraFeature::Gravity: return s.gravity.valid && s.gravityLiteralValid && s.playerGravityRead;
         case ExtraFeature::ForceDualWield: return profile.dualAnimResolved && s.dualWield.valid && s.inventoryValid;
@@ -1169,6 +1201,8 @@ bool ToggleExtraFeature(ExtraFeature feature) {
     }
     features.extra.toggle(feature); features.nextUpdate=0;
     if(feature==ExtraFeature::FriendlyFire)SetAllowFriendlyFire(features.extra.wanted(feature));
+    if(feature==ExtraFeature::Hitmarkers)SetHitmarkers(features.extra.wanted(feature));
+    if(feature==ExtraFeature::InvincibleFriendlies)SetSpawnedFriendliesInvincible(features.extra.wanted(feature));
     if (feature==ExtraFeature::GiveAll) features.inventoryNeedsBaseline=false;
     Log("EXTRA_REQUEST %s %s",ExtraName(feature),features.extra.wanted(feature)?"ON":"OFF"); return true;
 }
@@ -1182,7 +1216,7 @@ bool AdjustExtraFeature(ExtraFeature feature,int direction) {
 void ResetWeaponFeatures() {
     std::lock_guard<std::mutex> lock(featuresMutex);
     features.extra.resetWeapons(); features.preferences.enabled[static_cast<std::size_t>(PlayerFeature::InfiniteAmmo)]=false; features.preferences.enabled[static_cast<std::size_t>(PlayerFeature::NoReload)]=false;
-    features.clearSustain=true; features.nextUpdate=0; RestoreRapid();
+    features.clearSustain=true; features.nextUpdate=0; RestoreRapid(); RestoreFireMode(); SetHitmarkers(false);
     UpdateRecoil(ReadSnapshot(),false);
     Log("EXTRA_REQUEST RESET_WEAPONS linked_no_reload=OFF saved_fov_unchanged=1");
 }
@@ -1224,7 +1258,7 @@ void UpdatePlayerFeatures(ULONGLONG now) {
         if (features.dualClient!=s.client.address || std::strcmp(features.dualMap,s.map)!=0) {
             features.dualSlots={}; features.dualAmmo={}; features.lastHand.clear();
         }
-        RestoreRapid();
+        RestoreRapid(); RestoreFireMode();
         InvalidateCandidates(); s=ReadSnapshot();
         features.ammo.clear();
         features.clearInvulnerability=true;
@@ -1328,11 +1362,13 @@ void UpdatePlayerFeatures(ULONGLONG now) {
     }
     ApplyBool(features.explosive,s.explosive,features.extra.wanted(ExtraFeature::ExplosiveBullets),1,"EXPLOSIVE_BULLETS");
     ApplyBool(features.ai,s.ai,features.extra.wanted(ExtraFeature::FreezeAI),0,"FREEZE_AI");
-    ApplyFloat(features.time,s.timeScale,features.extra.wanted(ExtraFeature::SlowMotion),features.extra.timeScale,"SLOW_MOTION");
+    ApplyFloat(features.time,s.timeScale,features.extra.wanted(ExtraFeature::WorldSpeed),features.extra.timeScale,"WORLD_SPEED");
     const bool friendlyFire=features.extra.wanted(ExtraFeature::FriendlyFire) && ExtraAvailable(s,ExtraFeature::FriendlyFire);
     SetAllowFriendlyFire(friendlyFire);
     ApplyFloat(features.friendlyFireDistance,s.friendlyFireDistance,friendlyFire,0.f,"FRIENDLY_FIRE_AIM_BLOCK");
     ApplyFloat(features.friendlyFireScale,s.friendlyFireScale,friendlyFire,1.f,"FRIENDLY_FIRE_DAMAGE_SCALE");
+    SetHitmarkers(features.extra.wanted(ExtraFeature::Hitmarkers) && ExtraAvailable(s,ExtraFeature::Hitmarkers));
+    SetSpawnedFriendliesInvincible(features.extra.wanted(ExtraFeature::InvincibleFriendlies) && ExtraAvailable(s,ExtraFeature::InvincibleFriendlies));
     if (ExtraAvailable(s,ExtraFeature::Gravity)) {
         const bool enabled=features.extra.wanted(ExtraFeature::Gravity);
         ApplyFloat(features.gravity,s.gravity,enabled,static_cast<float>(features.extra.gravity),"GRAVITY");
@@ -1342,6 +1378,7 @@ void UpdatePlayerFeatures(ULONGLONG now) {
     auto held=s; // Bank changes refresh s; only the held timing needs a live read.
     unsigned current=0;
     if (ReadValue(s.client.address+kCurrentWeapon,current)) held.weapon=ReadWeapon(current);
+    UpdateFireMode(held);
     const bool rapid=features.extra.wanted(ExtraFeature::RapidFire);
     if (!rapid || !ExtraAvailable(held,ExtraFeature::RapidFire) || (features.rapid.owned && !features.rapid.sameIdentity(held.weapon))) RestoreRapid();
     // If restoring the previous asset must retry, keep its ownership record

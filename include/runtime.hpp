@@ -89,6 +89,7 @@ void ResetWeaponFeatures();
 void ResetWorldFeatures();
 void SuspendRecoilForCheckpoint(bool suspend);
 bool RapidFireApplied(const WeaponFields& weapon);
+bool SemiAutoApplied(const WeaponFields& weapon);
 struct WeaponModeStatus {
     bool owned=false; int page=0,pages=1,added=0;
     bool dualOwned=false,dualReady=false,dualFallback=false,reconciling=false,needsBaseline=false;
@@ -108,7 +109,11 @@ void RequestAiOperation(AiOperation operation,const Snapshot& snapshot);
 void AdjustAiSpawner(bool friendly,int direction);
 void ToggleAiSpawnPause();
 bool FriendlyFireHookReady();
+bool NativeDamageHookReady();
 void SetAllowFriendlyFire(bool enabled);
+void SetHitmarkers(bool enabled);
+void SetSpawnedFriendliesInvincible(bool enabled);
+std::uint8_t GetHitmarkerAlpha(ULONGLONG now);
 AiStatus GetAiStatus();
 void LogAiState();
 std::uint64_t RequestNativeHandDefinitions(const WeaponFields&,std::uintptr_t names,std::uintptr_t normalTree,

@@ -1,0 +1,71 @@
+{
+  "version": "0.1.20-squad-test21",
+  "dll_sha256": "21c88037f1fa9213f71b9b7b32b788d6124d553ab78e6d40bb2e23e6f83f593b",
+  "dll_size": 4619694,
+  "machine": "AMD64 PE32+",
+  "aslr_nx": true,
+  "imports": [
+    "bcrypt.dll",
+    "dbghelp.dll",
+    "gdi32.dll",
+    "kernel32.dll",
+    "msvcrt.dll",
+    "user32.dll"
+  ],
+  "exports": [
+    "D3DPERF_BeginEvent",
+    "D3DPERF_EndEvent",
+    "D3DPERF_GetStatus",
+    "D3DPERF_QueryRepeatFrame",
+    "D3DPERF_SetMarker",
+    "D3DPERF_SetOptions",
+    "D3DPERF_SetRegion",
+    "DebugSetMute",
+    "Direct3DCreate9",
+    "Direct3DCreate9Ex"
+  ],
+  "cpp_suites_passed": 17,
+  "python_fixtures_passed": 28,
+  "exact_profile_anchors": 99,
+  "native_combat_bindings": "controls-test21-native-bindings.json",
+  "native_firing_probe": "fire-mode-test21-probe.json",
+  "native_firing_cases": 530,
+  "native_expanded_lifecycle_probe": "expanded-lifecycle-test21-probe.json",
+  "native_expanded_lifecycle_results": {
+    "probe": "native expanded lifecycle and population records",
+    "native_perception_accessor_cases": 70144,
+    "native_actor_records_roundtripped": 256,
+    "native_sentient_records_roundtripped": 274,
+    "native_perception_node_pointers_roundtripped": 70144,
+    "population_chunk_bytes": 4805570,
+    "expanded_header_rejects_wrong_layout": true,
+    "native_stock_record_migration": true,
+    "native_special_victim_index": 270,
+    "native_cleanup_actor_references": 256,
+    "native_cleanup_perception_records": 256,
+    "native_high_sentient_free_reuse": true,
+    "converted_reference_heads_reset": 274,
+    "native_animation_trees_cleared": 256,
+    "substituted_dependencies": [
+      "memory stream byte transport",
+      "animation tree release recorder",
+      "following global engine teardown omitted",
+      "Test19 perception notification/profiler isolation"
+    ],
+    "full_engine_checkpoint_tested": false,
+    "client_snapshot_consumers_tested": false,
+    "runtime_expansion_enabled": false
+  },
+  "runtime_capacity": 32,
+  "expanded_population_enabled": false,
+  "ownership_reference_fix": "Test20 borrowed user-1 ownership fix unchanged; matching retail run is stable",
+  "checkpoint_format": "Runtime stock 32-actor/50-sentient format; private prototype population chunk has its own version/layout header",
+  "new_options": [
+    "Hitmarkers",
+    "Make Semi-Auto Full-Auto",
+    "Invincible Spawned Friendlies",
+    "World Speed 0.1x-10x"
+  ],
+  "feedback_performance": "Damage event checks and atomic timestamp; one marker draw; no extra periodic actor scans or per-hit disk log",
+  "retail_execution": "Returned Test20 run is stable. The new Test21 controls and full 256 engine integration are not executed in the Linux workspace."
+}

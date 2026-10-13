@@ -11,6 +11,7 @@
 #include "ai_persistence.hpp"
 #include "script_parameters.hpp"
 #include "friendly_fire.hpp"
+#include "combat_feedback.hpp"
 
 namespace mod {
 namespace {
@@ -101,6 +102,9 @@ SaveReadFn originalSaveRead=nullptr;
 SaveWriteFn originalSaveWrite=nullptr;
 DamageFn originalDamage=nullptr;
 std::atomic<bool> allowFriendlyFire{false},friendlyFireHookReady{false};
+std::atomic<bool> hitmarkersEnabled{false},invincibleFriendlies{false};
+std::atomic<ULONGLONG> lastPlayerHit{0};
+std::atomic<unsigned long long> confirmedPlayerHits{0},protectedFriendlyHits{0};
 std::atomic<bool> nativePending{false};
 std::atomic<unsigned long long> nativeCallbacks{0};
 std::atomic<DWORD> nativeThread{0};
@@ -112,28 +116,51 @@ thread_local int traceIgnoreEntity=-1;
 
 bool DamageHook(std::uintptr_t target,std::uintptr_t inflictor,std::uintptr_t attacker,const float* direction,const float* point,
     int damage,int flags,int mod,int weapon,int hitloc,int time,int surface) {
-    if(allowFriendlyFire.load(std::memory_order_relaxed) && target && attacker) {
+    const bool feedback=hitmarkersEnabled.load(std::memory_order_relaxed);
+    const bool protect=invincibleFriendlies.load(std::memory_order_relaxed);
+    const bool friendlyFire=allowFriendlyFire.load(std::memory_order_relaxed);
+    AiEntity before;
+    bool player=false;
+    if((feedback || protect || friendlyFire) && target) {
         const auto pool=aiProfile.fixedPool;
         const auto inPool=[&](std::uintptr_t at) {return at>=pool && (at-pool)%kAiEntityStride==0 && (at-pool)/kAiEntityStride<kAiEntityCapacity;};
-        if(inPool(target) && inPool(attacker) && target!=attacker) {
-            const auto e=ReadAiEntity(target,static_cast<int>((target-pool)/kAiEntityStride),[](auto at,auto out,auto size){return CheckedReadMemory(at,out,size);});
+        if(inPool(target)) {
+            before=ReadAiEntity(target,static_cast<int>((target-pool)/kAiEntityStride),[](auto at,auto out,auto size){return CheckedReadMemory(at,out,size);});
+        }
+        if(before.valid && protect) {
+            std::lock_guard<std::recursive_mutex> lock(aiMutex);
+            for(const auto& owned:ai.owned)if(ProtectSpawnedFriendly(true,owned.identity,before,ai.allyTeam)) {
+                ++protectedFriendlyHits;
+                return false;
+            }
+        }
+        if(before.valid && attacker==pool && target!=attacker) {
             std::uintptr_t client=0,sentient=0,self=0;int team=0;std::uint8_t active=0;
-            const bool player=CheckedReadMemory(attacker+kAiInUse,&active,1) && active==1
+            player=CheckedReadMemory(attacker+kAiInUse,&active,1) && active==1
                 && CheckedReadMemory(attacker+kAiClient,&client,8) && client
                 && CheckedReadMemory(attacker+kAiSentient,&sentient,8) && sentient
                 && CheckedReadMemory(sentient,&self,8) && self==attacker
                 && CheckedReadMemory(sentient+8,&team,4);
-            if(BypassFriendlyFirePenalty(true,e,player,team)) {
+            if(BypassFriendlyFirePenalty(friendlyFire,before,player,team)) {
                 // The native damage dispatcher substitutes the world entity
                 // for null attribution. Campaign damage/death callbacks then
                 // cannot count the hit as a player attack on an ally. Damage,
                 // hit location, weapon and native actor reactions still run.
                 inflictor=0;attacker=0;
-                RecordNativeOperation("FRIENDLY_DAMAGE_NEUTRAL",e.number);
+                RecordNativeOperation("FRIENDLY_DAMAGE_NEUTRAL",before.number);
             }
         }
     }
-    return originalDamage(target,inflictor,attacker,direction,point,damage,flags,mod,weapon,hitloc,time,surface);
+    const auto result=originalDamage(target,inflictor,attacker,direction,point,damage,flags,mod,weapon,hitloc,time,surface);
+    if(feedback && player && result) {
+        std::uint32_t serial=0;int health=0;
+        if(CheckedReadMemory(target+kAiUseCount,&serial,4) && CheckedReadMemory(target+kAiHealth,&health,4)
+            && ConfirmedPlayerActorHit(true,damage,before,serial,health)) {
+            lastPlayerHit.store(GetTickCount64(),std::memory_order_release);
+            ++confirmedPlayerHits;
+        }
+    }
+    return result;
 }
 
 bool ReadAi(std::uintptr_t at,void* out,std::size_t length) {
@@ -1294,7 +1321,16 @@ void ReadWorld(const Snapshot& s,const AiScope& scope) {
 } // namespace
 
 bool FriendlyFireHookReady() {return friendlyFireHookReady.load(std::memory_order_acquire);}
+bool NativeDamageHookReady() {return FriendlyFireHookReady();}
 void SetAllowFriendlyFire(bool enabled) {allowFriendlyFire.store(enabled && FriendlyFireHookReady(),std::memory_order_release);}
+void SetHitmarkers(bool enabled) {
+    hitmarkersEnabled.store(enabled && NativeDamageHookReady(),std::memory_order_release);
+    if(!enabled)lastPlayerHit.store(0,std::memory_order_release);
+}
+void SetSpawnedFriendliesInvincible(bool enabled) {invincibleFriendlies.store(enabled && NativeDamageHookReady(),std::memory_order_release);}
+std::uint8_t GetHitmarkerAlpha(ULONGLONG now) {
+    return hitmarkersEnabled.load(std::memory_order_acquire)?HitmarkerAlpha(lastPlayerHit.load(std::memory_order_acquire),now):0;
+}
 
 void InitializeAiEngine(std::uintptr_t base,std::size_t size,std::uintptr_t text,std::size_t textSize,bool supported) {
     std::lock_guard<std::recursive_mutex> lock(aiMutex);
@@ -1469,6 +1505,8 @@ void LogAiState() {
     Log("AI_PLACEMENT engine_actors=%d engine_limit=%d friendly_fallback=%d last_entity=%u last_team=%d last_position=%.1f,%.1f,%.1f last_distance=%.1f placement_attempts=%d",
         s.engineActors,s.engineLimit,s.friendlyFallback,s.lastEntity,s.lastTeam,s.lastPosition[0],s.lastPosition[1],s.lastPosition[2],s.lastSpawnDistance,s.placementAttempts);
     Log("AI_COMBAT_STATS killed=%llu campaign_reclaimed=%llu character_loaded=%d scheduler=SERVER_CLOCK",s.killed,s.reclaimed,s.characterLoaded);
+    Log("AI_DAMAGE_OPTIONS hitmarkers=%d invincible_spawned_friendlies=%d confirmed_hits=%llu protected_hits=%llu",
+        hitmarkersEnabled.load(),invincibleFriendlies.load(),confirmedPlayerHits.load(),protectedFriendlyHits.load());
     Log("AI_PERF service_updates=%llu service_average_us=%.1f service_peak_us=%.1f world_reads=%llu world_average_us=%.1f world_peak_us=%.1f max_npcs_per_tick=4 recovery_pending=%d reassertions=%llu render_world_reads=0 disk_flush=CRASH_ONLY",
         s.serviceUpdates,s.serviceAverageUs,s.servicePeakUs,s.worldReads,s.worldAverageUs,s.worldPeakUs,s.recovering,s.combatReassertions);
     Log("AI_SCAN_PERF last_pool_us=%.1f last_decode_us=%.1f last_sort_us=%.1f kernel_reads_per_scan=%.1f image_reads_per_scan=%.1f name_cache_hits=%llu name_cache_misses=%llu",

@@ -132,6 +132,25 @@ void Text(Overlay& overlay, float x, float y, float scale, D3DCOLOR color, const
         overlay.device->DrawPrimitiveUP(D3DPT_TRIANGLELIST, static_cast<UINT>(vertices.size()/3), vertices.data(), sizeof(Vertex));
     }
 }
+void DrawHitmarker(IDirect3DDevice9* device,float centerX,float centerY,float scale,std::uint8_t alpha) {
+    std::array<Vertex,24> vertices{};
+    const auto color=D3DCOLOR_ARGB(alpha,255,255,255);
+    unsigned offset=0;
+    for(float sx:{-1.f,1.f})for(float sy:{-1.f,1.f}) {
+        const float x1=centerX+sx*3.f*scale-.5f,y1=centerY+sy*3.f*scale-.5f;
+        const float x2=centerX+sx*9.f*scale-.5f,y2=centerY+sy*9.f*scale-.5f;
+        const float nx=-sy*.7f*scale,ny=sx*.7f*scale;
+        const Vertex a{x1+nx,y1+ny,0,1,color,0,0},b{x1-nx,y1-ny,0,1,color,0,0};
+        const Vertex c{x2+nx,y2+ny,0,1,color,0,0},d{x2-nx,y2-ny,0,1,color,0,0};
+        for(const auto& v:{a,b,c,c,b,d})vertices[offset++]=v;
+    }
+    device->SetTexture(0,nullptr);
+    device->SetTextureStageState(0,D3DTSS_COLOROP,D3DTOP_SELECTARG1);
+    device->SetTextureStageState(0,D3DTSS_COLORARG1,D3DTA_DIFFUSE);
+    device->SetTextureStageState(0,D3DTSS_ALPHAOP,D3DTOP_SELECTARG1);
+    device->SetTextureStageState(0,D3DTSS_ALPHAARG1,D3DTA_DIFFUSE);
+    device->DrawPrimitiveUP(D3DPT_TRIANGLELIST,8,vertices.data(),sizeof(Vertex));
+}
 const char* PageName(Page page) {
     switch (page) {
         case Page::Home: return "MOD FRAMEWORK";
@@ -150,9 +169,9 @@ const char* PageName(Page page) {
 const char* Row(Page page, int n) {
     static constexpr const char* home[] = {"PLAYER", "WEAPONS", "WORLD", "AI", "ZOMBIE MODE", "DIAGNOSTICS"};
     static constexpr const char* player[] = {"God Mode", "FOV settings", "Noclip", "Super Speed", "Super Jump", "Reset player toggles"};
-    static constexpr const char* weapons[] = {"Give All (usable banks)", "Infinite Ammo", "No Reload", "Infinite Grenades (linked)", "Rapid Fire", "Explosive Bullets", "Force Dual Wield", "No Recoil", "Weapon info to log", "Reset weapon toggles"};
-    static constexpr const char* world[] = {"Slow Motion", "Freeze AI", "Gravity", "Kill All Enemies", "Allow Friendly Fire", "Reset world toggles"};
-    static constexpr const char* ai[] = {"Spawn Enemy (nearest point)", "Spawn Friendly (near you)", "Enemy model", "Friendly model", "Pause AI spawning", "Freeze AI (linked)", "Alive enemy / friendly", "Our spawned actors", "Remove our spawned actors", "AI info to log", "Engine actor slots"};
+    static constexpr const char* weapons[] = {"Give All (usable banks)", "Infinite Ammo", "No Reload", "Infinite Grenades (linked)", "Rapid Fire", "Explosive Bullets", "Force Dual Wield", "No Recoil", "Hitmarkers", "Make Semi-Auto Full-Auto", "Weapon info to log", "Reset weapon toggles"};
+    static constexpr const char* world[] = {"World Speed", "Freeze AI", "Gravity", "Kill All Enemies", "Allow Friendly Fire", "Reset world toggles"};
+    static constexpr const char* ai[] = {"Spawn Enemy (nearest point)", "Spawn Friendly (near you)", "Enemy model", "Friendly model", "Pause AI spawning", "Freeze AI (linked)", "Invincible Spawned Friendlies", "Alive enemy / friendly", "Our spawned actors", "Remove our spawned actors", "AI info to log", "Engine actor slots"};
     static constexpr const char* zombies[] = {"Round rules preview", "Controller rehearsal", "Playable Zombies / actors"};
     static constexpr const char* diag[] = {"Status HUD", "Write State to Log"};
     static constexpr const char* rules[] = {"Preview round", "Total zombies", "Zombie health", "Simultaneous cap", "Spawn interval", "Between rounds"};
@@ -274,9 +293,12 @@ void Overlay::frame() {
         else if (action == Action::DecreaseRapidFire || action == Action::IncreaseRapidFire)
             AdjustExtraFeature(ExtraFeature::RapidFire,action==Action::IncreaseRapidFire?1:-1);
         else if (action == Action::ToggleNoRecoil) ToggleExtraFeature(ExtraFeature::NoRecoil);
+        else if (action == Action::ToggleHitmarkers) ToggleExtraFeature(ExtraFeature::Hitmarkers);
+        else if (action == Action::ToggleSemiAutoFullAuto) ToggleExtraFeature(ExtraFeature::SemiAutoFullAuto);
+        else if (action == Action::ToggleInvincibleFriendlies) ToggleExtraFeature(ExtraFeature::InvincibleFriendlies);
         else if (action == Action::ToggleExplosiveBullets) ToggleExtraFeature(ExtraFeature::ExplosiveBullets);
         else if (action == Action::ResetWeapons) ResetWeaponFeatures();
-        else if (action == Action::ToggleSlowMotion) ToggleExtraFeature(ExtraFeature::SlowMotion);
+        else if (action == Action::ToggleWorldSpeed) ToggleExtraFeature(ExtraFeature::WorldSpeed);
         else if (action == Action::ToggleFreezeAI) ToggleExtraFeature(ExtraFeature::FreezeAI);
         else if (action == Action::ToggleGravity) ToggleExtraFeature(ExtraFeature::Gravity);
         else if (action == Action::ToggleFriendlyFire) ToggleExtraFeature(ExtraFeature::FriendlyFire);
@@ -292,7 +314,7 @@ void Overlay::frame() {
         else if(action==Action::ToggleAiSpawnPause) ToggleAiSpawnPause();
         else if(action==Action::WriteAiState) LogAiState();
         else if (action == Action::DecreaseTimeScale || action == Action::IncreaseTimeScale)
-            AdjustExtraFeature(ExtraFeature::SlowMotion,action==Action::IncreaseTimeScale?1:-1);
+            AdjustExtraFeature(ExtraFeature::WorldSpeed,action==Action::IncreaseTimeScale?1:-1);
         else if (action == Action::DecreaseGravity || action == Action::IncreaseGravity)
             AdjustExtraFeature(ExtraFeature::Gravity,action==Action::IncreaseGravity?1:-1);
         else if (action == Action::WriteSnapshot) LogSnapshot();
@@ -345,15 +367,17 @@ void Overlay::frame() {
             playerPreferences.wanted(PlayerFeature::God),playerPreferences.wanted(PlayerFeature::InfiniteAmmo),
             playerPreferences.wanted(PlayerFeature::NoReload),playerPreferences.wanted(PlayerFeature::Noclip),
             playerPreferences.wanted(PlayerFeature::SuperSpeed),playerPreferences.wanted(PlayerFeature::SuperJump));
-        Log("EXTRA_PREF speed_selected=%d jump_selected=%d give_all=%d rapid_fire=%d explosive=%d slow_motion=%d time_selected=%.2f freeze_ai=%d gravity=%d gravity_selected=%d dual_wield=%d bank=%d/%d granted=%d bank_owned=%d dual_owned=%d session_only=1",
+        Log("EXTRA_PREF speed_selected=%d jump_selected=%d give_all=%d rapid_fire=%d explosive=%d world_speed=%d time_selected=%.2f freeze_ai=%d gravity=%d gravity_selected=%d dual_wield=%d bank=%d/%d granted=%d bank_owned=%d dual_owned=%d session_only=1",
             playerPreferences.speed,playerPreferences.jump,extraPreferences.wanted(ExtraFeature::GiveAll),extraPreferences.wanted(ExtraFeature::RapidFire),
-            extraPreferences.wanted(ExtraFeature::ExplosiveBullets),extraPreferences.wanted(ExtraFeature::SlowMotion),extraPreferences.timeScale,
+            extraPreferences.wanted(ExtraFeature::ExplosiveBullets),extraPreferences.wanted(ExtraFeature::WorldSpeed),extraPreferences.timeScale,
             extraPreferences.wanted(ExtraFeature::FreezeAI),extraPreferences.wanted(ExtraFeature::Gravity),extraPreferences.gravity,
             extraPreferences.wanted(ExtraFeature::ForceDualWield),weaponMode.page+1,weaponMode.pages,weaponMode.added,weaponMode.owned,weaponMode.dualOwned);
-        Log("WEAPON_OPTIONS rapid_multiplier=%d no_recoil=%d resolved=%d valid=%d native_scale=%d native_flag=%d",
-            extraPreferences.rapidFireMultiplier,extraPreferences.wanted(ExtraFeature::NoRecoil),s.recoilResolved,s.recoilValid,s.recoilScale,(s.weaponFlags&kRecoilScaleFlag)!=0);
+        Log("WEAPON_OPTIONS rapid_multiplier=%d no_recoil=%d resolved=%d valid=%d native_scale=%d native_flag=%d hitmarkers=%d semi_auto_full_auto=%d fire_mode=%d owned_mode=%d",
+            extraPreferences.rapidFireMultiplier,extraPreferences.wanted(ExtraFeature::NoRecoil),s.recoilResolved,s.recoilValid,s.recoilScale,(s.weaponFlags&kRecoilScaleFlag)!=0,
+            extraPreferences.wanted(ExtraFeature::Hitmarkers),extraPreferences.wanted(ExtraFeature::SemiAutoFullAuto),s.weapon.fireMode,SemiAutoApplied(s.weapon));
     }
-    if (!menu.visible && !menu.hud) return;
+    const auto hitAlpha=GetHitmarkerAlpha(now);
+    if (!menu.visible && !menu.hud && !hitAlpha) return;
     IDirect3DStateBlock9* state = nullptr;
     if (FAILED(device->CreateStateBlock(D3DSBT_ALL, &state)) || !state) return;
     if (FAILED(state->Capture())) { state->Release(); return; }
@@ -369,13 +393,14 @@ void Overlay::frame() {
     HRESULT sizeResult = target->GetDesc(&size); target->Release();
     if (FAILED(sizeResult) || !size.Width || !size.Height) { state->Apply(); state->Release(); return; }
     D3DVIEWPORT9 full{0,0,size.Width,size.Height,0,1}; device->SetViewport(&full);
-    if (!font && !fontAttempted) BuildFont(*this);
+    if ((menu.visible || menu.hud) && !font && !fontAttempted) BuildFont(*this);
     Configure(device);
     const float panelHeight=MenuPanelHeight(menu.count());
     const float scale=std::min(1.1f,std::min(size.Width/710.f,size.Height/(panelHeight+76.f)));
     auto rect = [&](float x,float y,float w,float h,D3DCOLOR c) { Rect(device,x*scale,y*scale,w*scale,h*scale,c); };
     auto text = [&](float x,float y,D3DCOLOR c,const char* value,float factor=.8f) { Text(*this,x*scale,y*scale,scale*factor,c,value); };
     char line[128]{};
+    if(hitAlpha)DrawHitmarker(device,size.Width*.5f,size.Height*.5f,std::clamp(size.Height/720.f,.6f,2.f),hitAlpha);
     if (menu.hud) {
         rect(12,12,446,25,D3DCOLOR_ARGB(205,7,10,6));
         std::snprintf(line,sizeof(line),"BO1MW2 | F4 | %s",StateText(s.state));
@@ -501,13 +526,15 @@ void Overlay::frame() {
                 else if (n==5) status=!ExtraAvailable(s,ExtraFeature::ExplosiveBullets)?"LOCKED":s.explosive.current?(extraPreferences.wanted(ExtraFeature::ExplosiveBullets)?"ON":"NATIVE"):(extraPreferences.wanted(ExtraFeature::ExplosiveBullets)?"WAIT":"OFF");
                 else if (n==6) status=!ExtraAvailable(s,ExtraFeature::ForceDualWield)?"LOCKED":extraPreferences.wanted(ExtraFeature::ForceDualWield)?(weaponMode.dualReady && s.dualWield.current && s.lastWeaponHand==1?(weaponMode.dualFallback?(weaponMode.nativeHandState==NativeHandBuildState::Queued?"BUILD":"COMPAT"):"ON"):s.dualCurrentSupported?"WAIT":"ON*"):weaponMode.dualOwned?"UNDO":s.dualWield.current?"NATIVE":"OFF";
                 else if (n==7) status=!ExtraAvailable(s,ExtraFeature::NoRecoil)?"LOCKED":extraPreferences.wanted(ExtraFeature::NoRecoil)?(s.recoilScale==0 && (s.weaponFlags&kRecoilScaleFlag)?"ON":"WAIT"):"OFF";
+                else if (n==8) status=!ExtraAvailable(s,ExtraFeature::Hitmarkers)?"LOCKED":extraPreferences.wanted(ExtraFeature::Hitmarkers)?"ON":"OFF";
+                else if (n==9) status=!ExtraAvailable(s,ExtraFeature::SemiAutoFullAuto)?"LOCKED":!extraPreferences.wanted(ExtraFeature::SemiAutoFullAuto)?"OFF":s.weapon.fireMode==0?"ON":s.weapon.fireMode==1?"WAIT":"ON (BURST)";
                 else status="ENTER";
             }
             else if (menu.page==Page::World) {
                 if (n==0) {
-                    const bool wanted=extraPreferences.wanted(ExtraFeature::SlowMotion);
-                    if (!ExtraAvailable(s,ExtraFeature::SlowMotion)) status="LOCKED";
-                    else { std::snprintf(value,sizeof(value),"%s %.2fx",wanted?(s.timeScale.current==extraPreferences.timeScale?"ON":"WAIT"):"OFF",extraPreferences.timeScale); status=value; }
+                    const bool wanted=extraPreferences.wanted(ExtraFeature::WorldSpeed);
+                    if (!ExtraAvailable(s,ExtraFeature::WorldSpeed)) status="LOCKED";
+                    else { std::snprintf(value,sizeof(value),"%s %.1fx",wanted?(s.timeScale.current==extraPreferences.timeScale?"ON":"WAIT"):"OFF",extraPreferences.timeScale); status=value; }
                 } else if (n==1) status=!ExtraAvailable(s,ExtraFeature::FreezeAI)?"LOCKED":!s.ai.current?(extraPreferences.wanted(ExtraFeature::FreezeAI)?"ON":"NATIVE"):(extraPreferences.wanted(ExtraFeature::FreezeAI)?"WAIT":"OFF");
                 else if (n==2) {
                     const bool wanted=extraPreferences.wanted(ExtraFeature::Gravity);
@@ -524,10 +551,11 @@ void Overlay::frame() {
                 else if(n==3) { std::snprintf(value,sizeof(value),"%d/%d",aiStatus.friendlySpawner,aiStatus.friendlySpawners); status=value; }
                 else if(n==4) status=!aiStatus.ready?"LOCKED":aiStatus.spawnPaused?(aiStatus.pauseWanted?"ON":"NATIVE"):(aiStatus.pauseWanted?"WAIT":"OFF");
                 else if(n==5) status=!ExtraAvailable(s,ExtraFeature::FreezeAI)?"LOCKED":!s.ai.current?"ON":"OFF";
-                else if(n==6) { std::snprintf(value,sizeof(value),"%d / %d",aiStatus.enemyAlive,aiStatus.friendlyAlive); status=aiStatus.ready?value:"UNKNOWN"; }
-                else if(n==7) { std::snprintf(value,sizeof(value),"%d",aiStatus.owned); status=value; }
-                else if(n==8) status=aiStatus.pending?"QUEUED":aiStatus.owned?"ENTER":"EMPTY";
-                else if(n==10) { std::snprintf(value,sizeof(value),"%d / %d",aiStatus.engineActors,kAiNativeActorCapacity); status=value; }
+                else if(n==6) status=!ExtraAvailable(s,ExtraFeature::InvincibleFriendlies)?"LOCKED":extraPreferences.wanted(ExtraFeature::InvincibleFriendlies)?"ON":"OFF";
+                else if(n==7) { std::snprintf(value,sizeof(value),"%d / %d",aiStatus.enemyAlive,aiStatus.friendlyAlive); status=aiStatus.ready?value:"UNKNOWN"; }
+                else if(n==8) { std::snprintf(value,sizeof(value),"%d",aiStatus.owned); status=value; }
+                else if(n==9) status=aiStatus.pending?"QUEUED":aiStatus.owned?"ENTER":"EMPTY";
+                else if(n==11) { std::snprintf(value,sizeof(value),"%d / %d",aiStatus.engineActors,kAiNativeActorCapacity); status=value; }
                 else status="ENTER";
             }
             else if (menu.page==Page::View) {
@@ -606,6 +634,8 @@ void Overlay::frame() {
                 "All bullet weapons, including AI. Try with God ON.",
                 "COMPAT: normal animations. BUILD: native hand setup.",
                 "Native player recoil scale is zero; OFF restores it.",
+                "Shows an X when your shot damages an actor; fades quickly.",
+                "Hold fire to repeat single shots at their native rate.",
                 "Records current weapon and new controls in latest.log.",
                 "Weapon cheats OFF, including ammo, reload and grenade sustain."
             };
@@ -622,7 +652,7 @@ void Overlay::frame() {
         }
         if (menu.page==Page::World) {
             static constexpr const char* hints[]={
-                "LEFT/RIGHT: 0.25x-1x. ENTER: ON/OFF; whole game.",
+                "LEFT/RIGHT: 0.1x-10x. ENTER: ON/OFF; whole game.",
                 "Pauses all actor thinking. Player and scripts continue.",
                 "LEFT/RIGHT: 100-1600. Player + projectile gravity.",
                 "Native damage to hostile NPCs; allies/player excluded.",
@@ -639,6 +669,7 @@ void Overlay::frame() {
                 "LEFT/RIGHT: Soldier / Ghost / Price / Soap / Roach.",
                 "Native spawn gate; existing actors still think.",
                 "Linked to WORLD Freeze AI. Spawn gate is separate.",
+                "Our living allies ignore damage, including friendly fire.",
                 "Verified live axis/allies actors; other teams excluded.",
                 "No eight-actor cap. Native pool capacity still applies.",
                 "Our NPCs and corpses; original mission NPCs remain.",

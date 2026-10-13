@@ -1,11 +1,18 @@
 # BO1 Zombies in MW2
 
 Incremental mod framework for **retail Modern Warfare 2 (2009), single player**.
-Current build: **0.1.19-squad-test20**. The owner confirms Test16's performance
+Current build: **0.1.20-squad-test21**. The owner confirms Test16's performance
 fix. Its returned world scans average 388 microseconds and peak at 942.1
 microseconds, compared with Test15's 61.6 ms average/152.9 ms peak. Test16's
 snapshot reads, name cache and checked permanent-image reads remain unchanged.
 See [Test16 runtime evidence](docs/runtime-test16-evidence.json).
+
+Test21 adds **Hitmarkers**, **Make Semi-Auto Full-Auto**, **Invincible Spawned
+Friendlies**, and **World Speed** from 0.1x to 10x. The returned Test20 run reaches
+32 active actors, records 278 creations/148 deletions and 24 checkpoint writes,
+and has no new crash. The owner confirms stability. The ownership fix and its
+existing performance protections remain in place. See [Test21 controls and
+native checks](docs/squad-test21.md).
 
 Test20 fixes a native string-reference bug in squad ownership labels. Repeated
 user-1 intern lookups return a borrowed id, but the old code released it after
@@ -13,8 +20,8 @@ assigning each entity's label. The native regression creates 32 labeled fields
 with only one remaining reference, frees their shared slot on the first cleanup,
 then shows stale releases decrementing a reused model/VM code pointer. Corrected
 assignments retain all 32 field references, survive full cleanup and repeated
-replacement cycles. This is a concrete pool-corruption fix; Windows crowded
-squad testing remains required. See [Test20 evidence](docs/squad-test20.md).
+replacement cycles. This is a concrete pool-corruption fix; the returned Test20 crowded-squad run
+and owner report now provide positive retail evidence. See [Test20 evidence](docs/squad-test20.md).
 
 Test19 addresses the returned large-squad script-stack underflow with a full
 idle VM work context, caller frame/local-state restoration, fresh target
@@ -39,12 +46,14 @@ Test17's native autosaves, saved ownership tags, validated actor/helper adoption
 after load, and recovery placement remain in place. The later returned run
 retained and restored ten spawned actors, then removed all ten successfully.
 
-**Runtime capacity remains 32.** The second 256-actor prototype appends perception
-storage and passes native allocation/iteration, all 274 perception clear/copy
-records, animation-pointer lookup, widened snapshot production through corpse
-319, converted reset and actor/sentient save-pointer round-trips. Its remaining
-consumers and complete checkpoint streams are not yet converted. The prototype
-is separate from the DLL. See [native results](docs/expanded-layout-test19-probe.json).
+**Runtime capacity remains 32.** The third prototype advances the separate
+256-actor/274-sentient layout through 64 inline perception sites, the common
+accessor, special allocation/cleanup beyond slot 49, a relocated reference-head
+array, complete native population-record serialization and all 256 animation
+cleanup entries. Native round-trips cover 70,144 perception-node pointers and a
+versioned 4.8 MB population chunk. Client snapshot representation and complete
+engine checkpoint routing remain activation requirements. No partial expansion
+is installed. See [native results](docs/expanded-lifecycle-test21-probe.json).
 The 1x-10x Rapid Fire, No Recoil and named model rows remain included.
 The owner confirms No Recoil and Kill All Enemies work.
 Ghost/Price/Soap/Roach require a matching loaded character in the current mission;
@@ -85,7 +94,7 @@ Player cheats start OFF on a full restart; explicitly saved FOV persists.
 
 `0.1.7-world-weapons-test8` adds Left/Right strengths for speed and jump, loaded
 weapon access, linked frag/flash sustain, current-gun Rapid Fire, native global
-Explosive Bullets, Slow Motion, actor-think Freeze AI and player/projectile
+Explosive Bullets, World Speed, actor-think Freeze AI and player/projectile
 Gravity. Kill All Enemies remains planned. See [test8 checks](docs/world-weapons-test8.md).
 The returned test8 run confirms adjustable movement and several world toggles,
 but the owner reports invisible/empty Give All weapons and LOCKED Rapid Fire.
@@ -202,9 +211,9 @@ Copy the log immediately after a failing run: `latest.log` is replaced on launch
 | BO1 round-rules preview | Owner test5 front-end navigation passed; normal CSV values now recovered locally and match the preview |
 | BO1 controller rehearsal | Test11 owner-accepted; simulated actors only, source-derived normal solo lifecycle and game-clock guards |
 | FOV selector and saved preference | Owner confirms test6 behavior; matching logs show load/selection/save/reset |
-| WEAPONS | Owner confirms No Recoil works in Test15. 1x-10x Rapid Fire is retained. G18 dual appearance is deferred. |
+| WEAPONS | Hitmarkers and held-fire semi-auto conversion added in Test21. No Recoil and 1x-10x Rapid Fire retained. G18 dual appearance is deferred. |
 | WORLD | Test18 fixes help-text bounds and adds player friendly-fire penalty bypass; native damage/mission behavior needs retail retest. |
-| AI | Test20 fixes premature release of shared ownership labels. Native pool-reuse and replacement regressions pass; crowded-squad retail retest is pending. Test19 context/target guards remain. Active capacity is 32. |
+| AI | Test20 crowded-squad retail run is stable. Test21 adds invincible spawned allies and advances native 256/274 cleanup/population serialization. Active capacity remains 32 pending snapshot/checkpoint integration. |
 | Kill All Enemies | Owner-confirmed working native damage call for hostile actors; allies, clients and protected entities excluded. |
 | BO1 Zombies gameplay | Planned; normal MW2 AI is not a BO1 behavior/animation/assets port. |
 

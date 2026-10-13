@@ -1,0 +1,1549 @@
+{
+  "executable_sha256": "fb7e8a987c371dea7b666091b0b9e2011c0cd9cd277b191ad453d11d557dd777",
+  "allocation_snapshot_regression": {
+    "probe": "isolated appended 256-actor native layout",
+    "native_actor_allocations": 256,
+    "native_257th_allocation_refused": true,
+    "native_ordinary_sentient_allocations": 274,
+    "native_275th_sentient_allocation_refused": true,
+    "native_iteration_visits": 256,
+    "native_perception_records_cleared": 274,
+    "native_perception_records_copied": 274,
+    "actor_tail_and_pool_guards_intact": true,
+    "native_snapshot_actor_indices": 256,
+    "native_snapshot_highest_corpse_index": 319,
+    "native_animation_pointer_lookups": 256,
+    "native_corpse_snapshot_goal_copy_verified": true,
+    "converted_reset_active_flags": 256,
+    "native_actor_pointer_roundtrips": 256,
+    "native_sentient_pointer_roundtrips": 274,
+    "expanded_perception_save_descriptors": 274,
+    "appended_perception_cleared_on_reuse": true,
+    "runtime_expansion_enabled": false,
+    "substituted_dependencies": [
+      "memset MS-ABI REP STOSB",
+      "iterator predicate records visits",
+      "perception callbacks skipped",
+      "snapshot profiler isolated"
+    ],
+    "scope": "Native routines in a private Linux MS-ABI fixture. Full checkpoint streams, snapshot consumers, all AI perception consumers and Windows gameplay are not executed."
+  },
+  "lifecycle_population_regression": {
+    "probe": "native expanded lifecycle and population records",
+    "native_perception_accessor_cases": 70144,
+    "native_actor_records_roundtripped": 256,
+    "native_sentient_records_roundtripped": 274,
+    "native_perception_node_pointers_roundtripped": 70144,
+    "population_chunk_bytes": 4805570,
+    "expanded_header_rejects_wrong_layout": true,
+    "native_stock_record_migration": true,
+    "native_special_victim_index": 270,
+    "native_cleanup_actor_references": 256,
+    "native_cleanup_perception_records": 256,
+    "native_high_sentient_free_reuse": true,
+    "converted_reference_heads_reset": 274,
+    "native_animation_trees_cleared": 256,
+    "substituted_dependencies": [
+      "memory stream byte transport",
+      "animation tree release recorder",
+      "following global engine teardown omitted",
+      "Test19 perception notification/profiler isolation"
+    ],
+    "full_engine_checkpoint_tested": false,
+    "client_snapshot_consumers_tested": false,
+    "runtime_expansion_enabled": false
+  },
+  "manifest": {
+    "previous_stage": {
+      "actor_capacity": 256,
+      "sentient_capacity": 274,
+      "actor_stride": "0x48c0",
+      "perception_base": "0x1560",
+      "snapshot_index_bits": 16,
+      "highest_corpse_index": 319,
+      "confirmed_perception_sites": [
+        "0x124822",
+        "0x12482a",
+        "0x124832",
+        "0x12d467",
+        "0x12d46f",
+        "0x12d479",
+        "0x12d481",
+        "0x12d489",
+        "0x12d491",
+        "0x12d499",
+        "0x12d4a1",
+        "0x12d4a9",
+        "0x12d4b1",
+        "0x12d4b9",
+        "0x1519af"
+      ],
+      "prototype_edits": [
+        {
+          "rva": "0x4600000",
+          "bytes": 18,
+          "role": "expanded capacity bound relay"
+        },
+        {
+          "rva": "0x12398a",
+          "bytes": 6,
+          "role": "expanded capacity bound"
+        },
+        {
+          "rva": "0x4600012",
+          "bytes": 18,
+          "role": "expanded capacity bound relay"
+        },
+        {
+          "rva": "0x123bfc",
+          "bytes": 6,
+          "role": "expanded capacity bound"
+        },
+        {
+          "rva": "0x4600024",
+          "bytes": 18,
+          "role": "expanded capacity bound relay"
+        },
+        {
+          "rva": "0x123c77",
+          "bytes": 6,
+          "role": "expanded capacity bound"
+        },
+        {
+          "rva": "0x4600036",
+          "bytes": 18,
+          "role": "expanded capacity bound relay"
+        },
+        {
+          "rva": "0x123cb7",
+          "bytes": 6,
+          "role": "expanded capacity bound"
+        },
+        {
+          "rva": "0x4600048",
+          "bytes": 18,
+          "role": "expanded capacity bound relay"
+        },
+        {
+          "rva": "0x174f7b",
+          "bytes": 10,
+          "role": "expanded capacity bound"
+        },
+        {
+          "rva": "0x460005a",
+          "bytes": 17,
+          "role": "expanded capacity bound relay"
+        },
+        {
+          "rva": "0x1ae24a",
+          "bytes": 5,
+          "role": "expanded capacity bound"
+        },
+        {
+          "rva": "0x460006b",
+          "bytes": 17,
+          "role": "expanded capacity bound relay"
+        },
+        {
+          "rva": "0x1ae7d8",
+          "bytes": 9,
+          "role": "expanded capacity bound"
+        },
+        {
+          "rva": "0x460007c",
+          "bytes": 17,
+          "role": "expanded capacity bound relay"
+        },
+        {
+          "rva": "0x1ae28f",
+          "bytes": 5,
+          "role": "expanded capacity bound"
+        },
+        {
+          "rva": "0x460008d",
+          "bytes": 17,
+          "role": "expanded capacity bound relay"
+        },
+        {
+          "rva": "0x1ae822",
+          "bytes": 9,
+          "role": "expanded capacity bound"
+        },
+        {
+          "rva": "0x460009e",
+          "bytes": 18,
+          "role": "expanded capacity bound relay"
+        },
+        {
+          "rva": "0x1b0dd4",
+          "bytes": 6,
+          "role": "expanded capacity bound"
+        },
+        {
+          "rva": "0x123986",
+          "bytes": 4,
+          "role": "expanded actor stride"
+        },
+        {
+          "rva": "0x123bf8",
+          "bytes": 4,
+          "role": "expanded actor stride"
+        },
+        {
+          "rva": "0x123c12",
+          "bytes": 4,
+          "role": "expanded actor stride"
+        },
+        {
+          "rva": "0x123c80",
+          "bytes": 4,
+          "role": "expanded actor stride"
+        },
+        {
+          "rva": "0x123cb3",
+          "bytes": 4,
+          "role": "expanded actor stride"
+        },
+        {
+          "rva": "0x174f6c",
+          "bytes": 4,
+          "role": "expanded actor stride"
+        },
+        {
+          "rva": "0x1ae27a",
+          "bytes": 4,
+          "role": "expanded actor stride"
+        },
+        {
+          "rva": "0x1239a9",
+          "bytes": 4,
+          "role": "clear complete appended actor allocation"
+        },
+        {
+          "rva": "0x123c26",
+          "bytes": 8,
+          "role": "division multiplier for 18624-byte actor"
+        },
+        {
+          "rva": "0x123c69",
+          "bytes": 1,
+          "role": "division shift for 18624-byte actor"
+        },
+        {
+          "rva": "0x1ae7bb",
+          "bytes": 8,
+          "role": "division multiplier for 18624-byte actor"
+        },
+        {
+          "rva": "0x1ae7c9",
+          "bytes": 1,
+          "role": "division shift for 18624-byte actor"
+        },
+        {
+          "rva": "0x12c779",
+          "bytes": 8,
+          "role": "division multiplier for 18624-byte actor"
+        },
+        {
+          "rva": "0x12c78e",
+          "bytes": 1,
+          "role": "division shift for 18624-byte actor"
+        },
+        {
+          "rva": "0x12c7e7",
+          "bytes": 8,
+          "role": "division multiplier for 18624-byte actor"
+        },
+        {
+          "rva": "0x12c7f5",
+          "bytes": 1,
+          "role": "division shift for 18624-byte actor"
+        },
+        {
+          "rva": "0x12c819",
+          "bytes": 8,
+          "role": "division multiplier for 18624-byte actor"
+        },
+        {
+          "rva": "0x12c827",
+          "bytes": 1,
+          "role": "division shift for 18624-byte actor"
+        },
+        {
+          "rva": "0x124826",
+          "bytes": 4,
+          "role": "appended perception record"
+        },
+        {
+          "rva": "0x12482e",
+          "bytes": 4,
+          "role": "appended perception record"
+        },
+        {
+          "rva": "0x124836",
+          "bytes": 4,
+          "role": "appended perception record"
+        },
+        {
+          "rva": "0x12d46b",
+          "bytes": 4,
+          "role": "appended perception record"
+        },
+        {
+          "rva": "0x12d473",
+          "bytes": 4,
+          "role": "appended perception record"
+        },
+        {
+          "rva": "0x12d47d",
+          "bytes": 4,
+          "role": "appended perception record"
+        },
+        {
+          "rva": "0x12d485",
+          "bytes": 4,
+          "role": "appended perception record"
+        },
+        {
+          "rva": "0x12d48d",
+          "bytes": 4,
+          "role": "appended perception record"
+        },
+        {
+          "rva": "0x12d495",
+          "bytes": 4,
+          "role": "appended perception record"
+        },
+        {
+          "rva": "0x12d49d",
+          "bytes": 4,
+          "role": "appended perception record"
+        },
+        {
+          "rva": "0x12d4a5",
+          "bytes": 4,
+          "role": "appended perception record"
+        },
+        {
+          "rva": "0x12d4ad",
+          "bytes": 4,
+          "role": "appended perception record"
+        },
+        {
+          "rva": "0x12d4b5",
+          "bytes": 4,
+          "role": "appended perception record"
+        },
+        {
+          "rva": "0x12d4bd",
+          "bytes": 4,
+          "role": "appended perception record"
+        },
+        {
+          "rva": "0x1519b2",
+          "bytes": 4,
+          "role": "appended perception record"
+        },
+        {
+          "rva": "0x174e82",
+          "bytes": 4,
+          "role": "relocated 256-entry snapshot team array"
+        },
+        {
+          "rva": "0x174e8c",
+          "bytes": 4,
+          "role": "relocated 256-entry snapshot goal IDs/positions"
+        },
+        {
+          "rva": "0x174e95",
+          "bytes": 4,
+          "role": "relocated 256-entry snapshot goal state"
+        },
+        {
+          "rva": "0x12c787",
+          "bytes": 4,
+          "role": "relocated 256-entry animation pointer lookup"
+        },
+        {
+          "rva": "0x1711ea",
+          "bytes": 4,
+          "role": "320-entry corpse snapshot goal cache"
+        },
+        {
+          "rva": "0x1711fc",
+          "bytes": 4,
+          "role": "320-entry corpse snapshot goal state"
+        },
+        {
+          "rva": "0x171204",
+          "bytes": 4,
+          "role": "320-entry corpse snapshot goal cache"
+        },
+        {
+          "rva": "0x17120c",
+          "bytes": 4,
+          "role": "320-entry corpse snapshot goal state"
+        },
+        {
+          "rva": "0x171214",
+          "bytes": 4,
+          "role": "320-entry corpse snapshot goal cache"
+        },
+        {
+          "rva": "0x17121c",
+          "bytes": 4,
+          "role": "320-entry corpse snapshot goal state"
+        },
+        {
+          "rva": "0x171224",
+          "bytes": 4,
+          "role": "320-entry corpse snapshot goal cache"
+        },
+        {
+          "rva": "0x17122e",
+          "bytes": 4,
+          "role": "320-entry corpse snapshot goal cache"
+        },
+        {
+          "rva": "0x171243",
+          "bytes": 4,
+          "role": "320-entry corpse snapshot goal cache"
+        },
+        {
+          "rva": "0x17124e",
+          "bytes": 4,
+          "role": "320-entry corpse snapshot goal cache"
+        },
+        {
+          "rva": "0x171259",
+          "bytes": 4,
+          "role": "320-entry corpse snapshot goal cache"
+        },
+        {
+          "rva": "0x171264",
+          "bytes": 4,
+          "role": "320-entry corpse snapshot goal cache"
+        },
+        {
+          "rva": "0x171274",
+          "bytes": 4,
+          "role": "320-entry corpse snapshot goal state"
+        },
+        {
+          "rva": "0x171283",
+          "bytes": 4,
+          "role": "320-entry corpse snapshot goal state"
+        },
+        {
+          "rva": "0x46000b0",
+          "bytes": 14,
+          "role": "16-bit actor snapshot map relay"
+        },
+        {
+          "rva": "0x174ebd",
+          "bytes": 8,
+          "role": "16-bit actor snapshot map"
+        },
+        {
+          "rva": "0x46000be",
+          "bytes": 20,
+          "role": "corpse map indices 256..319 relay"
+        },
+        {
+          "rva": "0x174f98",
+          "bytes": 11,
+          "role": "corpse map indices 256..319"
+        },
+        {
+          "rva": "0x46000d2",
+          "bytes": 16,
+          "role": "expanded corpse callback index relay"
+        },
+        {
+          "rva": "0x174fa3",
+          "bytes": 8,
+          "role": "expanded corpse callback index"
+        },
+        {
+          "rva": "0x46000e2",
+          "bytes": 13,
+          "role": "256-entry animation-presence array relay"
+        },
+        {
+          "rva": "0x174f54",
+          "bytes": 5,
+          "role": "256-entry animation-presence array"
+        },
+        {
+          "rva": "0x12c840",
+          "bytes": 40,
+          "role": "converted full actor active-flag reset"
+        }
+      ],
+      "runtime_activation": false,
+      "untested_dependencies": [
+        "remaining inline perception consumers and actor-index divisions",
+        "pool reset/free/animation lifetime beyond 31",
+        "snapshot consumers and client/wire representation",
+        "full checkpoint counts, format marker and legacy stream compatibility"
+      ]
+    },
+    "stage21_edits": [
+      {
+        "rva": "0x123e46",
+        "before": "60150000",
+        "after": "c0480000",
+        "role": "full actor traversal stride"
+      },
+      {
+        "rva": "0x1269d3",
+        "before": "60150000",
+        "after": "c0480000",
+        "role": "full actor traversal stride"
+      },
+      {
+        "rva": "0x1269e8",
+        "before": "60150000",
+        "after": "c0480000",
+        "role": "full actor traversal stride"
+      },
+      {
+        "rva": "0x126abe",
+        "before": "60150000",
+        "after": "c0480000",
+        "role": "full actor traversal stride"
+      },
+      {
+        "rva": "0x126af3",
+        "before": "60150000",
+        "after": "c0480000",
+        "role": "full actor traversal stride"
+      },
+      {
+        "rva": "0x126b61",
+        "before": "60150000",
+        "after": "c0480000",
+        "role": "full actor traversal stride"
+      },
+      {
+        "rva": "0x126b74",
+        "before": "60150000",
+        "after": "c0480000",
+        "role": "full actor traversal stride"
+      },
+      {
+        "rva": "0x126d04",
+        "before": "60150000",
+        "after": "c0480000",
+        "role": "full actor traversal stride"
+      },
+      {
+        "rva": "0x126e2f",
+        "before": "60150000",
+        "after": "c0480000",
+        "role": "full actor traversal stride"
+      },
+      {
+        "rva": "0x126e44",
+        "before": "60150000",
+        "after": "c0480000",
+        "role": "full actor traversal stride"
+      },
+      {
+        "rva": "0x126f69",
+        "before": "60150000",
+        "after": "c0480000",
+        "role": "full actor traversal stride"
+      },
+      {
+        "rva": "0x126f98",
+        "before": "60150000",
+        "after": "c0480000",
+        "role": "full actor traversal stride"
+      },
+      {
+        "rva": "0x127089",
+        "before": "60150000",
+        "after": "c0480000",
+        "role": "full actor traversal stride"
+      },
+      {
+        "rva": "0x12709e",
+        "before": "60150000",
+        "after": "c0480000",
+        "role": "full actor traversal stride"
+      },
+      {
+        "rva": "0x1271e1",
+        "before": "60150000",
+        "after": "c0480000",
+        "role": "full actor traversal stride"
+      },
+      {
+        "rva": "0x127214",
+        "before": "60150000",
+        "after": "c0480000",
+        "role": "full actor traversal stride"
+      },
+      {
+        "rva": "0x127263",
+        "before": "60150000",
+        "after": "c0480000",
+        "role": "full actor traversal stride"
+      },
+      {
+        "rva": "0x127278",
+        "before": "60150000",
+        "after": "c0480000",
+        "role": "full actor traversal stride"
+      },
+      {
+        "rva": "0x1273ca",
+        "before": "60150000",
+        "after": "c0480000",
+        "role": "full actor traversal stride"
+      },
+      {
+        "rva": "0x1273f9",
+        "before": "60150000",
+        "after": "c0480000",
+        "role": "full actor traversal stride"
+      },
+      {
+        "rva": "0x127454",
+        "before": "60150000",
+        "after": "c0480000",
+        "role": "full actor traversal stride"
+      },
+      {
+        "rva": "0x127469",
+        "before": "60150000",
+        "after": "c0480000",
+        "role": "full actor traversal stride"
+      },
+      {
+        "rva": "0x127542",
+        "before": "60150000",
+        "after": "c0480000",
+        "role": "full actor traversal stride"
+      },
+      {
+        "rva": "0x127574",
+        "before": "60150000",
+        "after": "c0480000",
+        "role": "full actor traversal stride"
+      },
+      {
+        "rva": "0x1286d4",
+        "before": "60150000",
+        "after": "c0480000",
+        "role": "full actor traversal stride"
+      },
+      {
+        "rva": "0x1286fa",
+        "before": "60150000",
+        "after": "c0480000",
+        "role": "full actor traversal stride"
+      },
+      {
+        "rva": "0x1296fb",
+        "before": "60150000",
+        "after": "c0480000",
+        "role": "full actor traversal stride"
+      },
+      {
+        "rva": "0x1800e8",
+        "before": "60150000",
+        "after": "c0480000",
+        "role": "full actor traversal stride"
+      },
+      {
+        "rva": "0x18137b",
+        "before": "60150000",
+        "after": "c0480000",
+        "role": "full actor traversal stride"
+      },
+      {
+        "rva": "0x19f8bc",
+        "before": "60150000",
+        "after": "c0480000",
+        "role": "full actor traversal stride"
+      },
+      {
+        "rva": "0x1a158e",
+        "before": "60150000",
+        "after": "c0480000",
+        "role": "full actor traversal stride"
+      },
+      {
+        "rva": "0x1a165b",
+        "before": "60150000",
+        "after": "c0480000",
+        "role": "full actor traversal stride"
+      },
+      {
+        "rva": "0x1a1730",
+        "before": "60150000",
+        "after": "c0480000",
+        "role": "full actor traversal stride"
+      },
+      {
+        "rva": "0x1a193d",
+        "before": "60150000",
+        "after": "c0480000",
+        "role": "full actor traversal stride"
+      },
+      {
+        "rva": "0x1a33be",
+        "before": "60150000",
+        "after": "c0480000",
+        "role": "full actor traversal stride"
+      },
+      {
+        "rva": "0x1a3498",
+        "before": "60150000",
+        "after": "c0480000",
+        "role": "full actor traversal stride"
+      },
+      {
+        "rva": "0x1a6c92",
+        "before": "60150000",
+        "after": "c0480000",
+        "role": "full actor traversal stride"
+      },
+      {
+        "rva": "0x1b1514",
+        "before": "60150000",
+        "after": "c0480000",
+        "role": "full actor traversal stride"
+      },
+      {
+        "rva": "0x123e4d",
+        "before": "00ac0200",
+        "after": "00c04800",
+        "role": "full actor traversal span"
+      },
+      {
+        "rva": "0x126d0b",
+        "before": "00ac0200",
+        "after": "00c04800",
+        "role": "full actor traversal span"
+      },
+      {
+        "rva": "0x129702",
+        "before": "00ac0200",
+        "after": "00c04800",
+        "role": "full actor traversal span"
+      },
+      {
+        "rva": "0x19f8c3",
+        "before": "00ac0200",
+        "after": "00c04800",
+        "role": "full actor traversal span"
+      },
+      {
+        "rva": "0x1a1666",
+        "before": "00ac0200",
+        "after": "00c04800",
+        "role": "full actor traversal span"
+      },
+      {
+        "rva": "0x1a1948",
+        "before": "00ac0200",
+        "after": "00c04800",
+        "role": "full actor traversal span"
+      },
+      {
+        "rva": "0x1a34a3",
+        "before": "00ac0200",
+        "after": "00c04800",
+        "role": "full actor traversal span"
+      },
+      {
+        "rva": "0x1a6c99",
+        "before": "00ac0200",
+        "after": "00c04800",
+        "role": "full actor traversal span"
+      },
+      {
+        "rva": "0x1b151b",
+        "before": "00ac0200",
+        "after": "00c04800",
+        "role": "full actor traversal span"
+      },
+      {
+        "rva": "0x12a23d",
+        "before": "3f23c700",
+        "after": "bf5d3d04",
+        "role": "relocated direct sentient storage"
+      },
+      {
+        "rva": "0x151d40",
+        "before": "3ca8c400",
+        "after": "bce23a04",
+        "role": "relocated direct sentient storage"
+      },
+      {
+        "rva": "0x15b103",
+        "before": "7914c400",
+        "after": "f94e3a04",
+        "role": "relocated direct sentient storage"
+      },
+      {
+        "rva": "0x15b28b",
+        "before": "f112c400",
+        "after": "714d3a04",
+        "role": "relocated direct sentient storage"
+      },
+      {
+        "rva": "0x1716dd",
+        "before": "9faec200",
+        "after": "1fe93804",
+        "role": "relocated direct sentient storage"
+      },
+      {
+        "rva": "0x1a6ec4",
+        "before": "b856bf00",
+        "after": "38913504",
+        "role": "relocated direct sentient storage"
+      },
+      {
+        "rva": "0x1a887c",
+        "before": "003dbf00",
+        "after": "80773504",
+        "role": "relocated direct sentient storage"
+      },
+      {
+        "rva": "0x1a8b96",
+        "before": "e639bf00",
+        "after": "66743504",
+        "role": "relocated direct sentient storage"
+      },
+      {
+        "rva": "0x1a8f24",
+        "before": "5836bf00",
+        "after": "d8703504",
+        "role": "relocated direct sentient storage"
+      },
+      {
+        "rva": "0x1ab2cd",
+        "before": "af12bf00",
+        "after": "2f4d3504",
+        "role": "relocated direct sentient storage"
+      },
+      {
+        "rva": "0x1ab3a5",
+        "before": "d711bf00",
+        "after": "574c3504",
+        "role": "relocated direct sentient storage"
+      },
+      {
+        "rva": "0x1b6f81",
+        "before": "fb55be00",
+        "after": "7b903404",
+        "role": "relocated direct sentient storage"
+      },
+      {
+        "rva": "0x1716f2",
+        "before": "3a29d900",
+        "after": "0ae9e803",
+        "role": "relocated direct actor storage"
+      },
+      {
+        "rva": "0x170c4b",
+        "before": "f1f3dd00",
+        "after": "b1f33e04",
+        "role": "relocated animation lifecycle array"
+      },
+      {
+        "rva": "0x1710d9",
+        "before": "63efdd00",
+        "after": "23ef3e04",
+        "role": "relocated animation lifecycle array"
+      },
+      {
+        "rva": "0x17514d",
+        "before": "efaedd00",
+        "after": "afae3e04",
+        "role": "relocated animation lifecycle array"
+      },
+      {
+        "rva": "0x170c57",
+        "before": "20000000",
+        "after": "00010000",
+        "role": "256-entry animation lifecycle"
+      },
+      {
+        "rva": "0x1710ea",
+        "before": "20000000",
+        "after": "00010000",
+        "role": "256-entry animation lifecycle"
+      },
+      {
+        "rva": "0x175152",
+        "before": "20000000",
+        "after": "00010000",
+        "role": "256-entry animation lifecycle"
+      },
+      {
+        "rva": "0x125bc8",
+        "before": "58030000",
+        "after": "70150000",
+        "role": "appended inline perception consumer"
+      },
+      {
+        "rva": "0x12b7b3",
+        "before": "64030000",
+        "after": "7c150000",
+        "role": "appended inline perception consumer"
+      },
+      {
+        "rva": "0x12b7c4",
+        "before": "68030000",
+        "after": "80150000",
+        "role": "appended inline perception consumer"
+      },
+      {
+        "rva": "0x12b7d3",
+        "before": "6c030000",
+        "after": "84150000",
+        "role": "appended inline perception consumer"
+      },
+      {
+        "rva": "0x12f168",
+        "before": "48030000",
+        "after": "60150000",
+        "role": "appended inline perception consumer"
+      },
+      {
+        "rva": "0x12f4dc",
+        "before": "58030000",
+        "after": "70150000",
+        "role": "appended inline perception consumer"
+      },
+      {
+        "rva": "0x12f4f2",
+        "before": "68030000",
+        "after": "80150000",
+        "role": "appended inline perception consumer"
+      },
+      {
+        "rva": "0x12f4fb",
+        "before": "64030000",
+        "after": "7c150000",
+        "role": "appended inline perception consumer"
+      },
+      {
+        "rva": "0x12f509",
+        "before": "6c030000",
+        "after": "84150000",
+        "role": "appended inline perception consumer"
+      },
+      {
+        "rva": "0x12f77c",
+        "before": "48030000",
+        "after": "60150000",
+        "role": "appended inline perception consumer"
+      },
+      {
+        "rva": "0x12f94d",
+        "before": "54030000",
+        "after": "6c150000",
+        "role": "appended inline perception consumer"
+      },
+      {
+        "rva": "0x12f954",
+        "before": "50030000",
+        "after": "68150000",
+        "role": "appended inline perception consumer"
+      },
+      {
+        "rva": "0x133c4b",
+        "before": "58030000",
+        "after": "70150000",
+        "role": "appended inline perception consumer"
+      },
+      {
+        "rva": "0x1380bb",
+        "before": "54030000",
+        "after": "6c150000",
+        "role": "appended inline perception consumer"
+      },
+      {
+        "rva": "0x138121",
+        "before": "54030000",
+        "after": "6c150000",
+        "role": "appended inline perception consumer"
+      },
+      {
+        "rva": "0x138b7b",
+        "before": "58030000",
+        "after": "70150000",
+        "role": "appended inline perception consumer"
+      },
+      {
+        "rva": "0x138c97",
+        "before": "54030000",
+        "after": "6c150000",
+        "role": "appended inline perception consumer"
+      },
+      {
+        "rva": "0x138fc2",
+        "before": "54030000",
+        "after": "6c150000",
+        "role": "appended inline perception consumer"
+      },
+      {
+        "rva": "0x13a51c",
+        "before": "50030000",
+        "after": "68150000",
+        "role": "appended inline perception consumer"
+      },
+      {
+        "rva": "0x1485e1",
+        "before": "48030000",
+        "after": "60150000",
+        "role": "appended inline perception consumer"
+      },
+      {
+        "rva": "0x148618",
+        "before": "50030000",
+        "after": "68150000",
+        "role": "appended inline perception consumer"
+      },
+      {
+        "rva": "0x148634",
+        "before": "50030000",
+        "after": "68150000",
+        "role": "appended inline perception consumer"
+      },
+      {
+        "rva": "0x148734",
+        "before": "50030000",
+        "after": "68150000",
+        "role": "appended inline perception consumer"
+      },
+      {
+        "rva": "0x14920b",
+        "before": "48030000",
+        "after": "60150000",
+        "role": "appended inline perception consumer"
+      },
+      {
+        "rva": "0x14f8b2",
+        "before": "58030000",
+        "after": "70150000",
+        "role": "appended inline perception consumer"
+      },
+      {
+        "rva": "0x15092f",
+        "before": "4c030000",
+        "after": "64150000",
+        "role": "appended inline perception consumer"
+      },
+      {
+        "rva": "0x150956",
+        "before": "48030000",
+        "after": "60150000",
+        "role": "appended inline perception consumer"
+      },
+      {
+        "rva": "0x150a32",
+        "before": "50030000",
+        "after": "68150000",
+        "role": "appended inline perception consumer"
+      },
+      {
+        "rva": "0x150ea1",
+        "before": "48030000",
+        "after": "60150000",
+        "role": "appended inline perception consumer"
+      },
+      {
+        "rva": "0x1510d5",
+        "before": "4c030000",
+        "after": "64150000",
+        "role": "appended inline perception consumer"
+      },
+      {
+        "rva": "0x1510ed",
+        "before": "48030000",
+        "after": "60150000",
+        "role": "appended inline perception consumer"
+      },
+      {
+        "rva": "0x151ae3",
+        "before": "4c030000",
+        "after": "64150000",
+        "role": "appended inline perception consumer"
+      },
+      {
+        "rva": "0x151afe",
+        "before": "50030000",
+        "after": "68150000",
+        "role": "appended inline perception consumer"
+      },
+      {
+        "rva": "0x151b7b",
+        "before": "4c030000",
+        "after": "64150000",
+        "role": "appended inline perception consumer"
+      },
+      {
+        "rva": "0x151ba2",
+        "before": "48030000",
+        "after": "60150000",
+        "role": "appended inline perception consumer"
+      },
+      {
+        "rva": "0x151c70",
+        "before": "4c030000",
+        "after": "64150000",
+        "role": "appended inline perception consumer"
+      },
+      {
+        "rva": "0x151c89",
+        "before": "50030000",
+        "after": "68150000",
+        "role": "appended inline perception consumer"
+      },
+      {
+        "rva": "0x152252",
+        "before": "4c030000",
+        "after": "64150000",
+        "role": "appended inline perception consumer"
+      },
+      {
+        "rva": "0x152351",
+        "before": "4c030000",
+        "after": "64150000",
+        "role": "appended inline perception consumer"
+      },
+      {
+        "rva": "0x15606d",
+        "before": "5c030000",
+        "after": "74150000",
+        "role": "appended inline perception consumer"
+      },
+      {
+        "rva": "0x1560cc",
+        "before": "58030000",
+        "after": "70150000",
+        "role": "appended inline perception consumer"
+      },
+      {
+        "rva": "0x1562e3",
+        "before": "5c030000",
+        "after": "74150000",
+        "role": "appended inline perception consumer"
+      },
+      {
+        "rva": "0x1568f4",
+        "before": "54030000",
+        "after": "6c150000",
+        "role": "appended inline perception consumer"
+      },
+      {
+        "rva": "0x156961",
+        "before": "48030000",
+        "after": "60150000",
+        "role": "appended inline perception consumer"
+      },
+      {
+        "rva": "0x1569be",
+        "before": "6c030000",
+        "after": "84150000",
+        "role": "appended inline perception consumer"
+      },
+      {
+        "rva": "0x1569d7",
+        "before": "68030000",
+        "after": "80150000",
+        "role": "appended inline perception consumer"
+      },
+      {
+        "rva": "0x1569e0",
+        "before": "64030000",
+        "after": "7c150000",
+        "role": "appended inline perception consumer"
+      },
+      {
+        "rva": "0x156a5d",
+        "before": "58030000",
+        "after": "70150000",
+        "role": "appended inline perception consumer"
+      },
+      {
+        "rva": "0x156ad5",
+        "before": "58030000",
+        "after": "70150000",
+        "role": "appended inline perception consumer"
+      },
+      {
+        "rva": "0x12d43c",
+        "before": "48030000",
+        "after": "60150000",
+        "role": "common native perception accessor"
+      },
+      {
+        "rva": "0x1269fe",
+        "before": "03fa0be82fa0bf00",
+        "after": "9b7080bae4d49a70",
+        "role": "remaining actor index division"
+      },
+      {
+        "rva": "0x126e04",
+        "before": "03fa0be82fa0bf00",
+        "after": "9b7080bae4d49a70",
+        "role": "remaining actor index division"
+      },
+      {
+        "rva": "0x1286af",
+        "before": "03fa0be82fa0bf00",
+        "after": "9b7080bae4d49a70",
+        "role": "remaining actor index division"
+      },
+      {
+        "rva": "0x126aa7",
+        "before": "04",
+        "after": "0d",
+        "role": "remaining actor index division shift"
+      },
+      {
+        "rva": "0x126f52",
+        "before": "04",
+        "after": "0d",
+        "role": "remaining actor index division shift"
+      },
+      {
+        "rva": "0x1271ca",
+        "before": "04",
+        "after": "0d",
+        "role": "remaining actor index division shift"
+      },
+      {
+        "rva": "0x1273b3",
+        "before": "04",
+        "after": "0d",
+        "role": "remaining actor index division shift"
+      },
+      {
+        "rva": "0x12752b",
+        "before": "04",
+        "after": "0d",
+        "role": "remaining actor index division shift"
+      },
+      {
+        "rva": "0x1286bd",
+        "before": "04",
+        "after": "0d",
+        "role": "remaining actor index division shift"
+      },
+      {
+        "rva": "0x4601000",
+        "before": "000000000000000000000000000000000000",
+        "after": "4981f8000100000f8ca359b2fbe9cb59b2fb",
+        "role": "complete lifecycle capacity relay"
+      },
+      {
+        "rva": "0x1269d7",
+        "before": "4983f8207cd3",
+        "after": "e924a64d0490",
+        "role": "complete lifecycle capacity guard"
+      },
+      {
+        "rva": "0x4601012",
+        "before": "000000000000000000000000000000000000",
+        "after": "4981f8000100000f8de95ab2fbe9975ab2fb",
+        "role": "complete lifecycle capacity relay"
+      },
+      {
+        "rva": "0x126ab5",
+        "before": "4983f8207d4d",
+        "after": "e958a54d0490",
+        "role": "complete lifecycle capacity guard"
+      },
+      {
+        "rva": "0x4601024",
+        "before": "000000000000000000000000000000000000",
+        "after": "4981f8000100000f8c9f5ab2fbe9c75ab2fb",
+        "role": "complete lifecycle capacity relay"
+      },
+      {
+        "rva": "0x126af7",
+        "before": "4983f8207cd3",
+        "after": "e928a54d0490",
+        "role": "complete lifecycle capacity guard"
+      },
+      {
+        "rva": "0x4601036",
+        "before": "000000000000000000000000000000000000",
+        "after": "4981f8000100000f8c015bb2fbe9235bb2fb",
+        "role": "complete lifecycle capacity relay"
+      },
+      {
+        "rva": "0x126b65",
+        "before": "4983f8207cd9",
+        "after": "e9cca44d0490",
+        "role": "complete lifecycle capacity guard"
+      },
+      {
+        "rva": "0x4601048",
+        "before": "000000000000000000000000000000000000",
+        "after": "4981f8000100000f8cad5db2fbe9df5db2fb",
+        "role": "complete lifecycle capacity relay"
+      },
+      {
+        "rva": "0x126e33",
+        "before": "4983f8207cc9",
+        "after": "e910a24d0490",
+        "role": "complete lifecycle capacity guard"
+      },
+      {
+        "rva": "0x460105a",
+        "before": "000000000000000000000000000000000000",
+        "after": "4981f8000100000f8d465fb2fbe9fa5eb2fb",
+        "role": "complete lifecycle capacity relay"
+      },
+      {
+        "rva": "0x126f60",
+        "before": "4983f8207d47",
+        "after": "e9f5a04d0490",
+        "role": "complete lifecycle capacity guard"
+      },
+      {
+        "rva": "0x460106c",
+        "before": "000000000000000000000000000000000000",
+        "after": "4981f8000100000f8cfb5eb2fbe9245fb2fb",
+        "role": "complete lifecycle capacity relay"
+      },
+      {
+        "rva": "0x126f9c",
+        "before": "4983f8207cd2",
+        "after": "e9cba04d0490",
+        "role": "complete lifecycle capacity guard"
+      },
+      {
+        "rva": "0x460107e",
+        "before": "000000000000000000000000000000000000",
+        "after": "4981f8000100000f8ca55fb2fbe90360b2fb",
+        "role": "complete lifecycle capacity relay"
+      },
+      {
+        "rva": "0x12708d",
+        "before": "4983f8207c9d",
+        "after": "e9ec9f4d0490",
+        "role": "complete lifecycle capacity guard"
+      },
+      {
+        "rva": "0x4601090",
+        "before": "000000000000000000000000000000000000",
+        "after": "4981f8000100000f8d8c61b2fbe93c61b2fb",
+        "role": "complete lifecycle capacity relay"
+      },
+      {
+        "rva": "0x1271d8",
+        "before": "4983f8207d4b",
+        "after": "e9b39e4d0490",
+        "role": "complete lifecycle capacity guard"
+      },
+      {
+        "rva": "0x46010a2",
+        "before": "000000000000000000000000000000000000",
+        "after": "4981f8000100000f8c4161b2fbe96a61b2fb",
+        "role": "complete lifecycle capacity relay"
+      },
+      {
+        "rva": "0x127218",
+        "before": "4983f8207cd2",
+        "after": "e9859e4d0490",
+        "role": "complete lifecycle capacity guard"
+      },
+      {
+        "rva": "0x46010b4",
+        "before": "000000000000000000000000000000000000",
+        "after": "4981f8000100000f8c7f61b2fbe9a761b2fb",
+        "role": "complete lifecycle capacity relay"
+      },
+      {
+        "rva": "0x127267",
+        "before": "4983f8207cd3",
+        "after": "e9489e4d0490",
+        "role": "complete lifecycle capacity guard"
+      },
+      {
+        "rva": "0x46010c6",
+        "before": "000000000000000000000000000000000000",
+        "after": "4981f8000100000f8d4d63b2fbe9ef62b2fb",
+        "role": "complete lifecycle capacity relay"
+      },
+      {
+        "rva": "0x1273c1",
+        "before": "4983f8207d59",
+        "after": "e9009d4d0490",
+        "role": "complete lifecycle capacity guard"
+      },
+      {
+        "rva": "0x46010d8",
+        "before": "000000000000000000000000000000000000",
+        "after": "4981f8000100000f8cf062b2fbe91963b2fb",
+        "role": "complete lifecycle capacity relay"
+      },
+      {
+        "rva": "0x1273fd",
+        "before": "4983f8207cd2",
+        "after": "e9d69c4d0490",
+        "role": "complete lifecycle capacity guard"
+      },
+      {
+        "rva": "0x46010ea",
+        "before": "000000000000000000000000000000000000",
+        "after": "4881fa000100000f8c3963b2fbe96263b2fb",
+        "role": "complete lifecycle capacity relay"
+      },
+      {
+        "rva": "0x127458",
+        "before": "4883fa207cd2",
+        "after": "e98d9c4d0490",
+        "role": "complete lifecycle capacity guard"
+      },
+      {
+        "rva": "0x46010fc",
+        "before": "000000000000000000000000000000000000",
+        "after": "4981f8000100000f8d8064b2fbe93164b2fb",
+        "role": "complete lifecycle capacity relay"
+      },
+      {
+        "rva": "0x127539",
+        "before": "4983f8207d4a",
+        "after": "e9be9b4d0490",
+        "role": "complete lifecycle capacity guard"
+      },
+      {
+        "rva": "0x460110e",
+        "before": "000000000000000000000000000000000000",
+        "after": "4981f8000100000f8c3564b2fbe95e64b2fb",
+        "role": "complete lifecycle capacity relay"
+      },
+      {
+        "rva": "0x127578",
+        "before": "4983f8207cd2",
+        "after": "e9919b4d0490",
+        "role": "complete lifecycle capacity guard"
+      },
+      {
+        "rva": "0x4601120",
+        "before": "000000000000000000000000000000000000",
+        "after": "4981f8000100000f8dd775b2fbe99f75b2fb",
+        "role": "complete lifecycle capacity relay"
+      },
+      {
+        "rva": "0x1286cb",
+        "before": "4983f8207d33",
+        "after": "e9508a4d0490",
+        "role": "complete lifecycle capacity guard"
+      },
+      {
+        "rva": "0x4601132",
+        "before": "0000000000000000000000000000000000",
+        "after": "81f8000100000f8ca275b2fbe9c175b2fb",
+        "role": "complete lifecycle capacity relay"
+      },
+      {
+        "rva": "0x1286ff",
+        "before": "83f8207cdc",
+        "after": "e92e8a4d04",
+        "role": "complete lifecycle capacity guard"
+      },
+      {
+        "rva": "0x1b0c01",
+        "before": "8bd3498d8092010000448d4b0566903898f0feffff741b488b886efeffff48399910010000750b483999080100007502ffc2389878ffffff741b",
+        "after": "31d24c89c041b9120100003898820000007417488b0848399910010000750b483999080100007502ffc248058800000049ffc975d6e93c010000",
+        "role": "complete special-sentient census"
+      },
+      {
+        "rva": "0x4601143",
+        "before": "000000000000000000000000000000000000",
+        "after": "4881f9120100000f8c36fcbafbe949fcbafb",
+        "role": "complete lifecycle capacity relay"
+      },
+      {
+        "rva": "0x1b0d98",
+        "before": "4883f9327ce8",
+        "after": "e9a603450490",
+        "role": "complete lifecycle capacity guard"
+      },
+      {
+        "rva": "0x4601155",
+        "before": "000000000000000000000000000000000000",
+        "after": "4981f8120100000f8c8e04bbfbe9af04bbfb",
+        "role": "complete lifecycle capacity relay"
+      },
+      {
+        "rva": "0x1b1610",
+        "before": "4983f8327cda",
+        "after": "e940fb440490",
+        "role": "complete lifecycle capacity guard"
+      },
+      {
+        "rva": "0x4601167",
+        "before": "000000000000000000000000000000000000",
+        "after": "4981f8120100000f8d0e06bbfbe9bc05bbfb",
+        "role": "complete lifecycle capacity relay"
+      },
+      {
+        "rva": "0x1b172f",
+        "before": "4983f8327d4d",
+        "after": "e933fa440490",
+        "role": "complete lifecycle capacity guard"
+      },
+      {
+        "rva": "0x4601179",
+        "before": "000000000000000000000000000000000000",
+        "after": "4981f8120100000f8cbd05bbfbe9de05bbfb",
+        "role": "complete lifecycle capacity relay"
+      },
+      {
+        "rva": "0x1b1763",
+        "before": "4983f8327cda",
+        "after": "e911fa440490",
+        "role": "complete lifecycle capacity guard"
+      },
+      {
+        "rva": "0x15b128",
+        "before": "e4beb900",
+        "after": "d44e4104",
+        "role": "274-entry sentient reference-head array"
+      },
+      {
+        "rva": "0x15b292",
+        "before": "7abdb900",
+        "after": "6a4d4104",
+        "role": "274-entry sentient reference-head array"
+      },
+      {
+        "rva": "0x15b050",
+        "before": "0f57c033c00f1105b4bfb90089050ec0b9000f1105b7bfb9000f11",
+        "after": "57488d3da84f4104b91201000031c0fc66f3ab5f89050ac0b900c3",
+        "role": "complete sentient reference-head reset"
+      },
+      {
+        "rva": "0x17119d",
+        "before": "e8ce09f0ff",
+        "after": "e918000000",
+        "role": "fixture-only following engine teardown isolation"
+      }
+    ],
+    "inline_perception_sites": 64,
+    "common_perception_accessor": true,
+    "relocated_reference_heads": 274,
+    "runtime_activation": false,
+    "remaining_gates": [
+      "transitive perception/index consumer review",
+      "snapshot client/transport consumers and old/new representation",
+      "native checkpoint stream routing/format detection and surrounding engine data",
+      "engine startup, animation assets and Windows gameplay stress"
+    ]
+  },
+  "runtime_expansion_enabled": false
+}

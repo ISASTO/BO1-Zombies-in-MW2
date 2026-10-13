@@ -8,7 +8,7 @@
 #include "fov_preferences.hpp"
 
 namespace mod {
-inline constexpr const char* kVersion = "0.1.19-squad-test20";
+inline constexpr const char* kVersion = "0.1.20-squad-test21";
 inline constexpr const char* kExeSha256 = "fb7e8a987c371dea7b666091b0b9e2011c0cd9cd277b191ad453d11d557dd777";
 
 // -1 is a wildcard. Reject malformed patterns rather than matching everything.
@@ -284,14 +284,15 @@ inline constexpr const char* kAiEnemySetterStartPattern =
 inline constexpr const char* kAiSpawnTargetnamePattern =
     "49 8D 8E 46 01 00 00 8B D3 E8 ?? ?? ?? ?? 41 83 A6 4C 01 00 00 FE";
 
+inline constexpr const char* kHeldFireModePattern = "44 8B 4A 64 4C 8B D1 41 83 E9 01 74 51 41 83 E9 01";
+inline constexpr const char* kSemiAutoFireGatePattern = "83 7A 64 00 74 2A 48 6B C0 1C 83 BC 18 00 02 00 00 00";
 inline constexpr int kVisibleMenuRows = 12;
 inline constexpr float MenuPanelHeight(int rows) { return 200.f+26.f*rows; }
 enum class Page { Home, Player, Weapons, World, AI, Zombies, Diagnostics, ZombieRules, View, ZombieController };
 inline constexpr int MenuRowCount(Page page) {
     switch(page) {
         case Page::Home: case Page::Player: case Page::World: case Page::ZombieRules: return 6;
-        case Page::Weapons: return 10;
-        case Page::AI: return 11;
+        case Page::Weapons: case Page::AI: return 12;
         case Page::Zombies: return 3;
         case Page::Diagnostics: return 2;
         case Page::View: return 5;
@@ -310,7 +311,8 @@ enum class Action { None, ToggleGod, ToggleHud, WriteSnapshot, WriteRoundPreview
     DecreaseSpeed, IncreaseSpeed, DecreaseJump, IncreaseJump,
     ToggleGiveAll, ToggleRapidFire, ToggleExplosiveBullets, ResetWeapons, ToggleDualWield, PreviousWeaponBank, NextWeaponBank,
     DecreaseRapidFire, IncreaseRapidFire, ToggleNoRecoil,
-    ToggleSlowMotion, ToggleFreezeAI, ToggleGravity, ToggleFriendlyFire, ResetWorld,
+    ToggleHitmarkers, ToggleSemiAutoFullAuto, ToggleInvincibleFriendlies,
+    ToggleWorldSpeed, ToggleFreezeAI, ToggleGravity, ToggleFriendlyFire, ResetWorld,
     DecreaseTimeScale, IncreaseTimeScale, DecreaseGravity, IncreaseGravity,
     ToggleRehearsal, ChangeRehearsalRound, ToggleRehearsalAutoClear, ToggleRehearsalSpawning,
     KillRehearsalActor, ClearRehearsalActors, WriteRehearsal,
@@ -387,9 +389,11 @@ struct MenuState {
             else if (page == Page::Weapons && selected == 5) return Action::ToggleExplosiveBullets;
             else if (page == Page::Weapons && selected == 6) return Action::ToggleDualWield;
             else if (page == Page::Weapons && selected == 7) return Action::ToggleNoRecoil;
-            else if (page == Page::Weapons && selected == 8) return Action::WriteSnapshot;
-            else if (page == Page::Weapons && selected == 9) return Action::ResetWeapons;
-            else if (page == Page::World && selected == 0) return Action::ToggleSlowMotion;
+            else if (page == Page::Weapons && selected == 8) return Action::ToggleHitmarkers;
+            else if (page == Page::Weapons && selected == 9) return Action::ToggleSemiAutoFullAuto;
+            else if (page == Page::Weapons && selected == 10) return Action::WriteSnapshot;
+            else if (page == Page::Weapons && selected == 11) return Action::ResetWeapons;
+            else if (page == Page::World && selected == 0) return Action::ToggleWorldSpeed;
             else if (page == Page::World && selected == 1) return Action::ToggleFreezeAI;
             else if (page == Page::World && selected == 2) return Action::ToggleGravity;
             else if (page == Page::World && selected == 3) return Action::KillAllEnemies;
@@ -400,8 +404,9 @@ struct MenuState {
                 if(selected==1) return Action::SpawnAiFriendly;
                 if(selected==4) return Action::ToggleAiSpawnPause;
                 if(selected==5) return Action::ToggleFreezeAI;
-                if(selected==8) return Action::RemoveSpawnedAi;
-                if(selected==9) return Action::WriteAiState;
+                if(selected==6) return Action::ToggleInvincibleFriendlies;
+                if(selected==9) return Action::RemoveSpawnedAi;
+                if(selected==10) return Action::WriteAiState;
             }
             else if (page == Page::View && selected == 1) return Action::SaveFov;
             else if (page == Page::View && selected == 2) return Action::ResetFov;

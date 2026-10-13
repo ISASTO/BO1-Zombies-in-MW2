@@ -183,7 +183,7 @@ void InitializeLog() {
     }
     std::swprintf(logPath,32768,L"%ls",file);
     Log("BO1MW2 %s | AMD64 | log=%ls", kVersion, file);
-    Log("Test20: ownership labels retain their native field references; user-1 interner ids are borrowed. Test19 VM/target guards remain. 256-actor prototype remains separate from the DLL.");
+    Log("Test21: hitmarkers, native semi-auto repeat, spawned-ally damage protection and world speed 0.1x-10x. Test20 ownership fix retained. Expanded 256/274 population lifecycle prototype remains separate from the DLL.");
 }
 void Log(const char* format, ...) {
     char body[4096]{};
