@@ -17,6 +17,7 @@ inline constexpr std::size_t kAiAttachmentModels=0x208,kAiAttachmentTags=0x246,k
 inline constexpr std::size_t kAiAttachmentCount=31;
 inline constexpr std::uintptr_t kAiEmptyAttachmentTagRva=0x1157900;
 inline constexpr std::uintptr_t kAiInternStringRva=0x18f440;
+inline constexpr std::uintptr_t kScriptStringPoolPointerRva=0x1466008;
 inline constexpr std::uintptr_t kAiEntitySaveFieldsRva=0x3405b0;
 inline constexpr std::uintptr_t kScriptParametersRva=0x18f44b0,kScriptExecuteDepthRva=0x18fca44;
 inline constexpr std::uintptr_t kScriptNotifyRva=0x223970;

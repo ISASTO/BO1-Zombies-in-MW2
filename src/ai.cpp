@@ -169,13 +169,16 @@ bool ScriptText(std::uint16_t id,std::string& out) {
 }
 std::string ClassName(std::uint16_t id) {std::string out;ScriptText(id,out);return out;}
 bool MarkOwned(std::uintptr_t entity,const std::string& marker) {
-    const auto id=reinterpret_cast<InternStringFn>(aiProfile.base+kAiInternStringRva)(marker.c_str());
-    if(!id || id>0xffff)return false;
-    auto reference=static_cast<std::uint16_t>(id);
-    reinterpret_cast<ScriptStringFn>(aiProfile.setString)(entity+kAiTargetname,id);
-    reinterpret_cast<ScriptStringFn>(aiProfile.setString)(reinterpret_cast<std::uintptr_t>(&reference),0);
+    if(!AssignOwnedAiMarker(entity+kAiTargetname,marker,
+        reinterpret_cast<InternStringFn>(aiProfile.base+kAiInternStringRva),
+        reinterpret_cast<ScriptStringFn>(aiProfile.setString)))return false;
     std::uint16_t current=0;std::string text;
-    return Value(entity+kAiTargetname,current) && ScriptText(current,text) && text==marker;
+    if(!Value(entity+kAiTargetname,current) || !ScriptText(current,text) || text!=marker)return false;
+    std::uintptr_t pool=0;std::uint32_t header=0;
+    if(Value(aiProfile.stringPoolSlot,pool) && pool && Value(pool+static_cast<std::uintptr_t>(current)*16,header))
+        Log("AI_MARKER entity=%u id=%u references=%u engine_user1=%u temporary_reference=NONE",
+            static_cast<unsigned>((entity-aiProfile.fixedPool)/kAiEntityStride),current,header&0xffffu,(header>>16)&1u);
+    return true;
 }
 std::uintptr_t Rip(std::uintptr_t at,int offset,int displacement,int length) {
     std::int32_t rel=0;

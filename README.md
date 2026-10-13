@@ -1,11 +1,20 @@
 # BO1 Zombies in MW2
 
 Incremental mod framework for **retail Modern Warfare 2 (2009), single player**.
-Current build: **0.1.18-squad-test19**. The owner confirms Test16's performance
+Current build: **0.1.19-squad-test20**. The owner confirms Test16's performance
 fix. Its returned world scans average 388 microseconds and peak at 942.1
 microseconds, compared with Test15's 61.6 ms average/152.9 ms peak. Test16's
 snapshot reads, name cache and checked permanent-image reads remain unchanged.
 See [Test16 runtime evidence](docs/runtime-test16-evidence.json).
+
+Test20 fixes a native string-reference bug in squad ownership labels. Repeated
+user-1 intern lookups return a borrowed id, but the old code released it after
+assigning each entity's label. The native regression creates 32 labeled fields
+with only one remaining reference, frees their shared slot on the first cleanup,
+then shows stale releases decrementing a reused model/VM code pointer. Corrected
+assignments retain all 32 field references, survive full cleanup and repeated
+replacement cycles. This is a concrete pool-corruption fix; Windows crowded
+squad testing remains required. See [Test20 evidence](docs/squad-test20.md).
 
 Test19 addresses the returned large-squad script-stack underflow with a full
 idle VM work context, caller frame/local-state restoration, fresh target
@@ -195,7 +204,7 @@ Copy the log immediately after a failing run: `latest.log` is replaced on launch
 | FOV selector and saved preference | Owner confirms test6 behavior; matching logs show load/selection/save/reset |
 | WEAPONS | Owner confirms No Recoil works in Test15. 1x-10x Rapid Fire is retained. G18 dual appearance is deferred. |
 | WORLD | Test18 fixes help-text bounds and adds player friendly-fire penalty bypass; native damage/mission behavior needs retail retest. |
-| AI | Test19 isolates the external VM work context and validates live targets. Native context and appended 256-actor prototype checks pass; crowded-squad retail retest is pending. Active capacity is 32. |
+| AI | Test20 fixes premature release of shared ownership labels. Native pool-reuse and replacement regressions pass; crowded-squad retail retest is pending. Test19 context/target guards remain. Active capacity is 32. |
 | Kill All Enemies | Owner-confirmed working native damage call for hostile actors; allies, clients and protected entities excluded. |
 | BO1 Zombies gameplay | Planned; normal MW2 AI is not a BO1 behavior/animation/assets port. |
 

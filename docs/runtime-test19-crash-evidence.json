@@ -1,0 +1,35 @@
+{
+  "returned_crashes": [
+    {
+      "diagnostic_zip": "BO1MW2-startup-results-20261013-062151-80a5a7fc.zip",
+      "diagnostic_sha256": "d8bab5844928efe739421b23fa812975773eb822fb9f996bbd445dd858b46180",
+      "version": "0.1.18-squad-test19",
+      "fault_rva": "0x2244c8",
+      "native_actor_count_at_crash": 32,
+      "last_reported_owned_tickets": 32,
+      "campaign_reclamation_events": 0,
+      "crash_log_preserved": true,
+      "vm_logical_stack_count": -1,
+      "checkpoint_observation": "Native autosave retained 32 tickets 3 seconds before the crash"
+    },
+    {
+      "diagnostic_zip": "BO1MW2-startup-results-20261013-062307-7e317216.zip",
+      "diagnostic_sha256": "509f76c0cb744eca7a4a9cc5275dd538fb3a42c481fb5e2f250077be9de2e27a",
+      "version": "0.1.18-squad-test19",
+      "fault_rva": "0x29967d",
+      "native_actor_count_at_crash": 26,
+      "last_reported_owned_tickets": 23,
+      "campaign_reclamation_events": 0,
+      "crash_log_preserved": true,
+      "vm_logical_stack_count": 1,
+      "collision_observation": "Bone hierarchy reads model parent list from invalid address; many friendly-fire hits precede the fault; actor count peaked at 32"
+    }
+  ],
+  "proven_code_bug": "User-1 repeated intern lookup is borrowed, but old MarkOwned cleared a fabricated temporary reference after field assignment",
+  "native_regression": "owned-strings-test20-probe.json",
+  "proof": "32 old label assignments retain one reference; first cleanup frees a slot still referenced by 31 fields; native stale releases decrement model/archive pointers placed into that reused slot",
+  "retail_causal_limit": "The dumps do not include the first freed label header or allocation reuse history. Applying that proven corruption mechanism to each specific retail fault is an inference, not a captured end-to-end sequence.",
+  "runtime_capacity": 32,
+  "expanded_capacity_enabled": false,
+  "native_model_reproduction": "Native string releases move a valid model pointer back two bytes after shared slot reuse; the unchanged native bone hierarchy faults at the returned RVA 0x29967d in an isolated child"
+}

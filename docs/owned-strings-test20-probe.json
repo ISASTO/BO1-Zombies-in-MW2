@@ -1,0 +1,23 @@
+{
+  "probe": "native shared ownership-label lifetime",
+  "repeated_user1_lookup_acquires_temporary_reference": false,
+  "old_32_field_reference_count": 1,
+  "old_first_cleanup_frees_live_shared_slot": true,
+  "old_remaining_stale_fields": 31,
+  "reused_dobj_pointer_decrement": 2,
+  "reused_vm_archive_pointer_decrement": 1,
+  "fixed_32_field_reference_count": 33,
+  "healthy_native_bone_hierarchy_passed": true,
+  "old_reused_model_native_fault_rva": "0x29967d",
+  "fixed_32_field_cleanup_premature_frees": 0,
+  "fixed_remaining_engine_user_references": 1,
+  "fixed_repeated_field_assignments_balanced": true,
+  "fixed_replacement_cycles": 16,
+  "native_hash_user_mask_setter_and_release_unchanged": true,
+  "substituted_dependencies": [
+    "single-thread locks",
+    "pool allocator/free recorder"
+  ],
+  "scope": "Private Linux MS-ABI reference/pool-reuse fixture. Campaign scripts, Windows gameplay and full checkpoint streams are not executed.",
+  "executable_sha256": "fb7e8a987c371dea7b666091b0b9e2011c0cd9cd277b191ad453d11d557dd777"
+}

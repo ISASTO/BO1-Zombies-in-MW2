@@ -64,6 +64,13 @@ def verify(path,include=Path('include')):
     intern=value(hooks,'kAiInternStringRva');code=pe.get_data(intern,10)
     if code[:6]!=bytes.fromhex('ba 01 00 00 00 e9') or intern+10+struct.unpack_from('<i',code,6)[0]!=0x21ac70:
         raise ValueError('Native string-reference wrapper binding differs')
+    pool=value(hooks,'kScriptStringPoolPointerRva')
+    if operand(0x21a374,3,7)!=pool:
+        raise ValueError('Native shared string-pool pointer differs')
+    for at,expected_bytes in ((0x21ac8b,'ba 01 00 00 00'),(0x21b01e,'85 d5 75 03 f0 ff 07'),
+                        (0x21b16e,'85 d5 75 03 f0 ff 07'),(0x21ad91,'f0 41 ff 00')):
+        expected_bytes=bytes.fromhex(expected_bytes)
+        if pe.get_data(at,len(expected_bytes))!=expected_bytes:raise ValueError(f'Native user-1 field reference semantics differ at {at:x}')
     # The native string factory computes the length and creates a user-1 ref.
     if pe.get_data(0x21ac8b,5)!=bytes.fromhex('ba 01 00 00 00'):
         raise ValueError('Native ownership-string factory user reference differs')
@@ -93,6 +100,8 @@ def verify(path,include=Path('include')):
         'script_vm_state_rva':hex(vm),'script_stack_base_rva':hex(stack),'script_frame_base_rva':hex(frame),
         'damage_hook_rva':hex(damage),'damage_trampoline_bytes':len(prologue),
         'native_string_factory_rva':hex(intern),'native_entity_save_fields_rva':hex(table),
+        'native_string_pool_pointer_rva':hex(pool),
+        'native_user1_marker_ownership':'Borrowed interner id; Scr_SetString acquires each field reference; no temporary release',
         'targetname_save_kind':1,'targetname_saved_as':'Text through SL_ConvertToString/MemFile_WriteCString',
         'checkpoint_write_behavior':'Keep live native actors/helpers; do not delete or enqueue save recovery',
         'checkpoint_read_behavior':'Clean current owned allocations before native read; adopt validated tagged actor/helper pairs afterward',

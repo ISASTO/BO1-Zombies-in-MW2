@@ -1,0 +1,50 @@
+{
+  "version": "0.1.19-squad-test20",
+  "dll_sha256": "5cf3073e1573ffa998c4fd3cb7cf91abdde1738d3e14dbd2631daa4894e4276d",
+  "dll_size": 4578467,
+  "machine": "AMD64 PE32+",
+  "aslr_nx": true,
+  "imports": [
+    "bcrypt.dll",
+    "dbghelp.dll",
+    "gdi32.dll",
+    "kernel32.dll",
+    "msvcrt.dll",
+    "user32.dll"
+  ],
+  "exports": [
+    "D3DPERF_BeginEvent",
+    "D3DPERF_EndEvent",
+    "D3DPERF_GetStatus",
+    "D3DPERF_QueryRepeatFrame",
+    "D3DPERF_SetMarker",
+    "D3DPERF_SetOptions",
+    "D3DPERF_SetRegion",
+    "DebugSetMute",
+    "Direct3DCreate9",
+    "Direct3DCreate9Ex"
+  ],
+  "cpp_suites_passed": 16,
+  "python_fixtures_passed": 28,
+  "existing_exact_profile_anchors": 97,
+  "native_squad_bindings": "squad-test20-native-bindings.json",
+  "native_shared_label_probe": "owned-strings-test20-probe.json",
+  "native_regression": {
+    "old_32_fields_remaining_refs": 1,
+    "old_cleanup_premature_free": true,
+    "old_stale_releases_damage_reused_pointer": true,
+    "fixed_32_fields_remaining_refs": 33,
+    "fixed_cleanup_premature_frees": 0,
+    "replacement_cycles": 16,
+    "healthy_native_bone_hierarchy_passed": true,
+    "old_reused_model_native_fault_rva": "0x29967d"
+  },
+  "runtime_capacity": 32,
+  "expanded_population_enabled": false,
+  "capacity_prototype": "Unchanged separate Test19 appended 256/274 layout; remaining consumers/full checkpoint and lifetime conversion block runtime activation",
+  "checkpoint_format": "Stock 32-actor/50-sentient native save with existing targetname ownership tags",
+  "vm_context": "Test19 guard retained; ownership-label lifetime fixed independently",
+  "performance": "Snapshot/name-cache/checked image reads and four NPC follow updates per tick retained. Marker counts logged on assignment; shared-pool memory copied only on crash.",
+  "retail_execution": "Windows crowded-squad/friendly-fire/replacements/autosave/death/relaunch testing still required",
+  "causal_limit": "Native reference/pool-reuse failure is reproduced. Specific freed slot histories were not captured in the returned dumps."
+}

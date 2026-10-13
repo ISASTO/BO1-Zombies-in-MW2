@@ -25,12 +25,14 @@ struct NativeEvent {
 };
 std::array<NativeEvent,64> nativeEvents{};
 std::atomic<std::uint64_t> nextNativeEvent{0};
-struct DumpMemory {std::uintptr_t base=0;unsigned next=0;};
+struct DumpMemory {std::uintptr_t base=0;unsigned next=0;std::uintptr_t sharedPool=0;ULONG sharedBytes=0;};
 BOOL CALLBACK IncludeNativeVmMemory(PVOID user,const PMINIDUMP_CALLBACK_INPUT input,PMINIDUMP_CALLBACK_OUTPUT output) {
     if(input->CallbackType!=MemoryCallback)return TRUE;
     auto& memory=*static_cast<DumpMemory*>(user);
     if(memory.next==0) {output->MemoryBase=memory.base+0x18f0000;output->MemorySize=0x20000;++memory.next;return TRUE;}
     if(memory.next==1) {output->MemoryBase=memory.base+0xd96e70;output->MemorySize=0x80;++memory.next;return TRUE;}
+    if(memory.next==2) {output->MemoryBase=memory.base+kScriptStringPoolPointerRva;output->MemorySize=8;++memory.next;return TRUE;}
+    if(memory.next==3 && memory.sharedBytes) {output->MemoryBase=memory.sharedPool;output->MemorySize=memory.sharedBytes;++memory.next;return TRUE;}
     return FALSE;
 }
 
@@ -129,7 +131,14 @@ LONG WINAPI CrashFilter(EXCEPTION_POINTERS* info) {
     if (dump != INVALID_HANDLE_VALUE) {
         MINIDUMP_EXCEPTION_INFORMATION exception{GetCurrentThreadId(), info, FALSE};
         const auto type=static_cast<MINIDUMP_TYPE>(MiniDumpNormal|MiniDumpWithIndirectlyReferencedMemory|MiniDumpWithThreadInfo);
-        DumpMemory memory{base,0};MINIDUMP_CALLBACK_INFORMATION callbacks{IncludeNativeVmMemory,&memory};
+        DumpMemory memory{base,0};MEMORY_BASIC_INFORMATION poolRegion{};
+        if(ReadProcessMemory(process,reinterpret_cast<void*>(base+kScriptStringPoolPointerRva),&memory.sharedPool,sizeof(memory.sharedPool),&read)
+            && memory.sharedPool && VirtualQuery(reinterpret_cast<void*>(memory.sharedPool),&poolRegion,sizeof(poolRegion))
+            && poolRegion.State==MEM_COMMIT && !(poolRegion.Protect&(PAGE_GUARD|PAGE_NOACCESS))) {
+            const auto available=reinterpret_cast<std::uintptr_t>(poolRegion.BaseAddress)+poolRegion.RegionSize-memory.sharedPool;
+            memory.sharedBytes=static_cast<ULONG>(std::min<std::uintptr_t>(available,0x100000));
+        }
+        MINIDUMP_CALLBACK_INFORMATION callbacks{IncludeNativeVmMemory,&memory};
         BOOL ok = MiniDumpWriteDump(GetCurrentProcess(), GetCurrentProcessId(), dump, type,
                                    &exception, nullptr, &callbacks);
         size = std::snprintf(message, sizeof(message), "minidump=%s error=%lu\r\n", ok ? "written" : "failed", ok ? 0 : GetLastError());
@@ -174,7 +183,7 @@ void InitializeLog() {
     }
     std::swprintf(logPath,32768,L"%ls",file);
     Log("BO1MW2 %s | AMD64 | log=%ls", kVersion, file);
-    Log("Test19: isolated full native VM work context, live enemy validation, notification deduplication and VM memory in crash dumps. 256-actor appended-layout prototype remains separate from the DLL.");
+    Log("Test20: ownership labels retain their native field references; user-1 interner ids are borrowed. Test19 VM/target guards remain. 256-actor prototype remains separate from the DLL.");
 }
 void Log(const char* format, ...) {
     char body[4096]{};
