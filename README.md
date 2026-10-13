@@ -1,25 +1,27 @@
 # BO1 Zombies in MW2
 
 Incremental mod framework for **retail Modern Warfare 2 (2009), single player**.
-Current build: **0.1.21-squad-test22**. The owner reports Test21 working and stable.
-Test22 replaces the drawn hitmarker with the original multiplayer
-**damage_feedback** texture, **MP_hit_alert** PCM sound and one-second linear
-fade. The installer extracts the image from your local `main/*.iwd` archives.
-Hitmarkers stay unavailable if the original asset or audio output is missing.
+Current build: **0.1.22-squad-test23**. Test23 fixes the mission-load crash in
+Test22's native actor-team iterator. All three returned dumps reach actor index
+451 beyond the 256-slot pool: a patch started inside a prefixed instruction and
+compared the actor pointer instead of the actor index. The corrected patch keeps
+the complete `CMP R8, 256` guard. The generator also rejects capacity guards
+that begin inside an original instruction.
 
-Test22 makes the first **runtime 256-actor / 274-sentient attempt**. It expands
-native storage, perception, snapshot producer/client readers, animation pools,
-and native checkpoint actor/sentient loops together. Activation requires the
-exact supported executable, matching original instructions, idle pools and a
-separately allocated nearby arena. The AI page shows the actual active capacity;
-the log records successful activation or its blocking reason.
+The regression reproduces the original crash and the alternate address-layout
+bug that skipped later actors. The fix passes **2,052 exact-native guarded
+iterator cases** across both address layouts. All 18 C++ suites, 31 Python tests,
+and expanded population/snapshot/animation checks pass. See [Test23 crash and
+fix evidence](docs/squad-test23.md). Windows mission loading still needs the
+owner's retest.
 
-All 18 C++ suites and 28 Python tests pass. The exact-native Linux fixture also
-passes with an arena outside the main image, including 256-actor save/load,
-32-actor legacy migration, 320 client goal lookups and 658 animation trees.
-**Windows gameplay, compressed retail checkpoints and crowded-AI performance
-still need the owner's test.** See [Test22 installation and checks](docs/squad-test22.md).
-Test16's performance protections and Test20's ownership fix remain included.
+The **256-actor / 274-sentient runtime attempt** and original multiplayer
+**damage_feedback** texture, **MP_hit_alert** PCM sound and one-second fade remain
+included. The installer extracts the real image from local `main/*.iwd` archives;
+returned Test22 logs confirm that asset initialization succeeded. The AI page
+shows actual active capacity. Expanded checkpoint layout remains version 1,
+with stock 32-actor checkpoint migration. Test16's performance protections and
+Test20's ownership fix remain included.
 
 Test20 fixes a native string-reference bug in squad ownership labels. Repeated
 user-1 intern lookups return a borrowed id, but the old code released it after

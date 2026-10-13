@@ -94,6 +94,10 @@ def flatten(meta):
  rows+=meta.get('prototype_edits',[])+meta.get('stage21_edits',[])+meta.get('stage22_edits',[])
  return [r for r in rows if not r['role'].startswith('fixture-only')]
 
+def validate_control_entry(role,at,instruction_start):
+ if ('capacity guard' in role or 'capacity bound' in role) and at!=instruction_start:
+  raise ValueError(f'Capacity guard begins inside instruction: {at:x}, actual start {instruction_start:x}')
+
 def runtime_plan(pe,image,meta):
  base=pe.OPTIONAL_HEADER.ImageBase;dec=Cs(CS_ARCH_X86,CS_MODE_64);dec.detail=True
  # Find original instruction boundaries in executable sections to expand
@@ -111,7 +115,9 @@ def runtime_plan(pe,image,meta):
   at=int(r['rva'],16);length=r.get('bytes',len(bytes.fromhex(r.get('after',''))))
   if at<0x4000000:
    if at not in boundaries or at+length-1 not in boundaries:raise ValueError(f'Instruction boundary missing {at:x}')
-   a,_=boundaries[at];z,n=boundaries[at+length-1];spans.append((a,z+n))
+   a,_=boundaries[at];z,n=boundaries[at+length-1]
+   validate_control_entry(r['role'],at,a)
+   spans.append((a,z+n))
   else:spans.append((at,at+length))
  spans.sort();merged=[]
  for a,z in spans:

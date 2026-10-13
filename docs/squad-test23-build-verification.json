@@ -1,0 +1,38 @@
+{
+  "version": "0.1.22-squad-test23",
+  "dll_sha256": "48299e656da69469dbf602ae5a283e65b9ff3d74cb6d09b50db1c60718f13f95",
+  "dll_bytes": 5234710,
+  "architecture": "AMD64",
+  "imports": [
+    "bcrypt.dll",
+    "dbghelp.dll",
+    "gdi32.dll",
+    "kernel32.dll",
+    "msvcrt.dll",
+    "user32.dll",
+    "winmm.dll"
+  ],
+  "exports": [
+    "D3DPERF_BeginEvent",
+    "D3DPERF_EndEvent",
+    "D3DPERF_GetStatus",
+    "D3DPERF_QueryRepeatFrame",
+    "D3DPERF_SetMarker",
+    "D3DPERF_SetOptions",
+    "D3DPERF_SetRegion",
+    "DebugSetMute",
+    "Direct3DCreate9",
+    "Direct3DCreate9Ex"
+  ],
+  "aslr": true,
+  "nx": true,
+  "cpp_suites_passed": 18,
+  "python_tests_passed": 31,
+  "guarded_native_iterator_cases": 2052,
+  "old_test22_crash_reproduced": true,
+  "corrected_native_iterator": "iterator-test23-probe.json",
+  "returned_crash_evidence": "runtime-test23-crash-evidence.json",
+  "expanded_runtime_regression": "expanded-runtime-test23-probe.json",
+  "retail_execution": "The returned Test22 crash is diagnosed and reproduced in the native fixture. Corrected Windows mission loading and crowded-AI stress need owner retesting.",
+  "experimental_max_capacity": 256
+}
