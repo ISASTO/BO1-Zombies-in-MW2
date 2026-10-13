@@ -1,5 +1,6 @@
 #include "runtime.hpp"
 #include <algorithm>
+#include <cmath>
 #include <cstdio>
 #include <map>
 #include <vector>
@@ -132,24 +133,14 @@ void Text(Overlay& overlay, float x, float y, float scale, D3DCOLOR color, const
         overlay.device->DrawPrimitiveUP(D3DPT_TRIANGLELIST, static_cast<UINT>(vertices.size()/3), vertices.data(), sizeof(Vertex));
     }
 }
-void DrawHitmarker(IDirect3DDevice9* device,float centerX,float centerY,float scale,std::uint8_t alpha) {
-    std::array<Vertex,24> vertices{};
+void DrawHitmarker(IDirect3DDevice9* device,IDirect3DTexture9* texture,float centerX,float centerY,float scale,std::uint8_t alpha) {
+    if(!texture)return;
+    const float x=centerX-12.f*scale-.5f,y=centerY-12.f*scale-.5f,w=24.f*scale,h=48.f*scale;
     const auto color=D3DCOLOR_ARGB(alpha,255,255,255);
-    unsigned offset=0;
-    for(float sx:{-1.f,1.f})for(float sy:{-1.f,1.f}) {
-        const float x1=centerX+sx*3.f*scale-.5f,y1=centerY+sy*3.f*scale-.5f;
-        const float x2=centerX+sx*9.f*scale-.5f,y2=centerY+sy*9.f*scale-.5f;
-        const float nx=-sy*.7f*scale,ny=sx*.7f*scale;
-        const Vertex a{x1+nx,y1+ny,0,1,color,0,0},b{x1-nx,y1-ny,0,1,color,0,0};
-        const Vertex c{x2+nx,y2+ny,0,1,color,0,0},d{x2-nx,y2-ny,0,1,color,0,0};
-        for(const auto& v:{a,b,c,c,b,d})vertices[offset++]=v;
-    }
-    device->SetTexture(0,nullptr);
-    device->SetTextureStageState(0,D3DTSS_COLOROP,D3DTOP_SELECTARG1);
-    device->SetTextureStageState(0,D3DTSS_COLORARG1,D3DTA_DIFFUSE);
-    device->SetTextureStageState(0,D3DTSS_ALPHAOP,D3DTOP_SELECTARG1);
-    device->SetTextureStageState(0,D3DTSS_ALPHAARG1,D3DTA_DIFFUSE);
-    device->DrawPrimitiveUP(D3DPT_TRIANGLELIST,8,vertices.data(),sizeof(Vertex));
+    const Vertex a{x,y,0,1,color,0,0},b{x+w,y,0,1,color,1,0},c{x,y+h,0,1,color,0,1},d{x+w,y+h,0,1,color,1,1};
+    const std::array<Vertex,6> vertices{a,b,c,c,b,d};
+    device->SetTexture(0,texture);
+    device->DrawPrimitiveUP(D3DPT_TRIANGLELIST,2,vertices.data(),sizeof(Vertex));
 }
 const char* PageName(Page page) {
     switch (page) {
@@ -258,6 +249,8 @@ void Overlay::detach() {
     window = nullptr;
 }
 void Overlay::invalidate() {
+    InvalidateMpFeedback();
+    if(hitTexture){hitTexture->Release();hitTexture=nullptr;}hitAttempted=false;
     if (font) { font->Release(); font = nullptr; }
     fontAttempted = false;
 }
@@ -376,6 +369,7 @@ void Overlay::frame() {
             extraPreferences.rapidFireMultiplier,extraPreferences.wanted(ExtraFeature::NoRecoil),s.recoilResolved,s.recoilValid,s.recoilScale,(s.weaponFlags&kRecoilScaleFlag)!=0,
             extraPreferences.wanted(ExtraFeature::Hitmarkers),extraPreferences.wanted(ExtraFeature::SemiAutoFullAuto),s.weapon.fireMode,SemiAutoApplied(s.weapon));
     }
+    PrepareMpFeedback(*this);
     const auto hitAlpha=GetHitmarkerAlpha(now);
     if (!menu.visible && !menu.hud && !hitAlpha) return;
     IDirect3DStateBlock9* state = nullptr;
@@ -400,7 +394,7 @@ void Overlay::frame() {
     auto rect = [&](float x,float y,float w,float h,D3DCOLOR c) { Rect(device,x*scale,y*scale,w*scale,h*scale,c); };
     auto text = [&](float x,float y,D3DCOLOR c,const char* value,float factor=.8f) { Text(*this,x*scale,y*scale,scale*factor,c,value); };
     char line[128]{};
-    if(hitAlpha)DrawHitmarker(device,size.Width*.5f,size.Height*.5f,std::clamp(size.Height/720.f,.6f,2.f),hitAlpha);
+    if(hitAlpha)DrawHitmarker(device,hitTexture,size.Width*.5f,size.Height*.5f-std::trunc(MpCrosshairOffset()*240.f)*(size.Height/480.f),size.Height/480.f,hitAlpha);
     if (menu.hud) {
         rect(12,12,446,25,D3DCOLOR_ARGB(205,7,10,6));
         std::snprintf(line,sizeof(line),"BO1MW2 | F4 | %s",StateText(s.state));
@@ -526,7 +520,7 @@ void Overlay::frame() {
                 else if (n==5) status=!ExtraAvailable(s,ExtraFeature::ExplosiveBullets)?"LOCKED":s.explosive.current?(extraPreferences.wanted(ExtraFeature::ExplosiveBullets)?"ON":"NATIVE"):(extraPreferences.wanted(ExtraFeature::ExplosiveBullets)?"WAIT":"OFF");
                 else if (n==6) status=!ExtraAvailable(s,ExtraFeature::ForceDualWield)?"LOCKED":extraPreferences.wanted(ExtraFeature::ForceDualWield)?(weaponMode.dualReady && s.dualWield.current && s.lastWeaponHand==1?(weaponMode.dualFallback?(weaponMode.nativeHandState==NativeHandBuildState::Queued?"BUILD":"COMPAT"):"ON"):s.dualCurrentSupported?"WAIT":"ON*"):weaponMode.dualOwned?"UNDO":s.dualWield.current?"NATIVE":"OFF";
                 else if (n==7) status=!ExtraAvailable(s,ExtraFeature::NoRecoil)?"LOCKED":extraPreferences.wanted(ExtraFeature::NoRecoil)?(s.recoilScale==0 && (s.weaponFlags&kRecoilScaleFlag)?"ON":"WAIT"):"OFF";
-                else if (n==8) status=!ExtraAvailable(s,ExtraFeature::Hitmarkers)?"LOCKED":extraPreferences.wanted(ExtraFeature::Hitmarkers)?"ON":"OFF";
+                else if (n==8) status=!MpFeedbackReady()?"ASSET MISSING":!ExtraAvailable(s,ExtraFeature::Hitmarkers)?"LOCKED":extraPreferences.wanted(ExtraFeature::Hitmarkers)?"ON":"OFF";
                 else if (n==9) status=!ExtraAvailable(s,ExtraFeature::SemiAutoFullAuto)?"LOCKED":!extraPreferences.wanted(ExtraFeature::SemiAutoFullAuto)?"OFF":s.weapon.fireMode==0?"ON":s.weapon.fireMode==1?"WAIT":"ON (BURST)";
                 else status="ENTER";
             }
@@ -546,7 +540,7 @@ void Overlay::frame() {
             }
             else if(menu.page==Page::AI) {
                 if(n==0 || n==1) status=!aiStatus.ready?"LOCKED":aiStatus.pending?"QUEUED":
-                    !(n==1?aiStatus.friendlySpawners:aiStatus.enemySpawners)?"NONE":(n==1 && !aiStatus.characterLoaded)?"NOT LOADED":aiStatus.spawnPaused?"PAUSED":aiStatus.engineActors>=kAiNativeActorCapacity?"ENGINE FULL":"ENTER";
+                    !(n==1?aiStatus.friendlySpawners:aiStatus.enemySpawners)?"NONE":(n==1 && !aiStatus.characterLoaded)?"NOT LOADED":aiStatus.spawnPaused?"PAUSED":aiStatus.engineActors>=NativeActorCapacity()?"ENGINE FULL":"ENTER";
                 else if(n==2) { std::snprintf(value,sizeof(value),"%d/%d",aiStatus.enemySpawner,aiStatus.enemySpawners); status=value; }
                 else if(n==3) { std::snprintf(value,sizeof(value),"%d/%d",aiStatus.friendlySpawner,aiStatus.friendlySpawners); status=value; }
                 else if(n==4) status=!aiStatus.ready?"LOCKED":aiStatus.spawnPaused?(aiStatus.pauseWanted?"ON":"NATIVE"):(aiStatus.pauseWanted?"WAIT":"OFF");
@@ -555,7 +549,7 @@ void Overlay::frame() {
                 else if(n==7) { std::snprintf(value,sizeof(value),"%d / %d",aiStatus.enemyAlive,aiStatus.friendlyAlive); status=aiStatus.ready?value:"UNKNOWN"; }
                 else if(n==8) { std::snprintf(value,sizeof(value),"%d",aiStatus.owned); status=value; }
                 else if(n==9) status=aiStatus.pending?"QUEUED":aiStatus.owned?"ENTER":"EMPTY";
-                else if(n==11) { std::snprintf(value,sizeof(value),"%d / %d",aiStatus.engineActors,kAiNativeActorCapacity); status=value; }
+                else if(n==11) { std::snprintf(value,sizeof(value),"%d / %d",aiStatus.engineActors,NativeActorCapacity()); status=value; }
                 else status="ENTER";
             }
             else if (menu.page==Page::View) {

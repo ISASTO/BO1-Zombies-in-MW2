@@ -6,7 +6,7 @@
 #include <cstring>
 
 namespace mod::expansion {
-// Experimental layout used by the isolated native prototype, not the DLL.
+// Experimental Test22 native layout; also exercised by isolated probes.
 // Append perception rather than inserting it: all original brain field
 // offsets, including goals, animation state and active flags, stay unchanged.
 inline constexpr std::size_t kActors=256,kSentients=274,kCorpses=64;
@@ -34,8 +34,8 @@ inline std::vector<SaveField> ExpandedSaveFields(const std::vector<SaveField>& o
     for(std::size_t n=0;n<kSentients;++n)out.push_back({kPerceptionStart+n*kRecordBytes+40,14,0});
     out.push_back({});return out;
 }
-// Discriminator for an expanded population chunk. Engine checkpoint integration
-// must route this chunk separately from stock 32/50 streams before activation.
+// Native checkpoint segment 3 discriminator. Stock 32/50 streams are decoded
+// with stock descriptors, then migrated before the caller resumes.
 struct PopulationChunkHeader {
     std::array<char,8> magic{'B','O','1','M','W','2','A','I'};
     std::uint32_t version=1,actors=kActors,sentients=kSentients;

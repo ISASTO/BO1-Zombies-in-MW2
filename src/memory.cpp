@@ -39,7 +39,7 @@ std::size_t HostReadableBytes(std::uintptr_t address) {
 }
 bool CheckedReadMemory(std::uintptr_t address,void* output,std::size_t size) {
     if(!address || !output || !size)return false;
-    if(size<=HostReadableBytes(address)) {++readCounts.image;std::memcpy(output,reinterpret_cast<const void*>(address),size);return true;}
+    if(ExpandedArenaContains(address,size) || size<=HostReadableBytes(address)) {++readCounts.image;std::memcpy(output,reinterpret_cast<const void*>(address),size);return true;}
     ++readCounts.kernel;SIZE_T copied=0;
     return ReadProcessMemory(GetCurrentProcess(),reinterpret_cast<const void*>(address),output,size,&copied) && copied==size;
 }

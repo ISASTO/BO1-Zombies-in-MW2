@@ -1,0 +1,1243 @@
+{
+  "sha256": "fb7e8a987c371dea7b666091b0b9e2011c0cd9cd277b191ad453d11d557dd777",
+  "architecture": "AMD64",
+  "signatures": {
+    "kSvRunningPattern": {
+      "match_count": 1,
+      "match_rva": "0x1fc9cc",
+      "rip_targets": {
+        "29": "0x34b530",
+        "54": "0x13260c0"
+      },
+      "name_anchor": "sv_running"
+    },
+    "kMapNamePattern": {
+      "match_count": 1,
+      "match_rva": "0x23234f",
+      "rip_targets": {
+        "13": "0x32bd78",
+        "27": "0x19ada88"
+      },
+      "name_anchor": "mapname"
+    },
+    "kEntityPattern": {
+      "match_count": 1,
+      "match_rva": "0x165bb3",
+      "rip_targets": {
+        "0": "0xd96e78"
+      }
+    },
+    "kGodDamagePattern": {
+      "match_count": 1,
+      "match_rva": "0x168210",
+      "rip_targets": {}
+    },
+    "kHealthGuardPattern": {
+      "match_count": 1,
+      "match_rva": "0x1656de",
+      "rip_targets": {}
+    },
+    "kFovRegistrationPattern": {
+      "match_count": 1,
+      "match_rva": "0xa7177",
+      "rip_targets": {
+        "9": "0x327bb4",
+        "68": "0x51e1a8"
+      },
+      "name_anchor": "cg_fov"
+    },
+    "kFovCameraPattern": {
+      "match_count": 1,
+      "match_rva": "0xbc25d",
+      "rip_targets": {
+        "0": "0x51e1a8"
+      }
+    },
+    "kClientReadinessPattern": {
+      "match_count": 1,
+      "match_rva": "0x15be45",
+      "rip_targets": {}
+    },
+    "kClientDamageGuardPattern": {
+      "match_count": 1,
+      "match_rva": "0x167e89",
+      "rip_targets": {}
+    },
+    "kClientInvulnerabilityClearPattern": {
+      "match_count": 1,
+      "match_rva": "0x164ffe",
+      "rip_targets": {}
+    },
+    "kNoclipCommandPattern": {
+      "match_count": 1,
+      "match_rva": "0x165d76",
+      "rip_targets": {}
+    },
+    "kNoclipMovementPattern": {
+      "match_count": 1,
+      "match_rva": "0x15beb2",
+      "rip_targets": {}
+    },
+    "kReserveReadPattern": {
+      "match_count": 1,
+      "match_rva": "0x7f1a4",
+      "rip_targets": {}
+    },
+    "kReserveWritePattern": {
+      "match_count": 1,
+      "match_rva": "0x86b99",
+      "rip_targets": {}
+    },
+    "kSustainRegistrationPattern": {
+      "match_count": 1,
+      "match_rva": "0x75414",
+      "rip_targets": {
+        "2": "0x322b60",
+        "20": "0x3dd718"
+      },
+      "name_anchor": "player_sustainAmmo"
+    },
+    "kSustainConsumerPattern": {
+      "match_count": 1,
+      "match_rva": "0x84e98",
+      "rip_targets": {
+        "0": "0x3dd718"
+      }
+    },
+    "kSpeedRegistrationPattern": {
+      "match_count": 1,
+      "match_rva": "0x172b8f",
+      "rip_targets": {
+        "0": "0x33c188",
+        "64": "0xd9c040"
+      },
+      "name_anchor": "g_speed"
+    },
+    "kSpeedConsumerPattern": {
+      "match_count": 1,
+      "match_rva": "0x15bf60",
+      "rip_targets": {
+        "0": "0xd9c040"
+      }
+    },
+    "kJumpRegistrationPattern": {
+      "match_count": 1,
+      "match_rva": "0x70833",
+      "rip_targets": {
+        "8": "0x31f7a0",
+        "62": "0x3d9658"
+      },
+      "name_anchor": "jump_height"
+    },
+    "kJumpImpulsePattern": {
+      "match_count": 1,
+      "match_rva": "0x703a8",
+      "rip_targets": {}
+    },
+    "kJumpClampPattern": {
+      "match_count": 1,
+      "match_rva": "0x7069e",
+      "rip_targets": {}
+    },
+    "kJumpStepPattern": {
+      "match_count": 1,
+      "match_rva": "0x70730",
+      "rip_targets": {}
+    },
+    "kJumpCeilingPattern": {
+      "match_count": 1,
+      "match_rva": "0x70790",
+      "rip_targets": {}
+    },
+    "kGiveAllRegistrationPattern": {
+      "match_count": 1,
+      "match_rva": "0x173df4",
+      "rip_targets": {
+        "0": "0x33def8",
+        "15": "0x33df10",
+        "27": "0x37e023",
+        "34": "0xd9e068"
+      },
+      "name_anchor": "g_giveAll"
+    },
+    "kGiveAllConsumerPattern": {
+      "match_count": 1,
+      "match_rva": "0x8389a",
+      "rip_targets": {
+        "0": "0xd9e068"
+      }
+    },
+    "kExplosiveRegistrationPattern": {
+      "match_count": 1,
+      "match_rva": "0x750bb",
+      "rip_targets": {
+        "6": "0x322500",
+        "18": "0x385b14",
+        "27": "0x322578",
+        "34": "0x3dd690"
+      },
+      "name_anchor": "bg_forceExplosiveBullets"
+    },
+    "kExplosiveConsumerPattern": {
+      "match_count": 1,
+      "match_rva": "0x86f30",
+      "rip_targets": {
+        "9": "0x3dd690"
+      }
+    },
+    "kTimeRegistrationPattern": {
+      "match_count": 1,
+      "match_rva": "0x1fc917",
+      "rip_targets": {
+        "0": "0x34b458",
+        "7": "0x3859cc",
+        "15": "0x385a54",
+        "28": "0x13260b8",
+        "48": "0x13260b0"
+      },
+      "name_anchor": "timescale"
+    },
+    "kTimeConsumerPattern": {
+      "match_count": 1,
+      "match_rva": "0x1fc269",
+      "rip_targets": {
+        "0": "0x13260b0",
+        "30": "0x3c3960"
+      }
+    },
+    "kAiRegistrationPattern": {
+      "match_count": 1,
+      "match_rva": "0x172bf7",
+      "rip_targets": {
+        "0": "0x33c1c0",
+        "7": "0xd9c048",
+        "20": "0x33c1cc",
+        "34": "0x33c1d8",
+        "41": "0xd9c0b8"
+      },
+      "name_anchor": "g_ai"
+    },
+    "kAiConsumerPattern": {
+      "match_count": 1,
+      "match_rva": "0x12a699",
+      "rip_targets": {
+        "0": "0xd9c0b8",
+        "16": "0xd96ec8"
+      }
+    },
+    "kGravityRegistrationPattern": {
+      "match_count": 1,
+      "match_rva": "0x75fbe",
+      "rip_targets": {
+        "0": "0x324340",
+        "8": "0x323b88",
+        "15": "0x3dd780",
+        "25": "0x323b60",
+        "57": "0x3dd5e8"
+      },
+      "name_anchor": "g_gravity"
+    },
+    "kGravityTrajectoryPattern": {
+      "match_count": 1,
+      "match_rva": "0x736f7",
+      "rip_targets": {
+        "0": "0x3dd5e8",
+        "12": "0x385a24"
+      }
+    },
+    "kPlayerGravityPattern": {
+      "match_count": 1,
+      "match_rva": "0x15bf24",
+      "rip_targets": {
+        "0": "0x338b0c",
+        "13": "0x385b2c",
+        "60": "0xd9c040"
+      }
+    },
+    "kWeaponCatalogPattern": {
+      "match_count": 1,
+      "match_rva": "0x85220",
+      "rip_targets": {
+        "6": "0x3edce0",
+        "26": "0x3ee320"
+      }
+    },
+    "kWeaponCountPattern": {
+      "match_count": 1,
+      "match_rva": "0x8589d",
+      "rip_targets": {
+        "0": "0x3edae0",
+        "6": "0x3edce0",
+        "17": "0x3edae4"
+      }
+    },
+    "kWeaponPointersPattern": {
+      "match_count": 1,
+      "match_rva": "0x85840",
+      "rip_targets": {
+        "2": "0x3edce0",
+        "16": "0x3ee320"
+      }
+    },
+    "kWeaponBindingPattern": {
+      "match_count": 1,
+      "match_rva": "0x852a8",
+      "rip_targets": {
+        "4": "0x3ee320",
+        "11": "0x3ee970"
+      }
+    },
+    "kWeaponFireScriptPattern": {
+      "match_count": 1,
+      "match_rva": "0x18b4e6",
+      "rip_targets": {
+        "15": "0x3859cc"
+      }
+    },
+    "kWeaponFireConsumerPattern": {
+      "match_count": 1,
+      "match_rva": "0x83b68",
+      "rip_targets": {}
+    },
+    "kGrenadeSustainPattern": {
+      "match_count": 1,
+      "match_rva": "0x84edc",
+      "rip_targets": {
+        "3": "0x3246f8",
+        "26": "0x324708"
+      }
+    },
+    "kDualRegistrationPattern": {
+      "match_count": 1,
+      "match_rva": "0x746ac",
+      "rip_targets": {
+        "0": "0x3212f0",
+        "7": "0x321318",
+        "25": "0x3d99a8"
+      },
+      "name_anchor": "bg_forceDualWield"
+    },
+    "kDualConsumerPattern": {
+      "match_count": 1,
+      "match_rva": "0x82a67",
+      "rip_targets": {
+        "0": "0x3d99a8"
+      }
+    },
+    "kWeaponSlotGrantPattern": {
+      "match_count": 1,
+      "match_rva": "0x861d3",
+      "rip_targets": {}
+    },
+    "kWeaponMetadataPattern": {
+      "match_count": 1,
+      "match_rva": "0x1a0d2b",
+      "rip_targets": {}
+    },
+    "kAmmoIndexPattern": {
+      "match_count": 1,
+      "match_rva": "0x84280",
+      "rip_targets": {}
+    },
+    "kClipIndexPattern": {
+      "match_count": 1,
+      "match_rva": "0x16d2c0",
+      "rip_targets": {}
+    },
+    "kClipSizePattern": {
+      "match_count": 1,
+      "match_rva": "0x86290",
+      "rip_targets": {}
+    },
+    "kPlayableWeaponPattern": {
+      "match_count": 1,
+      "match_rva": "0x1a1d41",
+      "rip_targets": {}
+    },
+    "kAlternateChainPattern": {
+      "match_count": 1,
+      "match_rva": "0x1a1e34",
+      "rip_targets": {}
+    },
+    "kClipPoolPattern": {
+      "match_count": 1,
+      "match_rva": "0x84210",
+      "rip_targets": {}
+    },
+    "kDualAnimSupportPattern": {
+      "match_count": 1,
+      "match_rva": "0x86740",
+      "rip_targets": {}
+    },
+    "kDualAnimSelectPattern": {
+      "match_count": 1,
+      "match_rva": "0x86eac",
+      "rip_targets": {}
+    },
+    "kDualAnimCacheReadPattern": {
+      "match_count": 1,
+      "match_rva": "0xc66f5",
+      "rip_targets": {
+        "0": "0x43f470"
+      }
+    },
+    "kDualAnimCacheResetPattern": {
+      "match_count": 1,
+      "match_rva": "0xa6392",
+      "rip_targets": {
+        "2": "0x43f470"
+      }
+    },
+    "kDualAnimCacheStridePattern": {
+      "match_count": 1,
+      "match_rva": "0xc4b38",
+      "rip_targets": {}
+    },
+    "kWeaponAnimBuildPattern": {
+      "match_count": 1,
+      "match_rva": "0xc2ccf",
+      "rip_targets": {}
+    },
+    "kAiActorThinkStartPattern": {
+      "match_count": 1,
+      "match_rva": "0x12a690",
+      "rip_targets": {
+        "9": "0xd9c0b8",
+        "25": "0xd96ec8"
+      }
+    },
+    "kAiThinkDispatchPattern": {
+      "match_count": 1,
+      "match_rva": "0x174dfb",
+      "rip_targets": {
+        "12": "0x3c0aa0",
+        "45": "0x33f590"
+      }
+    },
+    "kAiSpawnerArrayPattern": {
+      "match_count": 1,
+      "match_rva": "0x191239",
+      "rip_targets": {
+        "0": "0xd96e80",
+        "12": "0xd96e78",
+        "24": "0xd9b820"
+      }
+    },
+    "kAiSpawnerFieldsPattern": {
+      "match_count": 1,
+      "match_rva": "0x1912f7",
+      "rip_targets": {}
+    },
+    "kAiNormalSpawnMethodPattern": {
+      "match_count": 1,
+      "match_rva": "0x19186d",
+      "rip_targets": {
+        "31": "0xd96ec8"
+      }
+    },
+    "kAiSpawnCorePattern": {
+      "match_count": 1,
+      "match_rva": "0x152e60",
+      "rip_targets": {
+        "13": "0xd9c170",
+        "56": "0xd97be8"
+      }
+    },
+    "kAiActorInitPattern": {
+      "match_count": 1,
+      "match_rva": "0x12ce20",
+      "rip_targets": {
+        "26": "0xd9c0c0"
+      }
+    },
+    "kAiActorLinksPattern": {
+      "match_count": 1,
+      "match_rva": "0x12cefa",
+      "rip_targets": {
+        "21": "0xd96ec8"
+      }
+    },
+    "kAiActorHandlerPattern": {
+      "match_count": 1,
+      "match_rva": "0x12cf33",
+      "rip_targets": {}
+    },
+    "kAiDeleteMethodPattern": {
+      "match_count": 1,
+      "match_rva": "0x189240",
+      "rip_targets": {
+        "51": "0xd9e070"
+      }
+    },
+    "kAiDeleteGuardPattern": {
+      "match_count": 1,
+      "match_rva": "0x189295",
+      "rip_targets": {
+        "4": "0xd97c00",
+        "17": "0x115792e"
+      }
+    },
+    "kAiEntitySerialPattern": {
+      "match_count": 1,
+      "match_rva": "0x19fbef",
+      "rip_targets": {
+        "22": "0xd96e78"
+      }
+    },
+    "kAiEntitySerialCommitPattern": {
+      "match_count": 1,
+      "match_rva": "0x19fc3e",
+      "rip_targets": {}
+    },
+    "kAiStringConvertPattern": {
+      "match_count": 1,
+      "match_rva": "0x21a370",
+      "rip_targets": {
+        "4": "0x1466008"
+      }
+    },
+    "kAiSpawnEnabledRegistrationPattern": {
+      "match_count": 1,
+      "match_rva": "0x172c27",
+      "rip_targets": {
+        "6": "0x33c1f0",
+        "20": "0x33c200",
+        "27": "0xd9c0c0"
+      },
+      "name_anchor": "g_spawnai"
+    },
+    "kAiSpawnDisabledRegistrationPattern": {
+      "match_count": 1,
+      "match_rva": "0x17348e",
+      "rip_targets": {
+        "2": "0x33d180",
+        "20": "0x385ba0",
+        "29": "0x33d1b0",
+        "36": "0xd9c170"
+      },
+      "name_anchor": "ai_disableSpawn"
+    },
+    "kAiNormalSpawnEntryPattern": {
+      "match_count": 1,
+      "match_rva": "0x191810",
+      "rip_targets": {
+        "24": "0xd96ec8"
+      }
+    },
+    "kAiSentientLinksPattern": {
+      "match_count": 1,
+      "match_rva": "0x1b1970",
+      "rip_targets": {}
+    },
+    "kAiActorTypePattern": {
+      "match_count": 1,
+      "match_rva": "0x12cfa3",
+      "rip_targets": {}
+    },
+    "kAiActorSelfPattern": {
+      "match_count": 1,
+      "match_rva": "0x12d0f1",
+      "rip_targets": {}
+    },
+    "kAiSpawnCopyCallsPattern": {
+      "match_count": 1,
+      "match_rva": "0x152ee0",
+      "rip_targets": {}
+    },
+    "kAiCopyFieldsStartPattern": {
+      "match_count": 1,
+      "match_rva": "0x19a2c0",
+      "rip_targets": {
+        "10": "0x346460",
+        "35": "0x346468"
+      }
+    },
+    "kAiCopyDynamicStartPattern": {
+      "match_count": 1,
+      "match_rva": "0x19a3c0",
+      "rip_targets": {}
+    },
+    "kAiTraceStartPattern": {
+      "match_count": 1,
+      "match_rva": "0x175280",
+      "rip_targets": {}
+    },
+    "kAiTraceScriptCallPattern": {
+      "match_count": 1,
+      "match_rva": "0x189722",
+      "rip_targets": {
+        "0": "0x355818"
+      }
+    },
+    "kAiTraceLayoutPattern": {
+      "match_count": 1,
+      "match_rva": "0x1f8140",
+      "rip_targets": {}
+    },
+    "kAiPositionSetterPattern": {
+      "match_count": 1,
+      "match_rva": "0x1a05c0",
+      "rip_targets": {}
+    },
+    "kAiPositionMethodCallPattern": {
+      "match_count": 1,
+      "match_rva": "0x1908ad",
+      "rip_targets": {}
+    },
+    "kAiTeamChangePattern": {
+      "match_count": 1,
+      "match_rva": "0x1b1f50",
+      "rip_targets": {}
+    },
+    "kAiTeamScriptSetterPattern": {
+      "match_count": 1,
+      "match_rva": "0x1b2090",
+      "rip_targets": {}
+    },
+    "kAiGoalPositionPattern": {
+      "match_count": 1,
+      "match_rva": "0x1504e0",
+      "rip_targets": {}
+    },
+    "kAiGoalScriptCallPattern": {
+      "match_count": 1,
+      "match_rva": "0x14f041",
+      "rip_targets": {}
+    },
+    "kAiActorCapacityPattern": {
+      "match_count": 1,
+      "match_rva": "0x123950",
+      "rip_targets": {
+        "10": "0xd9c0e0",
+        "17": "0xd96ee0",
+        "28": "0xd96ea0"
+      }
+    },
+    "kAiClearEnemyTailPattern": {
+      "match_count": 1,
+      "match_rva": "0x14f8fc",
+      "rip_targets": {}
+    },
+    "kWeaponAnimBuildStartPattern": {
+      "match_count": 1,
+      "match_rva": "0xc2c70",
+      "rip_targets": {
+        "29": "0xa9730",
+        "41": "0x32e088"
+      }
+    },
+    "kAiActorBoundsPattern": {
+      "match_count": 1,
+      "match_rva": "0x12cf71",
+      "rip_targets": {
+        "0": "0x334538",
+        "14": "0x334548"
+      }
+    },
+    "kAiActorTraceResultPattern": {
+      "match_count": 1,
+      "match_rva": "0x12d045",
+      "rip_targets": {
+        "18": "0x385b60",
+        "32": "0x31fd30"
+      }
+    },
+    "kNativeWeaponHandsCallsPattern": {
+      "match_count": 1,
+      "match_rva": "0xc4c99",
+      "rip_targets": {}
+    },
+    "kAiEnemySetterStartPattern": {
+      "match_count": 1,
+      "match_rva": "0x1b1cb0",
+      "rip_targets": {}
+    },
+    "kAiSpawnTargetnamePattern": {
+      "match_count": 1,
+      "match_rva": "0x152efe",
+      "rip_targets": {}
+    },
+    "kHeldFireModePattern": {
+      "match_count": 1,
+      "match_rva": "0x83f90",
+      "rip_targets": {}
+    },
+    "kSemiAutoFireGatePattern": {
+      "match_count": 1,
+      "match_rva": "0x7f49a",
+      "rip_targets": {}
+    }
+  },
+  "fov": {
+    "slot_rva": "0x51e1a8",
+    "type": 1,
+    "current_offset": "0x10",
+    "width_bytes": 4,
+    "camera_read_rva": "0xbc26d",
+    "registration_constants": {
+      "minimum": {
+        "value": 1.0,
+        "rva": "0x385a54"
+      },
+      "maximum": {
+        "value": 160.0,
+        "rva": "0x31e6a4"
+      },
+      "default": {
+        "value": 65.0,
+        "rva": "0x32ae10"
+      }
+    },
+    "limits": "Static exact-build evidence; owner confirms test6 FOV behavior. See runtime-test6-evidence.json for recorded coverage."
+  },
+  "entity_number": {
+    "offset": "0x7e",
+    "width_bytes": 2,
+    "evidence": {
+      "allocator_word_store": {
+        "match_count": 1,
+        "instruction_rva": "0x1a0953",
+        "decoded_member_offset": "0x7e"
+      },
+      "native_word_read": {
+        "match_count": 1,
+        "instruction_rva": "0x19afb4",
+        "decoded_member_offset": "0x7e"
+      }
+    }
+  },
+  "player": {
+    "partial_fields": {
+      "kEntityClient": [
+        {
+          "signature": "kClientReadinessPattern",
+          "encoded_member_rva": "0x15be48",
+          "offset": "0x108"
+        },
+        {
+          "signature": "kNoclipCommandPattern",
+          "encoded_member_rva": "0x165d79",
+          "offset": "0x108"
+        },
+        {
+          "signature": "kClientInvulnerabilityClearPattern",
+          "encoded_member_rva": "0x165006",
+          "offset": "0x108"
+        }
+      ],
+      "kClientConnected": [
+        {
+          "signature": "kClientReadinessPattern",
+          "encoded_member_rva": "0x15be59",
+          "offset": "0xaca4"
+        }
+      ],
+      "kClientCheatFlags": [
+        {
+          "signature": "kClientReadinessPattern",
+          "encoded_member_rva": "0x15be6b",
+          "offset": "0xad54"
+        },
+        {
+          "signature": "kNoclipCommandPattern",
+          "encoded_member_rva": "0x165d95",
+          "offset": "0xad54"
+        }
+      ],
+      "kClientOtherFlags": [
+        {
+          "signature": "kClientDamageGuardPattern",
+          "encoded_member_rva": "0x167e8b",
+          "offset": "0x10"
+        },
+        {
+          "signature": "kClientInvulnerabilityClearPattern",
+          "encoded_member_rva": "0x16500c",
+          "offset": "0x10"
+        }
+      ],
+      "kReserveAmmo": [
+        {
+          "signature": "kReserveReadPattern",
+          "encoded_member_rva": "0x7f1a7",
+          "offset": "0x2d8"
+        },
+        {
+          "signature": "kReserveWritePattern",
+          "encoded_member_rva": "0x86b9f",
+          "offset": "0x2d8"
+        }
+      ],
+      "kEntityTakeDamage": [
+        {
+          "instruction_rva": "0x167d53",
+          "offset": "0x139"
+        }
+      ],
+      "kClientHealth": [
+        {
+          "instruction_rva": "0x165c7d",
+          "offset": "0x14c"
+        }
+      ],
+      "kClientMoveType": [
+        {
+          "instruction_rva": "0x15bf20",
+          "offset": "0x4"
+        }
+      ]
+    },
+    "reserve_entries": 15,
+    "reserve_stride": 8,
+    "sustain_slot_rva": "0x3dd718",
+    "sustain_type": 0,
+    "speed_slot_rva": "0xd9c040",
+    "speed_type": 5,
+    "limits": "Static exact-build evidence. Owner accepts PLAYER test7 and adjustable movement test8; test9 weapon feedback is recorded; new checkpoint/dual behavior awaits test10 retail run.",
+    "jump": {
+      "height_constant_rva": "0x31f8cc",
+      "twice_height_constant_rva": "0x31f8d0",
+      "height_references": [
+        "0x706a6",
+        "0x70738",
+        "0x70798",
+        "0x70833"
+      ],
+      "twice_height_references": [
+        "0x703b0"
+      ],
+      "native_height": 39,
+      "default_selected_height": 117,
+      "selectable_heights": [
+        39,
+        78,
+        117,
+        156,
+        195,
+        234,
+        273,
+        312
+      ],
+      "compatibility": "Runtime data-only float pair; jump_height dvar is not consumed by the observed jump paths."
+    }
+  },
+  "weapon_inventory": {
+    "partial_fields": {
+      "kOwnedWeapons": [
+        {
+          "signature": "kWeaponSlotGrantPattern",
+          "encoded_member_rva": "0x861e9",
+          "offset": "0x220"
+        }
+      ],
+      "kWeaponMetadata": [
+        {
+          "signature": "kWeaponSlotGrantPattern",
+          "encoded_member_rva": "0x861da",
+          "offset": "0x25c"
+        },
+        {
+          "signature": "kWeaponMetadataPattern",
+          "encoded_member_rva": "0x1a0d30",
+          "offset": "0x25c"
+        }
+      ],
+      "kClipAmmo": [
+        {
+          "signature": "kClipPoolPattern",
+          "encoded_member_rva": "0x84213",
+          "offset": "0x350"
+        }
+      ],
+      "kLastWeaponHand": [
+        {
+          "signature": "kDualConsumerPattern",
+          "encoded_member_rva": "0x82a87",
+          "offset": "0x2d4"
+        }
+      ],
+      "kNoDualWield": [
+        {
+          "signature": "kDualConsumerPattern",
+          "encoded_member_rva": "0x82a91",
+          "offset": "0x873"
+        }
+      ],
+      "kGunModels": [
+        {
+          "signature": "kPlayableWeaponPattern",
+          "encoded_member_rva": "0x1a1d60",
+          "offset": "0x8"
+        }
+      ],
+      "kWeaponClass": [
+        {
+          "signature": "kPlayableWeaponPattern",
+          "encoded_member_rva": "0x1a1d43",
+          "offset": "0x58"
+        }
+      ],
+      "kInventoryType": [
+        {
+          "signature": "kPlayableWeaponPattern",
+          "encoded_member_rva": "0x1a1d55",
+          "offset": "0x60"
+        }
+      ],
+      "kAmmoIndex": [
+        {
+          "signature": "kAmmoIndexPattern",
+          "encoded_member_rva": "0x8428e",
+          "offset": "0x348"
+        }
+      ],
+      "kClipIndex": [
+        {
+          "signature": "kClipIndexPattern",
+          "encoded_member_rva": "0x16d2cd",
+          "offset": "0x358"
+        }
+      ],
+      "kClipSize": [
+        {
+          "signature": "kClipSizePattern",
+          "encoded_member_rva": "0x8629d",
+          "offset": "0x34"
+        }
+      ],
+      "kAlternateWeapon": [
+        {
+          "signature": "kAlternateChainPattern",
+          "encoded_member_rva": "0x1a1e3b",
+          "offset": "0x58"
+        }
+      ],
+      "kRightWeaponAnims": [
+        {
+          "signature": "kDualAnimSupportPattern",
+          "encoded_member_rva": "0x86743",
+          "offset": "0x18"
+        },
+        {
+          "signature": "kDualAnimSelectPattern",
+          "encoded_member_rva": "0x86eaf",
+          "offset": "0x18"
+        }
+      ],
+      "kLeftWeaponAnims": [
+        {
+          "signature": "kDualAnimSelectPattern",
+          "encoded_member_rva": "0x86ed4",
+          "offset": "0x20"
+        }
+      ],
+      "kNormalWeaponAnims": [
+        {
+          "signature": "kDualAnimSelectPattern",
+          "encoded_member_rva": "0x86ee1",
+          "offset": "0x20"
+        }
+      ]
+    },
+    "owned_entries": 15,
+    "metadata_stride": 5,
+    "clip_entries": 15,
+    "clip_stride": 12,
+    "limits": "Own filtered inventory/ammo compatibility; native grant/allocation routines are reference-only. Original baseline and introduced weapon/pool ID history survive same-process checkpoints; readable asset identities are validated without positive firing-time requirements for equipment.",
+    "dual_animations": {
+      "cache_rva": "0x43f470",
+      "stride": 24,
+      "slots_per_weapon": 3,
+      "animation_names": 37,
+      "normal_array_offset": "0x20",
+      "right_array_offset": "0x18",
+      "left_array_offset": "0x20",
+      "compatibility": "For missing/unregistered paired animations, alias validated normal names and arena-owned normal definition into the two cached hand slots; native engine constructs independent playback trees. Native veto is temporarily cleared and all owned fields conditionally restored."
+    }
+  },
+  "weapon_world": {
+    "dvars": {
+      "g_giveAll": {
+        "slot_rva": "0xd9e068",
+        "type": 0,
+        "current_offset": "0x10"
+      },
+      "bg_forceExplosiveBullets": {
+        "slot_rva": "0x3dd690",
+        "type": 0,
+        "current_offset": "0x10"
+      },
+      "g_ai": {
+        "slot_rva": "0xd9c0b8",
+        "type": 0,
+        "current_offset": "0x10"
+      },
+      "timescale": {
+        "slot_rva": "0x13260b0",
+        "type": 1,
+        "current_offset": "0x10"
+      },
+      "g_gravity": {
+        "slot_rva": "0x3dd5e8",
+        "type": 1,
+        "current_offset": "0x10"
+      },
+      "bg_forceDualWield": {
+        "slot_rva": "0x3d99a8",
+        "type": 0,
+        "current_offset": "0x10"
+      }
+    },
+    "partial_fields": {
+      "kCurrentWeapon": [
+        {
+          "signature": "kGiveAllConsumerPattern",
+          "encoded_member_rva": "0x838bc",
+          "offset": "0x2b4"
+        }
+      ],
+      "kPlayerGravity": [
+        {
+          "signature": "kPlayerGravityPattern",
+          "encoded_member_rva": "0x15bf5f",
+          "offset": "0x54"
+        }
+      ],
+      "kCompleteDefinition": [
+        {
+          "signature": "kWeaponBindingPattern",
+          "encoded_member_rva": "0x852ab",
+          "offset": "0x8"
+        }
+      ],
+      "kWeaponFireTime": [
+        {
+          "signature": "kWeaponFireScriptPattern",
+          "encoded_member_rva": "0x18b4f1",
+          "offset": "0x3c"
+        },
+        {
+          "signature": "kWeaponFireConsumerPattern",
+          "encoded_member_rva": "0x83b76",
+          "offset": "0x3c"
+        }
+      ],
+      "kWeaponType": [
+        {
+          "signature": "kSustainConsumerPattern",
+          "encoded_member_rva": "0x84ec2",
+          "offset": "0x54"
+        }
+      ]
+    },
+    "weapon_catalog": {
+      "complete_table_rva": "0x3edce0",
+      "definition_table_rva": "0x3ee320",
+      "last_loaded_index_rva": "0x3edae4",
+      "capacity": 200,
+      "stride": 8
+    },
+    "player_gravity": {
+      "native_literal": 800.5,
+      "literal_rva": "0x338b0c",
+      "scalar_references": [
+        "0x15bf24"
+      ],
+      "positive_floor_helper_rva": "0x2f20a0",
+      "native_dvar_default": 800,
+      "compatibility": "Selected gravity + 0.5 in the sole player constant; native g_gravity float covers trajectories."
+    },
+    "grenade_sustain": {
+      "aliases": [
+        "fraggrenade",
+        "flash_grenade"
+      ],
+      "bypass_target_rva": "0x84fff",
+      "compatibility": "Infinite Grenades is explicitly linked to No Reload; both use player_sustainAmmo."
+    },
+    "limits": "Static evidence. Test9 confirms catalog resolution and Rapid Fire; test11 owner feedback confirms checkpoint-bank recovery, while initial page count and dual still failed. Test12 changes animation validation/page preview and adds native AI controls; new retail animation/FPS/AI checks are pending. Kill All Enemies remains unimplemented."
+  },
+  "native_ai": {
+    "status": "Static exact-build cross-checks passed; retail observations are recorded separately by iteration.",
+    "calling_convention": "Windows AMD64; think(RCX entity), spawn(RCX spawner, EDX targetname, R8D visibility/distance bypass, R9D additional check flag), delete(ECX packed class-0 entity number). Test13 submits (spawner,0,1,0) after independent clearance traces.",
+    "graph": {
+      "callback_slot_value": "0x12a690",
+      "actor_think": "0x12a690",
+      "spawn_call_target": "0x152e60",
+      "spawn_core": "0x152e60",
+      "spawn_enabled_consumer": "0xd9c0c0",
+      "spawn_enabled_registration": "0xd9c0c0",
+      "spawn_disabled_consumer": "0xd9c170",
+      "spawn_disabled_registration": "0xd9c170",
+      "entity_pool_reader": "0xd96e78",
+      "entity_pool_free_reader": "0xd96e78",
+      "level_time": "0xd96ec8",
+      "spawn_time_read": "0xd96ec8",
+      "spawn_time_write": "0xd96ec8",
+      "actor_init_time": "0xd96ec8",
+      "think_ai_gate": "0xd9c0b8",
+      "world_ai_gate": "0xd9c0b8"
+    },
+    "think_callback_slot_rva": "0x3c0b40",
+    "entity_pool_rva": "0xd9e070",
+    "entity_count_slot_rva": "0xd96e80",
+    "active_bitmap_rva": "0xd9b820",
+    "script_string_pool_slot_rva": "0x1466008",
+    "protected_entity_number_rva": "0xd97c00",
+    "compiled_method_entries": {
+      "delete": "0x342e68",
+      "dospawn": "0x345488"
+    },
+    "team_name_table_rva": "0x3c36b0",
+    "team_names": [
+      "invalid",
+      "axis",
+      "allies",
+      "neutral",
+      "team3",
+      "dead"
+    ],
+    "entity_field_descriptors_rva": "0x346480",
+    "script_classname_offset": "0x13e",
+    "entity_stride": "0x2a0",
+    "entity_capacity": 2048,
+    "partial_field_evidence": {
+      "kAiHandler": [
+        {
+          "offset": "0x13b",
+          "signature": "kAiThinkDispatchPattern",
+          "encoded_rva": "0x174dfe"
+        },
+        {
+          "offset": "0x13b",
+          "signature": "kAiActorHandlerPattern",
+          "encoded_rva": "0x12cf35"
+        }
+      ],
+      "kAiSpawnerTeam": [
+        {
+          "offset": "0x178",
+          "signature": "kAiSpawnerFieldsPattern",
+          "encoded_rva": "0x191305"
+        }
+      ],
+      "kAiEntityStride": [
+        {
+          "offset": "0x2a0",
+          "signature": "kAiSpawnerFieldsPattern",
+          "encoded_rva": "0x191314"
+        }
+      ],
+      "kAiSpawnCount": [
+        {
+          "offset": "0x184",
+          "signature": "kAiSpawnCorePattern",
+          "encoded_rva": "0x152e88"
+        }
+      ],
+      "kAiLastSpawn": [
+        {
+          "offset": "0x17c",
+          "signature": "kAiNormalSpawnMethodPattern",
+          "encoded_rva": "0x191894"
+        }
+      ],
+      "kAiActor": [
+        {
+          "offset": "0x110",
+          "signature": "kAiActorLinksPattern",
+          "encoded_rva": "0x12cefd"
+        }
+      ],
+      "kAiSentient": [
+        {
+          "offset": "0x118",
+          "signature": "kAiActorLinksPattern",
+          "encoded_rva": "0x12cf04"
+        }
+      ],
+      "kAiHealth": [
+        {
+          "offset": "0x164",
+          "signature": "kAiActorHandlerPattern",
+          "encoded_rva": "0x12cf4d"
+        }
+      ],
+      "kAiClient": [
+        {
+          "offset": "0x108",
+          "signature": "kAiDeleteMethodPattern",
+          "encoded_rva": "0x189289"
+        }
+      ],
+      "kAiNumber": [
+        {
+          "offset": "0x7e",
+          "signature": "kAiDeleteGuardPattern",
+          "encoded_rva": "0x189298"
+        }
+      ],
+      "kAiUseCount": [
+        {
+          "offset": "0x78",
+          "signature": "kAiEntitySerialPattern",
+          "encoded_rva": "0x19fbf1"
+        },
+        {
+          "offset": "0x78",
+          "signature": "kAiEntitySerialCommitPattern",
+          "encoded_rva": "0x19fc48"
+        }
+      ]
+    },
+    "in_use_writer_rva": "0x1a091b",
+    "lifetime": "Native useCount DWORD increments when G_FreeEntity clears the slot; also require matching number/type/actor/sentient/self links and level identity.",
+    "limits": "Native mission NPC debugging, not BO1 zombie AI. Hook installs on first request and needs an existing actor callback. Test13 uses independently traced placement, temporary native spawners, team/goal adapters and dynamic generation ownership. Physical actor capacity32 remains; the mod does not impose eight."
+  },
+  "native_spawn": {
+    "graph": {
+      "copy_static_call": "0x19a2c0",
+      "copy_static": "0x19a2c0",
+      "copy_dynamic_call": "0x19a3c0",
+      "copy_dynamic": "0x19a3c0",
+      "physics_trace_call": "0x175280",
+      "bounds_trace": "0x175280",
+      "actor_trace_call": "0x175280",
+      "origin_set_call": "0x1a05c0",
+      "origin_set": "0x1a05c0",
+      "team_script_tail": "0x1b1f50",
+      "team_set": "0x1b1f50",
+      "goal_script_call": "0x1504e0",
+      "goal_set": "0x1504e0",
+      "enemy_script_tail": "0x1b1cb0",
+      "enemy_set": "0x1b1cb0",
+      "right_hand_call": "0xc2c70",
+      "left_hand_call": "0xc2c70",
+      "animation_builder": "0xc2c70"
+    },
+    "g_spawn_rva": "0x1a0870",
+    "g_free_entity_rva": "0x19f900",
+    "script_string_setter_rva": "0x21ad70",
+    "actor_used_count_slot_rva": "0xd96ee0",
+    "actor_soft_limit_slot_rva": "0xd9c0e0",
+    "actor_pool_slot_rva": "0xd96ea0",
+    "physical_actor_capacity": 32,
+    "actor_stride": "0x1560",
+    "bounds_midpoint_halfsize": [
+      0.0,
+      0.0,
+      36.0,
+      15.0,
+      15.0,
+      36.0
+    ],
+    "placement_mask": "0x2820015",
+    "trace_output_bytes": 48,
+    "trace_fraction_offset": 0,
+    "trace_startsolid_offset": "0x2d",
+    "team_transfer": "Native helper writes sentient team+8 and actor team mirror+0x1378.",
+    "goal": "Native setgoalpos caller uses actor pointer, Vec3 pointer, optional node=null; helper has no boolean success return.",
+    "animation": "Native caller builds each hand with (WeaponDef*, names**) returning distinct arena-owned opaque definitions. Runtime requests use already validated/loaded normal names, not guessed asset names.",
+    "scope": "First retail test pending for temporary helper spawners, forced-visibility bypass with independent collision traces, team conversion, goals and queued hand creation."
+  }
+}

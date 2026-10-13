@@ -414,6 +414,7 @@ void BeforeLoad(const char* reason) {
 }
 void SaveReadHook(std::uintptr_t save) {
     RecordNativeOperation("CHECKPOINT_READ_BEGIN");
+    CheckStockCheckpoint(save);
     {std::lock_guard<std::recursive_mutex> lock(aiMutex);++ai.checkpointEpoch;}
     BeforeLoad("CHECKPOINT_READ");
     {std::lock_guard<std::recursive_mutex> lock(aiMutex);ai.names={};ai.nextWorldTime=0;ai.adoptPending=true;nativePending=true;}
@@ -440,13 +441,13 @@ int ActorInitHook(std::uintptr_t entity) {
     const auto epoch=ai.checkpointEpoch.load();
     if(!spawningOwned && !checkpointReadDepth) {
         std::lock_guard<std::recursive_mutex> lock(aiMutex);
-        int count=0,limit=kAiNativeActorCapacity;std::uintptr_t dvar=0;
+        int count=0,limit=NativeActorCapacity();std::uintptr_t dvar=0;
         if(Value(aiProfile.actorLimitSlot,dvar) && dvar)Value(dvar+0x10,limit);
-        if((!ai.owned.empty() || !ai.recovery.empty()) && limit>0 && limit<kAiNativeActorCapacity
-            && SetCount(dvar+0x10,limit,kAiNativeActorCapacity)) {
-            ai.capacity.applied(dvar,limit,kAiNativeActorCapacity);limit=kAiNativeActorCapacity;
+        if((!ai.owned.empty() || !ai.recovery.empty()) && limit>0 && limit<NativeActorCapacity()
+            && SetCount(dvar+0x10,limit,NativeActorCapacity())) {
+            ai.capacity.applied(dvar,limit,NativeActorCapacity());limit=NativeActorCapacity();
         }
-        while(limit>0 && limit<=kAiNativeActorCapacity && Value(aiProfile.actorCountSlot,count) && count>=limit && !ai.owned.empty()) {
+        while(limit>0 && limit<=NativeActorCapacity() && Value(aiProfile.actorCountSlot,count) && count>=limit && !ai.owned.empty()) {
             RecordNativeOperation("CAMPAIGN_RECLAIM_BEGIN",0,count);
             const auto removed=CleanupOwned("CAMPAIGN_NEEDS_SLOT",true);
             if(epoch!=ai.checkpointEpoch)return 0;
@@ -584,7 +585,7 @@ IntDvarRead ActorLimit() {
     IntDvarRead d; std::uintptr_t name=0; std::uint8_t type=255; char text[32]{};
     d.valid=Value(aiProfile.actorLimitSlot,d.address) && d.address && Value(d.address,name)
         && Value(d.address+0xc,type) && type==5 && CString(name,text,sizeof(text)) && !std::strcmp(text,"ai_count")
-        && Value(d.address+0x10,d.current) && d.current>=0 && d.current<=kAiNativeActorCapacity;
+        && Value(d.address+0x10,d.current) && d.current>=0 && d.current<=NativeActorCapacity();
     return d;
 }
 void RestoreCapacity() {
@@ -698,7 +699,7 @@ void ClearRecovery(bool releaseTags) {
 void CaptureRecovery(const AiIdentity* only) {
     for(const auto& owned:ai.owned) {
         if(only && (owned.identity.address!=only->address || owned.identity.serial!=only->serial))continue;
-        if(ai.recovery.size()>=kAiNativeActorCapacity)break;
+        if(ai.recovery.size()>=static_cast<std::size_t>(NativeActorCapacity()))break;
         if(std::any_of(ai.recovery.begin(),ai.recovery.end(),[&](const auto& r){return r.previous.address==owned.identity.address && r.previous.serial==owned.identity.serial;}))continue;
         const auto e=Entity(owned.identity,ai.pool,false);
         if(!owned.identity.matches(e) || e.health<=0)continue;
@@ -1040,11 +1041,11 @@ void SpawnOwned(const AiRequest& input,const Snapshot& s,const AiScope& scope,in
     const auto enabled=Bool(aiProfile.spawnEnabledSlot,"g_spawnai"),disabled=Bool(aiProfile.spawnDisabledSlot,"ai_disableSpawn");
     if(!enabled.valid || !enabled.current || !disabled.valid || disabled.current || ai.pauseWanted) {Finish(AiRequestResult::SpawnPaused);return;}
     const auto limit=ActorLimit(); int actorCount=0;
-    if(!limit.valid || !Value(aiProfile.actorCountSlot,actorCount) || actorCount<0 || actorCount>=kAiNativeActorCapacity) {Finish(AiRequestResult::Limit);return;}
-    if(!recovery && actorCount+static_cast<int>(ai.recovery.size())>=kAiNativeActorCapacity) {Finish(AiRequestResult::Limit);return;}
-    if(limit.current<kAiNativeActorCapacity && SetCount(limit.address+0x10,limit.current,kAiNativeActorCapacity)) {
-        ai.capacity.applied(limit.address,limit.current,kAiNativeActorCapacity);
-        Log("AI_CAPACITY requested native maximum %d original=%d",kAiNativeActorCapacity,limit.current);
+    if(!limit.valid || !Value(aiProfile.actorCountSlot,actorCount) || actorCount<0 || actorCount>=NativeActorCapacity()) {Finish(AiRequestResult::Limit);return;}
+    if(!recovery && actorCount+static_cast<int>(ai.recovery.size())>=NativeActorCapacity()) {Finish(AiRequestResult::Limit);return;}
+    if(limit.current<NativeActorCapacity() && SetCount(limit.address+0x10,limit.current,NativeActorCapacity())) {
+        ai.capacity.applied(limit.address,limit.current,NativeActorCapacity());
+        Log("AI_CAPACITY requested native maximum %d original=%d",NativeActorCapacity(),limit.current);
     }
     std::array<std::uint8_t,kAiEntityCapacity> active{};
     if(!ReadAi(aiProfile.activeArray,active.data(),active.size())
@@ -1312,7 +1313,7 @@ void ReadWorld(const Snapshot& s,const AiScope& scope) {
     ai.status.friendlyDistance=0.f;ai.status.characterLoaded=!ai.friendlyIndex || ai.appearances[ai.friendlyIndex].address;
     if(ai.status.lastEntity)ai.status.lastSpawnDistance=std::sqrt(PointDistanceSquared(ai.status.lastPosition,player));
     int nativeActors=0;if(Value(aiProfile.actorCountSlot,nativeActors))ai.status.engineActors=nativeActors;
-    const auto limit=ActorLimit();ai.status.engineLimit=limit.valid?limit.current:kAiNativeActorCapacity;
+    const auto limit=ActorLimit();ai.status.engineLimit=limit.valid?limit.current:NativeActorCapacity();
     ai.status.owned=OwnCount();ai.status.ready=s.state==LevelState::Ready;
     QueryPerformanceCounter(&doneAt);ai.status.lastSortUs=(doneAt.QuadPart-decodedAt.QuadPart)*1000000.0/measure.frequency.QuadPart;
     const auto readAfter=GetMemoryReadCounts();ai.status.worldKernelReads+=readAfter.kernel-readBefore.kernel;ai.status.worldImageReads+=readAfter.image-readBefore.image;
@@ -1324,12 +1325,17 @@ bool FriendlyFireHookReady() {return friendlyFireHookReady.load(std::memory_orde
 bool NativeDamageHookReady() {return FriendlyFireHookReady();}
 void SetAllowFriendlyFire(bool enabled) {allowFriendlyFire.store(enabled && FriendlyFireHookReady(),std::memory_order_release);}
 void SetHitmarkers(bool enabled) {
-    hitmarkersEnabled.store(enabled && NativeDamageHookReady(),std::memory_order_release);
+    hitmarkersEnabled.store(enabled && NativeDamageHookReady() && MpFeedbackReady(),std::memory_order_release);
     if(!enabled)lastPlayerHit.store(0,std::memory_order_release);
 }
 void SetSpawnedFriendliesInvincible(bool enabled) {invincibleFriendlies.store(enabled && NativeDamageHookReady(),std::memory_order_release);}
 std::uint8_t GetHitmarkerAlpha(ULONGLONG now) {
-    return hitmarkersEnabled.load(std::memory_order_acquire)?HitmarkerAlpha(lastPlayerHit.load(std::memory_order_acquire),now):0;
+    static std::uint64_t presented=0;
+    if(!hitmarkersEnabled.load(std::memory_order_acquire) || !MpFeedbackReady()){presented=confirmedPlayerHits.load();return 0;}
+    const auto count=confirmedPlayerHits.load(std::memory_order_acquire);
+    const auto alpha=HitmarkerAlpha(lastPlayerHit.load(std::memory_order_acquire),now);
+    if(count!=presented){presented=count;if(alpha)PlayMpHitAlert();}
+    return alpha;
 }
 
 void InitializeAiEngine(std::uintptr_t base,std::size_t size,std::uintptr_t text,std::size_t textSize,bool supported) {
@@ -1429,7 +1435,7 @@ void InitializeAiEngine(std::uintptr_t base,std::size_t size,std::uintptr_t text
         && Rip(base+0x223812,0,3,7)==base+kScriptLocalVariablesBaseRva
         && Rip(base+0x223819,0,3,7)==base+kScriptLocalVariablesPointerRva;
     ai.status.resolved=aiProfile.resolved;
-    Log("AI_CAPACITY_EXPANSION requested=256 enabled=0 runtime_capacity=%d prototype=APPENDED_256_274 blocked=REMAINING_CONSUMERS_FULL_CHECKPOINT_LIFECYCLE",kAiNativeActorCapacity);
+    InstallExpandedCapacity(base,aiProfile.resolved);
     Log("AI_PROFILE resolved=%d callback_slot_rva=0x%llx spawn_rva=0x%llx delete_rva=0x%llx pool_slot_rva=0x%llx clock_rva=0x%llx",
         aiProfile.resolved,static_cast<unsigned long long>(aiProfile.thinkSlot-base),static_cast<unsigned long long>(spawn-base),
         static_cast<unsigned long long>(remove-base),static_cast<unsigned long long>(aiProfile.poolSlot-base),static_cast<unsigned long long>(aiProfile.timeSlot-base));

@@ -16,7 +16,7 @@ try {
         $source = Join-Path (Split-Path $PSScriptRoot -Parent) $relative
     }
     if (-not (Test-Path -LiteralPath $source)) { throw 'd3d9.dll was not found. Extract the full test ZIP first.' }
-    $version = if ($Build -eq 'startup') { '0.1.1-startup-test2' } else { '0.1.20-squad-test21' }
+    $version = if ($Build -eq 'startup') { '0.1.1-startup-test2' } else { '0.1.21-squad-test22' }
     $payloadPath = Join-Path $PSScriptRoot 'payload.json'
     if (Test-Path -LiteralPath $payloadPath) {
         $payload = Get-Content -LiteralPath $payloadPath -Raw | ConvertFrom-Json
@@ -31,10 +31,41 @@ try {
     New-Item -ItemType Directory -Force -Path $logs | Out-Null
     $players = Join-Path $root 'players'
     if ($Build -eq 'menu' -and (Test-Path -LiteralPath $players -PathType Container)) {
-        $saveBackup = Join-Path $root ('bo1mw2\backups\before-test21-' + [DateTime]::UtcNow.ToString('yyyyMMdd-HHmmss-fff'))
+        $saveBackup = Join-Path $root ('bo1mw2\backups\before-test22-' + [DateTime]::UtcNow.ToString('yyyyMMdd-HHmmss-fff'))
         New-Item -ItemType Directory -Path $saveBackup | Out-Null
         Copy-Item -LiteralPath $players -Destination $saveBackup -Recurse
         Write-Host "Local player/save backup: $saveBackup"
+    }
+    if ($Build -eq 'menu') {
+        Add-Type -AssemblyName System.IO.Compression.FileSystem
+        $assetDirectory = Join-Path $root 'bo1mw2\assets'
+        New-Item -ItemType Directory -Force -Path $assetDirectory | Out-Null
+        $asset = Join-Path $assetDirectory 'damage_feedback.iwi'
+        $found = $false
+        $archives = @(Get-ChildItem -LiteralPath (Join-Path $root 'main') -Filter '*.iwd' -File -ErrorAction SilentlyContinue | Sort-Object Name -Descending)
+        foreach ($archive in $archives) {
+            $zip = [IO.Compression.ZipFile]::OpenRead($archive.FullName)
+            try {
+                $entry = $zip.Entries | Where-Object { $_.FullName.Replace('\','/') -ieq 'images/damage_feedback.iwi' } | Select-Object -First 1
+                if (-not $entry -or $entry.Length -lt 32 -or $entry.Length -gt 65536) { continue }
+                $stream = $entry.Open()
+                $memory = New-Object IO.MemoryStream
+                try { $stream.CopyTo($memory); $bytes = $memory.ToArray() } finally { $stream.Dispose(); $memory.Dispose() }
+                if ($bytes.Length -ne $entry.Length -or $bytes[0] -ne 73 -or $bytes[1] -ne 87 -or $bytes[2] -ne 105 -or
+                    $bytes[3] -ne 8 -or $bytes[8] -ne 13 -or [BitConverter]::ToUInt16($bytes,10) -ne 36 -or
+                    [BitConverter]::ToUInt16($bytes,12) -ne 72 -or [BitConverter]::ToUInt16($bytes,14) -ne 1 -or
+                    [BitConverter]::ToUInt32($bytes,16) -ne $bytes.Length -or $bytes.Length -lt 2624) { continue }
+                [IO.File]::WriteAllBytes($asset + '.tmp',$bytes)
+                Move-Item -LiteralPath ($asset + '.tmp') -Destination $asset -Force
+                $found = $true
+                Write-Host ('Original MP hitmarker extracted from ' + $archive.Name)
+                break
+            } finally { $zip.Dispose() }
+        }
+        if (-not $found) {
+            if (Test-Path -LiteralPath $asset) { Remove-Item -LiteralPath $asset }
+            Write-Host 'Original MP hitmarker image was not found in main/*.iwd. Hitmarkers will remain unavailable.'
+        }
     }
     Copy-Item -LiteralPath $source -Destination $dest
     @{

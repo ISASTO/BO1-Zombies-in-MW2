@@ -120,7 +120,7 @@ def prepare(pe):
     # The actual animation-array cleanup runs in full. Its following global
     # game/script/zone shutdown needs a booted engine, so only that tail is
     # omitted in this disposable fixture; the native stack epilogue remains.
-    put(0x17119d,jump(0x17119d,0x1711ba),'fixture-only following engine teardown isolation')
+    put(0x17119d,jump(0x17119d,0x1711b8),'fixture-only following engine teardown isolation')
     return image,{'previous_stage':previous,'stage21_edits':edits,'inline_perception_sites':len(PERCEPTION_SITES),
                   'common_perception_accessor':True,'relocated_reference_heads':SENTIENTS,
                   'runtime_activation':False,

@@ -183,7 +183,7 @@ void InitializeLog() {
     }
     std::swprintf(logPath,32768,L"%ls",file);
     Log("BO1MW2 %s | AMD64 | log=%ls", kVersion, file);
-    Log("Test21: hitmarkers, native semi-auto repeat, spawned-ally damage protection and world speed 0.1x-10x. Test20 ownership fix retained. Expanded 256/274 population lifecycle prototype remains separate from the DLL.");
+    Log("Test22: original MP hitmarker texture/sound/fade; exact-build experimental 256 actors/274 sentients with expanded snapshots, animation pools and versioned checkpoints. Startup activation and capacity are logged separately.");
 }
 void Log(const char* format, ...) {
     char body[4096]{};

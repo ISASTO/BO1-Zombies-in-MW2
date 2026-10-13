@@ -14,7 +14,7 @@ def verify(path, header):
     data=path.read_bytes()
     expected='fb7e8a987c371dea7b666091b0b9e2011c0cd9cd277b191ad453d11d557dd777'
     if hashlib.sha256(data).hexdigest()!=expected:raise ValueError('Exact executable hash mismatch')
-    pe=pefile.PE(data=data);base=pe.OPTIONAL_HEADER.ImageBase
+    pe=pefile.PE(data=data,fast_load=True);base=pe.OPTIONAL_HEADER.ImageBase
     text=header.read_text()
     def value(name):return int(re.search(r'\b'+name+r'\s*=\s*(0x[0-9a-f]+|\d+)',text)[1],0)
     def branch(at,op=0xe8):
@@ -124,7 +124,7 @@ def verify(path, header):
             'hook_publication':'Clock call publishes first; remaining hooks publish on the next server-clock callback.',
             'native_reentrancy':'Recursive ownership lock, snapshot iteration and deferred cleanup prevent NPC freeing during active native mod calls.',
             'retail_execution':'Not executed in this Linux environment; owner test required.',
-            'actor_capacity':32,'actor_capacity_expansion':'Test21 separate 256/274 lifecycle/population probe; snapshot clients and full engine checkpoint routing remain gated.'}
+            'stock_actor_capacity':32,'experimental_actor_capacity':256,'actor_capacity_expansion':'Test22 exact-byte-validated external arena, expanded client snapshots, animation lifecycle and versioned native checkpoints. Windows activation is logged; owner test required.'}
 
 
 if __name__=='__main__':

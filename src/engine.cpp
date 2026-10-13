@@ -1177,7 +1177,8 @@ bool ExtraAvailable(const Snapshot& s,ExtraFeature feature) {
         case ExtraFeature::GiveAll: return s.giveAll.valid && s.inventoryValid;
         case ExtraFeature::RapidFire: return s.weapon.valid && s.weapon.type==0 && s.weapon.fireTime>=1 && s.weapon.fireTime<=4000;
         case ExtraFeature::NoRecoil: return s.recoilValid;
-        case ExtraFeature::Hitmarkers: case ExtraFeature::InvincibleFriendlies: return NativeDamageHookReady();
+        case ExtraFeature::Hitmarkers: return NativeDamageHookReady() && MpFeedbackReady();
+        case ExtraFeature::InvincibleFriendlies: return NativeDamageHookReady();
         case ExtraFeature::SemiAutoFullAuto: return s.weapon.valid && s.weapon.type==0 && s.weapon.fireMode>=0 && s.weapon.fireMode<=5;
         case ExtraFeature::FriendlyFire: return s.friendlyFireDistance.valid && s.friendlyFireScale.valid && FriendlyFireHookReady();
         case ExtraFeature::ExplosiveBullets: return s.explosive.valid;

@@ -1,18 +1,25 @@
 # BO1 Zombies in MW2
 
 Incremental mod framework for **retail Modern Warfare 2 (2009), single player**.
-Current build: **0.1.20-squad-test21**. The owner confirms Test16's performance
-fix. Its returned world scans average 388 microseconds and peak at 942.1
-microseconds, compared with Test15's 61.6 ms average/152.9 ms peak. Test16's
-snapshot reads, name cache and checked permanent-image reads remain unchanged.
-See [Test16 runtime evidence](docs/runtime-test16-evidence.json).
+Current build: **0.1.21-squad-test22**. The owner reports Test21 working and stable.
+Test22 replaces the drawn hitmarker with the original multiplayer
+**damage_feedback** texture, **MP_hit_alert** PCM sound and one-second linear
+fade. The installer extracts the image from your local `main/*.iwd` archives.
+Hitmarkers stay unavailable if the original asset or audio output is missing.
 
-Test21 adds **Hitmarkers**, **Make Semi-Auto Full-Auto**, **Invincible Spawned
-Friendlies**, and **World Speed** from 0.1x to 10x. The returned Test20 run reaches
-32 active actors, records 278 creations/148 deletions and 24 checkpoint writes,
-and has no new crash. The owner confirms stability. The ownership fix and its
-existing performance protections remain in place. See [Test21 controls and
-native checks](docs/squad-test21.md).
+Test22 makes the first **runtime 256-actor / 274-sentient attempt**. It expands
+native storage, perception, snapshot producer/client readers, animation pools,
+and native checkpoint actor/sentient loops together. Activation requires the
+exact supported executable, matching original instructions, idle pools and a
+separately allocated nearby arena. The AI page shows the actual active capacity;
+the log records successful activation or its blocking reason.
+
+All 18 C++ suites and 28 Python tests pass. The exact-native Linux fixture also
+passes with an arena outside the main image, including 256-actor save/load,
+32-actor legacy migration, 320 client goal lookups and 658 animation trees.
+**Windows gameplay, compressed retail checkpoints and crowded-AI performance
+still need the owner's test.** See [Test22 installation and checks](docs/squad-test22.md).
+Test16's performance protections and Test20's ownership fix remain included.
 
 Test20 fixes a native string-reference bug in squad ownership labels. Repeated
 user-1 intern lookups return a borrowed id, but the old code released it after
@@ -46,14 +53,10 @@ Test17's native autosaves, saved ownership tags, validated actor/helper adoption
 after load, and recovery placement remain in place. The later returned run
 retained and restored ten spawned actors, then removed all ten successfully.
 
-**Runtime capacity remains 32.** The third prototype advances the separate
-256-actor/274-sentient layout through 64 inline perception sites, the common
-accessor, special allocation/cleanup beyond slot 49, a relocated reference-head
-array, complete native population-record serialization and all 256 animation
-cleanup entries. Native round-trips cover 70,144 perception-node pointers and a
-versioned 4.8 MB population chunk. Client snapshot representation and complete
-engine checkpoint routing remain activation requirements. No partial expansion
-is installed. See [native results](docs/expanded-lifecycle-test21-probe.json).
+The Test21 prototype remains documented in [its native results](docs/expanded-lifecycle-test21-probe.json).
+Test22's [runtime-plan fixture](docs/expanded-runtime-test22-probe.json) closes
+snapshot and native population stream coverage and ships the experimental
+activation code. This is a test build, not a claim of proven 256-AI retail stability.
 The 1x-10x Rapid Fire, No Recoil and named model rows remain included.
 The owner confirms No Recoil and Kill All Enemies work.
 Ghost/Price/Soap/Roach require a matching loaded character in the current mission;
@@ -213,7 +216,7 @@ Copy the log immediately after a failing run: `latest.log` is replaced on launch
 | FOV selector and saved preference | Owner confirms test6 behavior; matching logs show load/selection/save/reset |
 | WEAPONS | Hitmarkers and held-fire semi-auto conversion added in Test21. No Recoil and 1x-10x Rapid Fire retained. G18 dual appearance is deferred. |
 | WORLD | Test18 fixes help-text bounds and adds player friendly-fire penalty bypass; native damage/mission behavior needs retail retest. |
-| AI | Test20 crowded-squad retail run is stable. Test21 adds invincible spawned allies and advances native 256/274 cleanup/population serialization. Active capacity remains 32 pending snapshot/checkpoint integration. |
+| AI | Test20 crowded-squad retail run is stable. Test21 adds invincible spawned allies and advances native 256/274 cleanup/population serialization. Test22 attempts native 256 capacity at startup; in-game stress testing is pending. |
 | Kill All Enemies | Owner-confirmed working native damage call for hostile actors; allies, clients and protected entities excluded. |
 | BO1 Zombies gameplay | Planned; normal MW2 AI is not a BO1 behavior/animation/assets port. |
 

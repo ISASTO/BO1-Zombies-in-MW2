@@ -1,0 +1,48 @@
+{
+  "source_sha256": {
+    "common_mp(2).ff.zone": "0a458f2671bc0413a5e1119bbdcefe4a026241e72b61c5137b9d9f55a48505fb",
+    "localized_common_mp(2).ff.zone": "6cd33f6a2a33286cfcc7e4a3a2183ab4b710015601654a48f8a975a09ab11e22"
+  },
+  "feedback_script_sha256": "141664ce14ccb2d79489885a7fe1302b2ac3a3cf7f65a99c725a68ca7e494035",
+  "sound": {
+    "alias": "MP_hit_alert",
+    "sample": "misc/mp_hit_indication_3c.wav",
+    "rate": 44100,
+    "channels": 1,
+    "bits": 16,
+    "pcm_bytes": 2968,
+    "pcm_sha256": "c12924b634aa045f9566a32b606e77e06919d38b126a8079d917f68d9f2f53d8",
+    "volume": 0.9300000071525574,
+    "pitch": 1.0,
+    "duration_ms": 33.65079365079365,
+    "playback": "Eight prepared PCM16 waveOut voices, original gain times snd_volume; one update per render callback"
+  },
+  "supplied_fastfiles_sha256": {
+    "common_mp.ff": "60b87c540c08205fd2f3ab3eb2e37bb83ff1bef71b9df26d3ce97368ad19b0b3",
+    "localized_common_mp.ff": "d0d12784d3cf14695025b4c1f61409490957434867d7fc6031767f38138fec0b",
+    "patch_mp.ff": "a1736fae9769267a1f7d93e5595f282059129f2de6055dd6453350ff3199e4b9",
+    "ui_mp.ff": "b3182bcb937d1851b95e05d1b221bc9f35f525f3b5466cd0ec6fc1533d7a39d5"
+  },
+  "material": {
+    "name": "damage_feedback",
+    "image": "images/damage_feedback.iwi",
+    "base_level": [
+      36,
+      72,
+      1
+    ],
+    "format": "DXT5",
+    "base_level_bytes": 2592,
+    "source": "common_mp material/image metadata; texture pixels external in game IWDs"
+  },
+  "hud": {
+    "x": -12,
+    "y": -12,
+    "width": 24,
+    "height": 48,
+    "fade_ms": 1000,
+    "virtual_height": 480,
+    "crosshair_offset_multiplier": 240
+  },
+  "sp_event_rule": "Confirmed actual player-to-actor health loss, including lethal hits; zero/blocked damage or changed allocation suppressed."
+}
