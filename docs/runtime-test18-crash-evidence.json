@@ -1,0 +1,22 @@
+{
+  "diagnostic_zip_sha256": "45425edb3b2fd0f0359635f63c88925e021d02a82d691f9eeb6f3642ff49d4a0",
+  "returned_version": "0.1.17-crash-test18",
+  "fault_rva": "0x2244c8",
+  "native_function": "VM stack archive, non-codepos value write",
+  "observed_archived_value_count": -1,
+  "last_reported_active_actors": 26,
+  "last_reported_owned_allocations_including_corpses": 33,
+  "created_in_run": 39,
+  "campaign_slot_reclamation_events": 0,
+  "crash_log_retention": "Successful; supplied log belongs to the crashed run",
+  "menu_failure_in_returned_dump": false,
+  "test19_changes": [
+    "Full idle VM work frame and local-variable pointer isolation",
+    "Caller frame/state/sentinel restoration",
+    "Release ignored native work return values",
+    "Fresh allocation/team/health validation before enemy assignment",
+    "Only notify scripts on a new target, not same-target reassertions",
+    "Correct VM pointer addresses and capture VM/pool metadata memory in dump"
+  ],
+  "confidence": "Underflow is proven by native registers and instruction arithmetic. The specific first leaked callback is not identified by Test18; full-context isolation addresses that external-call contract and requires owner retail retest."
+}

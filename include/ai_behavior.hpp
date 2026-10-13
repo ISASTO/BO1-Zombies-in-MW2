@@ -4,6 +4,10 @@
 #include <vector>
 namespace mod {
 struct AiTarget {std::uintptr_t entity=0;AiPoint position{};float squaredDistance=std::numeric_limits<float>::max();};
+inline bool LiveAiTarget(const AiEntity& cached,const AiEntity& live,int ownTeam) {
+    return AiIdentity::capture(cached).matches(live) && live.type==kActorType && live.health>0
+        && live.team!=ownTeam && (live.team==kAxisTeam || live.team==kAlliesTeam);
+}
 inline AiTarget ChooseAiTarget(const AiEntity& self,int playerTeam,std::uintptr_t player,const AiPoint& playerPosition,const std::vector<AiEntity>& actors) {
     AiTarget out;out.position=playerPosition;
     if(self.team!=playerTeam) {out.entity=player;out.squaredDistance=PointDistanceSquared(self.origin,playerPosition);}

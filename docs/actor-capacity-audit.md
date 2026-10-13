@@ -1,5 +1,11 @@
 # Test17: coordinated 256-actor attempt
 
+This records the first attempt. Test19's [appended layout prototype](squad-test19.md)
+now passes the expanded perception, snapshot producer, reset and pointer-fixup
+checks. Its DLL remains at 32 while the remaining consumers and full checkpoint
+streams are converted. The original overwrite below describes the unmodified
+Test17 fixture, not Test19's appended perception layout.
+
 Exact retail AMD64 executable SHA256:
 `fb7e8a987c371dea7b666091b0b9e2011c0cd9cd277b191ad453d11d557dd777`.
 

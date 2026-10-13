@@ -1,0 +1,49 @@
+{
+  "version": "0.1.18-squad-test19",
+  "dll_sha256": "a84b6ab924afe5cb79977e026c4136a5da70bd93cde1f26b829548a29038b82b",
+  "dll_size": 4579399,
+  "machine": "AMD64 PE32+",
+  "aslr_nx": true,
+  "imports": [
+    "bcrypt.dll",
+    "dbghelp.dll",
+    "gdi32.dll",
+    "kernel32.dll",
+    "msvcrt.dll",
+    "user32.dll"
+  ],
+  "exports": [
+    "D3DPERF_BeginEvent",
+    "D3DPERF_EndEvent",
+    "D3DPERF_GetStatus",
+    "D3DPERF_QueryRepeatFrame",
+    "D3DPERF_SetMarker",
+    "D3DPERF_SetOptions",
+    "D3DPERF_SetRegion",
+    "DebugSetMute",
+    "Direct3DCreate9",
+    "Direct3DCreate9Ex"
+  ],
+  "cpp_suites_passed": 16,
+  "python_fixtures_passed": 28,
+  "existing_exact_profile_anchors": 97,
+  "native_squad_bindings": "squad-test19-native-bindings.json",
+  "isolated_native_context_probe": "script-context-test19-probe.json",
+  "isolated_native_capacity_probe": "expanded-layout-test19-probe.json",
+  "native_prototype_actor_capacity": 256,
+  "native_prototype_sentient_capacity": 274,
+  "runtime_capacity": 32,
+  "expanded_population_enabled": false,
+  "checkpoint_format": "Unchanged stock 32-actor/50-sentient format; ownership via existing targetname strings",
+  "external_vm_context": "Saved/restored 32-byte current state, initial frame/sentinel, public top, frame pointer and local-variable pointer; busy VM defers work; checkpoint reset abandons old context",
+  "vm_memory_capture": "0x18f0000..0x190ffff and pool metadata captured only on crash",
+  "targeting": "Fresh allocation/brain/health/team validation before cached target assignment; notify on target change only",
+  "performance": "Test16 arena snapshot/name-cache/image reads retained; at most four follow updates per native tick",
+  "retail_execution": "Windows crowded-squad/friendly-fire/autosave/death/reload reproduction not run in the Linux workspace; owner retest required",
+  "capacity_activation_blockers": [
+    "Remaining inline perception/index consumers",
+    "Secondary pool/free/animation/special sentient lifetime paths",
+    "Snapshot consumers and client/wire representation",
+    "Full checkpoint sizes/counts/format discriminator and legacy streams"
+  ]
+}

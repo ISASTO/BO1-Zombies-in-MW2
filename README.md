@@ -1,11 +1,19 @@
 # BO1 Zombies in MW2
 
 Incremental mod framework for **retail Modern Warfare 2 (2009), single player**.
-Current build: **0.1.17-crash-test18**. The owner confirms Test16's performance
+Current build: **0.1.18-squad-test19**. The owner confirms Test16's performance
 fix. Its returned world scans average 388 microseconds and peak at 942.1
 microseconds, compared with Test15's 61.6 ms average/152.9 ms peak. Test16's
 snapshot reads, name cache and checked permanent-image reads remain unchanged.
 See [Test16 runtime evidence](docs/runtime-test16-evidence.json).
+
+Test19 addresses the returned large-squad script-stack underflow with a full
+idle VM work context, caller frame/local-state restoration, fresh target
+validation and enemy-change notification deduplication. The dump's last
+population was 26 active actors and no slot reclamation occurred in that run.
+The corrected VM pointers and explicit memory ranges make subsequent dumps
+more useful. The Windows crash reproduction still requires owner testing.
+See [Test19 findings and checks](docs/squad-test19.md).
 
 Test18 fixes the World help-text overflow that crashes menu navigation and
 isolates the script parameters of a campaign spawn before reclaiming a mod NPC.
@@ -22,12 +30,12 @@ Test17's native autosaves, saved ownership tags, validated actor/helper adoption
 after load, and recovery placement remain in place. The later returned run
 retained and restored ten spawned actors, then removed all ten successfully.
 
-**The 256-actor attempt is blocked; the game still uses 32 actor slots.**
-An isolated exact-native probe allocated/iterated all 256 slots successfully,
-but the unchanged perception code overwrote 48 bytes of actor state at sentient
-slot 50. Snapshot indices and checkpoint pointer bounds also require coordinated
-rewrites. The partial probe is tooling, not an enabled DLL patch. See
-[capacity audit](docs/actor-capacity-audit.md) and [Test17 checks](docs/squad-test17.md).
+**Runtime capacity remains 32.** The second 256-actor prototype appends perception
+storage and passes native allocation/iteration, all 274 perception clear/copy
+records, animation-pointer lookup, widened snapshot production through corpse
+319, converted reset and actor/sentient save-pointer round-trips. Its remaining
+consumers and complete checkpoint streams are not yet converted. The prototype
+is separate from the DLL. See [native results](docs/expanded-layout-test19-probe.json).
 The 1x-10x Rapid Fire, No Recoil and named model rows remain included.
 The owner confirms No Recoil and Kill All Enemies work.
 Ghost/Price/Soap/Roach require a matching loaded character in the current mission;
@@ -187,7 +195,7 @@ Copy the log immediately after a failing run: `latest.log` is replaced on launch
 | FOV selector and saved preference | Owner confirms test6 behavior; matching logs show load/selection/save/reset |
 | WEAPONS | Owner confirms No Recoil works in Test15. 1x-10x Rapid Fire is retained. G18 dual appearance is deferred. |
 | WORLD | Test18 fixes help-text bounds and adds player friendly-fire penalty bypass; native damage/mission behavior needs retail retest. |
-| AI | Test18 isolates caller script parameters during NPC reclamation. Exact-native parameter regression passes; crowded-squad retail retest pending. Saved ownership remains; active capacity is 32. |
+| AI | Test19 isolates the external VM work context and validates live targets. Native context and appended 256-actor prototype checks pass; crowded-squad retail retest is pending. Active capacity is 32. |
 | Kill All Enemies | Owner-confirmed working native damage call for hostile actors; allies, clients and protected entities excluded. |
 | BO1 Zombies gameplay | Planned; normal MW2 AI is not a BO1 behavior/animation/assets port. |
 

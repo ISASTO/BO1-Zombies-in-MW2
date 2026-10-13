@@ -20,6 +20,9 @@ inline constexpr std::uintptr_t kAiInternStringRva=0x18f440;
 inline constexpr std::uintptr_t kAiEntitySaveFieldsRva=0x3405b0;
 inline constexpr std::uintptr_t kScriptParametersRva=0x18f44b0,kScriptExecuteDepthRva=0x18fca44;
 inline constexpr std::uintptr_t kScriptNotifyRva=0x223970;
+inline constexpr std::uintptr_t kScriptVmStateRva=0x1900b78,kScriptFunctionCountRva=0x18f44a0;
+inline constexpr std::uintptr_t kScriptFramePointerRva=0x18f44a8,kScriptFrameBaseRva=0x18f44c0,kScriptStackBaseRva=0x18f49c0;
+inline constexpr std::uintptr_t kScriptLocalVariablesPointerRva=0x18f4490,kScriptLocalVariablesBaseRva=0x18feb74;
 inline constexpr std::size_t kAiEnemySightValid=0x309,kAiEnemySightPosition=0x30c;
 struct AiAppearance {
     std::uint16_t model=0;

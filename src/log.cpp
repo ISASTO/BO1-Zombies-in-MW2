@@ -25,6 +25,14 @@ struct NativeEvent {
 };
 std::array<NativeEvent,64> nativeEvents{};
 std::atomic<std::uint64_t> nextNativeEvent{0};
+struct DumpMemory {std::uintptr_t base=0;unsigned next=0;};
+BOOL CALLBACK IncludeNativeVmMemory(PVOID user,const PMINIDUMP_CALLBACK_INPUT input,PMINIDUMP_CALLBACK_OUTPUT output) {
+    if(input->CallbackType!=MemoryCallback)return TRUE;
+    auto& memory=*static_cast<DumpMemory*>(user);
+    if(memory.next==0) {output->MemoryBase=memory.base+0x18f0000;output->MemorySize=0x20000;++memory.next;return TRUE;}
+    if(memory.next==1) {output->MemoryBase=memory.base+0xd96e70;output->MemorySize=0x80;++memory.next;return TRUE;}
+    return FALSE;
+}
 
 void RawWrite(HANDLE file, const char* text, DWORD length, bool durable=false) {
     if (file == INVALID_HANDLE_VALUE) return;
@@ -91,15 +99,17 @@ LONG WINAPI CrashFilter(EXCEPTION_POINTERS* info) {
             static_cast<unsigned long long>(address - reinterpret_cast<std::uintptr_t>(faultModule)));
         if (size > 0) RawWrite(report, message, static_cast<DWORD>(size < 2048 ? size : 2047),true);
     }
-    NativeScriptParameters parameters{};int executeDepth=0;std::uintptr_t code=0,stack=0;SIZE_T read=0;
+    NativeScriptParameters parameters{};NativeScriptVmState vm{};int executeDepth=0,functionCount=0;std::uintptr_t frame=0;SIZE_T read=0;
     const auto process=GetCurrentProcess();
     if(ReadProcessMemory(process,reinterpret_cast<void*>(base+kScriptParametersRva),&parameters,sizeof(parameters),&read)
         && ReadProcessMemory(process,reinterpret_cast<void*>(base+kScriptExecuteDepthRva),&executeDepth,sizeof(executeDepth),&read)
-        && ReadProcessMemory(process,reinterpret_cast<void*>(base+0x18fcb78),&code,sizeof(code),&read)
-        && ReadProcessMemory(process,reinterpret_cast<void*>(base+0x18fcb88),&stack,sizeof(stack),&read)) {
-        size=std::snprintf(message,sizeof(message),"native_vm top=0x%llx incoming=%u outgoing=%u execute_depth=%d code=0x%llx stack=0x%llx\r\n",
+        && ReadProcessMemory(process,reinterpret_cast<void*>(base+kScriptVmStateRva),&vm,sizeof(vm),&read)
+        && ReadProcessMemory(process,reinterpret_cast<void*>(base+kScriptFunctionCountRva),&functionCount,sizeof(functionCount),&read)
+        && ReadProcessMemory(process,reinterpret_cast<void*>(base+kScriptFramePointerRva),&frame,sizeof(frame),&read)) {
+        size=std::snprintf(message,sizeof(message),"native_vm top=0x%llx incoming=%u outgoing=%u execute_depth=%d code=0x%llx stack=0x%llx start_top=0x%llx function_count=%d frame=0x%llx local_id=%u local_count=%u\r\n",
             static_cast<unsigned long long>(parameters.top),parameters.incoming,parameters.outgoing,executeDepth,
-            static_cast<unsigned long long>(code),static_cast<unsigned long long>(stack));
+            static_cast<unsigned long long>(vm.code),static_cast<unsigned long long>(vm.top),static_cast<unsigned long long>(vm.startTop),
+            functionCount,static_cast<unsigned long long>(frame),vm.localId,vm.localCount);
         if(size>0)RawWrite(report,message,static_cast<DWORD>(size));
     }
     const auto last=nextNativeEvent.load(std::memory_order_acquire);
@@ -119,8 +129,9 @@ LONG WINAPI CrashFilter(EXCEPTION_POINTERS* info) {
     if (dump != INVALID_HANDLE_VALUE) {
         MINIDUMP_EXCEPTION_INFORMATION exception{GetCurrentThreadId(), info, FALSE};
         const auto type=static_cast<MINIDUMP_TYPE>(MiniDumpNormal|MiniDumpWithIndirectlyReferencedMemory|MiniDumpWithThreadInfo);
+        DumpMemory memory{base,0};MINIDUMP_CALLBACK_INFORMATION callbacks{IncludeNativeVmMemory,&memory};
         BOOL ok = MiniDumpWriteDump(GetCurrentProcess(), GetCurrentProcessId(), dump, type,
-                                   &exception, nullptr, nullptr);
+                                   &exception, nullptr, &callbacks);
         size = std::snprintf(message, sizeof(message), "minidump=%s error=%lu\r\n", ok ? "written" : "failed", ok ? 0 : GetLastError());
         if (size > 0) RawWrite(report, message, static_cast<DWORD>(size),true);
         CloseHandle(dump);
@@ -163,7 +174,7 @@ void InitializeLog() {
     }
     std::swprintf(logPath,32768,L"%ls",file);
     Log("BO1MW2 %s | AMD64 | log=%ls", kVersion, file);
-    Log("Test18: checked menu text, isolated native script parameters, player-friendly damage attribution and crash-specific logs. BO1 live behavior remains staged.");
+    Log("Test19: isolated full native VM work context, live enemy validation, notification deduplication and VM memory in crash dumps. 256-actor appended-layout prototype remains separate from the DLL.");
 }
 void Log(const char* format, ...) {
     char body[4096]{};

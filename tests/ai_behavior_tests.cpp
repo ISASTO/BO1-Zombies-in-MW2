@@ -18,6 +18,14 @@ int main() {
     Check(ChooseAiTarget(self,kAlliesTeam,0x9000,player,{sameTeam}).entity==sameTeam.address,"friendly targets hostiles and never the player");
     sameTeam.origin={2600,0,0};
     Check(!ChooseAiTarget(self,kAlliesTeam,0x9000,player,{sameTeam}).entity,"friendly follows when threats are outside local combat range");
+    auto cached=sameTeam;cached.inUse=true;cached.serial=12;cached.actor=0x5000;cached.sentient=0x6000;
+    auto live=cached;
+    Check(LiveAiTarget(cached,live,kAlliesTeam),"cached enemy allocation is accepted while still alive and hostile");
+    live.health=0;Check(!LiveAiTarget(cached,live,kAlliesTeam),"enemy killed between world scan and assignment is rejected");
+    live=cached;++live.serial;Check(!LiveAiTarget(cached,live,kAlliesTeam),"recycled enemy slot is rejected before native assignment");
+    live=cached;live.team=kAlliesTeam;Check(!LiveAiTarget(cached,live,kAlliesTeam),"enemy converted to an ally is rejected");
+    live=cached;live.team=3;Check(!LiveAiTarget(cached,live,kAlliesTeam),"enemy converted to a neutral is rejected");
+    live=cached;live.type=kActorCorpseType;Check(!LiveAiTarget(cached,live,kAlliesTeam),"a corpse cannot become an enemy handle");
     Check(!NeedsAiGoal(true,{0,0,0},{20,0,0}) && NeedsAiGoal(true,{0,0,0},{100,0,0}),"small movement preserves native path instead of resetting it");
     AiAppearance look;look.models[0]=10;look.tags[0]=11;look.tags[1]=65000;look.models[2]=88;look.tags[2]=99;
     TrimAiAttachments(look);

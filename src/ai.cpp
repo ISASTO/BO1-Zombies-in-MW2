@@ -793,14 +793,25 @@ void FollowOwned(const Snapshot& s,const AiScope& scope,int time) {
             std::uint8_t current=0;if(Value(e.sentient+field,current) && current<=1)SetByte(e.sentient+field,current,0);
         }
         auto self=e;self.team=it->team;
-        const auto chosen=ChooseAiTarget(self,ally,s.entity,player,ai.combatants);
+        auto chosen=ChooseAiTarget(self,ally,s.entity,player,ai.combatants);
+        // The combatant cache can be 500 ms old. A dead or recycled allocation
+        // must never become an enemy handle, especially during large battles.
+        if(chosen.entity && chosen.entity!=s.entity) {
+            const auto candidate=std::find_if(ai.combatants.begin(),ai.combatants.end(),[&](const auto& x){return x.address==chosen.entity;});
+            const auto live=candidate==ai.combatants.end()?AiEntity{}:Entity(AiIdentity::capture(*candidate),scope.pool,false);
+            if(candidate==ai.combatants.end() || !LiveAiTarget(*candidate,live,self.team))
+                chosen={0,player,std::numeric_limits<float>::max()};
+            else {chosen.position=live.origin;chosen.squaredDistance=PointDistanceSquared(self.origin,live.origin);}
+        }
         const auto target=chosen.entity;auto goal=chosen.position;const auto distance=chosen.squaredDistance;
         std::uint16_t currentEnemy=0;
         const auto desiredEnemy=target?static_cast<std::uint16_t>((target-scope.pool)/kAiEntityStride+1):0;
         const bool enemyRead=Value(e.sentient+0x44,currentEnemy);
         if(target!=it->target || (target && enemyRead && currentEnemy!=desiredEnemy)) {
             RecordNativeOperation("SET_ENEMY_BEGIN",e.number);
-            reinterpret_cast<EnemyFn>(aiProfile.setEnemy)(e.sentient,target,1,0);
+            // Notify once for a genuinely new target. Reassertions of the same
+            // cached target update combat state without waking script listeners.
+            reinterpret_cast<EnemyFn>(aiProfile.setEnemy)(e.sentient,target,target!=it->target?1:0,0);
             RecordNativeOperation("SET_ENEMY_END",e.number);
             if(target!=it->target)Log("AI_COMBAT entity=%u team=%d target=%u",e.number,it->team,target?static_cast<unsigned>((target-scope.pool)/kAiEntityStride):0);
             else ++ai.status.combatReassertions;
@@ -875,11 +886,41 @@ void Service() {
     servicing=true;
     struct ClearServiceFlag { ~ClearServiceFlag() { servicing=false; } } clearServiceFlag;
     std::lock_guard<std::recursive_mutex> lock(aiMutex);
-    NativeScriptParameters parameters{};int executeDepth=0;
+    NativeScriptParameters parameters{};int executeDepth=0,functionCount=0;
     // The clock may be called recursively by campaign scripts. Only run mod
     // work when the VM is idle and no builtin owns stack parameters.
     if(!Value(aiProfile.base+kScriptExecuteDepthRva,executeDepth) || executeDepth!=-1
+        || !Value(aiProfile.base+kScriptFunctionCountRva,functionCount) || functionCount
         || !Value(aiProfile.base+kScriptParametersRva,parameters) || parameters.incoming || parameters.outgoing)return;
+    auto& liveParameters=*reinterpret_cast<volatile NativeScriptParameters*>(aiProfile.base+kScriptParametersRva);
+    auto& liveState=*reinterpret_cast<NativeScriptVmState*>(aiProfile.base+kScriptVmStateRva);
+    auto& liveFrame=*reinterpret_cast<volatile std::uintptr_t*>(aiProfile.base+kScriptFramePointerRva);
+    NativeScriptWorkFrame vmFrame(liveParameters,liveState,liveFrame,functionCount,executeDepth,
+        aiProfile.base+kScriptStackBaseRva,aiProfile.base+kScriptFrameBaseRva,
+        reinterpret_cast<std::uint8_t*>(aiProfile.base+kScriptFrameBaseRva),reinterpret_cast<std::uint8_t*>(aiProfile.base+kScriptStackBaseRva),
+        reinterpret_cast<volatile std::uintptr_t*>(aiProfile.base+kScriptLocalVariablesPointerRva),aiProfile.base+kScriptLocalVariablesBaseRva);
+    if(!vmFrame.valid())return;
+    const auto workEpoch=ai.checkpointEpoch.load();
+    struct RestoreWorkVm {
+        NativeScriptWorkFrame& frame;std::uint64_t epoch;
+        ~RestoreWorkVm() {
+            if(epoch!=ai.checkpointEpoch) {frame.abandon();return;}
+            auto& p=*reinterpret_cast<volatile NativeScriptParameters*>(aiProfile.base+kScriptParametersRva);
+            int count=0,depth=0;
+            if(!Value(aiProfile.base+kScriptFunctionCountRva,count) || !Value(aiProfile.base+kScriptExecuteDepthRva,depth)) {frame.abandon();return;}
+            // Only values produced by this isolated operation are released.
+            // Zero-object native Notify consumes both outgoing and incoming
+            // parameters, including ignored native return values/references.
+            if(!count && depth==-1 && p.incoming<=2048 && p.outgoing<=2048
+                && p.top<=aiProfile.base+kScriptStackBaseRva+16*2047 && !(p.top&15)
+                && p.top>=aiProfile.base+kScriptStackBaseRva+16*(static_cast<std::uintptr_t>(p.incoming)+p.outgoing))
+                reinterpret_cast<void(*)(unsigned,unsigned,unsigned)>(aiProfile.base+kScriptNotifyRva)(0,0,p.incoming);
+            if(!frame.close(count,depth)) {
+                RecordNativeOperation("VM_WORK_UNBALANCED");
+                Log("AI_SERVICE native VM work did not balance; incoming=%u outgoing=%u top=%p functions=%d depth=%d",p.incoming,p.outgoing,reinterpret_cast<void*>(p.top),count,depth);
+            }
+        }
+    } restoreWorkVm{vmFrame,workEpoch};
     if(!CompleteServiceInstall()) {
         ai.queue.cancel(AiRequestResult::HookUnavailable);ai.hands.pending=false;ai.hands.result.state=NativeHandBuildState::Failed;
         Finish(AiRequestResult::HookUnavailable);return;
@@ -1339,9 +1380,17 @@ void InitializeAiEngine(std::uintptr_t base,std::size_t size,std::uintptr_t text
         && InHost(base+kScriptExecuteDepthRva,4) && ReadAi(base+kDamageRva,damageStart.data(),damageStart.size()) && damageStart==kDamagePrologue
         && Rip(base+0x223180,0,2,6)==base+kScriptParametersRva+12
         && Rip(base+0x223994,0,3,7)==base+kScriptParametersRva
-        && Rip(base+0x224934,0,2,6)==base+kScriptExecuteDepthRva;
+        && Rip(base+0x224934,0,2,6)==base+kScriptExecuteDepthRva
+        && Rip(base+0x224777,0,3,7)==base+kScriptVmStateRva
+        && Rip(base+0x2237f0,0,3,7)==base+kScriptStackBaseRva
+        && Rip(base+0x223867,0,2,10)==base+kScriptStackBaseRva+8
+        && Rip(base+0x223804,0,3,7)==base+kScriptFrameBaseRva
+        && Rip(base+0x2237f7,0,2,6)==base+kScriptFunctionCountRva
+        && Rip(base+0x22380b,0,3,7)==base+kScriptFramePointerRva
+        && Rip(base+0x223812,0,3,7)==base+kScriptLocalVariablesBaseRva
+        && Rip(base+0x223819,0,3,7)==base+kScriptLocalVariablesPointerRva;
     ai.status.resolved=aiProfile.resolved;
-    Log("AI_CAPACITY_EXPANSION requested=256 enabled=0 runtime_capacity=%d blocked=PERCEPTION_SNAPSHOT_SAVE_LAYOUT",kAiNativeActorCapacity);
+    Log("AI_CAPACITY_EXPANSION requested=256 enabled=0 runtime_capacity=%d prototype=APPENDED_256_274 blocked=REMAINING_CONSUMERS_FULL_CHECKPOINT_LIFECYCLE",kAiNativeActorCapacity);
     Log("AI_PROFILE resolved=%d callback_slot_rva=0x%llx spawn_rva=0x%llx delete_rva=0x%llx pool_slot_rva=0x%llx clock_rva=0x%llx",
         aiProfile.resolved,static_cast<unsigned long long>(aiProfile.thinkSlot-base),static_cast<unsigned long long>(spawn-base),
         static_cast<unsigned long long>(remove-base),static_cast<unsigned long long>(aiProfile.poolSlot-base),static_cast<unsigned long long>(aiProfile.timeSlot-base));

@@ -33,6 +33,16 @@ def verify(path,include=Path('include')):
         raise ValueError('Native execution depth/idle value differs')
     if value(hooks,'kScriptNotifyRva')!=0x223970:
         raise ValueError('Native notification routine differs')
+    vm=value(hooks,'kScriptVmStateRva');stack=value(hooks,'kScriptStackBaseRva');frame=value(hooks,'kScriptFrameBaseRva')
+    for at,offset,length,expected_target in (
+        (0x224777,3,7,vm),(0x2237f0,3,7,stack),(0x223867,2,10,stack+8),(0x223804,3,7,frame),
+        (0x2237f7,2,6,value(hooks,'kScriptFunctionCountRva')),
+        (0x22380b,3,7,value(hooks,'kScriptFramePointerRva')),
+        (0x223812,3,7,value(hooks,'kScriptLocalVariablesBaseRva')),
+        (0x223819,3,7,value(hooks,'kScriptLocalVariablesPointerRva'))):
+        if operand(at,offset,length)!=expected_target:raise ValueError(f'Native VM work-context binding differs at {at:x}')
+    if pe.get_data(0x22386d,4)!=bytes.fromhex('07 00 00 00'):
+        raise ValueError('Native initial stack sentinel type differs')
     damage=value(hooks,'kDamageRva')
     prologue=bytes(int(n,16) for n in re.search(r'kDamagePrologue=\{([^}]+)',hooks)[1].split(',') if n.strip())
     if pe.get_data(damage,len(prologue))!=prologue or len(prologue)!=15 or damage&15:
@@ -79,6 +89,8 @@ def verify(path,include=Path('include')):
         'enabled_allied_damage_attribution':'Native world entity instead of player; damage/death callbacks retain native processing',
         'script_parameters_rva':hex(parameters),'script_execute_depth_rva':hex(depth),'idle_script_execute_depth':-1,
         'cleanup_parameter_isolation':'Preserve caller stack/refcounts; hide incoming/outgoing counts only for the hidden native operation',
+        'external_vm_context':'Idle native frame/stack/local-variable base; caller context restored after balanced work',
+        'script_vm_state_rva':hex(vm),'script_stack_base_rva':hex(stack),'script_frame_base_rva':hex(frame),
         'damage_hook_rva':hex(damage),'damage_trampoline_bytes':len(prologue),
         'native_string_factory_rva':hex(intern),'native_entity_save_fields_rva':hex(table),
         'targetname_save_kind':1,'targetname_saved_as':'Text through SL_ConvertToString/MemFile_WriteCString',

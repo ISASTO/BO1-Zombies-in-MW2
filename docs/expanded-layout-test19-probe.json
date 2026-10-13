@@ -1,0 +1,463 @@
+{
+  "probe": "isolated appended 256-actor native layout",
+  "native_actor_allocations": 256,
+  "native_257th_allocation_refused": true,
+  "native_ordinary_sentient_allocations": 274,
+  "native_275th_sentient_allocation_refused": true,
+  "native_iteration_visits": 256,
+  "native_perception_records_cleared": 274,
+  "native_perception_records_copied": 274,
+  "actor_tail_and_pool_guards_intact": true,
+  "native_snapshot_actor_indices": 256,
+  "native_snapshot_highest_corpse_index": 319,
+  "native_animation_pointer_lookups": 256,
+  "native_corpse_snapshot_goal_copy_verified": true,
+  "converted_reset_active_flags": 256,
+  "native_actor_pointer_roundtrips": 256,
+  "native_sentient_pointer_roundtrips": 274,
+  "expanded_perception_save_descriptors": 274,
+  "appended_perception_cleared_on_reuse": true,
+  "runtime_expansion_enabled": false,
+  "substituted_dependencies": [
+    "memset MS-ABI REP STOSB",
+    "iterator predicate records visits",
+    "perception callbacks skipped",
+    "snapshot profiler isolated"
+  ],
+  "scope": "Native routines in a private Linux MS-ABI fixture. Full checkpoint streams, snapshot consumers, all AI perception consumers and Windows gameplay are not executed.",
+  "executable_sha256": "fb7e8a987c371dea7b666091b0b9e2011c0cd9cd277b191ad453d11d557dd777",
+  "manifest": {
+    "actor_capacity": 256,
+    "sentient_capacity": 274,
+    "actor_stride": "0x48c0",
+    "perception_base": "0x1560",
+    "snapshot_index_bits": 16,
+    "highest_corpse_index": 319,
+    "confirmed_perception_sites": [
+      "0x124822",
+      "0x12482a",
+      "0x124832",
+      "0x12d467",
+      "0x12d46f",
+      "0x12d479",
+      "0x12d481",
+      "0x12d489",
+      "0x12d491",
+      "0x12d499",
+      "0x12d4a1",
+      "0x12d4a9",
+      "0x12d4b1",
+      "0x12d4b9",
+      "0x1519af"
+    ],
+    "prototype_edits": [
+      {
+        "rva": "0x4600000",
+        "bytes": 18,
+        "role": "expanded capacity bound relay"
+      },
+      {
+        "rva": "0x12398a",
+        "bytes": 6,
+        "role": "expanded capacity bound"
+      },
+      {
+        "rva": "0x4600012",
+        "bytes": 18,
+        "role": "expanded capacity bound relay"
+      },
+      {
+        "rva": "0x123bfc",
+        "bytes": 6,
+        "role": "expanded capacity bound"
+      },
+      {
+        "rva": "0x4600024",
+        "bytes": 18,
+        "role": "expanded capacity bound relay"
+      },
+      {
+        "rva": "0x123c77",
+        "bytes": 6,
+        "role": "expanded capacity bound"
+      },
+      {
+        "rva": "0x4600036",
+        "bytes": 18,
+        "role": "expanded capacity bound relay"
+      },
+      {
+        "rva": "0x123cb7",
+        "bytes": 6,
+        "role": "expanded capacity bound"
+      },
+      {
+        "rva": "0x4600048",
+        "bytes": 18,
+        "role": "expanded capacity bound relay"
+      },
+      {
+        "rva": "0x174f7b",
+        "bytes": 10,
+        "role": "expanded capacity bound"
+      },
+      {
+        "rva": "0x460005a",
+        "bytes": 17,
+        "role": "expanded capacity bound relay"
+      },
+      {
+        "rva": "0x1ae24a",
+        "bytes": 5,
+        "role": "expanded capacity bound"
+      },
+      {
+        "rva": "0x460006b",
+        "bytes": 17,
+        "role": "expanded capacity bound relay"
+      },
+      {
+        "rva": "0x1ae7d8",
+        "bytes": 9,
+        "role": "expanded capacity bound"
+      },
+      {
+        "rva": "0x460007c",
+        "bytes": 17,
+        "role": "expanded capacity bound relay"
+      },
+      {
+        "rva": "0x1ae28f",
+        "bytes": 5,
+        "role": "expanded capacity bound"
+      },
+      {
+        "rva": "0x460008d",
+        "bytes": 17,
+        "role": "expanded capacity bound relay"
+      },
+      {
+        "rva": "0x1ae822",
+        "bytes": 9,
+        "role": "expanded capacity bound"
+      },
+      {
+        "rva": "0x460009e",
+        "bytes": 18,
+        "role": "expanded capacity bound relay"
+      },
+      {
+        "rva": "0x1b0dd4",
+        "bytes": 6,
+        "role": "expanded capacity bound"
+      },
+      {
+        "rva": "0x123986",
+        "bytes": 4,
+        "role": "expanded actor stride"
+      },
+      {
+        "rva": "0x123bf8",
+        "bytes": 4,
+        "role": "expanded actor stride"
+      },
+      {
+        "rva": "0x123c12",
+        "bytes": 4,
+        "role": "expanded actor stride"
+      },
+      {
+        "rva": "0x123c80",
+        "bytes": 4,
+        "role": "expanded actor stride"
+      },
+      {
+        "rva": "0x123cb3",
+        "bytes": 4,
+        "role": "expanded actor stride"
+      },
+      {
+        "rva": "0x174f6c",
+        "bytes": 4,
+        "role": "expanded actor stride"
+      },
+      {
+        "rva": "0x1ae27a",
+        "bytes": 4,
+        "role": "expanded actor stride"
+      },
+      {
+        "rva": "0x1239a9",
+        "bytes": 4,
+        "role": "clear complete appended actor allocation"
+      },
+      {
+        "rva": "0x123c26",
+        "bytes": 8,
+        "role": "division multiplier for 18624-byte actor"
+      },
+      {
+        "rva": "0x123c69",
+        "bytes": 1,
+        "role": "division shift for 18624-byte actor"
+      },
+      {
+        "rva": "0x1ae7bb",
+        "bytes": 8,
+        "role": "division multiplier for 18624-byte actor"
+      },
+      {
+        "rva": "0x1ae7c9",
+        "bytes": 1,
+        "role": "division shift for 18624-byte actor"
+      },
+      {
+        "rva": "0x12c779",
+        "bytes": 8,
+        "role": "division multiplier for 18624-byte actor"
+      },
+      {
+        "rva": "0x12c78e",
+        "bytes": 1,
+        "role": "division shift for 18624-byte actor"
+      },
+      {
+        "rva": "0x12c7e7",
+        "bytes": 8,
+        "role": "division multiplier for 18624-byte actor"
+      },
+      {
+        "rva": "0x12c7f5",
+        "bytes": 1,
+        "role": "division shift for 18624-byte actor"
+      },
+      {
+        "rva": "0x12c819",
+        "bytes": 8,
+        "role": "division multiplier for 18624-byte actor"
+      },
+      {
+        "rva": "0x12c827",
+        "bytes": 1,
+        "role": "division shift for 18624-byte actor"
+      },
+      {
+        "rva": "0x124826",
+        "bytes": 4,
+        "role": "appended perception record"
+      },
+      {
+        "rva": "0x12482e",
+        "bytes": 4,
+        "role": "appended perception record"
+      },
+      {
+        "rva": "0x124836",
+        "bytes": 4,
+        "role": "appended perception record"
+      },
+      {
+        "rva": "0x12d46b",
+        "bytes": 4,
+        "role": "appended perception record"
+      },
+      {
+        "rva": "0x12d473",
+        "bytes": 4,
+        "role": "appended perception record"
+      },
+      {
+        "rva": "0x12d47d",
+        "bytes": 4,
+        "role": "appended perception record"
+      },
+      {
+        "rva": "0x12d485",
+        "bytes": 4,
+        "role": "appended perception record"
+      },
+      {
+        "rva": "0x12d48d",
+        "bytes": 4,
+        "role": "appended perception record"
+      },
+      {
+        "rva": "0x12d495",
+        "bytes": 4,
+        "role": "appended perception record"
+      },
+      {
+        "rva": "0x12d49d",
+        "bytes": 4,
+        "role": "appended perception record"
+      },
+      {
+        "rva": "0x12d4a5",
+        "bytes": 4,
+        "role": "appended perception record"
+      },
+      {
+        "rva": "0x12d4ad",
+        "bytes": 4,
+        "role": "appended perception record"
+      },
+      {
+        "rva": "0x12d4b5",
+        "bytes": 4,
+        "role": "appended perception record"
+      },
+      {
+        "rva": "0x12d4bd",
+        "bytes": 4,
+        "role": "appended perception record"
+      },
+      {
+        "rva": "0x1519b2",
+        "bytes": 4,
+        "role": "appended perception record"
+      },
+      {
+        "rva": "0x174e82",
+        "bytes": 4,
+        "role": "relocated 256-entry snapshot team array"
+      },
+      {
+        "rva": "0x174e8c",
+        "bytes": 4,
+        "role": "relocated 256-entry snapshot goal IDs/positions"
+      },
+      {
+        "rva": "0x174e95",
+        "bytes": 4,
+        "role": "relocated 256-entry snapshot goal state"
+      },
+      {
+        "rva": "0x12c787",
+        "bytes": 4,
+        "role": "relocated 256-entry animation pointer lookup"
+      },
+      {
+        "rva": "0x1711ea",
+        "bytes": 4,
+        "role": "320-entry corpse snapshot goal cache"
+      },
+      {
+        "rva": "0x1711fc",
+        "bytes": 4,
+        "role": "320-entry corpse snapshot goal state"
+      },
+      {
+        "rva": "0x171204",
+        "bytes": 4,
+        "role": "320-entry corpse snapshot goal cache"
+      },
+      {
+        "rva": "0x17120c",
+        "bytes": 4,
+        "role": "320-entry corpse snapshot goal state"
+      },
+      {
+        "rva": "0x171214",
+        "bytes": 4,
+        "role": "320-entry corpse snapshot goal cache"
+      },
+      {
+        "rva": "0x17121c",
+        "bytes": 4,
+        "role": "320-entry corpse snapshot goal state"
+      },
+      {
+        "rva": "0x171224",
+        "bytes": 4,
+        "role": "320-entry corpse snapshot goal cache"
+      },
+      {
+        "rva": "0x17122e",
+        "bytes": 4,
+        "role": "320-entry corpse snapshot goal cache"
+      },
+      {
+        "rva": "0x171243",
+        "bytes": 4,
+        "role": "320-entry corpse snapshot goal cache"
+      },
+      {
+        "rva": "0x17124e",
+        "bytes": 4,
+        "role": "320-entry corpse snapshot goal cache"
+      },
+      {
+        "rva": "0x171259",
+        "bytes": 4,
+        "role": "320-entry corpse snapshot goal cache"
+      },
+      {
+        "rva": "0x171264",
+        "bytes": 4,
+        "role": "320-entry corpse snapshot goal cache"
+      },
+      {
+        "rva": "0x171274",
+        "bytes": 4,
+        "role": "320-entry corpse snapshot goal state"
+      },
+      {
+        "rva": "0x171283",
+        "bytes": 4,
+        "role": "320-entry corpse snapshot goal state"
+      },
+      {
+        "rva": "0x46000b0",
+        "bytes": 14,
+        "role": "16-bit actor snapshot map relay"
+      },
+      {
+        "rva": "0x174ebd",
+        "bytes": 8,
+        "role": "16-bit actor snapshot map"
+      },
+      {
+        "rva": "0x46000be",
+        "bytes": 20,
+        "role": "corpse map indices 256..319 relay"
+      },
+      {
+        "rva": "0x174f98",
+        "bytes": 11,
+        "role": "corpse map indices 256..319"
+      },
+      {
+        "rva": "0x46000d2",
+        "bytes": 16,
+        "role": "expanded corpse callback index relay"
+      },
+      {
+        "rva": "0x174fa3",
+        "bytes": 8,
+        "role": "expanded corpse callback index"
+      },
+      {
+        "rva": "0x46000e2",
+        "bytes": 13,
+        "role": "256-entry animation-presence array relay"
+      },
+      {
+        "rva": "0x174f54",
+        "bytes": 5,
+        "role": "256-entry animation-presence array"
+      },
+      {
+        "rva": "0x12c840",
+        "bytes": 40,
+        "role": "converted full actor active-flag reset"
+      }
+    ],
+    "runtime_activation": false,
+    "untested_dependencies": [
+      "remaining inline perception consumers and actor-index divisions",
+      "pool reset/free/animation lifetime beyond 31",
+      "snapshot consumers and client/wire representation",
+      "full checkpoint counts, format marker and legacy stream compatibility"
+    ]
+  }
+}
