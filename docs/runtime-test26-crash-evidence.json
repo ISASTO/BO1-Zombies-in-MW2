@@ -1,0 +1,32 @@
+{
+  "archive_sha256": "b4b0b26d820e34bbb7ca35a3db65eb2f4e32c7f997dcd4d25bb6ec7b351dae3f",
+  "installed_version": "0.1.24-squad-test25",
+  "installed_dll_sha256": "f6501813cdfec98edc4b2fd599ab2249fba75676e6c0521c89fe87827842de6c",
+  "executable_sha256": "fb7e8a987c371dea7b666091b0b9e2011c0cd9cd277b191ad453d11d557dd777",
+  "matching_new_crashes": [
+    {
+      "dump": "crash-20261013-154917.dmp",
+      "exception": "0xc0000005",
+      "fault_instruction_rva": "0x1ef903",
+      "last_completed_spawn_actor_count": 56,
+      "primary_engine_error": "BG_EvaluateTrajectory: unknown trType: -1111617280",
+      "invalid_trajectory_type_bits": "0xbdbe1100",
+      "same_bits_as_float": -0.09280586242675781,
+      "client_entity_number": 1202,
+      "client_trajectory_rva": "0x4bd830",
+      "fault_is_during_engine_error_cleanup": true
+    },
+    {
+      "dump": "crash-20261013-155323.dmp",
+      "exception": "0xc0000005",
+      "fault_instruction_rva": "0x10047c",
+      "last_completed_spawn_actor_count": 98,
+      "allocator_pool_rva": "0xcdb118",
+      "corrupt_free_head": "0x3f161262",
+      "same_bits_as_float": 0.586217999458313,
+      "allocator_address_arithmetic_matches_fault": true
+    }
+  ],
+  "independently_reproduced_defect": "The expanded opposing-team iterator can feed more than 50 entries to a native 50-row threat stack array. Candidate 51 overwrites saved XMM registers; subsequent rows overlap saved GPRs and caller control data.",
+  "causal_scope": "The returned faults show memory corruption. The exact native fixture reproduces this definite overwrite and checks its repair, but does not reproduce either complete Windows crash chain. Mission/renderer stability remains a retail retest."
+}

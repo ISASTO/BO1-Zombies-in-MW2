@@ -1,0 +1,36 @@
+{
+  "executable_sha256": "fb7e8a987c371dea7b666091b0b9e2011c0cd9cd277b191ad453d11d557dd777",
+  "old_revision": "3801b16dfd94b1873718da2f405f7fcf65df266d",
+  "old_crashes": {
+    "old-writer": {
+      "reproduced": true,
+      "fault_instruction": "0x232e68"
+    },
+    "old-shoot": {
+      "reproduced": true,
+      "fault_instruction": "0x1a187e"
+    }
+  },
+  "native_results": {
+    "history_pose_cases": 640,
+    "generation_validation_cases": 2048,
+    "temporal_interpolation_actor_cases": 32,
+    "history_ring_wrap": true,
+    "shot_pose_cases": 516,
+    "live_actor_capacity": 256,
+    "native_history_slots": 32,
+    "guarded_800_byte_shot_scratch": true,
+    "high_actor_poses_preserved": true,
+    "native_interpolation_and_restore": true,
+    "native_weapon_restore_loops_executed": 2,
+    "booted_game_tested": false
+  },
+  "external_runtime_arena": true,
+  "substituted_dependencies": [
+    "entity relinking recorder (requires a booted world)",
+    "MS-ABI memset transport"
+  ],
+  "old_shoot_isolation": "Only old-shoot uses a correct 32-slot validation callback to isolate the independent excessive loop bound. Fixed tests run the real validator and interpolation.",
+  "retail_gameplay_tested": false,
+  "capacity_scope": "256 live actors; native lag history and shot scratch remain 32 slots. Higher actors retain current server poses."
+}

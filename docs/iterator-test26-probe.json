@@ -1,0 +1,30 @@
+{
+  "executable_sha256": "fb7e8a987c371dea7b666091b0b9e2011c0cd9cd277b191ad453d11d557dd777",
+  "old_revision": "15f40d33cb63b1a37b2877161c241641f701b512",
+  "old_negative_pointer_overrun_reproduced": true,
+  "old_overrun_instruction_rva": "0x1286e0",
+  "old_guard_page_actor_index": 256,
+  "old_positive_pointer_skips_later_actors_reproduced": true,
+  "corrected_guard_instruction_rva": "0x1286fe",
+  "old_guard_started_at": "0x1286ff",
+  "corrected_native_results": [
+    {
+      "guarded_iterator_cases": 1026,
+      "actor_capacity": 256,
+      "original_native_function_rva": "0x1286a0",
+      "pool_guard": true,
+      "negative_pointer_low_dword": true
+    },
+    {
+      "guarded_iterator_cases": 1026,
+      "actor_capacity": 256,
+      "original_native_function_rva": "0x1286a0",
+      "pool_guard": true,
+      "negative_pointer_low_dword": false
+    }
+  ],
+  "total_corrected_cases": 2052,
+  "runtime_plan_external_arena": true,
+  "substituted_engine_callbacks": [],
+  "windows_mission_load_retest": "pending"
+}

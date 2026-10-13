@@ -13,6 +13,9 @@ inline constexpr std::size_t kActors=256,kSentients=274,kCorpses=64;
 inline constexpr std::size_t kOldStride=0x1560,kPerceptionStart=kOldStride;
 inline constexpr std::size_t kRecordBytes=48,kStride=kPerceptionStart+kSentients*kRecordBytes;
 inline constexpr std::size_t kSentientStride=0x88;
+// Runtime unwind entry for the ordered stack-page probe of the native threat
+// routine. Native chained unwind records are patched with the frame itself.
+inline constexpr std::uint32_t kThreatProbeRva=0x4610000,kThreatProbeEndRva=0x461001c,kThreatProbeUnwindRva=0x4610040;
 static_assert(kStride==0x48c0 && kStride%16==0);
 inline std::optional<std::size_t> PerceptionOffset(std::size_t sentient) {
     if(sentient>=kSentients)return std::nullopt;

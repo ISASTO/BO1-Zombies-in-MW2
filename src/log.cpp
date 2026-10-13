@@ -200,7 +200,7 @@ void InitializeLog() {
     }
     std::swprintf(logPath,32768,L"%ls",file);
     Log("BO1MW2 %s | AMD64 | log=%ls", kVersion, file);
-    Log("Test25: fixes shared scratch-tree leases, corpse search end markers and expanded actor/corpse tree ownership. Live capacity stays 256; native history stays 32 slots. Original MP hitmarkers retained.");
+    Log("Test26: fixes native 50-candidate threat stack overwrite, chained unwind metadata, biased sentient handles and remaining 50-sentient searches. Live capacity stays 256; native history stays 32 slots. Original MP hitmarkers retained.");
 }
 void Log(const char* format, ...) {
     char body[4096]{};

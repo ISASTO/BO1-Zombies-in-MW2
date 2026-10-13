@@ -139,8 +139,11 @@ def prepare(pe):
  # their companion loops already stop after 32. Match both halves exactly.
  for at in (0x1a1663,0x1a1945,0x1a34a0):
   imm(at,REWIND_ACTORS*STRIDE,'bounded native shooting scratch traversal')
+ from prepare_expanded_threat import prepare as prepare_threat
+ threat_edits,threat_meta=prepare_threat(pe,image);edits+=threat_edits
  return image,{'previous_stage':meta,'stage22_edits':edits,'frame_bytes':SNAPSHOT_BYTES,'temporary_animation_trees':TEMP_COUNT,
                'native_rewind_actor_slots':REWIND_ACTORS,
+               'threat_frame':threat_meta,
                'high_actor_collision':'Actors 32..255 keep their current server pose during shots; live pool capacity stays 256.'}
 
 def flatten(meta):
@@ -165,9 +168,11 @@ def runtime_plan(pe,image,meta):
   for i in dec.disasm(pe.get_data(start,section.SizeOfRawData),base+start):
    if not i.id:continue
    for offset in range(i.size):boundaries[i.address-base+offset]=(i.address-base,i.size)
- spans=[]
+ spans=[];data_spans=[]
  for r in flatten(meta):
   at=int(r['rva'],16);length=r.get('bytes',len(bytes.fromhex(r.get('after',''))))
+  if r.get('data'):
+   data_spans.append((at,at+length));continue
   if at<0x4000000:
    if at not in boundaries or at+length-1 not in boundaries:raise ValueError(f'Instruction boundary missing {at:x}')
    a,_=boundaries[at];z,n=boundaries[at+length-1]
@@ -199,6 +204,10 @@ def runtime_plan(pe,image,meta):
      if target>=0x4000000 or a>=0x4000000:fixups.append({'offset':at-a+i.imm_offset,'width':i.imm_size,'target':target,'end':at+i.size,'relative':True})
   before=pe.get_data(a,z-a).hex() if a<0x4000000 else ''
   plan.append({'rva':a,'before':before,'after':blob.hex(),'fixups':fixups})
+ for a,z in data_spans:
+  plan.append({'rva':a,'before':pe.get_data(a,z-a).hex() if a<0x4000000 else '',
+               'after':bytes(image[a:z]).hex(),'fixups':[]})
+ plan.sort(key=lambda p:p['rva'])
  return plan
 
 def generate_header(plan,output):

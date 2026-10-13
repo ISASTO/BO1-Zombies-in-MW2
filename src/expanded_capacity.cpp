@@ -11,6 +11,8 @@ using namespace expansion;
 std::atomic<int> capacity{32};
 std::uintptr_t host=0,arena=0;
 constexpr std::size_t kArenaBytes=0x800000;
+RUNTIME_FUNCTION threatProbeFunction{
+    kThreatProbeRva-0x4000000,kThreatProbeEndRva-0x4000000,kThreatProbeUnwindRva-0x4000000};
 std::vector<SaveField> fields;
 thread_local bool legacyRead=false;
 using SelectWrite=void(*)(std::uintptr_t,int);
@@ -166,7 +168,17 @@ bool InstallExpandedCapacity(std::uintptr_t base,bool exactResolved) {
         for(auto it=protections.rbegin();it!=protections.rend();++it){DWORD ignored;VirtualProtect(reinterpret_cast<void*>(it->write->address),it->write->after.size(),it->old,&ignored);}
         VirtualFree(reinterpret_cast<void*>(arena),0,MEM_RELEASE);arena=0;fields.clear();return false;
     }
-    for(const auto& write:writes)std::memcpy(reinterpret_cast<void*>(write.address),write.after.data(),write.after.size());
+    // Publish the probe's own unwind description before any native entry can
+    // reach it. Failure leaves all original native instructions intact.
+    for(const auto& write:writes)if(write.before.empty())
+        std::memcpy(reinterpret_cast<void*>(write.address),write.after.data(),write.after.size());
+    if(!RtlAddFunctionTable(&threatProbeFunction,1,arena)) {
+        for(auto it=protections.rbegin();it!=protections.rend();++it){DWORD ignored;VirtualProtect(reinterpret_cast<void*>(it->write->address),it->write->after.size(),it->old,&ignored);}
+        VirtualFree(reinterpret_cast<void*>(arena),0,MEM_RELEASE);arena=0;fields.clear();
+        Log("AI_CAPACITY_EXPANSION enabled=0 reason=THREAT_PROBE_UNWIND_REGISTRATION_FAILED");return false;
+    }
+    for(const auto& write:writes)if(!write.before.empty())
+        std::memcpy(reinterpret_cast<void*>(write.address),write.after.data(),write.after.size());
     // Idle pools only; G_Init's checked direct references also point here.
     *reinterpret_cast<std::uintptr_t*>(base+0xd96ea0)=Address(0x4000000);
     *reinterpret_cast<std::uintptr_t*>(base+0xd96e98)=Address(0x4500000);
@@ -174,7 +186,7 @@ bool InstallExpandedCapacity(std::uintptr_t base,bool exactResolved) {
     for(auto it=protections.rbegin();it!=protections.rend();++it){DWORD ignored;VirtualProtect(reinterpret_cast<void*>(it->write->address),it->write->after.size(),it->old,&ignored);}
     FlushInstructionCache(GetCurrentProcess(),nullptr,0);
     capacity.store(256,std::memory_order_release);
-    Log("AI_CAPACITY_EXPANSION enabled=1 experimental=1 actors=256 sentients=274 stride=0x48c0 snapshot_bytes=17412 temporary_trees=336 patches=%u arena=%p checkpoint=VERSIONED_V1_LEGACY_MIGRATION native_rewind_slots=32 high_actor_collision=CURRENT_SERVER_POSE",static_cast<unsigned>(protections.size()),reinterpret_cast<void*>(arena));
+    Log("AI_CAPACITY_EXPANSION enabled=1 experimental=1 actors=256 sentients=274 stride=0x48c0 snapshot_bytes=17412 temporary_trees=336 patches=%u arena=%p checkpoint=VERSIONED_V1_LEGACY_MIGRATION native_rewind_slots=32 high_actor_collision=CURRENT_SERVER_POSE native_threat_candidates=274 threat_stack_bytes=6760 threat_unwind=REGISTERED",static_cast<unsigned>(protections.size()),reinterpret_cast<void*>(arena));
     return true;
 }
 } // namespace mod

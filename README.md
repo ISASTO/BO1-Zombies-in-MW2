@@ -1,25 +1,31 @@
 # BO1 Zombies in MW2
 
 Incremental mod framework for **retail Modern Warfare 2 (2009), single player**.
-Current build: **0.1.24-squad-test25**. The returned Test24 missions load,
-but NPC skeletons distort and crowded runs still fail around 55-61 actors.
-Test25 corrects three animation relocation defects: duplicate mutable scratch
-animation trees, corpse searches with wrongly moved endpoints, and actor-to-corpse
-tree exchanges still indexing the original 32-entry array.
+Current build: **0.1.25-squad-test26**. Test25 improved the owner's animations
+and stability, but the returned Estate/Contingency runs still fail at 56 and
+98 active actors. Test26 repairs a native threat-selection stack overwrite:
+the expanded team iterator can supply 274 candidates to an array sized for 50.
+Candidate 51 overwrites saved registers with native distance/direction data.
 
-**Live capacity remains 256 actors / 274 sentients.** The three defects reproduce
-in the native fixture. Corrected checks pass 336 distinct simultaneous scratch
-trees, 1,000 release/reuse cycles, 195 bounded corpse lookup/removal cases and
-ownership exchanges across all 256 actor slots. Existing native population,
-animation lifecycle, snapshots, history, shooting, save/load and iterator checks
-pass, along with all 18 C++ suites and 31 Python tests.
-See [Test25 evidence and test scope](docs/squad-test25.md).
+The exact native fixture reproduces that old overwrite. Test26 expands the
+frame, its saves, all three exits and chained Windows unwind records together,
+with ordered stack-page probes and a registered relay unwind entry. It also
+corrects six biased sentient-handle lookups, remaining perception bases and
+50-sentient searches/copies, and entity-reference cleanup across all sentients.
 
-The screenshots show skeletal deformation, and one dump receives packed data
-as a noncanonical animation-tree pointer during DObj creation. These fixes
-address concrete causes of animation interference and invalid tree ownership.
-Real skeleton rendering and crowded Windows gameplay still need an owner retest.
-This is an experimental build. Start fresh missions for that check.
+**Live capacity remains 256 actors / 274 sentients.** Corrected threat tests
+pass 112 cases up to 273 opposing candidates, preserve all checked native
+nonvolatile registers and select the best target beyond the old limit.
+1,644 native handle resolutions and 273 recent-threat searches pass.
+All previous native animation, history, shooting, save/load and iterator
+regressions pass, along with all 18 C++ suites and 31 Python tests.
+See [Test26 evidence and test scope](docs/squad-test26.md).
+
+Test25's animation ownership fixes remain included. The returned dumps show
+corrupted movement/allocator data; the fixture establishes a definite native
+stack overwrite but does not reproduce both entire Windows crash chains.
+Crowded mission/renderer stability and Windows unwinding remain owner retests.
+This remains an experimental 256-capacity build.
 
 Original MP hitmarker image, sound and fade, menu options, performance safeguards
 and version-1 expanded checkpoints remain included. Historical shot rewind
