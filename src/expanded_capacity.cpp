@@ -10,9 +10,9 @@ namespace {
 using namespace expansion;
 std::atomic<int> capacity{32};
 std::uintptr_t host=0,arena=0;
-constexpr std::size_t kArenaBytes=0x800000;
-RUNTIME_FUNCTION threatProbeFunction{
-    kThreatProbeRva-0x4000000,kThreatProbeEndRva-0x4000000,kThreatProbeUnwindRva-0x4000000};
+RUNTIME_FUNCTION stackProbeFunctions[]{
+    {kThreatProbeRva-0x4000000,kThreatProbeEndRva-0x4000000,kThreatProbeUnwindRva-0x4000000},
+    {kAwarenessProbeRva-0x4000000,kAwarenessProbeEndRva-0x4000000,kAwarenessProbeUnwindRva-0x4000000}};
 std::vector<SaveField> fields;
 thread_local bool legacyRead=false;
 using SelectWrite=void(*)(std::uintptr_t,int);
@@ -85,7 +85,7 @@ void CheckStockCheckpoint(std::uintptr_t save) {
     }
 }
 bool ExpandedArenaContains(std::uintptr_t at,std::size_t bytes) {
-    return capacity.load(std::memory_order_acquire)==256 && ContainsBytes(arena,kArenaBytes,at,bytes);
+    return capacity.load(std::memory_order_acquire)==256 && at>=arena && ArenaReadable(at-arena,bytes);
 }
 bool InstallExpandedCapacity(std::uintptr_t base,bool exactResolved) {
     if(capacity.load()==256)return true;
@@ -132,6 +132,9 @@ bool InstallExpandedCapacity(std::uintptr_t base,bool exactResolved) {
     bool valid=true;
     for(const auto& patch:kCapacityPatches) {
         Write w{Address(patch.rva),Hex(patch.before),Hex(patch.after)};
+        if(patch.rva>=kArenaRva && !ArenaReadable(patch.rva-kArenaRva,w.after.size())) {
+            Log("AI_CAPACITY_EXPANSION invalid_arena_fragment rva=0x%x",patch.rva);valid=false;break;
+        }
         for(const auto& f:patch.fixups) {
             std::int64_t value=static_cast<std::int64_t>(Address(f.target));
             value-=f.relative?static_cast<std::int64_t>(Address(f.end)):static_cast<std::int64_t>(host+f.end);
@@ -148,6 +151,13 @@ bool InstallExpandedCapacity(std::uintptr_t base,bool exactResolved) {
         writes.push_back(std::move(w));
     }
     if(!valid){VirtualFree(reinterpret_cast<void*>(arena),0,MEM_RELEASE);arena=0;fields.clear();return false;}
+    for(const auto& guard:kArenaGuards) {
+        DWORD old=0;
+        if(!VirtualProtect(reinterpret_cast<void*>(Address(guard.rva)),guard.bytes,PAGE_NOACCESS,&old)) {
+            VirtualFree(reinterpret_cast<void*>(arena),0,MEM_RELEASE);arena=0;fields.clear();
+            Log("AI_CAPACITY_EXPANSION enabled=0 reason=ARENA_GUARD_PROTECTION_FAILED");return false;
+        }
+    }
     const std::uintptr_t callbacks[]={reinterpret_cast<std::uintptr_t>(&HeaderWrite),reinterpret_cast<std::uintptr_t>(&HeaderRead),reinterpret_cast<std::uintptr_t>(&WriteActor),reinterpret_cast<std::uintptr_t>(&ReadActor)};
     for(unsigned n=0;n<4;++n){const auto jump=AbsoluteJump(callbacks[n]);std::memcpy(reinterpret_cast<void*>(Address(0x47f0000+n*16)),jump.data(),jump.size());}
     *reinterpret_cast<int*>(Address(0x4590000))=256;*reinterpret_cast<int*>(Address(0x4590004))=274;
@@ -172,10 +182,10 @@ bool InstallExpandedCapacity(std::uintptr_t base,bool exactResolved) {
     // reach it. Failure leaves all original native instructions intact.
     for(const auto& write:writes)if(write.before.empty())
         std::memcpy(reinterpret_cast<void*>(write.address),write.after.data(),write.after.size());
-    if(!RtlAddFunctionTable(&threatProbeFunction,1,arena)) {
+    if(!RtlAddFunctionTable(stackProbeFunctions,static_cast<DWORD>(std::size(stackProbeFunctions)),arena)) {
         for(auto it=protections.rbegin();it!=protections.rend();++it){DWORD ignored;VirtualProtect(reinterpret_cast<void*>(it->write->address),it->write->after.size(),it->old,&ignored);}
         VirtualFree(reinterpret_cast<void*>(arena),0,MEM_RELEASE);arena=0;fields.clear();
-        Log("AI_CAPACITY_EXPANSION enabled=0 reason=THREAT_PROBE_UNWIND_REGISTRATION_FAILED");return false;
+        Log("AI_CAPACITY_EXPANSION enabled=0 reason=STACK_PROBE_UNWIND_REGISTRATION_FAILED");return false;
     }
     for(const auto& write:writes)if(!write.before.empty())
         std::memcpy(reinterpret_cast<void*>(write.address),write.after.data(),write.after.size());
@@ -186,7 +196,7 @@ bool InstallExpandedCapacity(std::uintptr_t base,bool exactResolved) {
     for(auto it=protections.rbegin();it!=protections.rend();++it){DWORD ignored;VirtualProtect(reinterpret_cast<void*>(it->write->address),it->write->after.size(),it->old,&ignored);}
     FlushInstructionCache(GetCurrentProcess(),nullptr,0);
     capacity.store(256,std::memory_order_release);
-    Log("AI_CAPACITY_EXPANSION enabled=1 experimental=1 actors=256 sentients=274 stride=0x48c0 snapshot_bytes=17412 temporary_trees=336 patches=%u arena=%p checkpoint=VERSIONED_V1_LEGACY_MIGRATION native_rewind_slots=32 high_actor_collision=CURRENT_SERVER_POSE native_threat_candidates=274 threat_stack_bytes=6760 threat_unwind=REGISTERED",static_cast<unsigned>(protections.size()),reinterpret_cast<void*>(arena));
+    Log("AI_CAPACITY_EXPANSION enabled=1 experimental=1 actors=256 sentients=274 stride=0x48c0 snapshot_bytes=17412 temporary_trees=336 patches=%u arena=%p checkpoint=VERSIONED_V1_LEGACY_MIGRATION native_rewind_slots=32 high_actor_collision=CURRENT_SERVER_POSE native_threat_candidates=274 threat_stack_bytes=6760 threat_unwind=REGISTERED awareness_candidates=274 awareness_stack_bytes=4512 stack_probe_unwind_entries=2 arena_guard_pages=8 ai_count_domain=256",static_cast<unsigned>(protections.size()),reinterpret_cast<void*>(arena));
     return true;
 }
 } // namespace mod

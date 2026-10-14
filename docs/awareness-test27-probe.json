@@ -1,0 +1,34 @@
+{
+  "executable_sha256": "fb7e8a987c371dea7b666091b0b9e2011c0cd9cd277b191ad453d11d557dd777",
+  "old_revision": "83de84bf972f7b501c7ad4b29de1334decdebad6",
+  "old_candidate_51_sentient_pointer_in_xmm8_reproduced": true,
+  "old_candidate_rows": 50,
+  "new_candidate_rows": 274,
+  "row_bytes": 16,
+  "old_frame_bytes": 928,
+  "new_frame_bytes": 4512,
+  "checked_runtime_plan_external_arena": true,
+  "native_results": {
+    "native_awareness_cases": 1264,
+    "native_candidate_records_checked": 302464,
+    "maximum_candidates": 273,
+    "actor_slots_exercised": 256,
+    "native_qsort_and_comparator": true,
+    "saved_gprs_per_case": 8,
+    "saved_xmm_registers_per_case": 10,
+    "early_exit_cases": 2,
+    "late_perception_cases": 1370,
+    "native_ai_count_default_and_maximum": 256,
+    "inaccessible_resource_guard_pages": 8,
+    "visibility_world_callbacks": "isolated",
+    "windows_gameplay_tested": false
+  },
+  "unwind_audit": {
+    "native_unwind_ranges": 7,
+    "saved_register_slots": 8,
+    "relay_partial_prolog_states": 3,
+    "frame_and_saves_match_native_instructions": true,
+    "windows_rtl_virtual_unwind_executed": false
+  },
+  "scope": "Actual sentient traversal, distance/weight calculation, candidate construction, native qsort/comparator, record refresh and nonvolatile preservation. World visibility callbacks are isolated. Windows mission/renderer stability and RtlVirtualUnwind remain owner tests."
+}

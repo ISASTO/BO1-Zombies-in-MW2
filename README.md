@@ -1,37 +1,38 @@
 # BO1 Zombies in MW2
 
 Incremental mod framework for **retail Modern Warfare 2 (2009), single player**.
-Current build: **0.1.25-squad-test26**. Test25 improved the owner's animations
-and stability, but the returned Estate/Contingency runs still fail at 56 and
-98 active actors. Test26 repairs a native threat-selection stack overwrite:
-the expanded team iterator can supply 274 candidates to an array sized for 50.
-Candidate 51 overwrites saved registers with native distance/direction data.
+Current build: **0.1.26-squad-test27**. The returned Test26 Estate and
+Contingency runs still fail at 64 and 56 actors. Contingency preserves an
+expanded-sentient pointer in XMM8 whose low DWORD matches the invalid trajectory
+type. The native fixture reproduces the source of that register corruption:
+a second, independent **50-row nearby-awareness stack buffer** is filled by the
+expanded iterator. Candidate 51 overwrites saved XMM8 with a sentient pointer.
 
-The exact native fixture reproduces that old overwrite. Test26 expands the
-frame, its saves, all three exits and chained Windows unwind records together,
-with ordered stack-page probes and a registered relay unwind entry. It also
-corrects six biased sentient-handle lookups, remaining perception bases and
-50-sentient searches/copies, and entity-reference cleanup across all sentients.
+Test27 grows that 16-byte-row array to 274 entries, moving its upper stack
+fields, exit and Windows unwind records together. Both expanded native frames
+have ordered stack-page probes and registered relay unwind entries. Five
+remaining indexed perception accesses now use the appended layout. The native
+`ai_count` default/domain becomes 256, and eight inaccessible pages separate
+the relocated data blocks. Checked memory reads exclude those guard pages.
 
-**Live capacity remains 256 actors / 274 sentients.** Corrected threat tests
-pass 112 cases up to 273 opposing candidates, preserve all checked native
-nonvolatile registers and select the best target beyond the old limit.
-1,644 native handle resolutions and 273 recent-threat searches pass.
-All previous native animation, history, shooting, save/load and iterator
-regressions pass, along with all 18 C++ suites and 31 Python tests.
-See [Test26 evidence and test scope](docs/squad-test26.md).
+**Live capacity remains 256 actors / 274 sentients.** The nearby-awareness
+fixture covers every actor slot, 302,464 candidate records, native qsort and
+nonvolatile registers, including repeated 273-candidate runs. Native population,
+snapshot, animation, shooting and checkpoint regressions remain required.
+See [Test27 evidence and validation scope](docs/squad-test27.md) and the
+[consumer audit](docs/actor-capacity-test27-audit.md).
 
-Test25's animation ownership fixes remain included. The returned dumps show
-corrupted movement/allocator data; the fixture establishes a definite native
-stack overwrite but does not reproduce both entire Windows crash chains.
-Crowded mission/renderer stability and Windows unwinding remain owner retests.
-This remains an experimental 256-capacity build.
+The reproduced overwrite is fixed. Full Windows missions, skeleton rendering,
+guard-page stack growth, `RtlVirtualUnwind` and the highest stable population
+still require an owner stress test. This remains an experimental expansion;
+the native fixtures do not establish error-free 256-actor gameplay.
 
-Original MP hitmarker image, sound and fade, menu options, performance safeguards
-and version-1 expanded checkpoints remain included. Historical shot rewind
-remains 32 slots; higher actors keep their current server poses during shots.
-Stock checkpoints retain migration support. The installer extracts the original
-MP image from local main/*.iwd and backs up player/save data before installation.
+Original MP hitmarker image/sound/fade, menu options, prior animation ownership
+fixes and version-1 expanded checkpoints remain included. Historical shot rewind
+keeps its coordinated 32-record representation; higher actors use current
+server poses during shots. Stock checkpoints retain migration support. The
+installer extracts the original MP image from local main/*.iwd and backs up
+player/save data before installation.
 
 Test20 fixes a native string-reference bug in squad ownership labels. Repeated
 user-1 intern lookups return a borrowed id, but the old code released it after

@@ -668,7 +668,7 @@ void Overlay::frame() {
                 "No eight-actor cap. Native pool capacity still applies.",
                 "Our NPCs and corpses; original mission NPCs remain.",
                 "Logs placement, team, goal and native hand-tree results.",
-                "IW4 has 32 active actor slots, including campaign NPCs."
+                "Shared actor pool; campaign NPCs also use these slots."
             };
             footer=MenuText<Page::AI>(hints,menu.selected);
             if(menu.selected==3 && !aiStatus.characterLoaded)

@@ -200,7 +200,7 @@ void InitializeLog() {
     }
     std::swprintf(logPath,32768,L"%ls",file);
     Log("BO1MW2 %s | AMD64 | log=%ls", kVersion, file);
-    Log("Test26: fixes native 50-candidate threat stack overwrite, chained unwind metadata, biased sentient handles and remaining 50-sentient searches. Live capacity stays 256; native history stays 32 slots. Original MP hitmarkers retained.");
+    Log("Test27: fixes the separate native 50-row nearby-awareness stack overwrite, five late perception accesses and the ai_count domain. Both enlarged frames have unwind metadata and ordered page probes. Eight arena guard pages protect 256 actors / 274 sentients; native shot history stays bounded to 32.");
 }
 void Log(const char* format, ...) {
     char body[4096]{};

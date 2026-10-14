@@ -1,0 +1,34 @@
+{
+  "archive_sha256": "70922b65e43fd1bfcc29d848461f7fd0d68e26eaacf4c4db1e723a98392a134c",
+  "installed_version": "0.1.25-squad-test26",
+  "installed_dll_sha256": "db32a3c55f2563d6efe79e4ae0f519386cbed7f2ba4678e796482b442e860f90",
+  "executable_sha256": "fb7e8a987c371dea7b666091b0b9e2011c0cd9cd277b191ad453d11d557dd777",
+  "new_crashes": [
+    {
+      "dump": "crash-20261014-062001.dmp",
+      "dump_sha256": "a650481318f4f908e962cc484f71e1df4df420f5ef536f1aa2a6efbad0e24b97",
+      "last_completed_spawn_actor_count": 64,
+      "secondary_exception_rva": "0x1ef903",
+      "primary_error": "BG_EvaluateTrajectory: unknown trType",
+      "invalid_trajectory_bits": "0x546b1980",
+      "same_bits_resolve_to_expanded_sentient_index": 48,
+      "xmm8_low_qword_matches_sentient_pointer": false,
+      "xmm8_low_dword_matches_invalid_trajectory_type": false
+    },
+    {
+      "dump": "crash-20261014-062156.dmp",
+      "dump_sha256": "169a9f38ebfb25a52850c35d7ca45a049e3dc3ddfa680e0ffceca5f9a6b776b8",
+      "last_completed_spawn_actor_count": 56,
+      "secondary_exception_rva": "0x1ef903",
+      "primary_error": "BG_EvaluateTrajectory: unknown trType",
+      "invalid_trajectory_bits": "0x546b1ed0",
+      "same_bits_resolve_to_expanded_sentient_index": 58,
+      "xmm8_low_qword_matches_sentient_pointer": true,
+      "xmm8_low_dword_matches_invalid_trajectory_type": true
+    }
+  ],
+  "independent_native_reproduction": "The second 50-row sentient scratch array at native 0x152100 receives expanded iterator output. Candidate 51 aliases saved XMM8. Native qsort can reorder that row; the restored register contains a sentient pointer.",
+  "scope": "Contingency preserves that pointer in XMM8 and its low DWORD as the primary trajectory error. The fixture reproduces the definite overwrite; it does not replay the complete Windows mission or final client-state write.",
+  "companion_archive_sha256": "9595b3fbc0f884acf952a9d24d46743fe8e019687d1024999b3bbc23f81ae8ab",
+  "companion_new_dumps_identical": true
+}

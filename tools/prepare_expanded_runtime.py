@@ -59,6 +59,12 @@ def prepare(pe):
   target=b.operands[0].imm-base
   code+=b'\x0f'+bytes([0x80|cond])+struct.pack('<i',target-(cursor+len(code)+6))
   relay(at,i.size+b.size,code,role)
+ # ai_count's registration shares R9's value with its EDX default. The pool,
+ # iterators and checkpoint representations have already been coordinated;
+ # expose the real supported domain instead of retaining the stock max 32.
+ if pe.get_data(0x33c288,9).split(b'\0')[0]!=b'ai_count':
+  raise ValueError('Native actor-count dvar name differs')
+ imm(0x172ca6,256,'expanded ai_count default and domain maximum')
  # One coherent snapshot frame used by producer, corpse cache and all three
  # client readers. Keep entity number indexing, widen the actor/corpse map.
  for at,target in ((0x174e72,FRAME),(0x174e7f,FRAME+0x4304),(0x174e89,FRAME+0x2e04+8),(0x174e92,FRAME+0x1004+16)):
@@ -141,9 +147,12 @@ def prepare(pe):
   imm(at,REWIND_ACTORS*STRIDE,'bounded native shooting scratch traversal')
  from prepare_expanded_threat import prepare as prepare_threat
  threat_edits,threat_meta=prepare_threat(pe,image);edits+=threat_edits
+ from prepare_expanded_awareness import prepare as prepare_awareness
+ awareness_edits,awareness_meta=prepare_awareness(pe,image);edits+=awareness_edits
  return image,{'previous_stage':meta,'stage22_edits':edits,'frame_bytes':SNAPSHOT_BYTES,'temporary_animation_trees':TEMP_COUNT,
                'native_rewind_actor_slots':REWIND_ACTORS,
                'threat_frame':threat_meta,
+               'awareness_frame':awareness_meta,
                'high_actor_collision':'Actors 32..255 keep their current server pose during shots; live pool capacity stays 256.'}
 
 def flatten(meta):
