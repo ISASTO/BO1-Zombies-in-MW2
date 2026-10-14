@@ -25,7 +25,9 @@ def run(executable):
  # Assemble a second image ONLY from the checked runtime plan, with its arena
  # outside the main image. Earlier fixture-only stubs cannot leak into this plan.
  relocated=bytearray(pe.get_memory_mapped_image());relocated.extend(bytes(max(0,0x5800000-len(relocated))))
- def address(rva):return rva+0x1000000 if 0x4000000<=rva<0x4800000 else rva
+ def address(rva):
+  if rva&0x80000000:return rva&0x7fffffff
+  return rva+0x1000000 if 0x4000000<=rva<0x4800000 else rva
  for patch in plan:
   at=address(patch['rva']);blob=bytearray.fromhex(patch['after'])
   if patch['rva']<0x4000000 and bytes(relocated[at:at+len(blob)]).hex()!=patch['before']:raise ValueError('Original-byte validation failed')

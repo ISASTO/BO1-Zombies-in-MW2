@@ -13,6 +13,10 @@ from audit_actor_capacity import EXACT_SHA256
 FRAME=0x4510000;CLIENT_FRAME=0x4580000;LOAD_ACTORS=0x4590000;LOAD_SENTIENTS=LOAD_ACTORS+4
 TEMP=0x45a0000;TEMP_COUNT=336;FLAGS=TEMP+TEMP_COUNT*8;CURSOR=FLAGS+TEMP_COUNT
 CALLBACKS=0x47f0000
+# The synthetic arena RVAs overlap the retail image's large renderer globals.
+# Encode native host targets explicitly; their numeric range is not ownership.
+HOST_TARGET_TAG=0x80000000
+NATIVE_CROWD_TARGETS={0x410fd00,0x458fb00}
 SNAPSHOT_BYTES=0x4404
 # These native history and shooting scratch records contain 32 actors. They
 # are independent of the live actor pool's capacity; enlarging a traversal
@@ -147,6 +151,10 @@ def prepare(pe):
   imm(at,REWIND_ACTORS*STRIDE,'bounded native shooting scratch traversal')
  from prepare_expanded_resources import prepare as prepare_resources
  resource_edits,resource_meta=prepare_resources(pe,image);edits+=resource_edits
+ from prepare_expanded_crowd import prepare as prepare_crowd
+ crowd_edits,crowd_meta=prepare_crowd(pe,image);edits+=crowd_edits
+ from prepare_expanded_bridge import prepare as prepare_bridge
+ bridge_edits,bridge_meta=prepare_bridge(pe,image);edits+=bridge_edits
  from prepare_expanded_threat import prepare as prepare_threat
  threat_edits,threat_meta=prepare_threat(pe,image);edits+=threat_edits
  from prepare_expanded_awareness import prepare as prepare_awareness
@@ -156,6 +164,8 @@ def prepare(pe):
                'threat_frame':threat_meta,
                'awareness_frame':awareness_meta,
                'crowd_resources':resource_meta,
+               'crowd_render_and_physics':crowd_meta,
+               'crowd_surface_bridge':bridge_meta,
                'high_actor_collision':'Actors 32..255 keep their current server pose during shots; live pool capacity stays 256.'}
 
 def flatten(meta):
@@ -205,7 +215,9 @@ def runtime_plan(pe,image,meta):
    for o in i.operands:
     if o.type==X86_OP_MEM and o.mem.base==X86_REG_RIP:
      target=at+i.size+o.mem.disp
-     if target>=0x4000000 or a>=0x4000000:fixups.append({'offset':at-a+i.disp_offset,'width':4,'target':target,'end':at+i.size,'relative':True})
+     if target>=0x4000000 or a>=0x4000000:
+      tagged=target|HOST_TARGET_TAG if target in NATIVE_CROWD_TARGETS else target
+      fixups.append({'offset':at-a+i.disp_offset,'width':4,'target':tagged,'end':at+i.size,'relative':True})
     elif o.type==X86_OP_MEM and o.mem.base!=X86_REG_RIP:
      # level-relative maps/corpse caches and image-relative handle conversion.
      root=NON_RIP_BASES.get(at,0xd96e70 if 0x3000000<o.mem.disp<0x4000000 else 0)
@@ -237,7 +249,10 @@ if __name__=='__main__':
  a=p.parse_args();raw=a.executable.read_bytes()
  if hashlib.sha256(raw).hexdigest()!=EXACT_SHA256:raise ValueError('Wrong executable')
  pe=pefile.PE(data=raw,fast_load=True);image,meta=prepare(pe);plan=runtime_plan(pe,image,meta)
- if a.header:generate_header(plan,a.header)
+ if a.header:
+  generate_header(plan,a.header)
+  from prepare_expanded_bridge import generate_layout
+  generate_layout(meta['crowd_surface_bridge'],a.header.parent/'crowd_bridge_layout.hpp')
  if a.fixture:a.fixture.write_bytes(image)
  if a.manifest:a.manifest.write_text(json.dumps({'patches':plan,'metadata':meta},indent=2)+'\n')
  print(json.dumps({'checked_patches':sum(p['rva']<0x4000000 for p in plan),'arena_fragments':sum(p['rva']>=0x4000000 for p in plan),'fixups':sum(len(p['fixups']) for p in plan)}))

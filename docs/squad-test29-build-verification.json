@@ -1,0 +1,71 @@
+{
+  "version": "0.1.28-squad-test29",
+  "base_commit": "86a24a95d73cc4f7c5dfc6714f07b9585359c61a",
+  "executable_sha256": "fb7e8a987c371dea7b666091b0b9e2011c0cd9cd277b191ad453d11d557dd777",
+  "dll_sha256": "0b921eda6158832c2cff0c07d1301c0ea344a1c1efa88b7a3dba2181d334518d",
+  "dll_bytes": 5480519,
+  "compiler": "MinGW-w64 GCC 13-posix, RelWithDebInfo, static GCC/C++ runtime",
+  "pe_checks": {
+    "amd64_pe32_plus": true,
+    "exact_ten_exports": true,
+    "aslr_and_nx": true,
+    "version_embedded": true,
+    "no_external_gcc_or_stdcpp_runtime": true
+  },
+  "imports": [
+    "bcrypt.dll",
+    "dbghelp.dll",
+    "gdi32.dll",
+    "kernel32.dll",
+    "msvcrt.dll",
+    "user32.dll",
+    "winmm.dll"
+  ],
+  "exports": [
+    "D3DPERF_BeginEvent",
+    "D3DPERF_EndEvent",
+    "D3DPERF_GetStatus",
+    "D3DPERF_QueryRepeatFrame",
+    "D3DPERF_SetMarker",
+    "D3DPERF_SetOptions",
+    "D3DPERF_SetRegion",
+    "DebugSetMute",
+    "Direct3DCreate9",
+    "Direct3DCreate9Ex"
+  ],
+  "checked_native_patch_entries": 357,
+  "arena_fragments": 49,
+  "registered_relay_unwind_entries": 36,
+  "native_cxx_tests": {
+    "passed": 19,
+    "failed": 0
+  },
+  "python_tests": {
+    "passed": 31,
+    "failed": 0
+  },
+  "native_fixtures": [
+    "crowd",
+    "resources",
+    "expanded-runtime",
+    "iterator",
+    "animation",
+    "history",
+    "threat",
+    "awareness"
+  ],
+  "native_fixtures_passed": 8,
+  "installer_scripts_parse": "passed",
+  "windows_gameplay_tested": false,
+  "scope": "Native fixtures use the exact supported executable and the checked runtime plan, with dependencies isolated as documented in each report. In-game rendering, physics integration, lifecycle and stable 256-actor play require the staged retail protocol.",
+  "packaged_installer_fixture": {
+    "host": "PowerShell 7.6.6 on Linux",
+    "dll_hash_and_receipt": "passed",
+    "player_save_backup": "passed",
+    "original_mp_asset_extraction": "passed",
+    "log_zip_contents": "passed",
+    "matching_dll_uninstall": "passed",
+    "saves_settings_backups_logs_preserved": "passed",
+    "windows_installer_execution": false
+  }
+}

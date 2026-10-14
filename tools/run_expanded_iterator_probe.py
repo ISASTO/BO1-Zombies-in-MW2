@@ -18,7 +18,9 @@ def patches(text):
 
 def fixture(pe,rows):
     image=bytearray(pe.get_memory_mapped_image());image.extend(bytes(0x5800000-len(image)))
-    def address(rva):return rva+0x1000000 if 0x4000000<=rva<0x4800000 else rva
+    def address(rva):
+        if rva&0x80000000:return rva&0x7fffffff
+        return rva+0x1000000 if 0x4000000<=rva<0x4800000 else rva
     for rva,before,after,fixups in rows:
         at=address(rva);blob=bytearray(after)
         if before and bytes(image[at:at+len(before)])!=before:raise ValueError(f'Original bytes changed at {rva:x}')

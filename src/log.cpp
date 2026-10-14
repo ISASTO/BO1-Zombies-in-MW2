@@ -6,6 +6,7 @@
 #include <mutex>
 #include "native_hooks.hpp"
 #include "script_parameters.hpp"
+#include "crowd_resources.hpp"
 
 namespace mod {
 namespace {
@@ -31,7 +32,7 @@ constexpr std::uintptr_t kEngineErrorDepthRva=0x1326134,kEngineErrorMessageRva=0
 constexpr std::size_t kEngineErrorMessageBytes=0x1000;
 struct DumpRange {std::uintptr_t at=0;ULONG bytes=0;};
 struct DumpMemory {
-    std::array<DumpRange,16> ranges{};unsigned count=0,next=0;
+    std::array<DumpRange,32> ranges{};unsigned count=0,next=0;
     void Add(std::uintptr_t at,std::size_t bytes) {
         if(!at || !bytes || count==ranges.size())return;
         MEMORY_BASIC_INFORMATION region{};
@@ -163,6 +164,27 @@ LONG WINAPI CrashFilter(EXCEPTION_POINTERS* info) {
         memory.Add(base+kScriptStringPoolPointerRva,8);memory.Add(base+0x1326100,0x1100);
         memory.Add(base+0xcdb118,0xa8);memory.Add(base+0x548cf0,8);
         memory.Add(base+0x19c386c,8);memory.Add(base+0x19ada30,16);
+        memory.Add(base+0x410fd00,8);memory.Add(base+0x4116588,48);
+        for(unsigned n=0;n<2;++n)
+            memory.Add(base+expansion::kRenderFrameBaseRva+n*expansion::kRenderFrameStride+0x41990,0x60);
+        const auto crowdAddress=ExpandedResourceStateAddress();
+        memory.Add(crowdAddress,expansion::kCrowdStateBytes);
+        expansion::CrowdResourceState crowd;
+        if(crowdAddress && ReadProcessMemory(process,reinterpret_cast<void*>(crowdAddress),&crowd,sizeof(crowd),&read)) {
+            // Retain packed-ID mappings and their records only on a crash.
+            // Corrupt counters cannot make the capture exceed owned bounds.
+            for(const auto& frame:crowd.frames) {
+                const auto used=std::min<std::size_t>(frame.used,expansion::kCrowdSurfaceBytes);
+                memory.Add(frame.table,expansion::kSurfaceTableBytes);
+                memory.Add(frame.reverse,(used/4)*sizeof(std::uint16_t));
+                memory.Add(frame.surfaces,used);
+            }
+            if(crowd.queryClaim==2) {
+                std::uintptr_t reference=0;std::memcpy(&reference,crowd.query.data()+0x90,8);
+                memory.Add(reference,16);
+                if(reference>=0x70)memory.Add(reference-0x70,0x100);
+            }
+        }
         std::uintptr_t sharedPool=0;
         if(ReadProcessMemory(process,reinterpret_cast<void*>(base+kScriptStringPoolPointerRva),&sharedPool,sizeof(sharedPool),&read))
             memory.Add(sharedPool,0x100000);
@@ -221,7 +243,7 @@ void InitializeLog() {
     }
     std::swprintf(logPath,32768,L"%ls",file);
     Log("BO1MW2 %s | AMD64 | log=%ls", kVersion, file);
-    Log("Test28: replaces stock client/server skeleton buffers and matching bounds with guarded 9 MiB/8 MiB storage; validates glass free links against native occupancy, repairs inactive links and rejects duplicate frees. Native frame generations, live transforms and 256/274 capacity are preserved.");
+    Log("Test29: coordinates 72 MiB native CPU/GPU skin caches, bounded atomic reservations and independent guarded 2 MiB skinned scene records per frame slot. Captures renderer overflows and rejects non-finite glass poses/queries and invalid triangle feature selectors. First corrupting physics update remains unproven; native 256/274 capacity and MP hitmarkers are retained.");
 }
 void Log(const char* format, ...) {
     char body[4096]{};

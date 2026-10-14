@@ -16,6 +16,7 @@ from run_expanded_iterator_probe import patches,HEADER
 from run_expanded_awareness_probe import unwind_audit as awareness_unwind
 from run_expanded_threat_probe import unwind_audit as threat_unwind
 from run_expanded_resources_probe import unwind_audit as resources_unwind, reference_inventory
+from run_expanded_crowd_probe import audit_unwinds as crowd_unwind
 
 
 def perception_flow(pe,image):
@@ -117,8 +118,10 @@ def audit(executable):
             'sentient_index_data_flow_sites':len(flow),'unrelocated_data_flow_sites':0,'data_flow_inventory':flow,
             'native_ai_count_default_and_maximum':256,'retained_native_fx_bound_sites':[hex(at) for at in fx_sites],
             'native_rewind_records':metadata['native_rewind_actor_slots'],
-            'native_unwind_audits':{'threat':threat_unwind(pe,rows),'awareness':awareness_unwind(pe,rows),'crowd_resources':resources_unwind(pe,rows)},
+            'native_unwind_audits':{'threat':threat_unwind(pe,rows),'awareness':awareness_unwind(pe,rows),'crowd_resources':resources_unwind(pe,rows),'crowd_render_physics':crowd_unwind(pe,rows)},
             'crowd_resources':metadata['crowd_resources'],
+            'crowd_render_physics':metadata['crowd_render_and_physics'],
+            'crowd_surface_bridge':metadata['crowd_surface_bridge'],
             'skeleton_reference_inventory':reference_inventory(pe),
             'remaining_source_literal_32':source_hits,
             'source_review':'Remaining 32s are stock-layout migration/bootstrap sizes, bounded shot history, a 32-byte checkpoint header, SHA256/graphics/ASCII dimensions, bit widths and original profile byte patterns. See the accompanying audit document for reasons.',

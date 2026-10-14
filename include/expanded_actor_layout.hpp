@@ -4,6 +4,7 @@
 #include <vector>
 #include <array>
 #include <cstring>
+#include "crowd_resources.hpp"
 
 namespace mod::expansion {
 // Experimental Test22 native layout; also exercised by isolated probes.
@@ -25,7 +26,7 @@ inline constexpr std::array<ArenaRange,9> kArenaDataRanges{{
     {0x4510000,0x4404},{0x4560000,static_cast<std::uint32_t>(kActors*8)},
     {0x4570000,static_cast<std::uint32_t>(kSentients*2)},
     {0x4580000,0x4404},{0x4590000,8},{0x45a0000,336*8+336+4},
-    {kResourcePointersRva,24}}};
+    {kResourcePointersRva,kCrowdStateBytes}}};
 constexpr std::array<ArenaRange,kArenaDataRanges.size()> ArenaGuards() {
     std::array<ArenaRange,kArenaDataRanges.size()> out{};
     for(std::size_t n=0;n<out.size();++n)

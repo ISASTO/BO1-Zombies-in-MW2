@@ -1,31 +1,36 @@
 # BO1 Zombies in MW2
 
 Incremental mod framework for **retail Modern Warfare 2 (2009), single player**.
-Current build: **0.1.27-squad-test28**. The returned Test27 Estate crash at
-97 actors reaches the native breakable-glass allocator with a quaternion-valued
-free-list head. Test28 checks free links against the native occupancy bitmap,
-repairs only inactive links and rejects duplicate/out-of-range frees. The exact
-invalid read is reproduced at the returned native instruction. Its first retail
-corrupting write is not captured by the dump.
+Current build: **0.1.28-squad-test29**. The returned Test28 crash is a different
+invalid read in native glass collision at `0x1dd323`: non-finite transforms
+leave an invalid feature selector that underflows into a huge vertex index.
+Test29 checks glass poses before map traversal, checks the finished collision
+query, and rejects invalid feature selectors before vertex arithmetic. The
+same returned fault instruction is reproduced in an exact native fixture.
+The first physics update that produced invalid transforms is still unknown.
 
-The deeper sweep also found unchanged **512 KiB server / 576 KiB client
-skeleton caches**. Native tests reproduce wrap at server allocation 65 and
-client exhaustion after 72 maximum-size allocations. Test28 replaces storage
-and every corresponding base/bound together, using **8 MiB server / 9 MiB
-client buffers with inaccessible end pages**. Native frame generations and
-DObj cache rules remain intact.
+For the reported crowd flickering, Test29 coordinates **72 MiB native GPU/CPU
+skinning buffers and matching allocation bounds**, and gives animated models
+their own **guarded 2 MiB surface-record buffer for each native frame slot**.
+Rigid models retain their original packed-offset representation. Reservations
+are bounded atomically; rejected requests do not advance past their buffers.
+The draw format remains 16 bits: animated records use per-frame handles rather
+than truncating offsets into the larger pool. Both producers and all 22 reader
+sites pass register, SIMD and flag comparisons against the original native code.
+Renderer warning counters, allocation peaks and first-invalid-physics capture
+provide evidence if another limit remains. No new periodic pool repair or disk
+flush is introduced.
 
-**Live capacity remains 256 actors / 274 sentients.** The new native fixture
-passes 30,720 skeleton allocations, 15,680 DObj cache/create cases and 100,000
-glass lifetime operations. Existing awareness, threat, animation, shooting,
-iterator, snapshot and population-checkpoint regressions are retained.
-See [Test28 findings and validation scope](docs/squad-test28.md) and the
-[updated resource/consumer audit](docs/actor-capacity-test28-audit.md).
+**Live capacity remains 256 actors / 274 sentients.** MP hitmarkers, 9 MiB/8 MiB
+skeleton storage, glass lifetime guards and the previous AI fixes remain.
+Native tests exercise 320 actor/corpse model allocations per frame, matching
+GPU/CPU requests, concurrent reservations and invalid numeric collision inputs.
+The fixtures do not execute a Windows renderer or establish stable 256-actor
+retail gameplay. See [Test29 changes and validation](docs/squad-test29.md).
 
-The fixtures do not boot Windows missions, render real skeleton assets or
-establish error-free 256-actor gameplay. Install the complete package and start
-the first retest fresh through Mission Select. Crash-only capture now includes
-the glass ownership data missing from this dump.
+Install the complete package and start fresh through Mission Select. Follow
+the [staged testing protocol](docs/test29-testing-protocol.md), beginning around
+the former 48-64 actor flicker threshold before progressing toward 256.
 
 Original MP hitmarker image/sound/fade, menu options, prior animation ownership
 fixes and version-1 expanded checkpoints remain included. Historical shot rewind

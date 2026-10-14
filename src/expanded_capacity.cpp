@@ -5,22 +5,35 @@
 #include "expanded_capacity_patches.hpp"
 #include <algorithm>
 #include <climits>
+#include <new>
 namespace mod {
 namespace {
 using namespace expansion;
 std::atomic<int> capacity{32};
 std::uintptr_t host=0,arena=0;
-RUNTIME_FUNCTION relayFunctions[]{
+constexpr RUNTIME_FUNCTION CrowdUnwind(const CrowdRelay& relay) {
+    return {relay.begin-kArenaRva,relay.end-kArenaRva,relay.unwind-kArenaRva};
+}
+auto relayFunctions=[] {
+    std::array<RUNTIME_FUNCTION,4+kCrowdRelays.size()+kCrowdBridgeRelays.size()> result{{
     {kThreatProbeRva-0x4000000,kThreatProbeEndRva-0x4000000,kThreatProbeUnwindRva-0x4000000},
     {kAwarenessProbeRva-0x4000000,kAwarenessProbeEndRva-0x4000000,kAwarenessProbeUnwindRva-0x4000000},
     {kGlassAllocateRva-kArenaRva,kGlassAllocateEndRva-kArenaRva,kGlassAllocateUnwindRva-kArenaRva},
-    {kGlassFreeRva-kArenaRva,kGlassFreeEndRva-kArenaRva,kGlassFreeUnwindRva-kArenaRva}};
+    {kGlassFreeRva-kArenaRva,kGlassFreeEndRva-kArenaRva,kGlassFreeUnwindRva-kArenaRva},
+    }};
+    std::size_t n=4;
+    for(const auto& relay:kCrowdRelays)result[n++]=CrowdUnwind(relay);
+    for(const auto& relay:kCrowdBridgeRelays)result[n++]=CrowdUnwind(relay);
+    return result;
+}();
 // Separate from executable relays. Bounds are published only after both owned
 // buffers and their end guards exist. Native frame generations/reset semantics
 // are retained; old static buffers are never enlarged or freed.
 struct SkeletonStorage {
     void* client=nullptr;void* server=nullptr;bool published=false;
-    ~SkeletonStorage(){if(!published){if(client)VirtualFree(client,0,MEM_RELEASE);if(server)VirtualFree(server,0,MEM_RELEASE);}}
+    std::array<void*,2> surfaces{};
+    std::array<void*,2> reverse{},tables{};
+    ~SkeletonStorage(){if(!published){if(client)VirtualFree(client,0,MEM_RELEASE);if(server)VirtualFree(server,0,MEM_RELEASE);for(const auto& group:{surfaces,reverse,tables})for(auto* data:group)if(data)VirtualFree(data,0,MEM_RELEASE);}}
     bool Allocate() {
         const auto allocate=[](std::size_t bytes)->void* {
             auto* data=VirtualAlloc(nullptr,bytes+4096,MEM_RESERVE|MEM_COMMIT,PAGE_READWRITE);
@@ -30,7 +43,11 @@ struct SkeletonStorage {
             return nullptr;
         };
         client=allocate(kClientSkeletonBytes);if(!client)return false;
-        server=allocate(kServerSkeletonBytes);return server!=nullptr;
+        server=allocate(kServerSkeletonBytes);if(!server)return false;
+        for(auto& data:surfaces){data=allocate(kCrowdSurfaceBytes);if(!data)return false;}
+        for(auto& data:reverse){data=allocate(kSurfaceReverseBytes);if(!data)return false;}
+        for(auto& data:tables){data=allocate(kSurfaceTableBytes);if(!data)return false;}
+        return true;
     }
 };
 std::vector<SaveField> fields;
@@ -41,7 +58,10 @@ using MemWrite=void(*)(std::uintptr_t,int,const void*);
 using MemRead=void(*)(std::uintptr_t,int,void*);
 using ActorWrite=void(*)(const SaveField*,const void*,void*,int,std::uintptr_t);
 using ActorRead=void(*)(const SaveField*,void*,int,std::uintptr_t);
-std::uintptr_t Address(std::uint32_t rva) {return rva>=0x4000000 && rva<0x4800000?arena+(rva-0x4000000):host+rva;}
+std::uintptr_t Address(std::uint32_t rva) {
+    if(rva&0x80000000u)return host+(rva&0x7fffffffu);
+    return rva>=0x4000000 && rva<0x4800000?arena+(rva-0x4000000):host+rva;
+}
 void HeaderWrite(std::uintptr_t mem,int segment) {
     reinterpret_cast<SelectWrite>(host+0x270080)(mem,segment);
     const PopulationChunkHeader header;
@@ -91,6 +111,9 @@ std::vector<std::uint8_t> Hex(const char* text) {
 struct Write {std::uintptr_t address;std::vector<std::uint8_t> before,after;};
 }
 int NativeActorCapacity() {return capacity.load(std::memory_order_acquire);}
+std::uintptr_t ExpandedResourceStateAddress() {
+    return capacity.load(std::memory_order_acquire)==256?Address(kResourcePointersRva):0;
+}
 void LogExpandedResources() {
     if(capacity.load(std::memory_order_acquire)!=256)return;
     unsigned clientUsed=0,serverUsed=0,serverGeneration=0,rebuilds=0,ignored=0;
@@ -101,6 +124,35 @@ void LogExpandedResources() {
        !CheckedReadMemory(Address(kResourcePointersRva+20),&ignored,4))return;
     Log("AI_CROWD_RESOURCES client_skeleton_used=%u client_skeleton_limit=%u server_skeleton_used=%u server_skeleton_limit=%u server_skeleton_generation=%u glass_free_list_rebuilds=%u glass_ignored_frees=%u",
         clientUsed,static_cast<unsigned>(kClientSkeletonBytes-16),serverUsed,static_cast<unsigned>(kServerSkeletonBytes-16),serverGeneration,rebuilds,ignored);
+    CrowdResourceState state;
+    if(!CheckedReadMemory(Address(kResourcePointersRva),&state,sizeof(state)))return;
+    Log("AI_RENDER_CROWD skin_limit_bytes=%u skin_limit_vertices=%u gpu_peak_bytes=%u cpu_peak_bytes=%u surface_limit_bytes=%u surface_used_0=%u surface_used_1=%u surface_peak_0=%u surface_peak_1=%u gpu_failures=%u cpu_failures=%u surface_failures=%u bad_frames=%u frame_resets=%u",
+        kSkinCacheBytes,kSkinCacheBytes/32,state.gpuPeak,state.cpuPeak,kCrowdSurfaceBytes,
+        state.frames[0].used,state.frames[1].used,state.frames[0].peak,state.frames[1].peak,
+        state.gpuFailures,state.cpuFailures,state.surfaceFailures,state.badFrames,state.resets);
+    Log("AI_RENDER_OVERFLOW entity_buffer=%u models=%u client_models=%u special_models=%u light_cache=%u scene_entities=%u temp_skin=%u skin_cache=%u native_surface_pool=%u native_draw_list=%u scene_dobj_refs=%u",
+        state.warnings[0],state.warnings[1],state.warnings[2],state.warnings[3],state.warnings[4],
+        state.warnings[5],state.warnings[6],state.warnings[7],state.warnings[8],state.warnings[25],state.warnings[32]);
+    // Include every observed category in an ordinary log collection, even if
+    // a remaining drawing limit does not crash. This runs only with AI info.
+    for(unsigned n=9;n<state.warnings.size();++n)
+        if(n!=25 && n!=32 && state.warnings[n])
+            Log("AI_RENDER_WARNING category=%u count=%u",n,state.warnings[n]);
+    Log("AI_RENDER_HANDLES capacity_per_frame=%u used_0=%u used_1=%u exhausted=%u invalid_records=%u packed_bits=16",
+        kSurfaceHandles,state.handleCounts[0],state.handleCounts[1],state.handleFailures,state.mapFailures);
+    Log("AI_PHYSICS_GUARDS nonfinite_glass_queries=%u invalid_features=%u first_query_state=%u last_invalid_feature=%u",
+        state.invalidGlassQueries,state.invalidFeatures,state.queryClaim,state.lastInvalidFeature);
+    static std::atomic<bool> reported{false};
+    if(state.queryClaim==2 && !reported.exchange(true)) {
+        std::array<unsigned,3> center{},axis{};
+        std::uintptr_t reference=0;
+        std::memcpy(center.data(),state.query.data()+0x38,sizeof(center));
+        std::memcpy(axis.data(),state.query.data()+0x44,sizeof(axis));
+        std::memcpy(&reference,state.query.data()+0x90,sizeof(reference));
+        Log("AI_PHYSICS_FIRST_BAD_GLASS stage=%u source=%p context=%p reference=%p origin_bits=%08x,%08x,%08x axis_bits=%08x,%08x,%08x",
+            state.queryStage,reinterpret_cast<void*>(state.firstQuery),reinterpret_cast<void*>(state.firstVertexData),reinterpret_cast<void*>(reference),
+            center[0],center[1],center[2],axis[0],axis[1],axis[2]);
+    }
 }
 void CheckStockCheckpoint(std::uintptr_t save) {
     if(NativeActorCapacity()!=32 || !host)return;
@@ -127,6 +179,16 @@ bool InstallExpandedCapacity(std::uintptr_t base,bool exactResolved) {
         std::wstring path(exe);const auto slash=path.find_last_of(L"\\/");
         if(slash!=std::wstring::npos){path.resize(slash+1);path+=L"bo1mw2\\use-stock-ai.flag";
             if(GetFileAttributesW(path.c_str())!=INVALID_FILE_ATTRIBUTES){Log("AI_CAPACITY_EXPANSION enabled=0 reason=USER_STOCK_OVERRIDE");return false;}}
+    }
+    // Initialization runs on the first D3D export, before the game's device
+    // and native vertex buffers exist. A late install cannot enlarge live GPU
+    // resources safely, so keep original code/pools intact in that case.
+    for(const auto rva:std::array<std::uint32_t,4>{0x4116590,0x41165a8,
+            kRenderFrameBaseRva+0x419d0,kRenderFrameBaseRva+kRenderFrameStride+0x419d0}) {
+        std::uintptr_t pointer=0;
+        if(!CheckedReadMemory(base+rva,&pointer,sizeof(pointer)) || pointer) {
+            Log("AI_CAPACITY_EXPANSION enabled=0 reason=RENDER_STORAGE_ALREADY_INITIALIZED rva=0x%x",rva);return false;
+        }
     }
     int count=-1;std::uintptr_t sentients=0;
     if(!CheckedReadMemory(base+0xd96ee0,&count,4) || count!=0 || !CheckedReadMemory(base+0xd96e98,&sentients,8)) {
@@ -197,8 +259,19 @@ bool InstallExpandedCapacity(std::uintptr_t base,bool exactResolved) {
     const std::uintptr_t callbacks[]={reinterpret_cast<std::uintptr_t>(&HeaderWrite),reinterpret_cast<std::uintptr_t>(&HeaderRead),reinterpret_cast<std::uintptr_t>(&WriteActor),reinterpret_cast<std::uintptr_t>(&ReadActor)};
     for(unsigned n=0;n<4;++n){const auto jump=AbsoluteJump(callbacks[n]);std::memcpy(reinterpret_cast<void*>(Address(0x47f0000+n*16)),jump.data(),jump.size());}
     *reinterpret_cast<int*>(Address(0x4590000))=256;*reinterpret_cast<int*>(Address(0x4590004))=274;
-    *reinterpret_cast<void**>(Address(kResourcePointersRva))=skeletons.client;
-    *reinterpret_cast<void**>(Address(kResourcePointersRva+8))=skeletons.server;
+    auto* resourceState=new(reinterpret_cast<void*>(Address(kResourcePointersRva))) CrowdResourceState{};
+    resourceState->clientSkeleton=reinterpret_cast<std::uintptr_t>(skeletons.client);
+    resourceState->serverSkeleton=reinterpret_cast<std::uintptr_t>(skeletons.server);
+    resourceState->secondFrameLow[0]=static_cast<std::uint32_t>(base+kRenderFrameBaseRva+kRenderFrameStride);
+    for(unsigned n=0;n<2;++n) {
+        auto& frame=resourceState->frames[n];
+        frame.surfaces=reinterpret_cast<std::uintptr_t>(skeletons.surfaces[n]);
+        frame.reverse=reinterpret_cast<std::uintptr_t>(skeletons.reverse[n]);
+        frame.table=reinterpret_cast<std::uintptr_t>(skeletons.tables[n]);
+        resourceState->framePointers[n]=reinterpret_cast<std::uintptr_t>(&frame);
+        auto* table=static_cast<std::uintptr_t*>(skeletons.tables[n]);
+        for(unsigned i=0;i<kSurfaceHandles;++i)table[i]=base+kRenderFrameBaseRva+n*kRenderFrameStride+0x42980+i*4;
+    }
     // Preserve already-created idle animation resources until native level
     // teardown/init visits the expanded arrays. Never duplicate ownership.
     std::memcpy(reinterpret_cast<void*>(Address(0x4560000)),reinterpret_cast<void*>(base+0xf50040),32*8);
@@ -220,7 +293,7 @@ bool InstallExpandedCapacity(std::uintptr_t base,bool exactResolved) {
     // reach it. Failure leaves all original native instructions intact.
     for(const auto& write:writes)if(write.before.empty())
         std::memcpy(reinterpret_cast<void*>(write.address),write.after.data(),write.after.size());
-    if(!RtlAddFunctionTable(relayFunctions,static_cast<DWORD>(std::size(relayFunctions)),arena)) {
+    if(!RtlAddFunctionTable(relayFunctions.data(),static_cast<DWORD>(std::size(relayFunctions)),arena)) {
         for(auto it=protections.rbegin();it!=protections.rend();++it){DWORD ignored;VirtualProtect(reinterpret_cast<void*>(it->write->address),it->write->after.size(),it->old,&ignored);}
         VirtualFree(reinterpret_cast<void*>(arena),0,MEM_RELEASE);arena=0;fields.clear();
         Log("AI_CAPACITY_EXPANSION enabled=0 reason=RELAY_UNWIND_REGISTRATION_FAILED");return false;
@@ -235,7 +308,7 @@ bool InstallExpandedCapacity(std::uintptr_t base,bool exactResolved) {
     FlushInstructionCache(GetCurrentProcess(),nullptr,0);
     skeletons.published=true;
     capacity.store(256,std::memory_order_release);
-    Log("AI_CAPACITY_EXPANSION enabled=1 experimental=1 actors=256 sentients=274 stride=0x48c0 snapshot_bytes=17412 temporary_trees=336 patches=%u arena=%p checkpoint=VERSIONED_V1_LEGACY_MIGRATION native_rewind_slots=32 high_actor_collision=CURRENT_SERVER_POSE native_threat_candidates=274 threat_stack_bytes=6760 threat_unwind=REGISTERED awareness_candidates=274 awareness_stack_bytes=4512 relay_unwind_entries=4 arena_guard_pages=9 skeleton_guard_pages=2 client_skeleton_bytes=9437184 server_skeleton_bytes=8388608 glass_free_list=OCCUPANCY_VALIDATED ai_count_domain=256",static_cast<unsigned>(protections.size()),reinterpret_cast<void*>(arena));
+    Log("AI_CAPACITY_EXPANSION enabled=1 experimental=1 actors=256 sentients=274 stride=0x48c0 snapshot_bytes=17412 temporary_trees=336 patches=%u arena=%p checkpoint=VERSIONED_V1_LEGACY_MIGRATION native_rewind_slots=32 high_actor_collision=CURRENT_SERVER_POSE native_threat_candidates=274 threat_stack_bytes=6760 threat_unwind=REGISTERED awareness_candidates=274 awareness_stack_bytes=4512 relay_unwind_entries=%u arena_guard_pages=9 skeleton_guard_pages=2 renderer_guard_pages=6 client_skeleton_bytes=9437184 server_skeleton_bytes=8388608 skin_cache_bytes=75497472 skinned_surface_bytes_per_frame=2097152 animated_handles_per_frame=32768 packed_draw_bits=16 render_reservations=BOUNDED_ATOMIC glass_free_list=OCCUPANCY_VALIDATED glass_collision=FINITE_CHECKED ai_count_domain=256",static_cast<unsigned>(protections.size()),reinterpret_cast<void*>(arena),static_cast<unsigned>(relayFunctions.size()));
     return true;
 }
 } // namespace mod
