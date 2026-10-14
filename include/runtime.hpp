@@ -104,6 +104,7 @@ void HandleZombieRehearsal(Action action,const Snapshot& snapshot,int startingRo
 ZombieRehearsalStatus GetZombieRehearsalStatus();
 void LogZombieRehearsal();
 int NativeActorCapacity();
+void LogExpandedResources();
 void CheckStockCheckpoint(std::uintptr_t);
 bool InstallExpandedCapacity(std::uintptr_t,bool);
 bool ExpandedArenaContains(std::uintptr_t,std::size_t);

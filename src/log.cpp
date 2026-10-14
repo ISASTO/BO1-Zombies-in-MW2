@@ -29,16 +29,26 @@ std::atomic<std::uint64_t> nextNativeEvent{0};
 // before shutdown. Preserve it if shutdown itself faults, hiding the cause.
 constexpr std::uintptr_t kEngineErrorDepthRva=0x1326134,kEngineErrorMessageRva=0x13261a0;
 constexpr std::size_t kEngineErrorMessageBytes=0x1000;
-struct DumpMemory {std::uintptr_t base=0;unsigned next=0;std::uintptr_t sharedPool=0;ULONG sharedBytes=0;};
+struct DumpRange {std::uintptr_t at=0;ULONG bytes=0;};
+struct DumpMemory {
+    std::array<DumpRange,16> ranges{};unsigned count=0,next=0;
+    void Add(std::uintptr_t at,std::size_t bytes) {
+        if(!at || !bytes || count==ranges.size())return;
+        MEMORY_BASIC_INFORMATION region{};
+        if(!VirtualQuery(reinterpret_cast<void*>(at),&region,sizeof(region)) ||
+           region.State!=MEM_COMMIT || region.Protect&(PAGE_GUARD|PAGE_NOACCESS))return;
+        const auto begin=reinterpret_cast<std::uintptr_t>(region.BaseAddress);
+        if(at<begin || at-begin>=region.RegionSize)return;
+        const auto available=region.RegionSize-(at-begin);
+        ranges[count++]={at,static_cast<ULONG>(std::min<std::size_t>(bytes,available))};
+    }
+};
 BOOL CALLBACK IncludeNativeVmMemory(PVOID user,const PMINIDUMP_CALLBACK_INPUT input,PMINIDUMP_CALLBACK_OUTPUT output) {
     if(input->CallbackType!=MemoryCallback)return TRUE;
     auto& memory=*static_cast<DumpMemory*>(user);
-    if(memory.next==0) {output->MemoryBase=memory.base+0x18f0000;output->MemorySize=0x20000;++memory.next;return TRUE;}
-    if(memory.next==1) {output->MemoryBase=memory.base+0xd96e70;output->MemorySize=0x80;++memory.next;return TRUE;}
-    if(memory.next==2) {output->MemoryBase=memory.base+kScriptStringPoolPointerRva;output->MemorySize=8;++memory.next;return TRUE;}
-    if(memory.next==3) {output->MemoryBase=memory.base+0x1326100;output->MemorySize=0x1100;++memory.next;return TRUE;}
-    if(memory.next==4 && memory.sharedBytes) {output->MemoryBase=memory.sharedPool;output->MemorySize=memory.sharedBytes;++memory.next;return TRUE;}
-    return FALSE;
+    if(memory.next==memory.count)return FALSE;
+    const auto& range=memory.ranges[memory.next++];
+    output->MemoryBase=range.at;output->MemorySize=range.bytes;return TRUE;
 }
 
 void RawWrite(HANDLE file, const char* text, DWORD length, bool durable=false) {
@@ -148,12 +158,23 @@ LONG WINAPI CrashFilter(EXCEPTION_POINTERS* info) {
     if (dump != INVALID_HANDLE_VALUE) {
         MINIDUMP_EXCEPTION_INFORMATION exception{GetCurrentThreadId(), info, FALSE};
         const auto type=static_cast<MINIDUMP_TYPE>(MiniDumpNormal|MiniDumpWithIndirectlyReferencedMemory|MiniDumpWithThreadInfo);
-        DumpMemory memory{base,0};MEMORY_BASIC_INFORMATION poolRegion{};
-        if(ReadProcessMemory(process,reinterpret_cast<void*>(base+kScriptStringPoolPointerRva),&memory.sharedPool,sizeof(memory.sharedPool),&read)
-            && memory.sharedPool && VirtualQuery(reinterpret_cast<void*>(memory.sharedPool),&poolRegion,sizeof(poolRegion))
-            && poolRegion.State==MEM_COMMIT && !(poolRegion.Protect&(PAGE_GUARD|PAGE_NOACCESS))) {
-            const auto available=reinterpret_cast<std::uintptr_t>(poolRegion.BaseAddress)+poolRegion.RegionSize-memory.sharedPool;
-            memory.sharedBytes=static_cast<ULONG>(std::min<std::uintptr_t>(available,0x100000));
+        DumpMemory memory;
+        memory.Add(base+0x18f0000,0x20000);memory.Add(base+0xd96e70,0x80);
+        memory.Add(base+kScriptStringPoolPointerRva,8);memory.Add(base+0x1326100,0x1100);
+        memory.Add(base+0xcdb118,0xa8);memory.Add(base+0x548cf0,8);
+        memory.Add(base+0x19c386c,8);memory.Add(base+0x19ada30,16);
+        std::uintptr_t sharedPool=0;
+        if(ReadProcessMemory(process,reinterpret_cast<void*>(base+kScriptStringPoolPointerRva),&sharedPool,sizeof(sharedPool),&read))
+            memory.Add(sharedPool,0x100000);
+        // Capture the missing glass ownership/free-link evidence, only on a
+        // crash. The normal game loop does no additional copying or disk I/O.
+        std::array<std::uint8_t,0xa8> glass{};
+        if(ReadProcessMemory(process,reinterpret_cast<void*>(base+0xcdb118),glass.data(),glass.size(),&read)) {
+            unsigned pieces=0;std::memcpy(&pieces,glass.data()+0xc,4);
+            if(pieces && pieces<=0xffff)for(const auto& field:std::array<std::pair<unsigned,std::size_t>,3>{{{0x38,pieces*32ull},{0x40,pieces*32ull},{0x58,((pieces+31ull)/32)*4}}}) {
+                std::uintptr_t pointer=0;std::memcpy(&pointer,glass.data()+field.first,8);
+                memory.Add(pointer,std::min<std::size_t>(field.second,0x100000));
+            }
         }
         MINIDUMP_CALLBACK_INFORMATION callbacks{IncludeNativeVmMemory,&memory};
         BOOL ok = MiniDumpWriteDump(GetCurrentProcess(), GetCurrentProcessId(), dump, type,
@@ -200,7 +221,7 @@ void InitializeLog() {
     }
     std::swprintf(logPath,32768,L"%ls",file);
     Log("BO1MW2 %s | AMD64 | log=%ls", kVersion, file);
-    Log("Test27: fixes the separate native 50-row nearby-awareness stack overwrite, five late perception accesses and the ai_count domain. Both enlarged frames have unwind metadata and ordered page probes. Eight arena guard pages protect 256 actors / 274 sentients; native shot history stays bounded to 32.");
+    Log("Test28: replaces stock client/server skeleton buffers and matching bounds with guarded 9 MiB/8 MiB storage; validates glass free links against native occupancy, repairs inactive links and rejects duplicate frees. Native frame generations, live transforms and 256/274 capacity are preserved.");
 }
 void Log(const char* format, ...) {
     char body[4096]{};

@@ -1517,6 +1517,7 @@ void LogAiState() {
         s.serviceUpdates,s.serviceAverageUs,s.servicePeakUs,s.worldReads,s.worldAverageUs,s.worldPeakUs,s.recovering,s.combatReassertions);
     Log("AI_SCAN_PERF last_pool_us=%.1f last_decode_us=%.1f last_sort_us=%.1f kernel_reads_per_scan=%.1f image_reads_per_scan=%.1f name_cache_hits=%llu name_cache_misses=%llu",
         s.lastPoolUs,s.lastDecodeUs,s.lastSortUs,s.worldReads?double(s.worldKernelReads)/s.worldReads:0.0,s.worldReads?double(s.worldImageReads)/s.worldReads:0.0,s.nameCacheHits,s.nameCacheMisses);
+    LogExpandedResources();
 }
 std::uint64_t RequestNativeHandDefinitions(const WeaponFields& weapon,std::uintptr_t names,std::uintptr_t normalTree,
     std::uintptr_t cache,const Snapshot& s) {

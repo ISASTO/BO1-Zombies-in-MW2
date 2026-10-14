@@ -1,31 +1,31 @@
 # BO1 Zombies in MW2
 
 Incremental mod framework for **retail Modern Warfare 2 (2009), single player**.
-Current build: **0.1.26-squad-test27**. The returned Test26 Estate and
-Contingency runs still fail at 64 and 56 actors. Contingency preserves an
-expanded-sentient pointer in XMM8 whose low DWORD matches the invalid trajectory
-type. The native fixture reproduces the source of that register corruption:
-a second, independent **50-row nearby-awareness stack buffer** is filled by the
-expanded iterator. Candidate 51 overwrites saved XMM8 with a sentient pointer.
+Current build: **0.1.27-squad-test28**. The returned Test27 Estate crash at
+97 actors reaches the native breakable-glass allocator with a quaternion-valued
+free-list head. Test28 checks free links against the native occupancy bitmap,
+repairs only inactive links and rejects duplicate/out-of-range frees. The exact
+invalid read is reproduced at the returned native instruction. Its first retail
+corrupting write is not captured by the dump.
 
-Test27 grows that 16-byte-row array to 274 entries, moving its upper stack
-fields, exit and Windows unwind records together. Both expanded native frames
-have ordered stack-page probes and registered relay unwind entries. Five
-remaining indexed perception accesses now use the appended layout. The native
-`ai_count` default/domain becomes 256, and eight inaccessible pages separate
-the relocated data blocks. Checked memory reads exclude those guard pages.
+The deeper sweep also found unchanged **512 KiB server / 576 KiB client
+skeleton caches**. Native tests reproduce wrap at server allocation 65 and
+client exhaustion after 72 maximum-size allocations. Test28 replaces storage
+and every corresponding base/bound together, using **8 MiB server / 9 MiB
+client buffers with inaccessible end pages**. Native frame generations and
+DObj cache rules remain intact.
 
-**Live capacity remains 256 actors / 274 sentients.** The nearby-awareness
-fixture covers every actor slot, 302,464 candidate records, native qsort and
-nonvolatile registers, including repeated 273-candidate runs. Native population,
-snapshot, animation, shooting and checkpoint regressions remain required.
-See [Test27 evidence and validation scope](docs/squad-test27.md) and the
-[consumer audit](docs/actor-capacity-test27-audit.md).
+**Live capacity remains 256 actors / 274 sentients.** The new native fixture
+passes 30,720 skeleton allocations, 15,680 DObj cache/create cases and 100,000
+glass lifetime operations. Existing awareness, threat, animation, shooting,
+iterator, snapshot and population-checkpoint regressions are retained.
+See [Test28 findings and validation scope](docs/squad-test28.md) and the
+[updated resource/consumer audit](docs/actor-capacity-test28-audit.md).
 
-The reproduced overwrite is fixed. Full Windows missions, skeleton rendering,
-guard-page stack growth, `RtlVirtualUnwind` and the highest stable population
-still require an owner stress test. This remains an experimental expansion;
-the native fixtures do not establish error-free 256-actor gameplay.
+The fixtures do not boot Windows missions, render real skeleton assets or
+establish error-free 256-actor gameplay. Install the complete package and start
+the first retest fresh through Mission Select. Crash-only capture now includes
+the glass ownership data missing from this dump.
 
 Original MP hitmarker image/sound/fade, menu options, prior animation ownership
 fixes and version-1 expanded checkpoints remain included. Historical shot rewind

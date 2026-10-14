@@ -15,6 +15,7 @@ from prepare_expanded_runtime import prepare
 from run_expanded_iterator_probe import patches,HEADER
 from run_expanded_awareness_probe import unwind_audit as awareness_unwind
 from run_expanded_threat_probe import unwind_audit as threat_unwind
+from run_expanded_resources_probe import unwind_audit as resources_unwind, reference_inventory
 
 
 def perception_flow(pe,image):
@@ -116,7 +117,9 @@ def audit(executable):
             'sentient_index_data_flow_sites':len(flow),'unrelocated_data_flow_sites':0,'data_flow_inventory':flow,
             'native_ai_count_default_and_maximum':256,'retained_native_fx_bound_sites':[hex(at) for at in fx_sites],
             'native_rewind_records':metadata['native_rewind_actor_slots'],
-            'native_unwind_audits':{'threat':threat_unwind(pe,rows),'awareness':awareness_unwind(pe,rows)},
+            'native_unwind_audits':{'threat':threat_unwind(pe,rows),'awareness':awareness_unwind(pe,rows),'crowd_resources':resources_unwind(pe,rows)},
+            'crowd_resources':metadata['crowd_resources'],
+            'skeleton_reference_inventory':reference_inventory(pe),
             'remaining_source_literal_32':source_hits,
             'source_review':'Remaining 32s are stock-layout migration/bootstrap sizes, bounded shot history, a 32-byte checkpoint header, SHA256/graphics/ASCII dimensions, bit widths and original profile byte patterns. See the accompanying audit document for reasons.',
             'scope':'Exact declared storage/stride/span checks and linear native sentient-index data flow, plus manually reviewed iterator callers. This is not a formal proof of every transitive engine consumer or Windows gameplay stability.'}

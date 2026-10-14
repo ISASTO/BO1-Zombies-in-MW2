@@ -1,0 +1,27 @@
+{
+  "executable_sha256": "fb7e8a987c371dea7b666091b0b9e2011c0cd9cd277b191ad453d11d557dd777",
+  "old_revision": "0ec3c88ad34d62c7516183ff5684906adc42a333",
+  "old_faults_reproduced": {
+    "old-leases": "TWO_LIVE_LEASES_SHARE_ONE_TREE",
+    "old-end": "CORPSE_SEARCH_ACCEPTED_ONE_PAST_END",
+    "old-swap": "ACTOR_59_REUSED_PACKED_CORPSE_DATA_AS_TREE"
+  },
+  "corrected_native_results": {
+    "distinct_simultaneous_scratch_trees": 336,
+    "native_tree_release_recycles": 1000,
+    "bounded_corpse_search_cases": 195,
+    "native_actor_corpse_tree_swaps": 256,
+    "packed_metadata_not_used_as_tree": true,
+    "unrelated_corpse_metadata_preserved": true,
+    "live_actor_capacity": 256,
+    "corpse_capacity": 64,
+    "booted_renderer_tested": false
+  },
+  "runtime_plan_external_arena": true,
+  "substituted_dependencies": [
+    "XAnim tree-node reset (real assets needed); allocator/release native loops run intact",
+    "corpse search stops before booted-world pose callbacks",
+    "tree exchange stops before script notifications"
+  ],
+  "scope": "Exact native addressing, allocation ownership and bounded lookup, using distinct tree tokens. Real skeleton evaluation/rendering and whole crash-chain reproduction remain retail tests."
+}

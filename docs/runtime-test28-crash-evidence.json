@@ -1,0 +1,54 @@
+{
+  "archives": [
+    {
+      "archive_sha256": "de9e70cca4c07fad82213b8ff28d4ed77b4601ec62109585946a005785498262",
+      "installed_version": "0.1.26-squad-test27",
+      "installed_dll_sha256": "9250ab44fb0acf0004f5bcd4a8a5326f0f3551ce9c7b6c5da24ecbdb55d5bf6a",
+      "executable_sha256": "fb7e8a987c371dea7b666091b0b9e2011c0cd9cd277b191ad453d11d557dd777",
+      "new_crashes": [
+        {
+          "dump": "crash-20261014-072936.dmp",
+          "dump_sha256": "e76295cdd272fea08090599ef883a93e1a55ad4f74241457f012541e538958b0",
+          "exception": "0xc0000005",
+          "fault_instruction_rva": "0x10047c",
+          "glass_pool_rva": "0xcdb118",
+          "corrupt_free_head": "0x3f33787f",
+          "free_head_as_float": 0.7010573744773865,
+          "first_captured_glass_transform_quaternion_bits": "0x3f33787f",
+          "free_head_matches_captured_quaternion": true,
+          "fault_address_matches_free_head_times_32": true,
+          "last_completed_actor_count": 97,
+          "primary_native_engine_error_present": false
+        }
+      ],
+      "confirmed": "A quaternion-valued free head is used as a 32-byte glass-piece index, producing the exact invalid read.",
+      "separate_reproduction": "Exact native stock skeleton allocators wrap after 64 maximum-size server allocations and exhaust after 72 client allocations. This is an independent capacity dependency, not a dump-proven first writer of the glass chain.",
+      "causal_limit": "The first retail write corrupting the glass free chain is not in this dump. Test28 validates current/next links and repairs inactive links from the occupancy map; future dumps include that map and pool metadata."
+    },
+    {
+      "archive_sha256": "d972cc0d4f4051c45ae1278b1a5a3f99fd9841b67b31ce3f326ff7a129d27be8",
+      "installed_version": "0.1.26-squad-test27",
+      "installed_dll_sha256": "9250ab44fb0acf0004f5bcd4a8a5326f0f3551ce9c7b6c5da24ecbdb55d5bf6a",
+      "executable_sha256": "fb7e8a987c371dea7b666091b0b9e2011c0cd9cd277b191ad453d11d557dd777",
+      "new_crashes": [
+        {
+          "dump": "crash-20261014-072936.dmp",
+          "dump_sha256": "e76295cdd272fea08090599ef883a93e1a55ad4f74241457f012541e538958b0",
+          "exception": "0xc0000005",
+          "fault_instruction_rva": "0x10047c",
+          "glass_pool_rva": "0xcdb118",
+          "corrupt_free_head": "0x3f33787f",
+          "free_head_as_float": 0.7010573744773865,
+          "first_captured_glass_transform_quaternion_bits": "0x3f33787f",
+          "free_head_matches_captured_quaternion": true,
+          "fault_address_matches_free_head_times_32": true,
+          "last_completed_actor_count": 97,
+          "primary_native_engine_error_present": false
+        }
+      ],
+      "confirmed": "A quaternion-valued free head is used as a 32-byte glass-piece index, producing the exact invalid read.",
+      "separate_reproduction": "Exact native stock skeleton allocators wrap after 64 maximum-size server allocations and exhaust after 72 client allocations. This is an independent capacity dependency, not a dump-proven first writer of the glass chain.",
+      "causal_limit": "The first retail write corrupting the glass free chain is not in this dump. Test28 validates current/next links and repairs inactive links from the occupancy map; future dumps include that map and pool metadata."
+    }
+  ]
+}

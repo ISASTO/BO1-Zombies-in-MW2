@@ -17,14 +17,17 @@ inline constexpr std::uint32_t kArenaRva=0x4000000,kArenaBytes=0x800000;
 struct ArenaRange {std::uint32_t rva,bytes;};
 // Independent resource storage, with an inaccessible whole page after every
 // data block. In-page tails remain padding; no live object occupies a guard.
-inline constexpr std::array<ArenaRange,8> kArenaDataRanges{{
+inline constexpr std::uint32_t kResourcePointersRva=0x47e0000;
+inline constexpr std::size_t kClientSkeletonBytes=0x900000,kServerSkeletonBytes=0x800000;
+inline constexpr std::array<ArenaRange,9> kArenaDataRanges{{
     {0x4000000,static_cast<std::uint32_t>(kActors*kStride)},
     {0x4500000,static_cast<std::uint32_t>(kSentients*kSentientStride)},
     {0x4510000,0x4404},{0x4560000,static_cast<std::uint32_t>(kActors*8)},
     {0x4570000,static_cast<std::uint32_t>(kSentients*2)},
-    {0x4580000,0x4404},{0x4590000,8},{0x45a0000,336*8+336+4}}};
-constexpr std::array<ArenaRange,8> ArenaGuards() {
-    std::array<ArenaRange,8> out{};
+    {0x4580000,0x4404},{0x4590000,8},{0x45a0000,336*8+336+4},
+    {kResourcePointersRva,24}}};
+constexpr std::array<ArenaRange,kArenaDataRanges.size()> ArenaGuards() {
+    std::array<ArenaRange,kArenaDataRanges.size()> out{};
     for(std::size_t n=0;n<out.size();++n)
         out[n]={(kArenaDataRanges[n].rva+kArenaDataRanges[n].bytes+4095u)&~4095u,4096};
     return out;
@@ -61,6 +64,8 @@ inline bool ArenaReadable(std::uintptr_t offset,std::size_t bytes) {
 // routine. Native chained unwind records are patched with the frame itself.
 inline constexpr std::uint32_t kThreatProbeRva=0x4610000,kThreatProbeEndRva=0x461001c,kThreatProbeUnwindRva=0x4610040;
 inline constexpr std::uint32_t kAwarenessProbeRva=0x4610100,kAwarenessProbeEndRva=0x461011c,kAwarenessProbeUnwindRva=0x4610140;
+inline constexpr std::uint32_t kGlassAllocateRva=0x4611000,kGlassAllocateEndRva=0x4611300,kGlassAllocateUnwindRva=0x4611300;
+inline constexpr std::uint32_t kGlassFreeRva=0x4611400,kGlassFreeEndRva=0x4611500,kGlassFreeUnwindRva=0x4611500;
 static_assert(kStride==0x48c0 && kStride%16==0);
 inline std::optional<std::size_t> PerceptionOffset(std::size_t sentient) {
     if(sentient>=kSentients)return std::nullopt;

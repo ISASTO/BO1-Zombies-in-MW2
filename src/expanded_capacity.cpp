@@ -10,9 +10,29 @@ namespace {
 using namespace expansion;
 std::atomic<int> capacity{32};
 std::uintptr_t host=0,arena=0;
-RUNTIME_FUNCTION stackProbeFunctions[]{
+RUNTIME_FUNCTION relayFunctions[]{
     {kThreatProbeRva-0x4000000,kThreatProbeEndRva-0x4000000,kThreatProbeUnwindRva-0x4000000},
-    {kAwarenessProbeRva-0x4000000,kAwarenessProbeEndRva-0x4000000,kAwarenessProbeUnwindRva-0x4000000}};
+    {kAwarenessProbeRva-0x4000000,kAwarenessProbeEndRva-0x4000000,kAwarenessProbeUnwindRva-0x4000000},
+    {kGlassAllocateRva-kArenaRva,kGlassAllocateEndRva-kArenaRva,kGlassAllocateUnwindRva-kArenaRva},
+    {kGlassFreeRva-kArenaRva,kGlassFreeEndRva-kArenaRva,kGlassFreeUnwindRva-kArenaRva}};
+// Separate from executable relays. Bounds are published only after both owned
+// buffers and their end guards exist. Native frame generations/reset semantics
+// are retained; old static buffers are never enlarged or freed.
+struct SkeletonStorage {
+    void* client=nullptr;void* server=nullptr;bool published=false;
+    ~SkeletonStorage(){if(!published){if(client)VirtualFree(client,0,MEM_RELEASE);if(server)VirtualFree(server,0,MEM_RELEASE);}}
+    bool Allocate() {
+        const auto allocate=[](std::size_t bytes)->void* {
+            auto* data=VirtualAlloc(nullptr,bytes+4096,MEM_RESERVE|MEM_COMMIT,PAGE_READWRITE);
+            DWORD old=0;
+            if(data && VirtualProtect(static_cast<std::uint8_t*>(data)+bytes,4096,PAGE_NOACCESS,&old))return data;
+            if(data)VirtualFree(data,0,MEM_RELEASE);
+            return nullptr;
+        };
+        client=allocate(kClientSkeletonBytes);if(!client)return false;
+        server=allocate(kServerSkeletonBytes);return server!=nullptr;
+    }
+};
 std::vector<SaveField> fields;
 thread_local bool legacyRead=false;
 using SelectWrite=void(*)(std::uintptr_t,int);
@@ -71,6 +91,17 @@ std::vector<std::uint8_t> Hex(const char* text) {
 struct Write {std::uintptr_t address;std::vector<std::uint8_t> before,after;};
 }
 int NativeActorCapacity() {return capacity.load(std::memory_order_acquire);}
+void LogExpandedResources() {
+    if(capacity.load(std::memory_order_acquire)!=256)return;
+    unsigned clientUsed=0,serverUsed=0,serverGeneration=0,rebuilds=0,ignored=0;
+    if(!CheckedReadMemory(host+0x548cf4,&clientUsed,4) ||
+       !CheckedReadMemory(host+0x19c3870,&serverUsed,4) ||
+       !CheckedReadMemory(host+0x19c386c,&serverGeneration,4) ||
+       !CheckedReadMemory(Address(kResourcePointersRva+16),&rebuilds,4) ||
+       !CheckedReadMemory(Address(kResourcePointersRva+20),&ignored,4))return;
+    Log("AI_CROWD_RESOURCES client_skeleton_used=%u client_skeleton_limit=%u server_skeleton_used=%u server_skeleton_limit=%u server_skeleton_generation=%u glass_free_list_rebuilds=%u glass_ignored_frees=%u",
+        clientUsed,static_cast<unsigned>(kClientSkeletonBytes-16),serverUsed,static_cast<unsigned>(kServerSkeletonBytes-16),serverGeneration,rebuilds,ignored);
+}
 void CheckStockCheckpoint(std::uintptr_t save) {
     if(NativeActorCapacity()!=32 || !host)return;
     const auto select=reinterpret_cast<SelectRead>(host+0x1af040);
@@ -120,6 +151,11 @@ bool InstallExpandedCapacity(std::uintptr_t base,bool exactResolved) {
         if(memory){arena=reinterpret_cast<std::uintptr_t>(memory);break;}
     }
     if(!arena){Log("AI_CAPACITY_EXPANSION enabled=0 reason=NEAR_ARENA_ALLOCATION_FAILED");return false;}
+    SkeletonStorage skeletons;
+    if(!skeletons.Allocate()) {
+        VirtualFree(reinterpret_cast<void*>(arena),0,MEM_RELEASE);arena=0;
+        Log("AI_CAPACITY_EXPANSION enabled=0 reason=GUARDED_SKELETON_STORAGE_FAILED");return false;
+    }
     std::vector<SaveField> original;
     for(unsigned n=0;n<400;++n) {
         SaveField field;
@@ -161,6 +197,8 @@ bool InstallExpandedCapacity(std::uintptr_t base,bool exactResolved) {
     const std::uintptr_t callbacks[]={reinterpret_cast<std::uintptr_t>(&HeaderWrite),reinterpret_cast<std::uintptr_t>(&HeaderRead),reinterpret_cast<std::uintptr_t>(&WriteActor),reinterpret_cast<std::uintptr_t>(&ReadActor)};
     for(unsigned n=0;n<4;++n){const auto jump=AbsoluteJump(callbacks[n]);std::memcpy(reinterpret_cast<void*>(Address(0x47f0000+n*16)),jump.data(),jump.size());}
     *reinterpret_cast<int*>(Address(0x4590000))=256;*reinterpret_cast<int*>(Address(0x4590004))=274;
+    *reinterpret_cast<void**>(Address(kResourcePointersRva))=skeletons.client;
+    *reinterpret_cast<void**>(Address(kResourcePointersRva+8))=skeletons.server;
     // Preserve already-created idle animation resources until native level
     // teardown/init visits the expanded arrays. Never duplicate ownership.
     std::memcpy(reinterpret_cast<void*>(Address(0x4560000)),reinterpret_cast<void*>(base+0xf50040),32*8);
@@ -178,14 +216,14 @@ bool InstallExpandedCapacity(std::uintptr_t base,bool exactResolved) {
         for(auto it=protections.rbegin();it!=protections.rend();++it){DWORD ignored;VirtualProtect(reinterpret_cast<void*>(it->write->address),it->write->after.size(),it->old,&ignored);}
         VirtualFree(reinterpret_cast<void*>(arena),0,MEM_RELEASE);arena=0;fields.clear();return false;
     }
-    // Publish the probe's own unwind description before any native entry can
+    // Publish each relay's own unwind description before any native entry can
     // reach it. Failure leaves all original native instructions intact.
     for(const auto& write:writes)if(write.before.empty())
         std::memcpy(reinterpret_cast<void*>(write.address),write.after.data(),write.after.size());
-    if(!RtlAddFunctionTable(stackProbeFunctions,static_cast<DWORD>(std::size(stackProbeFunctions)),arena)) {
+    if(!RtlAddFunctionTable(relayFunctions,static_cast<DWORD>(std::size(relayFunctions)),arena)) {
         for(auto it=protections.rbegin();it!=protections.rend();++it){DWORD ignored;VirtualProtect(reinterpret_cast<void*>(it->write->address),it->write->after.size(),it->old,&ignored);}
         VirtualFree(reinterpret_cast<void*>(arena),0,MEM_RELEASE);arena=0;fields.clear();
-        Log("AI_CAPACITY_EXPANSION enabled=0 reason=STACK_PROBE_UNWIND_REGISTRATION_FAILED");return false;
+        Log("AI_CAPACITY_EXPANSION enabled=0 reason=RELAY_UNWIND_REGISTRATION_FAILED");return false;
     }
     for(const auto& write:writes)if(!write.before.empty())
         std::memcpy(reinterpret_cast<void*>(write.address),write.after.data(),write.after.size());
@@ -195,8 +233,9 @@ bool InstallExpandedCapacity(std::uintptr_t base,bool exactResolved) {
     std::memset(reinterpret_cast<void*>(base+0xf50040),0,32*8);std::memset(reinterpret_cast<void*>(base+0xf50b40),0,112*8);
     for(auto it=protections.rbegin();it!=protections.rend();++it){DWORD ignored;VirtualProtect(reinterpret_cast<void*>(it->write->address),it->write->after.size(),it->old,&ignored);}
     FlushInstructionCache(GetCurrentProcess(),nullptr,0);
+    skeletons.published=true;
     capacity.store(256,std::memory_order_release);
-    Log("AI_CAPACITY_EXPANSION enabled=1 experimental=1 actors=256 sentients=274 stride=0x48c0 snapshot_bytes=17412 temporary_trees=336 patches=%u arena=%p checkpoint=VERSIONED_V1_LEGACY_MIGRATION native_rewind_slots=32 high_actor_collision=CURRENT_SERVER_POSE native_threat_candidates=274 threat_stack_bytes=6760 threat_unwind=REGISTERED awareness_candidates=274 awareness_stack_bytes=4512 stack_probe_unwind_entries=2 arena_guard_pages=8 ai_count_domain=256",static_cast<unsigned>(protections.size()),reinterpret_cast<void*>(arena));
+    Log("AI_CAPACITY_EXPANSION enabled=1 experimental=1 actors=256 sentients=274 stride=0x48c0 snapshot_bytes=17412 temporary_trees=336 patches=%u arena=%p checkpoint=VERSIONED_V1_LEGACY_MIGRATION native_rewind_slots=32 high_actor_collision=CURRENT_SERVER_POSE native_threat_candidates=274 threat_stack_bytes=6760 threat_unwind=REGISTERED awareness_candidates=274 awareness_stack_bytes=4512 relay_unwind_entries=4 arena_guard_pages=9 skeleton_guard_pages=2 client_skeleton_bytes=9437184 server_skeleton_bytes=8388608 glass_free_list=OCCUPANCY_VALIDATED ai_count_domain=256",static_cast<unsigned>(protections.size()),reinterpret_cast<void*>(arena));
     return true;
 }
 } // namespace mod
