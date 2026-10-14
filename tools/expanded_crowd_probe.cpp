@@ -155,6 +155,29 @@ unsigned BridgeEquivalence(std::uint8_t* original,CrowdResourceState& state){
  }
  return cases;
 }
+using StartupRead=std::uintptr_t(ABI*)(void*,unsigned);
+StartupRead StartupReadWrapper(){
+ // Isolate the exact quarter-unit addressing block, then execute the same
+ // mesh-field read that faults in both returned mission-start dumps. Asset,
+ // shader and D3D work between those blocks is excluded from this fixture.
+ Bytes(ProbeCode+0xa00,{0x53,0x56,0x48,0x83,0xec,0x28,0x49,0x89,0xc8,0x89,0xd6});
+ Jump(ProbeCode+0xa0b,std::uintptr_t(image+0x643d3));
+ RelativeJump(0x643e4,0x645b9);
+ Bytes(0x645c1,{0x48,0x83,0xc4,0x28,0x5e,0x5b,0xc3});
+ return reinterpret_cast<StartupRead>(image+ProbeCode+0xa00);
+}
+unsigned StartupReadCases(CrowdResourceState& state){
+ const auto read=StartupReadWrapper();std::array<std::uint8_t,0x40> mesh{};unsigned cases=0;
+ for(unsigned n=0;n<2;++n){auto* frame=image+kRenderFrameBaseRva+n*kRenderFrameStride;auto& f=state.frames[n];auto* table=reinterpret_cast<std::uintptr_t*>(f.table);
+  for(unsigned id:{0u,31u,0x7fe0u,0x8000u,0x8001u,0x9234u,0xffffu}){
+   auto* record=id<0x8000?frame+0x42980+id*4:reinterpret_cast<std::uint8_t*>(f.surfaces)+0x100+(id&0x7fff)*48;
+   const auto expected=0x1234567800000000ull+n*0x10000ull+id;
+   std::memset(record,0,48);Put(record,0,std::int32_t(-4));Put(record,0x20,std::uintptr_t(mesh.data()));Put(mesh.data(),0x10,expected);table[id]=std::uintptr_t(record);
+   Check(read(frame,id)==expected,"Quarter-unit CPU renderer read a mesh from the old pool or another frame");++cases;
+  }
+ }
+ return cases;
+}
 using Glass=void(ABI*)(const void*,const void*,unsigned,const void*,unsigned,void*);
 unsigned selectedFeature=0;
 bool ABI SelectFeature(const void*,const void*,const void*,void* output){
@@ -201,6 +224,11 @@ int main(int argc,char** argv){if(argc<3 || argc>4)return 2;rlimit none{0,0};set
  struct sigaction action{};action.sa_sigaction=Fault;action.sa_flags=SA_SIGINFO;sigemptyset(&action.sa_mask);sigaction(SIGSEGV,&action,nullptr);
  const auto mode=std::string(argv[2]);
  if(mode=="old-nan"){phase="returned non-finite glass narrowphase";GlassInput g;g.Nan();g.Run();throw std::runtime_error("Old NaN query unexpectedly returned");}
+ if(mode=="old-startup"){
+  phase="returned Test29 quarter-unit CPU renderer startup";
+  StartupReadWrapper()(image+kRenderFrameBaseRva,0x8000);
+  throw std::runtime_error("Old quarter-unit renderer unexpectedly returned");
+ }
  const bool fixed=mode=="fixed";
  phase="matching native GPU and CPU allocation requests";TestNativeCreation(fixed?kSkinCacheBytes:0x480000);
  Guarded scene0(kCrowdSurfaceBytes),scene1(kCrowdSurfaceBytes),reverse0(kSurfaceReverseBytes),reverse1(kSurfaceReverseBytes),table0(kSurfaceTableBytes),table1(kSurfaceTableBytes);
@@ -265,6 +293,8 @@ int main(int argc,char** argv){if(argc<3 || argc>4)return 2;rlimit none{0,0};set
  std::ifstream referenceFile(argv[3],std::ios::binary);std::vector<char> referenceBytes((std::istreambuf_iterator<char>(referenceFile)),{});Check(referenceBytes.size()==0x5800000,"Invalid original oracle image");
  auto* reference=static_cast<std::uint8_t*>(mmap(nullptr,referenceBytes.size(),PROT_READ|PROT_WRITE|PROT_EXEC,MAP_PRIVATE|MAP_ANONYMOUS,-1,0));Check(reference!=MAP_FAILED,"Oracle mapping failed");std::memcpy(reference,referenceBytes.data(),referenceBytes.size());referenceBytes.clear();referenceBytes.shrink_to_fit();
  const auto bridgeCasesPassed=BridgeEquivalence(reference,*state);munmap(reference,0x5800000);
+ phase="first and subsequent animated CPU renderer record reads";
+ const auto startupCasesPassed=StartupReadCases(*state);
  phase="all warning categories counted without native throttle";Bytes(0x2acf9,{0xc3});auto warning=reinterpret_cast<void(ABI*)(unsigned)>(image+0x2acf0);
  for(unsigned n=0;n<64;++n){warning(n);warning(n);}warning(64);warning(0xffffffffu);for(auto count:state->warnings)Check(count==2,"Warning counter dropped, overflowed or aliased a category");
  // Restore continuations altered by the allocation wrappers before physics.
@@ -304,5 +334,5 @@ int main(int argc,char** argv){if(argc<3 || argc>4)return 2;rlimit none{0,0};set
  Bytes(0x1dfaa4,{0x48,0x81,0xc4,0xf0,0x00,0x00,0x00,0x5b,0xc3});
  for(unsigned n=0;n<1000;++n){GlassInput input;Put(input.query.data(),0x38,float(n));input.Run();}
  Check(state->invalidGlassQueries==invalidCases+1+poseCases,"Finite geometry was rejected");
- std::cout<<"{\"native_gpu_create_requests\":2,\"native_cpu_reservations\":2,\"skin_cache_bytes\":"<<kSkinCacheBytes<<",\"skinned_surface_bytes_per_frame\":"<<kCrowdSurfaceBytes<<",\"native_frame_slots\":2,\"actor_and_corpse_models_per_frame\":320,\"model_allocation_cases\":"<<modelCases<<",\"concurrent_reservations\":24000,\"concurrent_handle_publications\":8000,\"native_packed_record_equivalence_cases\":"<<bridgeCasesPassed<<",\"native_gpr_xmm_flags_compared\":true,\"failure_counters_remain_bounded\":true,\"warning_categories\":64,\"nonfinite_query_cases\":"<<invalidCases+1<<",\"early_pose_cases\":"<<poseCases<<",\"valid_collision_features\":14,\"invalid_collision_features_rejected\":4,\"finite_query_pass_cases\":1000,\"first_invalid_descriptor_retained\":true,\"rigid_packed_pool_untouched\":true,\"gpu_peak_bytes\":"<<state->gpuPeak<<",\"cpu_peak_bytes\":"<<state->cpuPeak<<",\"windows_gameplay_tested\":false}\n";
+ std::cout<<"{\"native_gpu_create_requests\":2,\"native_cpu_reservations\":2,\"skin_cache_bytes\":"<<kSkinCacheBytes<<",\"skinned_surface_bytes_per_frame\":"<<kCrowdSurfaceBytes<<",\"native_frame_slots\":2,\"actor_and_corpse_models_per_frame\":320,\"model_allocation_cases\":"<<modelCases<<",\"concurrent_reservations\":24000,\"concurrent_handle_publications\":8000,\"native_packed_record_equivalence_cases\":"<<bridgeCasesPassed<<",\"native_gpr_xmm_flags_compared\":true,\"quarter_unit_renderer_read_cases\":"<<startupCasesPassed<<",\"failure_counters_remain_bounded\":true,\"warning_categories\":64,\"nonfinite_query_cases\":"<<invalidCases+1<<",\"early_pose_cases\":"<<poseCases<<",\"valid_collision_features\":14,\"invalid_collision_features_rejected\":4,\"finite_query_pass_cases\":1000,\"first_invalid_descriptor_retained\":true,\"rigid_packed_pool_untouched\":true,\"gpu_peak_bytes\":"<<state->gpuPeak<<",\"cpu_peak_bytes\":"<<state->cpuPeak<<",\"windows_gameplay_tested\":false}\n";
 }catch(const std::exception& e){std::cerr<<phase<<": "<<e.what()<<'\n';return 1;}}

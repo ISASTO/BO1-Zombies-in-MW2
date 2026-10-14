@@ -1,0 +1,74 @@
+{
+  "version": "0.1.29-squad-test30",
+  "base_commit": "f5e7d47d09eb253ee28c7f43a1043cdc091d9bef",
+  "executable_sha256": "fb7e8a987c371dea7b666091b0b9e2011c0cd9cd277b191ad453d11d557dd777",
+  "dll_sha256": "c1853d110773377a96d3aab81d76ab13abd1f87224b4542a9639557be1bbbe37",
+  "dll_bytes": 5492807,
+  "compiler": "MinGW-w64 GCC 13-posix, RelWithDebInfo, static GCC/C++ runtime",
+  "pe_checks": {
+    "amd64_pe32_plus": true,
+    "exact_ten_exports": true,
+    "aslr_and_nx": true,
+    "version_embedded": true,
+    "no_external_gcc_or_stdcpp_runtime": true
+  },
+  "imports": [
+    "bcrypt.dll",
+    "dbghelp.dll",
+    "gdi32.dll",
+    "kernel32.dll",
+    "msvcrt.dll",
+    "user32.dll",
+    "winmm.dll"
+  ],
+  "exports": [
+    "D3DPERF_BeginEvent",
+    "D3DPERF_EndEvent",
+    "D3DPERF_GetStatus",
+    "D3DPERF_QueryRepeatFrame",
+    "D3DPERF_SetMarker",
+    "D3DPERF_SetOptions",
+    "D3DPERF_SetRegion",
+    "DebugSetMute",
+    "Direct3DCreate9",
+    "Direct3DCreate9Ex"
+  ],
+  "checked_native_patch_entries": 363,
+  "arena_fragments": 55,
+  "registered_relay_unwind_entries": 42,
+  "native_cxx_tests": {
+    "passed": 19,
+    "failed": 0
+  },
+  "python_tests": {
+    "passed": 31,
+    "failed": 0
+  },
+  "native_fixtures": [
+    "crowd",
+    "resources",
+    "expanded-runtime",
+    "iterator",
+    "animation",
+    "history",
+    "threat",
+    "awareness"
+  ],
+  "native_fixtures_passed": 8,
+  "old_startup_read_reproduced_at": "0x645bd",
+  "native_packed_record_equivalence_cases": 1680,
+  "corrected_quarter_unit_renderer_reads": 14,
+  "installer_scripts_parse": "passed",
+  "windows_gameplay_tested": false,
+  "scope": "Exact native addressing, frame, allocation and lifetime fixtures with documented world/D3D substitutions. The returned Test29 startup fault is reproduced and corrected; real Windows missions and stable 256-actor gameplay require retail retesting.",
+  "packaged_installer_fixture": {
+    "host": "PowerShell 7.6.6 on Linux",
+    "dll_hash_and_receipt": "passed",
+    "player_save_backup": "passed",
+    "original_mp_asset_extraction": "passed",
+    "log_zip_contents": "passed",
+    "matching_dll_uninstall": "passed",
+    "saves_settings_backups_logs_preserved": "passed",
+    "windows_installer_execution": false
+  }
+}

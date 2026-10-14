@@ -1,36 +1,32 @@
 # BO1 Zombies in MW2
 
 Incremental mod framework for **retail Modern Warfare 2 (2009), single player**.
-Current build: **0.1.28-squad-test29**. The returned Test28 crash is a different
-invalid read in native glass collision at `0x1dd323`: non-finite transforms
-leave an invalid feature selector that underflows into a huge vertex index.
-Test29 checks glass poses before map traversal, checks the finished collision
-query, and rejects invalid feature selectors before vertex arithmetic. The
-same returned fault instruction is reproduced in an exact native fixture.
-The first physics update that produced invalid transforms is still unknown.
+Current build: **0.1.29-squad-test30**.
 
-For the reported crowd flickering, Test29 coordinates **72 MiB native GPU/CPU
-skinning buffers and matching allocation bounds**, and gives animated models
-their own **guarded 2 MiB surface-record buffer for each native frame slot**.
-Rigid models retain their original packed-offset representation. Reservations
-are bounded atomically; rejected requests do not advance past their buffers.
-The draw format remains 16 bits: animated records use per-frame handles rather
-than truncating offsets into the larger pool. Both producers and all 22 reader
-sites pass register, SIMD and flag comparisons against the original native code.
-Renderer warning counters, allocation peaks and first-invalid-physics capture
-provide evidence if another limit remains. No new periodic pool repair or disk
-flush is introduced.
+Test30 corrects the **Test29 mission-start renderer regression**. Both returned
+Estate crashes read a null mesh at `0x645bd`, before any mod actor was spawned.
+The CPU renderer was applying the first animated handles to the original
+surface pool. Its address calculation used `0x10a60` quarter units rather
+than the byte offset searched by the previous inventory.
 
-**Live capacity remains 256 actors / 274 sentients.** MP hitmarkers, 9 MiB/8 MiB
-skeleton storage, glass lifetime guards and the previous AI fixes remain.
-Native tests exercise 320 actor/corpse model allocations per frame, matching
-GPU/CPU requests, concurrent reservations and invalid numeric collision inputs.
-The fixtures do not execute a Windows renderer or establish stable 256-actor
-retail gameplay. See [Test29 changes and validation](docs/squad-test29.md).
+All six quarter-unit consumers are now bridged, including initial and next
+record paths. The regression fixture reproduces the old crash at the exact
+instruction and verifies the corrected read. The expanded bridge passes
+**1,680 native register, SIMD and flag comparisons**, and the inventory covers
+34 direct representation sites across byte and scaled-unit forms. See
+[Test30 diagnosis and validation](docs/squad-test30.md).
 
-Install the complete package and start fresh through Mission Select. Follow
-the [staged testing protocol](docs/test29-testing-protocol.md), beginning around
-the former 48-64 actor flicker threshold before progressing toward 256.
+**The live target remains 256 actors / 274 sentients.** Test29's coordinated
+72 MiB GPU/CPU skin buffers, guarded animated-record storage, 16-bit per-frame
+handles, bounded reservations and invalid-glass physics guards remain active.
+The native fixtures do not boot Windows missions or establish stable
+256-actor retail gameplay.
+
+Install the complete Test30 package and start Estate fresh through Mission
+Select. First play for two minutes with all toggles off and no spawned actors,
+then repeat mission loading on Contingency. Follow the
+[Test30 retest instructions](docs/test30-testing-protocol.md) before resuming
+the [full staged crowd protocol](docs/test30-crowd-protocol.md).
 
 Original MP hitmarker image/sound/fade, menu options, prior animation ownership
 fixes and version-1 expanded checkpoints remain included. Historical shot rewind

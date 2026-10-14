@@ -1,0 +1,47 @@
+{
+  "archive_sha256": "902bab9357466c2757a628f17b6ca73b1715db617b5b91a0337af81d6bd38949",
+  "installed_version": "0.1.28-squad-test29",
+  "installed_dll_sha256": "0b921eda6158832c2cff0c07d1301c0ea344a1c1efa88b7a3dba2181d334518d",
+  "executable_sha256": "fb7e8a987c371dea7b666091b0b9e2011c0cd9cd277b191ad453d11d557dd777",
+  "crashes": [
+    {
+      "dump": "crash-20261014-153218.dmp",
+      "dump_sha256": "c075ce310652c4e1955a4be59c531d8012d3b73d27f828fba9751e524d2b2f03",
+      "fault_instruction_rva": "0x645bd",
+      "read_address": "0x10",
+      "null_mesh_pointer": true,
+      "faulting_record_id": "0x8000",
+      "native_frame": 0,
+      "old_pointer_offset_from_native_pool": 131072,
+      "owned_record_offset": 0,
+      "owned_frame_used_bytes": 380,
+      "published_handles": 5,
+      "correct_record_marker": -4,
+      "correct_record_has_mesh_pointer": true,
+      "reverse_and_forward_mapping_agree": true,
+      "mod_spawn_completed_before_crash": false,
+      "native_engine_error_present": false
+    },
+    {
+      "dump": "crash-20261014-153243.dmp",
+      "dump_sha256": "757663f1254d437fb07b1671faf340462c6a1625198dad9be008de9c1da7d758",
+      "fault_instruction_rva": "0x645bd",
+      "read_address": "0x10",
+      "null_mesh_pointer": true,
+      "faulting_record_id": "0x8001",
+      "native_frame": 0,
+      "old_pointer_offset_from_native_pool": 131076,
+      "owned_record_offset": 76,
+      "owned_frame_used_bytes": 380,
+      "published_handles": 5,
+      "correct_record_marker": -4,
+      "correct_record_has_mesh_pointer": true,
+      "reverse_and_forward_mapping_agree": true,
+      "mod_spawn_completed_before_crash": false,
+      "native_engine_error_present": false
+    }
+  ],
+  "diagnosis": "The CPU renderer adds the stock surface origin as 0x10a60 quarter units before multiplying by four. Test29 did not bridge this representation. It applies animated handles 0x8000/0x8001 to the old pool, obtains a null mesh, and faults reading mesh+0x10. The captured forward/reverse mappings already contain the valid owned records.",
+  "expanded_inventory": "Six quarter-unit consumers occur at 0x5dfa2, 0x5e2da, 0x5e3a9, 0x5e5a5, 0x643d3 and 0x648cf. Test30 bridges their initial/continuing record reads and retains native field outputs and ADD flags.",
+  "scope": "Both returned faults are the same Test29 startup regression. This evidence does not establish that the prior crowded-renderer flicker or upstream invalid-glass physics is fully resolved."
+}

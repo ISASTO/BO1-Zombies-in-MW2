@@ -1,0 +1,57 @@
+{
+  "executable_sha256": "fb7e8a987c371dea7b666091b0b9e2011c0cd9cd277b191ad453d11d557dd777",
+  "old_revision": "749839366a722513b799f6cafe3e5bf894639852",
+  "returned_glass_free_head": "0x3f33787f",
+  "returned_native_fault_reproduced": "0x10047c",
+  "native_double_free_reproduces_live_piece_alias": true,
+  "stock_skeleton_baselines": {
+    "old-client": {
+      "client_skeletons_before_exhaustion": 72
+    },
+    "old-server": {
+      "server_wrap_allocation": 65
+    }
+  },
+  "runtime_plan_external_arena": true,
+  "corrected_native_results": {
+    "guarded_client_skeleton_bytes": 9437184,
+    "guarded_server_skeleton_bytes": 8388608,
+    "native_skeleton_frames": 16,
+    "native_skeleton_allocations": 30720,
+    "native_dobj_create_cache_and_invalidation_cases": 15680,
+    "maximum_size_skeletons_per_frame": 960,
+    "actors_and_corpses_per_pass": 320,
+    "client_exhaustion_and_server_generation_wrap_checked": true,
+    "glass_lifetime_operations": 100000,
+    "glass_corrupt_chain_cases": 143,
+    "glass_invalid_or_duplicate_frees": 8172,
+    "glass_rebuild_counter": 145,
+    "live_glass_transforms_preserved": true,
+    "guard_pages": 11,
+    "booted_game_tested": false
+  },
+  "unwind_audit": {
+    "standalone_glass_unwind_entries": 2,
+    "native_saved_registers_checked": 9,
+    "native_prologues_match_unwind": true,
+    "all_skeleton_base_sites": 5,
+    "all_skeleton_bound_sites": 4,
+    "windows_rtl_virtual_unwind_executed": false
+  },
+  "skeleton_reference_inventory": {
+    "old_buffer_direct_rip_sites": [
+      "0xd4a27",
+      "0x230efa",
+      "0x230f9d",
+      "0x2317d8",
+      "0x231911"
+    ],
+    "old_buffer_absolute_instruction_references": 0,
+    "old_buffer_static_dir64_references": 0,
+    "following_native_pointer_and_generation_globals": "preserved"
+  },
+  "substituted_dependencies": [
+    "released-piece physics/render broadphase callback; allocation/free bodies and occupancy bookkeeping execute natively"
+  ],
+  "scope": "Actual client/server skeleton allocations, generation wrap, bounds, glass allocation/free and free-list repair in Linux MS-ABI fixtures. No Windows missions or real skeleton assets/rendering. The first retail glass-chain corruption is not captured by the Test27 dump."
+}
