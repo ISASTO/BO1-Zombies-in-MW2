@@ -1,0 +1,94 @@
+{
+ "version": "0.1.33-squad-test34",
+ "base_commit": "c8794633b2093abf22a85965d176b0a2af7f30d8",
+ "executable_sha256": "fb7e8a987c371dea7b666091b0b9e2011c0cd9cd277b191ad453d11d557dd777",
+ "dll_sha256": "3a25a3cd85c3edeca1588b136f75efb0bef2983dc3a582a2d0c193501e06466d",
+ "dll_bytes": 5838841,
+ "compiler": "xPack MinGW-w64 GCC 13.2.0 (posix threads, UCRT), RelWithDebInfo, static GCC/C++ runtime",
+ "pe_checks": {
+  "amd64_pe32_plus": true,
+  "exact_ten_exports": true,
+  "aslr_and_nx": true,
+  "version_embedded": true,
+  "no_external_gcc_or_stdcpp_runtime": true
+ },
+ "imports": [
+  "bcrypt.dll",
+  "dbghelp.dll",
+  "gdi32.dll",
+  "kernel32.dll",
+  "api-ms-win-crt-*-l1-1-0.dll (11 UCRT API sets)",
+  "user32.dll",
+  "winmm.dll"
+ ],
+ "checked_native_patch_entries": 442,
+ "early_dllmain_patch_rows": 443,
+ "early_dllmain_relays_with_unwind": 7,
+ "early_patch_checks": {
+  "variable_list_references_relocated": 291,
+  "pool_selectors_masked": 111,
+  "parent_free_list_heads_masked": 3,
+  "pool_imul_sites_accounted": 110,
+  "checkpoint_lea_sites": 6,
+  "checkpoint_size_sites": 7,
+  "dobj_transfer_references": 7,
+  "capacity_rows_disjoint": 508,
+  "runtime_signatures_unchanged": 99,
+  "generated_header_applied_with_relocated_region_matches_manifest": true
+ },
+ "native_cxx_tests": {
+  "passed": 20,
+  "failed": 0
+ },
+ "python_tests": {
+  "passed": 35,
+  "failed": 0
+ },
+ "native_fixtures": [
+  "expanded-runtime",
+  "resources",
+  "iterator",
+  "animation",
+  "history",
+  "awareness",
+  "threat",
+  "crowd",
+  "fracture",
+  "glass-state",
+  "tables",
+  "script-vm"
+ ],
+ "native_fixtures_passed": 12,
+ "consumer_audit": "passed",
+ "actor_capacity_audit": "passed",
+ "returned_crash_analysis": "docs/runtime-test34-evidence.json",
+ "packaged_installer_fixture": {
+  "host": "PowerShell 7.5.3 on Linux",
+  "existing_wrapper_refused": "passed",
+  "uninstall_previous_receipt": "passed (Test33 DLL + receipt)",
+  "dll_hash_and_receipt": "passed",
+  "player_save_backup": "passed",
+  "original_mp_asset_extraction": "passed (synthetic iwd)",
+  "log_zip_contents": "passed",
+  "matching_dll_uninstall": "passed",
+  "saves_settings_backups_logs_preserved": "passed",
+  "windows_installer_execution": false
+ },
+ "windows_gameplay_tested": false,
+ "script_vm_results": {
+  "stock_children_before_error": 102383,
+  "stock_error": "exceeded maximum number of child1 script variables",
+  "test34_children_before_error": 409487,
+  "test34_objects": 25593,
+  "found_by_native_lookup": 409487,
+  "removed_children": 204744,
+  "free_parents_after_release": 36856,
+  "refill_children": 409487,
+  "single_pool5_children": 51199,
+  "single_pool5_error": "exceeded maximum number of child1 script variables",
+  "mt_routing": true,
+  "checkpoint_slot_bytes": 33554432,
+  "stock_list_untouched": true
+ },
+ "scope": "Exact native script-variable, memory-tree and checkpoint-slot code on Linux with guard pages, the generated header applied as the DLL applies it, and the eleven earlier native suites. Windows gameplay and 256-actor stability require retail testing."
+}

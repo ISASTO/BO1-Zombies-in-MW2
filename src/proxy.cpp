@@ -1,5 +1,6 @@
 #include "runtime.hpp"
 #include "vtable_patch.hpp"
+#include "script_vm.hpp"
 #include <array>
 #include <cwchar>
 #include <memory>
@@ -19,6 +20,7 @@ void Initialize() {
     targetHost = _wcsicmp(file, L"iw4sp.exe") == 0;
     if (targetHost) {
         mod::InitializeLog();
+        mod::LogScriptVm(false);
         mod::InstallCrashHandler();
         mod::InitializeEngine();
     }
@@ -283,6 +285,11 @@ extern "C" void WINAPI DebugSetMute() {
     auto fn = SystemFunction<void (WINAPI*)()>("DebugSetMute"); if (fn) fn();
 }
 BOOL WINAPI DllMain(HINSTANCE module, DWORD reason, LPVOID) {
-    if (reason == DLL_PROCESS_ATTACH) DisableThreadLibraryCalls(module);
+    if (reason == DLL_PROCESS_ATTACH) {
+        DisableThreadLibraryCalls(module);
+        // Static import: runs before iw4sp.exe initializes script variables,
+        // the memory tree or checkpoint slots. Kernel32-only, fails closed.
+        mod::InstallScriptVmExpansion();
+    }
     return TRUE;
 }

@@ -1,4 +1,5 @@
 #include "runtime.hpp"
+#include "script_vm.hpp"
 #include <cstdio>
 #include <vector>
 #include <limits>
@@ -1050,6 +1051,13 @@ void SpawnOwned(const AiRequest& input,const Snapshot& s,const AiScope& scope,in
     std::array<std::uint8_t,kAiEntityCapacity> active{};
     if(!ReadAi(aiProfile.activeArray,active.data(),active.size())
         || std::count(active.begin()+2,active.end()-2,0)<2) {Finish(AiRequestResult::Limit);return;}
+    // Keep every fatal native pool (script variables, string tree, entities)
+    // out of reach: refuse one more owned actor before headroom runs out.
+    if(const char* refusal=ScriptVmSpawnRefusal(ReadScriptVmUsage())) {
+        static ULONGLONG lastLog=0;const auto now=GetTickCount64();
+        if(now-lastLog>5000){lastLog=now;Log("AI_RESOURCE_GUARD refused=%s actors=%d",refusal,actorCount);LogScriptVm(true);}
+        Finish(AiRequestResult::ResourceGuard);return;
+    }
     AiPoint center{};
     if(!ReadAi(s.entity+kAiOrigin,center.data(),sizeof(center)) || !FinitePoint(center)) {Finish(AiRequestResult::NotReady);return;}
     const AiPoint player=center;
@@ -1518,6 +1526,7 @@ void LogAiState() {
     Log("AI_SCAN_PERF last_pool_us=%.1f last_decode_us=%.1f last_sort_us=%.1f kernel_reads_per_scan=%.1f image_reads_per_scan=%.1f name_cache_hits=%llu name_cache_misses=%llu",
         s.lastPoolUs,s.lastDecodeUs,s.lastSortUs,s.worldReads?double(s.worldKernelReads)/s.worldReads:0.0,s.worldReads?double(s.worldImageReads)/s.worldReads:0.0,s.nameCacheHits,s.nameCacheMisses);
     LogExpandedResources();
+    LogScriptVm(true);
 }
 std::uint64_t RequestNativeHandDefinitions(const WeaponFields& weapon,std::uintptr_t names,std::uintptr_t normalTree,
     std::uintptr_t cache,const Snapshot& s) {

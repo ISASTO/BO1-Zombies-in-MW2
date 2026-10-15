@@ -1,26 +1,26 @@
 # BO1 Zombies in MW2
 
 Incremental mod framework for **retail Modern Warfare 2 (2009), single player**.
-Current build: **0.1.32-squad-test33**.
+Current build: **0.1.33-squad-test34**.
 
-Test32 reached ~160 actors on Estate. Its hardware write watch caught the
-long-hunted memory corruption: the native **compass/minimap table holds 32
-actor slots**, and expanded actors wrote past it into static console command
-entries (actors 51–63) and the client glass pane state table (actors 93–209).
-That single overflow produced both the glass shatter crash chain (Test25–31)
-and the recurring command-list crash family. Test33 keeps actors ≥ 32 off the
-compass. It also relocates the native XAnim anim-info pool (4,096 → 16,384
-records) and the per-snapshot anim-transfer budget (2,048 → 16,384), which
-Estate (~160 actors) and Contingency exhausted. See
-[Test33 diagnosis](docs/squad-test33.md).
+Test33 reached 179 actors on Estate and ~111 on Contingency, then the engine
+stopped with "exceeded maximum number of child1 script variables": the native
+script VM keeps object fields in two hashed pools of 51,199 entries. Test34
+(applied from DllMain, before the game starts) widens that to eight pools
+(409,592 children), moves the script memory tree's pointer allocations to an
+owned heap so the 1 MiB tree holds only strings, raises checkpoint slots from
+1 MiB to 32 MiB and dobj transfer records from 1,024 to 8,192, and adds a spawn
+guard that refuses one more actor before any fatal native pool (script
+variables, strings, entities) runs out. See
+[Test34 diagnosis](docs/squad-test34.md).
 
 **The live target remains 256 actors / 274 sentients.** The Test30 renderer
 bridge, 72 MiB GPU/CPU skinning buffers, guarded animated-record storage and
 16-bit handles remain active. Rendering and actor regressions are rerun.
 Windows missions and stable 256-actor retail gameplay require owner testing.
 
-Install the complete Test33 package (run its Uninstall.cmd first to remove
-Test32). Follow the [Test33 retest instructions](docs/test33-testing-protocol.md):
+Install the complete Test34 package (run its Uninstall.cmd first to remove
+Test33). Follow the [Test34 retest instructions](docs/test34-testing-protocol.md):
 Estate and Contingency to 256, plus a checkpoint reload with a crowd. The
 [full crowd protocol](docs/test31-crowd-protocol.md) covers later stages.
 

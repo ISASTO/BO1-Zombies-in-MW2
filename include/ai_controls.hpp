@@ -115,7 +115,7 @@ inline bool SameAiAllocation(const AiIdentity& identity,const AiAllocation& a) {
 enum class AiOperation { SpawnEnemy, SpawnFriendly, RemoveOwned, KillEnemies };
 enum class AiRequestResult { None, Queued, Ready, NotReady, Busy, NoSpawner, SpawnPaused, NativeRefused,
     Created, Deleted, LifetimeChanged, Expired, IdentityChanged, Protected, HookUnavailable, NativeReturnedInvalid, Limit,
-    NoClearPosition, ModelUnavailable, Killed };
+    NoClearPosition, ModelUnavailable, Killed, ResourceGuard };
 inline const char* AiResultText(AiRequestResult value) {
     switch(value) {
         case AiRequestResult::None: return "NONE";
@@ -138,6 +138,7 @@ inline const char* AiResultText(AiRequestResult value) {
         case AiRequestResult::NoClearPosition: return "NO_CLEAR_POSITION";
         case AiRequestResult::ModelUnavailable: return "MODEL_NOT_LOADED";
         case AiRequestResult::Killed: return "KILLED";
+        case AiRequestResult::ResourceGuard: return "RESOURCE_GUARD";
     }
     return "UNKNOWN";
 }

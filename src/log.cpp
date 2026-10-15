@@ -7,6 +7,7 @@
 #include "native_hooks.hpp"
 #include "script_parameters.hpp"
 #include "crowd_resources.hpp"
+#include "script_vm.hpp"
 
 namespace mod {
 namespace {
@@ -141,6 +142,12 @@ LONG WINAPI CrashFilter(EXCEPTION_POINTERS* info) {
             static_cast<unsigned long long>(vm.code),static_cast<unsigned long long>(vm.top),static_cast<unsigned long long>(vm.startTop),
             functionCount,static_cast<unsigned long long>(frame),vm.localId,vm.localCount);
         if(size>0)RawWrite(report,message,static_cast<DWORD>(size));
+    }
+    if(const auto vm=ReadScriptVmUsage();vm.valid) {
+        size=std::snprintf(message,sizeof(message),"script_vm children=%u/%u peak_pool=%u/%u parents=%u/%u string_nodes=%u/%u pointer_heap=%llu entities=%u/%u dobj_transfers=%u/%u\r\n",
+            vm.childTotal,vm.childCapacity,vm.childPeakPool,vm.poolCapacity,vm.parents,vm.parentCapacity,vm.mtNativeUsedNodes,vm.mtNativeNodes,
+            static_cast<unsigned long long>(vm.heapUsed),vm.entitiesInUse,vm.entityCapacity,vm.dobjTransfers,vm.dobjCapacity);
+        if(size>0)RawWrite(report,message,static_cast<DWORD>(size<2048?size:2047));
     }
     {
         char watch[2048];const int used=FormatStaticWatchHits(watch,sizeof(watch));

@@ -1,0 +1,34 @@
+{
+ "returned_build": "0.1.32-squad-test33",
+ "installed_dll_sha256": "699561c3a28d4f4b069b95d289feb3fb46a6ad86560e6c4910cbe6122b1d3eef",
+ "executable_sha256": "fb7e8a987c371dea7b666091b0b9e2011c0cd9cd277b191ad453d11d557dd777",
+ "owner_observations": [
+  "Estate froze at 179 actors with the dialog 'exceeded maximum number of child1 script variables'",
+  "Contingency showed the same dialog at about 111 actors"
+ ],
+ "log_facts": {
+  "file": "latest.log (Contingency session)",
+  "sha256": "f7745eaee48afa7d66ff93cb38bf98d1a97d9c3939f5083c8eff0ed1c4c5ccb3",
+  "last_spawn": "AI_RESULT result=CREATED owned=110",
+  "highest_logged_actor_count": 100,
+  "highest_logged_entity_number": 1697,
+  "anim_info_peak": "2445 / 16383",
+  "glass_missing_place_shatters": 0,
+  "compass_rejected_actor_slots": 1893150,
+  "static_watch_hits": "4, all at startup from 0x1eedd3/0x1eede1 storing in-image addresses (native command registration), none later",
+  "render_warning_category_13": 20218,
+  "render_warning_category_49": 1880
+ },
+ "native_reproduction": {
+  "fixture": "docs/script-vm-test34-probe.json",
+  "stock_children_before_error": 102383,
+  "stock_error": "exceeded maximum number of child1 script variables",
+  "test34_children_before_error": 409487
+ },
+ "inference": "At most ~570 script child variables per actor on Estate (102,383 / 179, level variables included); Test33 exhausted both stock child pools (2 x 51,199) near 179 Estate actors. Contingency reached it near 111 actors, so its level scripts and/or actors use more variables (not separated by the log).",
+ "not_established": [
+  "parent objects per actor on real level scripts",
+  "entity use per actor on dense maps",
+  "checkpoint size at 256 actors"
+ ]
+}
