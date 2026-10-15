@@ -151,6 +151,23 @@ void LogExpandedResources() {
     Log("AI_GLASS_STATE missing_place_shatters=%u last_missing_place=%u rejected_place_damage=%u last_rejected_place=%u last_rejected_caller_rva=0x%llx ignored_free_records=%u",
         state.glassMissingPlaces,state.glassLastMissingPlace,state.glassRejectedDamage,state.glassLastRejectedPlace,
         rva(state.glassLastRejectedCaller),state.glassFreeRingNext);
+    Log("AI_COMPASS rejected_actor_slots=%u last_rejected_slot=%u unfound_slot_writes_skipped=%u native_actor_slots=32",
+        state.compassRejected,state.compassLastSlot,state.compassWriterSkips);
+    {
+        // Free-list walk of the expanded native anim-info pool (diagnostic
+        // only; bounded, read-only). Record 0 is the circular list head.
+        // One bounded copy, then walk locally: no per-record memory queries.
+        static std::vector<std::uint8_t> snapshot(kAnimInfoBytes);
+        unsigned free=0;
+        if(CheckedReadMemory(Address(kAnimInfoRva),snapshot.data(),snapshot.size())) {
+            std::uint16_t next=0;std::memcpy(&next,snapshot.data()+0xa,2);
+            while(next && next<kAnimInfoRecords && free<kAnimInfoRecords) {++free;std::memcpy(&next,snapshot.data()+std::size_t(next)*64+0xa,2);}
+        }
+        static std::atomic<unsigned> peak{0};
+        const unsigned used=free<kAnimInfoRecords?kAnimInfoRecords-1-free:0;
+        if(used>peak.load())peak.store(used);
+        Log("AI_ANIM_INFO capacity=%u used=%u peak=%u native_stock_capacity=4095",kAnimInfoRecords-1,used,peak.load());
+    }
     static std::atomic<std::uint32_t> printedFrees{0};
     if(state.glassFreeRingNext!=printedFrees.load()) {
         const auto total=state.glassFreeRingNext;
@@ -327,7 +344,7 @@ bool InstallExpandedCapacity(std::uintptr_t base,bool exactResolved) {
     FlushInstructionCache(GetCurrentProcess(),nullptr,0);
     skeletons.published=true;
     capacity.store(256,std::memory_order_release);
-    Log("AI_CAPACITY_EXPANSION enabled=1 experimental=1 actors=256 sentients=274 stride=0x48c0 snapshot_bytes=17412 temporary_trees=336 patches=%u arena=%p checkpoint=VERSIONED_V1_LEGACY_MIGRATION native_rewind_slots=32 high_actor_collision=CURRENT_SERVER_POSE native_threat_candidates=274 threat_stack_bytes=6760 threat_unwind=REGISTERED awareness_candidates=274 awareness_stack_bytes=4512 relay_unwind_entries=%u arena_guard_pages=9 skeleton_guard_pages=2 renderer_guard_pages=6 client_skeleton_bytes=9437184 server_skeleton_bytes=8388608 skin_cache_bytes=75497472 skinned_surface_bytes_per_frame=2097152 animated_handles_per_frame=32768 packed_draw_bits=16 render_reservations=BOUNDED_ATOMIC glass_free_list=OCCUPANCY_VALIDATED glass_collision=FINITE_CHECKED ai_count_domain=256",static_cast<unsigned>(protections.size()),reinterpret_cast<void*>(arena),static_cast<unsigned>(relayFunctions.size()));
+    Log("AI_CAPACITY_EXPANSION enabled=1 experimental=1 actors=256 sentients=274 stride=0x48c0 snapshot_bytes=17412 temporary_trees=336 patches=%u arena=%p checkpoint=VERSIONED_V1_LEGACY_MIGRATION native_rewind_slots=32 high_actor_collision=CURRENT_SERVER_POSE native_threat_candidates=274 threat_stack_bytes=6760 threat_unwind=REGISTERED awareness_candidates=274 awareness_stack_bytes=4512 relay_unwind_entries=%u arena_guard_pages=11 anim_info_records=16384 anim_transfer_records=16384 compass_actor_slots=32 skeleton_guard_pages=2 renderer_guard_pages=6 client_skeleton_bytes=9437184 server_skeleton_bytes=8388608 skin_cache_bytes=75497472 skinned_surface_bytes_per_frame=2097152 animated_handles_per_frame=32768 packed_draw_bits=16 render_reservations=BOUNDED_ATOMIC glass_free_list=OCCUPANCY_VALIDATED glass_collision=FINITE_CHECKED ai_count_domain=256",static_cast<unsigned>(protections.size()),reinterpret_cast<void*>(arena),static_cast<unsigned>(relayFunctions.size()));
     return true;
 }
 } // namespace mod

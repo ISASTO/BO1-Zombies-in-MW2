@@ -163,6 +163,10 @@ def prepare(pe):
  fracture_edits,fracture_meta=prepare_fracture(pe,image);edits+=fracture_edits
  from prepare_expanded_glass_state import prepare as prepare_glass_state
  glass_state_edits,glass_state_meta=prepare_glass_state(pe,image);edits+=glass_state_edits
+ from prepare_expanded_compass import prepare as prepare_compass
+ compass_edits,compass_meta=prepare_compass(pe,image);edits+=compass_edits
+ from prepare_expanded_animinfo import prepare as prepare_animinfo
+ animinfo_edits,animinfo_meta=prepare_animinfo(pe,image);edits+=animinfo_edits
  return image,{'previous_stage':meta,'stage22_edits':edits,'frame_bytes':SNAPSHOT_BYTES,'temporary_animation_trees':TEMP_COUNT,
                'native_rewind_actor_slots':REWIND_ACTORS,
                'threat_frame':threat_meta,
@@ -172,6 +176,8 @@ def prepare(pe):
                'crowd_surface_bridge':bridge_meta,
                'glass_fragment_builder':fracture_meta,
                'glass_place_state':glass_state_meta,
+               'compass_actor_slots':compass_meta,
+               'anim_info_pool':animinfo_meta,
                'high_actor_collision':'Actors 32..255 keep their current server pose during shots; live pool capacity stays 256.'}
 
 def flatten(meta):

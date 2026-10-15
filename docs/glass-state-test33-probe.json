@@ -1,0 +1,49 @@
+{
+  "executable_sha256": "fb7e8a987c371dea7b666091b0b9e2011c0cd9cd277b191ad453d11d557dd777",
+  "previous_revision": "ddeecf116454286f21775104e1e70ca5e1d1a5ec",
+  "returned_crashes": {
+    "20261015-055729": {
+      "fault_rva": "0x10e903",
+      "place": 10,
+      "found_flag": 0,
+      "uninitialized_index": "0x7ff7"
+    },
+    "20261015-060313": {
+      "fault_rva": "0x104469",
+      "place": 27,
+      "found_flag": 0,
+      "uninitialized_index": "0x0",
+      "estate_places": 27
+    }
+  },
+  "old_missing_piece_fracture": {
+    "fracture_calls": 1,
+    "fractured_piece": 2146926583
+  },
+  "old_out_of_range_damage": {
+    "guard_fault_rva": "0x16a0a0",
+    "native_access": "unbounded place-record read; the read-modify-write store follows at 0x16a0e8"
+  },
+  "corrected_native_results": {
+    "owned_shatter_cases": 15,
+    "missing_piece_cases": 5,
+    "server_damage_places": 27,
+    "published_state_changes": 54,
+    "rejected_damage_cases": 5,
+    "ignored_release_records": 4,
+    "missing_place_counter": 5,
+    "rejected_damage_counter": 5
+  },
+  "unwind_audit": {
+    "standalone_unwind_entries": 2,
+    "native_frame_descriptions_match": true,
+    "relays_keep_rsp": true,
+    "windows_RtlVirtualUnwind_executed": false
+  },
+  "substitutions": [
+    "fracture 0x103a80, effects 0x1013c0, state publication 0x16a380 and release tail 0x10b4f0 are MS-ABI recorders",
+    "client and server glass records are fixture allocations with a guard page after the 12-byte server place records"
+  ],
+  "scope": "Exact native shatter lookup, server place damage and guarded release code run on Linux. No Windows mission, physics, rendering or real glass topology is exercised.",
+  "causal_limit": "This proves the stock lookup fractures an uninitialized index when no piece owns the place, matching both returned dumps. It does not establish why the place had no active piece; Test32 records ignored releases and rejected damage to capture that upstream cause."
+}

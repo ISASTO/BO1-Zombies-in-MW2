@@ -46,7 +46,9 @@ struct CrowdResourceState {
     std::uint64_t glassLastRejectedCaller=0;
     std::uint32_t glassFreeRingNext=0,glassReserved=0;
     std::array<GlassFreeRecord,kGlassFreeRingEntries> glassFreeRing{};
-    std::array<std::uint8_t,0x70> tail{};
+    // Test33 compass actor-slot bound (+0x390).
+    std::uint32_t compassRejected=0,compassLastSlot=0,compassWriterSkips=0;
+    std::array<std::uint8_t,0x64> tail{};
 };
 static_assert(sizeof(CrowdFrameCounters)==32 && sizeof(CrowdResourceState)==kCrowdStateBytes);
 static_assert(offsetof(CrowdFrameCounters,used)==8 && offsetof(CrowdFrameCounters,peak)==12);
@@ -60,11 +62,12 @@ static_assert(offsetof(CrowdResourceState,queryStage)==0x2d8);
 static_assert(offsetof(CrowdResourceState,invalidFragments)==0x2dc && offsetof(CrowdResourceState,lastFragmentBytes)==0x2ec);
 static_assert(offsetof(CrowdResourceState,glassMissingPlaces)==0x2f0 && offsetof(CrowdResourceState,glassRejectedDamage)==0x2f8);
 static_assert(offsetof(CrowdResourceState,glassLastRejectedCaller)==0x300 && offsetof(CrowdResourceState,glassFreeRingNext)==0x308);
-static_assert(offsetof(CrowdResourceState,glassFreeRing)==0x310 && offsetof(CrowdResourceState,tail)==0x390);
+static_assert(offsetof(CrowdResourceState,glassFreeRing)==0x310 && offsetof(CrowdResourceState,compassRejected)==0x390);
+static_assert(offsetof(CrowdResourceState,compassWriterSkips)==0x398 && offsetof(CrowdResourceState,tail)==0x39c);
 // Body-only relays have generated standalone unwind records for the exact
 // already-executed native frames. The warning entry is a true leaf relay.
 struct CrowdRelay {std::uint32_t begin,end,unwind;};
-inline constexpr std::array<CrowdRelay,13> kCrowdRelays{{
+inline constexpr std::array<CrowdRelay,16> kCrowdRelays{{
     {0x4612000,0x4612100,0x4613a00}, // GPU bounded reservation.
     {0x4612100,0x4612200,0x4613a40}, // CPU bounded reservation.
     {0x4612200,0x4612400,0x4613a80}, // Independent skinned surface records.
@@ -78,6 +81,9 @@ inline constexpr std::array<CrowdRelay,13> kCrowdRelays{{
     {0x4615600,0x4615700,0x46157c0}, // Gate native piece publication.
     {0x4616000,0x4616100,0x4616700}, // Skip fracture when no piece owns the place.
     {0x4616100,0x4616200,0x4616740}, // Bound server glass place damage (entry relay).
+    {0x4616200,0x4616300,0x4616780}, // Compass entity update: actor slots < 32.
+    {0x4616300,0x4616400,0x46167c0}, // Compass slot lookup (calls native leaf).
+    {0x4616400,0x4616500,0x4616800}, // Compass writer: use only found slots.
 }};
 } // namespace mod::expansion
 #include "crowd_bridge_layout.hpp"

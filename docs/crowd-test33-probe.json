@@ -1,0 +1,63 @@
+{
+  "executable_sha256": "fb7e8a987c371dea7b666091b0b9e2011c0cd9cd277b191ad453d11d557dd777",
+  "previous_revision": "86a24a95d73cc4f7c5dfc6714f07b9585359c61a",
+  "returned_nonfinite_glass_fault_reproduced_at": "0x1dd323",
+  "returned_test29_startup_fault_reproduced_at": "0x645bd",
+  "stock_renderer_results": {
+    "stock_skin_models_at_4800_vertices": 30,
+    "stock_scene_models_at_64_surfaces": 42,
+    "failed_native_reservation_overshoots": true
+  },
+  "corrected_native_results": {
+    "native_gpu_create_requests": 2,
+    "native_cpu_reservations": 2,
+    "skin_cache_bytes": 75497472,
+    "skinned_surface_bytes_per_frame": 2097152,
+    "native_frame_slots": 2,
+    "actor_and_corpse_models_per_frame": 320,
+    "model_allocation_cases": 3840,
+    "concurrent_reservations": 24000,
+    "concurrent_handle_publications": 8000,
+    "native_packed_record_equivalence_cases": 1680,
+    "native_gpr_xmm_flags_compared": true,
+    "quarter_unit_renderer_read_cases": 14,
+    "failure_counters_remain_bounded": true,
+    "warning_categories": 64,
+    "nonfinite_query_cases": 125,
+    "early_pose_cases": 73,
+    "valid_collision_features": 14,
+    "invalid_collision_features_rejected": 4,
+    "finite_query_pass_cases": 1000,
+    "first_invalid_descriptor_retained": true,
+    "rigid_packed_pool_untouched": true,
+    "gpu_peak_bytes": 75497472,
+    "cpu_peak_bytes": 75497472,
+    "windows_gameplay_tested": false
+  },
+  "unwind_audit": {
+    "standalone_unwind_entries": 38,
+    "native_frame_descriptions_match": true,
+    "body_relays_keep_rsp": true,
+    "explicit_native_host_target_rvas": [
+      "0x410fd00",
+      "0x458fb00"
+    ],
+    "host_globals_are_not_relocated_into_actor_arena": true,
+    "windows_RtlVirtualUnwind_executed": false
+  },
+  "surface_representation_audit": {
+    "native_direct_surface_representation_sites": 34,
+    "all_declared_or_bridged": true,
+    "original_home_area_free_in_reader_fragments": true,
+    "packed_draw_format_bits": 16,
+    "native_rigid_ids": 32768,
+    "animated_handles": 32768
+  },
+  "substitutions": [
+    "D3D CreateVertexBuffer records length/flags; no GPU calls",
+    "native CPU reserve uses guarded mmap in the fixture",
+    "allocation continuation wrappers isolate native reservations from asset/world callbacks",
+    "finite-descriptor pass-through gate stops before world contacts"
+  ],
+  "scope": "Exact Windows-ABI native renderer allocation blocks, renderer initialization requests and glass narrowphase failure execute on Linux with an externally relocated patch arena. Real Windows rendering, mission gameplay, physics integration and RtlVirtualUnwind remain owner tests."
+}

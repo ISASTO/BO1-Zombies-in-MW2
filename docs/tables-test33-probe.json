@@ -1,0 +1,36 @@
+{
+  "executable_sha256": "fb7e8a987c371dea7b666091b0b9e2011c0cd9cd277b191ad453d11d557dd777",
+  "previous_revision": "52c7856e74a2143a175bb5f31d355de858d3c916",
+  "test32_reproduction": {
+    "anim_transfers_before_error": 2048,
+    "transfer_error": "exceeded maximum number of anim transfer info",
+    "bytes_written_past_compass_table": 24,
+    "actor_62_hits_command_entries": true,
+    "actor_100_hits_glass_place_states": true,
+    "anim_infos_before_error": 4095,
+    "anim_info_error": "exceeded maximum number of anim info"
+  },
+  "corrected_native_results": {
+    "compass_owned_slot_cases": 3,
+    "compass_expanded_actor_cases": 8,
+    "compass_rejections": 16,
+    "compass_unfound_writes_skipped": 8,
+    "anim_info_free_list_records": 16383,
+    "anim_infos_before_error": 16383,
+    "anim_transfers_before_error": 16384,
+    "old_static_pool_untouched": true,
+    "old_static_transfer_array_untouched": true
+  },
+  "unwind_audit": {
+    "standalone_unwind_entries": 3,
+    "native_frame_descriptions_match": true,
+    "windows_RtlVirtualUnwind_executed": false
+  },
+  "substitutions": [
+    "visibility test 0xa9740 returns false",
+    "engine error 0x1fb5f0 records the message",
+    "dvar registration 0x21b2d0 is a no-op"
+  ],
+  "scope": "Exact native compass entity update/writer and XAnim anim-info pool init/allocation on Linux. No Windows mission, rendering or real animation trees.",
+  "returned_evidence": "Test32 hardware watch: writes at rip 0x92d49..0x92d68 into command fields; engine error \"exceeded maximum number of anim info\" at ~160 (Estate) and ~100 (Contingency) actors."
+}

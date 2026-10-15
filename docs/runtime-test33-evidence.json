@@ -1,0 +1,92 @@
+{
+  "archives": [
+    {
+      "name": "BO1MW2-test-results-20261015-070927.zip",
+      "sha256": "adc495868d4ebc8e179234cf9e5a749b66cc0b0b34dc0e1d504ad8100385738d"
+    },
+    {
+      "name": "BO1MW2-test-results-20261015-070710.zip",
+      "sha256": "b288067e5c1c6851d78de72698502ad1fa0f6287f9790d29cd368e77e0aa308e"
+    },
+    {
+      "name": "BO1MW2-test-results-20261015-070822.zip",
+      "sha256": "3678b8064c6857f6bf68b66a6069c0eb04843b593fbef5d3ec448e664b3d7c75"
+    }
+  ],
+  "installed_version": "0.1.31-squad-test32",
+  "installed_dll_sha256": "7a368d2da1294b241767216474b7bbd56340a71ea705e001fea4d4d445c49adb",
+  "crashes": {
+    "070656": {
+      "dump_sha256": "2235ac3558d25aeb09761ddcf0b55f08b3631c58f42e2283430a7e3a0af796a4",
+      "map": "estate",
+      "fault_rva": "0x1ef903",
+      "primary_engine_error": "exceeded maximum number of anim info",
+      "last_logged_actor_count": 150,
+      "last_spawn_total": 162,
+      "missing_place_shatters": 43892,
+      "last_missing_place": 495,
+      "static_watch_hits_in_report": 19,
+      "last_static_watch_sequence": 97647,
+      "static_watch_writer_rvas": [
+        "0x92d49",
+        "0x92d50",
+        "0x92d57",
+        "0x92d68"
+      ],
+      "static_watch_fields": [
+        "0x3fe938",
+        "0x3fea00",
+        "0x3fea28"
+      ]
+    },
+    "070816": {
+      "dump_sha256": "e0e325f79bc24ad84a2e07784bcba2d9178e4cf0854e265a678d5d3527978f29",
+      "map": "contingency",
+      "fault_rva": "0x272628",
+      "primary_engine_error": null,
+      "last_logged_actor_count": 63,
+      "last_spawn_total": null,
+      "missing_place_shatters": 0,
+      "last_missing_place": 0,
+      "static_watch_hits_in_report": 19,
+      "last_static_watch_sequence": 4374,
+      "static_watch_writer_rvas": [
+        "0x92d50",
+        "0x92d57",
+        "0x92d68"
+      ],
+      "static_watch_fields": [
+        "0x3fe938",
+        "0x3fea00"
+      ]
+    },
+    "070921": {
+      "dump_sha256": "e1c239da907bbc674eb242f77dc681a72cc3739afd7e4620ac59258b00f4549c",
+      "map": "contingency",
+      "fault_rva": "0x1ef903",
+      "primary_engine_error": "exceeded maximum number of anim info",
+      "last_logged_actor_count": 58,
+      "last_spawn_total": null,
+      "missing_place_shatters": 0,
+      "last_missing_place": 0,
+      "static_watch_hits_in_report": 19,
+      "last_static_watch_sequence": 10543,
+      "static_watch_writer_rvas": [
+        "0x92d49",
+        "0x92d50",
+        "0x92d57",
+        "0x92d68"
+      ],
+      "static_watch_fields": [
+        "0x3fe938",
+        "0x3fea00",
+        "0x3fea28"
+      ]
+    }
+  },
+  "diagnosis": {
+    "compass": "Native compass entity update 0x92c00 (writes at 0x92d46..0x92d65) stores 0x2c-byte records at 0x3fdf50 + actor_slot*0x2c. The table holds 32 actor slots; slots 51..63 cover the static command entries the watch caught being written, and slots 93..209 cover the client glass place state table at 0x3fef50, producing the shatter requests for absent places (up to 495) that Test32 blocked.",
+    "anim_info": "Native XAnim anim-info pool of 4,096 x 64-byte records at 0x1bc0a30 was exhausted; engine error \"exceeded maximum number of anim info\" at ~160 actors (Estate) and during Contingency combat.",
+    "checkpoint_crash": "070816 (Contingency, friendly fire then checkpoint reload, 63 actors) faults in the console command lookup on a command entry overwritten by compass slots 51..63."
+  }
+}

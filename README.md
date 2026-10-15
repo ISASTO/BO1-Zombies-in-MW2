@@ -1,31 +1,27 @@
 # BO1 Zombies in MW2
 
 Incremental mod framework for **retail Modern Warfare 2 (2009), single player**.
-Current build: **0.1.31-squad-test32**.
+Current build: **0.1.32-squad-test33**.
 
-Test31's returned runs crashed again at 96–98 actors on Estate. Both glass
-dumps (and the Test30 glass dump) go through the same stock path: client glass
-state asks a pane to shatter, the native lookup finds no piece for that pane,
-and stock code fractures an **uninitialized stack index** anyway (0x7ff7 and 0
-in the dumps). Test31's fragment bound only moved that damage downstream.
-See [Test32 diagnosis](docs/squad-test32.md).
-
-Test32 skips fracture when the lookup found nothing, bounds server glass place
-damage, records which native path releases glass pieces it does not own, and
-watches the static console-command entries that a separate, recurring
-crash family (eight dumps, Test24–Test31) finds overwritten. The native
-fixture reproduces the stock uninitialized-index fracture and verifies owned
-pieces still fracture exactly as before.
+Test32 reached ~160 actors on Estate. Its hardware write watch caught the
+long-hunted memory corruption: the native **compass/minimap table holds 32
+actor slots**, and expanded actors wrote past it into static console command
+entries (actors 51–63) and the client glass pane state table (actors 93–209).
+That single overflow produced both the glass shatter crash chain (Test25–31)
+and the recurring command-list crash family. Test33 keeps actors ≥ 32 off the
+compass. It also relocates the native XAnim anim-info pool (4,096 → 16,384
+records) and the per-snapshot anim-transfer budget (2,048 → 16,384), which
+Estate (~160 actors) and Contingency exhausted. See
+[Test33 diagnosis](docs/squad-test33.md).
 
 **The live target remains 256 actors / 274 sentients.** The Test30 renderer
 bridge, 72 MiB GPU/CPU skinning buffers, guarded animated-record storage and
 16-bit handles remain active. Rendering and actor regressions are rerun.
 Windows missions and stable 256-actor retail gameplay require owner testing.
 
-Install the complete Test32 package (run its Uninstall.cmd first to remove
-Test31) and start Estate fresh. Follow the
-[Test32 retest instructions](docs/test32-testing-protocol.md), first holding
-at 96 actors and then advancing. The
+Install the complete Test33 package (run its Uninstall.cmd first to remove
+Test32). Follow the [Test33 retest instructions](docs/test33-testing-protocol.md):
+Estate and Contingency to 256, plus a checkpoint reload with a crowd. The
 [full crowd protocol](docs/test31-crowd-protocol.md) covers later stages.
 
 Original MP hitmarker image/sound/fade, menu options, prior animation ownership

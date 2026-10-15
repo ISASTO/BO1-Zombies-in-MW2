@@ -20,13 +20,19 @@ struct ArenaRange {std::uint32_t rva,bytes;};
 // data block. In-page tails remain padding; no live object occupies a guard.
 inline constexpr std::uint32_t kResourcePointersRva=0x47e0000;
 inline constexpr std::size_t kClientSkeletonBytes=0x900000,kServerSkeletonBytes=0x800000;
-inline constexpr std::array<ArenaRange,9> kArenaDataRanges{{
+// Test33: native XAnim anim-info pool, 16,384 x 64-byte records (stock 4,096).
+inline constexpr std::uint32_t kAnimInfoRva=0x4640000,kAnimInfoRecords=0x4000,kAnimInfoBytes=kAnimInfoRecords*64;
+// Per-snapshot anim transfer records, 0x1c bytes each (stock 2,048).
+inline constexpr std::uint32_t kAnimTransferRva=0x4741000,kAnimTransferRecords=kAnimInfoRecords,kAnimTransferBytes=kAnimTransferRecords*0x1c;
+inline constexpr std::array<ArenaRange,11> kArenaDataRanges{{
     {0x4000000,static_cast<std::uint32_t>(kActors*kStride)},
     {0x4500000,static_cast<std::uint32_t>(kSentients*kSentientStride)},
     {0x4510000,0x4404},{0x4560000,static_cast<std::uint32_t>(kActors*8)},
     {0x4570000,static_cast<std::uint32_t>(kSentients*2)},
     {0x4580000,0x4404},{0x4590000,8},{0x45a0000,336*8+336+4},
-    {kResourcePointersRva,kCrowdStateBytes}}};
+    {kResourcePointersRva,kCrowdStateBytes},
+    {kAnimInfoRva,kAnimInfoBytes},
+    {kAnimTransferRva,kAnimTransferBytes}}};
 constexpr std::array<ArenaRange,kArenaDataRanges.size()> ArenaGuards() {
     std::array<ArenaRange,kArenaDataRanges.size()> out{};
     for(std::size_t n=0;n<out.size();++n)
