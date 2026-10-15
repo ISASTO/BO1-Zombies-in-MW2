@@ -142,6 +142,8 @@ void LogExpandedResources() {
         kSurfaceHandles,state.handleCounts[0],state.handleCounts[1],state.handleFailures,state.mapFailures);
     Log("AI_PHYSICS_GUARDS nonfinite_glass_queries=%u invalid_features=%u first_query_state=%u last_invalid_feature=%u",
         state.invalidGlassQueries,state.invalidFeatures,state.queryClaim,state.lastInvalidFeature);
+    Log("AI_GLASS_FRACTURE invalid_fragments=%u output_limit_rejections=%u invalid_inputs=%u last_vertices=%u last_output_bytes=%u geometry_limit_bytes=924",
+        state.invalidFragments,state.fragmentOutputRejections,state.fragmentInputRejections,state.lastFragmentVertices,state.lastFragmentBytes);
     static std::atomic<bool> reported{false};
     if(state.queryClaim==2 && !reported.exchange(true)) {
         std::array<unsigned,3> center{},axis{};

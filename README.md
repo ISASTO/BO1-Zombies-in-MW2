@@ -1,32 +1,30 @@
 # BO1 Zombies in MW2
 
 Incremental mod framework for **retail Modern Warfare 2 (2009), single player**.
-Current build: **0.1.29-squad-test30**.
+Current build: **0.1.30-squad-test31**.
 
-Test30 corrects the **Test29 mission-start renderer regression**. Both returned
-Estate crashes read a null mesh at `0x645bd`, before any mod actor was spawned.
-The CPU renderer was applying the first animated handles to the original
-surface pool. Its address calculation used `0x10a60` quarter units rather
-than the byte offset searched by the previous inventory.
+Test30's returned run reached **97 actors without reported flickering**, then
+crashed in native glass-fragment construction. Its piece builder emitted
+416 geometry records into a local buffer holding 231, overwriting the saved
+registers and return address. This is distinct from the renderer startup
+regression corrected in Test30. See [Test31 diagnosis](docs/squad-test31.md).
 
-All six quarter-unit consumers are now bridged, including initial and next
-record paths. The regression fixture reproduces the old crash at the exact
-instruction and verifies the corrected read. The expanded bridge passes
-**1,680 native register, SIMD and flag comparisons**, and the inventory covers
-34 direct representation sites across byte and scaled-unit forms. See
-[Test30 diagnosis and validation](docs/squad-test30.md).
+Test31 bounds native polygon writes, rejects degenerate two-vertex fragments,
+includes terminator/alignment space, and skips allocation/publication of a
+rejected piece. New AI_GLASS_FRACTURE counters distinguish invalid geometry
+from output exhaustion. The native regression reproduces the old overrun,
+compares valid output byte-for-byte, and checks the parent publication gate.
 
-**The live target remains 256 actors / 274 sentients.** Test29's coordinated
-72 MiB GPU/CPU skin buffers, guarded animated-record storage, 16-bit per-frame
-handles, bounded reservations and invalid-glass physics guards remain active.
-The native fixtures do not boot Windows missions or establish stable
-256-actor retail gameplay.
+**The live target remains 256 actors / 274 sentients.** The Test30 renderer
+bridge, 72 MiB GPU/CPU skinning buffers, guarded animated-record storage and
+16-bit handles remain active. Rendering and actor regressions are rerun.
+Windows missions and stable 256-actor retail gameplay require owner testing.
 
-Install the complete Test30 package and start Estate fresh through Mission
-Select. First play for two minutes with all toggles off and no spawned actors,
-then repeat mission loading on Contingency. Follow the
-[Test30 retest instructions](docs/test30-testing-protocol.md) before resuming
-the [full staged crowd protocol](docs/test30-crowd-protocol.md).
+Install the complete Test31 package and start Estate fresh. Follow the
+[Test31 retest instructions](docs/test31-testing-protocol.md), first holding
+at 96 actors and then advancing to 112/128. Perform a separate ordinary-shot
+and glass-impact test before enabling explosives. The
+[full crowd protocol](docs/test31-crowd-protocol.md) covers later stages.
 
 Original MP hitmarker image/sound/fade, menu options, prior animation ownership
 fixes and version-1 expanded checkpoints remain included. Historical shot rewind

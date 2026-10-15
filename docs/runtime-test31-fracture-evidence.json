@@ -1,0 +1,40 @@
+{
+  "archive_sha256": "9c9cd4131a0b99fb8dc2801d5c444aae9969fca29b46f50fd3d24f2aef3bd5e9",
+  "installed_version": "0.1.29-squad-test30",
+  "installed_dll_sha256": "c1853d110773377a96d3aab81d76ab13abd1f87224b4542a9639557be1bbbe37",
+  "executable_sha256": "fb7e8a987c371dea7b666091b0b9e2011c0cd9cd277b191ad453d11d557dd777",
+  "dump": "crash-20261014-161533.dmp",
+  "dump_sha256": "fa6d42bdc7403327c5bc83af4111c071918a671febca27211540876d34ba7d6a",
+  "fault_instruction_rva": "0x1095e5",
+  "fault_instruction": "ret",
+  "final_total_actors": 97,
+  "corrupted_return_bytes": "ff 08 03 ff 08 03 ff 08",
+  "saved_register_fragment_patterns": {
+    "rbx": "0x308ff0308ff0308",
+    "rbp": "0x308ff0308ff0308",
+    "rsi": "0x8ff0308ff0308ff",
+    "rdi": "0xff0308ff0308ff03",
+    "r14": "0xff0308ff0308ff03",
+    "r15": "0x8ff0308ff0308ff"
+  },
+  "consecutive_repeated_fragment_bytes_at_return": 700,
+  "piece_geometry_dwords": 416,
+  "native_piece_geometry_limit_dwords": 231,
+  "captured_generated_fragment_dwords": 393,
+  "return_slot_bytes_after_geometry_bound": 24,
+  "render_failures": {
+    "gpu": 0,
+    "cpu": 0,
+    "surface": 0,
+    "bad_frames": 0,
+    "handle_exhaustion": 0,
+    "invalid_mapping": 0
+  },
+  "prior_physics_guards": {
+    "nonfinite_queries": 0,
+    "invalid_features": 0
+  },
+  "diagnosis": "The native glass-fragment builder emitted repeated two-vertex records beyond its 231-DWORD local piece geometry buffer. Saved nonvolatile registers and the return address contain those records; the eventual RET raises a noncanonical-address exception. The captured geometry count is 416 DWORDs.",
+  "correction": "Bound every native polygon output write; reject results with fewer than three vertices; include terminator/alignment in capacity checks; skip native piece allocation/publication on rejection.",
+  "causal_limit": "The dump proves the output overrun, but does not capture the first geometry update that produced the malformed edge topology. Zero renderer failures support separation from this glass crash; absence of flickering is the owner observation."
+}

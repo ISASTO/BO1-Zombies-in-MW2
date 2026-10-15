@@ -1,0 +1,855 @@
+{
+  "executable_sha256": "fb7e8a987c371dea7b666091b0b9e2011c0cd9cd277b191ad453d11d557dd777",
+  "live_actors": 256,
+  "sentients": 274,
+  "actor_stride": 18624,
+  "direct_native_consumers_checked": {
+    "actor_stride": 45,
+    "actor_pool_byte_length": 9,
+    "actor_storage": 1,
+    "sentient_storage": 12,
+    "animation_pointers": 4
+  },
+  "declared_relocated_perception_sites": 72,
+  "sentient_index_data_flow_sites": 52,
+  "unrelocated_data_flow_sites": 0,
+  "data_flow_inventory": [
+    {
+      "rva": "0x124822",
+      "instruction": "movups xmmword ptr [rcx + rax*8 + 0x348], xmm0",
+      "declared": true,
+      "patched": true
+    },
+    {
+      "rva": "0x12482a",
+      "instruction": "movups xmmword ptr [rcx + rax*8 + 0x358], xmm0",
+      "declared": true,
+      "patched": true
+    },
+    {
+      "rva": "0x124832",
+      "instruction": "movups xmmword ptr [rcx + rax*8 + 0x368], xmm0",
+      "declared": true,
+      "patched": true
+    },
+    {
+      "rva": "0x125bc5",
+      "instruction": "sub eax, dword ptr [rbx + rcx*8 + 0x358]",
+      "declared": true,
+      "patched": true
+    },
+    {
+      "rva": "0x12b7ad",
+      "instruction": "movss xmm1, dword ptr [r8 + rcx*8 + 0x364]",
+      "declared": true,
+      "patched": true
+    },
+    {
+      "rva": "0x12b7c0",
+      "instruction": "mov eax, dword ptr [r8 + rcx*8 + 0x368]",
+      "declared": true,
+      "patched": true
+    },
+    {
+      "rva": "0x12b7cf",
+      "instruction": "mov eax, dword ptr [r8 + rcx*8 + 0x36c]",
+      "declared": true,
+      "patched": true
+    },
+    {
+      "rva": "0x12f4d9",
+      "instruction": "cmp dword ptr [rbx + rax*8 + 0x358], 0",
+      "declared": true,
+      "patched": true
+    },
+    {
+      "rva": "0x12f4ed",
+      "instruction": "subss xmm2, dword ptr [rbx + rax*8 + 0x368]",
+      "declared": true,
+      "patched": true
+    },
+    {
+      "rva": "0x12f4f6",
+      "instruction": "subss xmm1, dword ptr [rbx + rax*8 + 0x364]",
+      "declared": true,
+      "patched": true
+    },
+    {
+      "rva": "0x12f504",
+      "instruction": "subss xmm0, dword ptr [rbx + rax*8 + 0x36c]",
+      "declared": true,
+      "patched": true
+    },
+    {
+      "rva": "0x12f779",
+      "instruction": "cmp byte ptr [rsi + rbp*8 + 0x348], 0",
+      "declared": true,
+      "patched": true
+    },
+    {
+      "rva": "0x12f94a",
+      "instruction": "mov ecx, dword ptr [rsi + rbp*8 + 0x354]",
+      "declared": true,
+      "patched": true
+    },
+    {
+      "rva": "0x12f951",
+      "instruction": "mov eax, dword ptr [rsi + rbp*8 + 0x350]",
+      "declared": true,
+      "patched": true
+    },
+    {
+      "rva": "0x133c48",
+      "instruction": "cmp dword ptr [rbx + rax*8 + 0x358], 0",
+      "declared": true,
+      "patched": true
+    },
+    {
+      "rva": "0x1380b8",
+      "instruction": "mov dword ptr [rbx + rcx*8 + 0x354], eax",
+      "declared": true,
+      "patched": true
+    },
+    {
+      "rva": "0x13811e",
+      "instruction": "mov dword ptr [rbx + rcx*8 + 0x354], eax",
+      "declared": true,
+      "patched": true
+    },
+    {
+      "rva": "0x138b78",
+      "instruction": "sub eax, dword ptr [rdi + rcx*8 + 0x358]",
+      "declared": true,
+      "patched": true
+    },
+    {
+      "rva": "0x138c94",
+      "instruction": "mov dword ptr [rdi + rcx*8 + 0x354], eax",
+      "declared": true,
+      "patched": true
+    },
+    {
+      "rva": "0x138fbf",
+      "instruction": "mov dword ptr [rcx + rdx*8 + 0x354], eax",
+      "declared": true,
+      "patched": true
+    },
+    {
+      "rva": "0x13a519",
+      "instruction": "mov ecx, dword ptr [rbx + rax*8 + 0x350]",
+      "declared": true,
+      "patched": true
+    },
+    {
+      "rva": "0x1485de",
+      "instruction": "cmp byte ptr [rdi + rbx + 0x348], 0",
+      "declared": true,
+      "patched": true
+    },
+    {
+      "rva": "0x148615",
+      "instruction": "cmp dword ptr [rdi + rbx + 0x350], 0",
+      "declared": true,
+      "patched": true
+    },
+    {
+      "rva": "0x148631",
+      "instruction": "sub eax, dword ptr [rdi + rbx + 0x350]",
+      "declared": true,
+      "patched": true
+    },
+    {
+      "rva": "0x14f8af",
+      "instruction": "mov dword ptr [rbx + rax*8 + 0x358], 0",
+      "declared": true,
+      "patched": true
+    },
+    {
+      "rva": "0x15092b",
+      "instruction": "mov edx, dword ptr [rbx + r8*8 + 0x34c]",
+      "declared": true,
+      "patched": true
+    },
+    {
+      "rva": "0x150951",
+      "instruction": "movzx eax, byte ptr [rbx + r8*8 + 0x348]",
+      "declared": true,
+      "patched": true
+    },
+    {
+      "rva": "0x150a2f",
+      "instruction": "mov ecx, dword ptr [rbx + rax*8 + 0x350]",
+      "declared": true,
+      "patched": true
+    },
+    {
+      "rva": "0x1510d2",
+      "instruction": "mov ecx, dword ptr [rcx + rax*8 + 0x34c]",
+      "declared": true,
+      "patched": true
+    },
+    {
+      "rva": "0x1510e8",
+      "instruction": "movzx eax, byte ptr [r11 + rax*8 + 0x348]",
+      "declared": true,
+      "patched": true
+    },
+    {
+      "rva": "0x1519af",
+      "instruction": "mov ecx, dword ptr [rbx + rax*8 + 0x358]",
+      "declared": true,
+      "patched": true
+    },
+    {
+      "rva": "0x151adf",
+      "instruction": "mov eax, dword ptr [rbx + r8*8 + 0x34c]",
+      "declared": true,
+      "patched": true
+    },
+    {
+      "rva": "0x151afa",
+      "instruction": "mov eax, dword ptr [rbx + r8*8 + 0x350]",
+      "declared": true,
+      "patched": true
+    },
+    {
+      "rva": "0x151b77",
+      "instruction": "mov edx, dword ptr [rbx + r8*8 + 0x34c]",
+      "declared": true,
+      "patched": true
+    },
+    {
+      "rva": "0x151b9d",
+      "instruction": "movzx eax, byte ptr [rbx + r8*8 + 0x348]",
+      "declared": true,
+      "patched": true
+    },
+    {
+      "rva": "0x151c6c",
+      "instruction": "mov eax, dword ptr [rcx + r9*8 + 0x34c]",
+      "declared": true,
+      "patched": true
+    },
+    {
+      "rva": "0x151c85",
+      "instruction": "mov eax, dword ptr [rbx + r9*8 + 0x350]",
+      "declared": true,
+      "patched": true
+    },
+    {
+      "rva": "0x15224f",
+      "instruction": "sub edx, dword ptr [rsi + rax*8 + 0x34c]",
+      "declared": true,
+      "patched": true
+    },
+    {
+      "rva": "0x15234e",
+      "instruction": "mov ecx, dword ptr [rsi + rax*8 + 0x34c]",
+      "declared": true,
+      "patched": true
+    },
+    {
+      "rva": "0x15606a",
+      "instruction": "mov dword ptr [rdi + rax*8 + 0x35c], esi",
+      "declared": true,
+      "patched": true
+    },
+    {
+      "rva": "0x1560c9",
+      "instruction": "mov edx, dword ptr [rcx + rax*8 + 0x358]",
+      "declared": true,
+      "patched": true
+    },
+    {
+      "rva": "0x1562df",
+      "instruction": "mov dword ptr [rbx + rax*8 + 0x35c], r8d",
+      "declared": true,
+      "patched": true
+    },
+    {
+      "rva": "0x1568f1",
+      "instruction": "mov ecx, dword ptr [rcx + rbp*8 + 0x354]",
+      "declared": true,
+      "patched": true
+    },
+    {
+      "rva": "0x15695c",
+      "instruction": "movzx r13d, byte ptr [rdi + rbp*8 + 0x348]",
+      "declared": true,
+      "patched": true
+    },
+    {
+      "rva": "0x1569b9",
+      "instruction": "subss xmm0, dword ptr [rdi + rcx*8 + 0x36c]",
+      "declared": true,
+      "patched": true
+    },
+    {
+      "rva": "0x1569d2",
+      "instruction": "subss xmm2, dword ptr [rdi + rcx*8 + 0x368]",
+      "declared": true,
+      "patched": true
+    },
+    {
+      "rva": "0x1569db",
+      "instruction": "subss xmm1, dword ptr [rdi + rcx*8 + 0x364]",
+      "declared": true,
+      "patched": true
+    },
+    {
+      "rva": "0x156ad2",
+      "instruction": "sub eax, dword ptr [rdi + rbp*8 + 0x358]",
+      "declared": true,
+      "patched": true
+    },
+    {
+      "rva": "0x1b22ef",
+      "instruction": "cmp dword ptr [rcx + rdx*8 + 0x358], 0",
+      "declared": true,
+      "patched": true
+    },
+    {
+      "rva": "0x1b4c70",
+      "instruction": "sub eax, dword ptr [r14 + rbx + 0x358]",
+      "declared": true,
+      "patched": true
+    },
+    {
+      "rva": "0x1b4cf7",
+      "instruction": "cmp byte ptr [r14 + rbx + 0x348], 0",
+      "declared": true,
+      "patched": true
+    },
+    {
+      "rva": "0x1b7799",
+      "instruction": "mov dword ptr [rsi + rax*8 + 0x35c], ecx",
+      "declared": true,
+      "patched": true
+    }
+  ],
+  "native_ai_count_default_and_maximum": 256,
+  "retained_native_fx_bound_sites": [
+    "0x17fdfe",
+    "0x181187",
+    "0x1ae361",
+    "0x1ae917"
+  ],
+  "native_rewind_records": 32,
+  "native_unwind_audits": {
+    "threat": {
+      "native_unwind_function_ranges": 13,
+      "native_stack_save_slots": 8,
+      "relay_partial_prolog_states": 3,
+      "frame_and_save_offsets_match_native_code": true,
+      "rtl_virtual_unwind_executed_on_windows": false
+    },
+    "awareness": {
+      "native_unwind_ranges": 7,
+      "saved_register_slots": 8,
+      "relay_partial_prolog_states": 3,
+      "frame_and_saves_match_native_instructions": true,
+      "windows_rtl_virtual_unwind_executed": false
+    },
+    "crowd_resources": {
+      "standalone_glass_unwind_entries": 2,
+      "native_saved_registers_checked": 9,
+      "native_prologues_match_unwind": true,
+      "all_skeleton_base_sites": 5,
+      "all_skeleton_bound_sites": 4,
+      "windows_rtl_virtual_unwind_executed": false
+    },
+    "crowd_render_physics": {
+      "standalone_unwind_entries": 38,
+      "native_frame_descriptions_match": true,
+      "body_relays_keep_rsp": true,
+      "explicit_native_host_target_rvas": [
+        "0x410fd00",
+        "0x458fb00"
+      ],
+      "host_globals_are_not_relocated_into_actor_arena": true,
+      "windows_RtlVirtualUnwind_executed": false
+    }
+  },
+  "crowd_resources": {
+    "client_skeleton_bytes": 9437184,
+    "server_skeleton_bytes": 8388608,
+    "native_skeleton_base_sites": 5,
+    "native_skeleton_bound_sites": 4,
+    "glass_allocation_guard": "validate current/next inactive indices; rebuild from occupancy map on corruption",
+    "glass_free_guard": "reject out-of-range or already inactive pieces",
+    "glass_relay_unwind_entries": 2,
+    "causal_limit": "The returned crash proves a corrupt glass free head. It does not capture the first write that damaged the chain."
+  },
+  "crowd_render_physics": {
+    "skin_cache_bytes": 75497472,
+    "skin_cache_vertices": 2359296,
+    "native_skin_allocation_sites": 4,
+    "bounded_atomic_skin_reservations": 2,
+    "skinned_scene_surface_bytes_per_frame": 2097152,
+    "frame_slots": 2,
+    "rigid_scene_surface_bytes": 131072,
+    "rigid_packed_offsets": "unchanged",
+    "warning_counters": 64,
+    "standalone_unwind_entries": 7,
+    "early_glass_pose": "reject non-finite native glass origin/rotation/bounds before map traversal",
+    "glass_query": "reject non-finite center/extents/axes before triangle work; preserve first invalid descriptor",
+    "collision_feature": "reject zero/out-of-range feature before unsigned vertex-index arithmetic",
+    "causal_limit": "The returned dump contains invalid glass geometry before narrowphase. Its first corrupting physics update is not captured."
+  },
+  "crowd_surface_bridge": {
+    "packed_draw_id_bits": 16,
+    "stock_quarter_offset_ids": 32768,
+    "animated_record_handles": 32768,
+    "native_record_readers": 28,
+    "packed_producers": 2,
+    "record_publication_gate": 1,
+    "quarter_unit_reader_sites": [
+      "0x5dfa2",
+      "0x5e2da",
+      "0x5e3a9",
+      "0x5e5a5",
+      "0x643d3",
+      "0x648cf"
+    ],
+    "pointer_table_entries_per_frame": 65536,
+    "reverse_map_bytes_per_frame": 1048576,
+    "relay_ranges": [
+      [
+        73531392,
+        73531904,
+        73596928
+      ],
+      [
+        73531904,
+        73532416,
+        73597056
+      ],
+      [
+        73532416,
+        73532928,
+        73597184
+      ],
+      [
+        73532928,
+        73533440,
+        73597312
+      ],
+      [
+        73533440,
+        73533952,
+        73597440
+      ],
+      [
+        73533952,
+        73534464,
+        73597568
+      ],
+      [
+        73534464,
+        73534976,
+        73597696
+      ],
+      [
+        73534976,
+        73535488,
+        73597824
+      ],
+      [
+        73535488,
+        73536000,
+        73597952
+      ],
+      [
+        73536000,
+        73536512,
+        73598080
+      ],
+      [
+        73536512,
+        73537024,
+        73598208
+      ],
+      [
+        73537024,
+        73537536,
+        73598336
+      ],
+      [
+        73537536,
+        73538048,
+        73598464
+      ],
+      [
+        73538048,
+        73538560,
+        73598592
+      ],
+      [
+        73538560,
+        73539072,
+        73598720
+      ],
+      [
+        73539072,
+        73539584,
+        73598848
+      ],
+      [
+        73539584,
+        73540096,
+        73598976
+      ],
+      [
+        73540096,
+        73540608,
+        73599104
+      ],
+      [
+        73540608,
+        73541120,
+        73599232
+      ],
+      [
+        73541120,
+        73541632,
+        73599360
+      ],
+      [
+        73541632,
+        73542144,
+        73599488
+      ],
+      [
+        73542144,
+        73542656,
+        73599616
+      ],
+      [
+        73542656,
+        73543168,
+        73599744
+      ],
+      [
+        73543168,
+        73543680,
+        73599872
+      ],
+      [
+        73543680,
+        73544192,
+        73600000
+      ],
+      [
+        73544192,
+        73544704,
+        73600128
+      ],
+      [
+        73544704,
+        73545216,
+        73600256
+      ],
+      [
+        73545216,
+        73545728,
+        73600384
+      ],
+      [
+        73545728,
+        73546240,
+        73600512
+      ],
+      [
+        73546240,
+        73546752,
+        73600640
+      ],
+      [
+        73546752,
+        73547264,
+        73600768
+      ]
+    ],
+    "source_sites": [
+      "0x419a",
+      "0x438d",
+      "0x5e686",
+      "0x5eb46",
+      "0x5ece9",
+      "0x5ed60",
+      "0x5ed6d",
+      "0x5ed7d",
+      "0x5ed91",
+      "0x5efb3",
+      "0x5efce",
+      "0x5efe0",
+      "0x5efee",
+      "0x5f0e2",
+      "0x60614",
+      "0x6063a",
+      "0x64f84",
+      "0x65004",
+      "0x65115",
+      "0x3c9e",
+      "0x3e77",
+      "0x64a71",
+      "0x64dd6",
+      "0x65016",
+      "0x5dfa2",
+      "0x5e2da",
+      "0x5e3a9",
+      "0x5e5a5",
+      "0x643d3",
+      "0x648cf",
+      "0x532e2"
+    ],
+    "native_registers_and_flags": "32-byte outgoing home scratch; R10/R11/XMM0 restored, no RSP changes",
+    "native_surface_representation": "lower rigid quarter-offsets retained; upper animated IDs use per-frame indirection"
+  },
+  "skeleton_reference_inventory": {
+    "old_buffer_direct_rip_sites": [
+      "0xd4a27",
+      "0x230efa",
+      "0x230f9d",
+      "0x2317d8",
+      "0x231911"
+    ],
+    "old_buffer_absolute_instruction_references": 0,
+    "old_buffer_static_dir64_references": 0,
+    "following_native_pointer_and_generation_globals": "preserved"
+  },
+  "remaining_source_literal_32": [
+    {
+      "file": "src/ai.cpp",
+      "line": 185,
+      "text": "if(static_cast<unsigned char>(out[n])<32 || static_cast<unsigned char>(out[n])>126) return false;"
+    },
+    {
+      "file": "src/ai.cpp",
+      "line": 307,
+      "text": "// then setter/getter pointers, 32-byte stride."
+    },
+    {
+      "file": "src/ai.cpp",
+      "line": 318,
+      "text": "if(field(0,\"classname\",kAiClassname,4) && field(32,\"origin\",kAiOrigin,6) && field(96,\"spawnflags\",kAiSpawnFlags,0)) ++found;"
+    },
+    {
+      "file": "src/ai.cpp",
+      "line": 585,
+      "text": "IntDvarRead d; std::uintptr_t name=0; std::uint8_t type=255; char text[32]{};"
+    },
+    {
+      "file": "src/engine.cpp",
+      "line": 158,
+      "text": "std::array<unsigned char, 32> digest{};"
+    },
+    {
+      "file": "src/engine.cpp",
+      "line": 270,
+      "text": "if (*c<32 || *c>126) return w;"
+    },
+    {
+      "file": "src/expanded_capacity.cpp",
+      "line": 12,
+      "text": "std::atomic<int> capacity{32};"
+    },
+    {
+      "file": "src/expanded_capacity.cpp",
+      "line": 89,
+      "text": "*reinterpret_cast<int*>(Address(0x4590000))=legacyRead?32:256;"
+    },
+    {
+      "file": "src/expanded_capacity.cpp",
+      "line": 91,
+      "text": "Log(\"AI_CHECKPOINT read_format=%s actors=%d sentients=%d\",legacyRead?\"STOCK_MIGRATED\":\"EXPANDED_V1\",legacyRead?32:256,legacyRead?50:274);"
+    },
+    {
+      "file": "src/expanded_capacity.cpp",
+      "line": 130,
+      "text": "kSkinCacheBytes,kSkinCacheBytes/32,state.gpuPeak,state.cpuPeak,kCrowdSurfaceBytes,"
+    },
+    {
+      "file": "src/expanded_capacity.cpp",
+      "line": 135,
+      "text": "state.warnings[5],state.warnings[6],state.warnings[7],state.warnings[8],state.warnings[25],state.warnings[32]);"
+    },
+    {
+      "file": "src/expanded_capacity.cpp",
+      "line": 139,
+      "text": "if(n!=25 && n!=32 && state.warnings[n])"
+    },
+    {
+      "file": "src/expanded_capacity.cpp",
+      "line": 160,
+      "text": "if(NativeActorCapacity()!=32 || !host)return;"
+    },
+    {
+      "file": "src/expanded_capacity.cpp",
+      "line": 205,
+      "text": "// Allocate ABOVE the full image, keeping all 32-bit RIP/level-relative"
+    },
+    {
+      "file": "src/expanded_capacity.cpp",
+      "line": 279,
+      "text": "std::memcpy(reinterpret_cast<void*>(Address(0x4560000)),reinterpret_cast<void*>(base+0xf50040),32*8);"
+    },
+    {
+      "file": "src/expanded_capacity.cpp",
+      "line": 308,
+      "text": "std::memset(reinterpret_cast<void*>(base+0xf50040),0,32*8);std::memset(reinterpret_cast<void*>(base+0xf50b40),0,112*8);"
+    },
+    {
+      "file": "src/expanded_capacity.cpp",
+      "line": 313,
+      "text": "Log(\"AI_CAPACITY_EXPANSION enabled=1 experimental=1 actors=256 sentients=274 stride=0x48c0 snapshot_bytes=17412 temporary_trees=336 patches=%u arena=%p checkpoint=VERSIONED_V1_LEGACY_MIGRATION native_rewind_slots=32 high_actor_collision=CURRENT_SERVER_POSE native_threat_candidates=274 threat_stack_bytes=6760 threat_unwind=REGISTERED awareness_candidates=274 awareness_stack_bytes=4512 relay_unwind_entries=%u arena_guard_pages=9 skeleton_guard_pages=2 renderer_guard_pages=6 client_skeleton_bytes=9437184 server_skeleton_bytes=8388608 skin_cache_bytes=75497472 skinned_surface_bytes_per_frame=2097152 animated_handles_per_frame=32768 packed_draw_bits=16 render_reservations=BOUNDED_ATOMIC glass_free_list=OCCUPANCY_VALIDATED glass_collision=FINITE_CHECKED ai_count_domain=256\",static_cast<unsigned>(protections.size()),reinterpret_cast<void*>(arena),static_cast<unsigned>(relayFunctions.size()));"
+    },
+    {
+      "file": "src/log.cpp",
+      "line": 35,
+      "text": "std::array<DumpRange,32> ranges{};unsigned count=0,next=0;"
+    },
+    {
+      "file": "src/log.cpp",
+      "line": 196,
+      "text": "if(pieces && pieces<=0xffff)for(const auto& field:std::array<std::pair<unsigned,std::size_t>,3>{{{0x38,pieces*32ull},{0x40,pieces*32ull},{0x58,((pieces+31ull)/32)*4}}}) {"
+    },
+    {
+      "file": "src/mp_feedback.cpp",
+      "line": 64,
+      "text": "if(GetFileSizeEx(file,&bytes) && bytes.QuadPart>=32 && bytes.QuadPart<=65536) {"
+    },
+    {
+      "file": "src/overlay.cpp",
+      "line": 60,
+      "text": "info.bmiHeader.biBitCount = 32;"
+    },
+    {
+      "file": "src/overlay.cpp",
+      "line": 76,
+      "text": "for (int n = 0; n < 95; ++n) { char c = static_cast<char>(n + 32); TextOutA(dc, (n % 16) * 16, (n / 16) * 28, &c, 1); }"
+    },
+    {
+      "file": "src/overlay.cpp",
+      "line": 117,
+      "text": "if (c < 32 || c > 126) c = '?';"
+    },
+    {
+      "file": "src/overlay.cpp",
+      "line": 118,
+      "text": "const unsigned n = c - 32;"
+    },
+    {
+      "file": "src/overlay.cpp",
+      "line": 456,
+      "text": "if (selected) { rect(34,y-1,640,24,D3DCOLOR_ARGB(255,49,57,32)); rect(34,y-1,3,24,kAccent); }"
+    },
+    {
+      "file": "src/overlay.cpp",
+      "line": 464,
+      "text": "char value[32]{};"
+    },
+    {
+      "file": "src/startup_proxy.c",
+      "line": 12,
+      "text": "wchar_t suffix[32] = L\"\\\\startup-00000000.log\";"
+    },
+    {
+      "file": "include/ai_controls.hpp",
+      "line": 23,
+      "text": "inline constexpr int kAiNativeActorCapacity=32,kAiSpawnerListLimit=kAiEntityCapacity,kAiRequestExpiryMilliseconds=10000;"
+    },
+    {
+      "file": "include/ai_placement.hpp",
+      "line": 52,
+      "text": "AiPoint start=candidate,end=candidate; start[2]+=32.f; end[2]-=160.f;"
+    },
+    {
+      "file": "include/bo1_round_rules.hpp",
+      "line": 31,
+      "text": "static_assert(sizeof(int) == 4, \"The preview uses 32-bit source integers\");"
+    },
+    {
+      "file": "include/core.hpp",
+      "line": 118,
+      "text": "\"80 B9 69 08 00 00 00 75 ?? 48 8B 05 ?? ?? ?? ?? 80 78 10 00 75 ?? 32 C0 C3 B0 01 C3\";"
+    },
+    {
+      "file": "include/core.hpp",
+      "line": 126,
+      "text": "\"48 8B 05 ?? ?? ?? ?? 48 8B E9 80 78 10 00 75 ?? 8B 05 ?? ?? ?? ?? 83 C0 32 89 81 60 01 00 00 48 81 C4 A0 00 00 00 5D C3\";"
+    },
+    {
+      "file": "include/core.hpp",
+      "line": 183,
+      "text": "\"40 55 48 81 EC A0 00 00 00 48 8B 05 ?? ?? ?? ?? 48 8B E9 80 78 10 00 75 18 8B 05 ?? ?? ?? ?? 83 C0 32 89 81 60 01 00 00 48 81 C4 A0 00 00 00 5D C3\";"
+    },
+    {
+      "file": "include/core.hpp",
+      "line": 201,
+      "text": "\"89 4C 24 08 48 83 EC 28 8B C1 C1 E8 10 66 83 F8 05 75 09 48 83 C4 28 E9 ?? ?? ?? ?? 66 83 7C 24 32 00 48 89 5C 24 20 75 16 0F B7 C1 48 69 D8 A0 02 00 00 48 8D 05 ?? ?? ?? ?? 48 03 D8 EB ?? E8 ?? ?? ?? ?? 33 DB\";"
+    },
+    {
+      "file": "include/crowd_resources.hpp",
+      "line": 6,
+      "text": "inline constexpr std::uint32_t kSkinCacheBytes=0x4800000; // 72 MiB, 32 bytes/vertex."
+    },
+    {
+      "file": "include/crowd_resources.hpp",
+      "line": 41,
+      "text": "static_assert(sizeof(CrowdFrameCounters)==32 && sizeof(CrowdResourceState)==kCrowdStateBytes);"
+    },
+    {
+      "file": "include/expanded_actor_layout.hpp",
+      "line": 91,
+      "text": "// Native checkpoint segment 3 discriminator. Stock 32/50 streams are decoded"
+    },
+    {
+      "file": "include/expanded_actor_layout.hpp",
+      "line": 98,
+      "text": "static_assert(sizeof(PopulationChunkHeader)==32);"
+    },
+    {
+      "file": "include/mp_feedback_assets.hpp",
+      "line": 11,
+      "text": "if(!data || size<32 || std::memcmp(data,\"IWi\\x08\",4) || data[8]!=0x0d)return std::nullopt;"
+    },
+    {
+      "file": "include/mp_feedback_assets.hpp",
+      "line": 17,
+      "text": "if(bytes>size-32)return std::nullopt;"
+    },
+    {
+      "file": "include/mp_feedback_assets.hpp",
+      "line": 18,
+      "text": "for(std::size_t at=16;at<32;at+=4) {"
+    },
+    {
+      "file": "include/mp_feedback_assets.hpp",
+      "line": 20,
+      "text": "if(v<32 || v>size)return std::nullopt;"
+    },
+    {
+      "file": "include/player_controls.hpp",
+      "line": 100,
+      "text": "return static_cast<std::uint64_t>(pool.id) | (static_cast<std::uint64_t>(static_cast<std::uint32_t>(pool.count))<<32);"
+    },
+    {
+      "file": "include/player_fields.hpp",
+      "line": 9,
+      "text": "// +0x00 is an entity-type byte, not a 32-bit entity number."
+    },
+    {
+      "file": "include/script_parameters.hpp",
+      "line": 20,
+      "text": "static_assert(sizeof(NativeScriptVmState)==32);"
+    },
+    {
+      "file": "include/script_text.hpp",
+      "line": 10,
+      "text": "if(c<32 || c>126)return false;"
+    }
+  ],
+  "source_review": "Remaining 32s are stock-layout migration/bootstrap sizes, bounded shot history, a 32-byte checkpoint header, SHA256/graphics/ASCII dimensions, bit widths and original profile byte patterns. See the accompanying audit document for reasons.",
+  "scope": "Exact declared storage/stride/span checks and linear native sentient-index data flow, plus manually reviewed iterator callers. This is not a formal proof of every transitive engine consumer or Windows gameplay stability."
+}

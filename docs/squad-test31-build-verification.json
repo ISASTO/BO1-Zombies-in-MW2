@@ -1,0 +1,86 @@
+{
+  "version": "0.1.30-squad-test31",
+  "base_commit": "202b64b0f1dc7f2efcf764c7cb10b3eedbecca9d",
+  "executable_sha256": "fb7e8a987c371dea7b666091b0b9e2011c0cd9cd277b191ad453d11d557dd777",
+  "dll_sha256": "e9e9b91415b0e138604fc904f51909e72b32c0d565006020c0984f85c1bbc51b",
+  "dll_bytes": 5501511,
+  "compiler": "MinGW-w64 GCC 13-posix, RelWithDebInfo, static GCC/C++ runtime",
+  "pe_checks": {
+    "amd64_pe32_plus": true,
+    "exact_ten_exports": true,
+    "aslr_and_nx": true,
+    "version_embedded": true,
+    "no_external_gcc_or_stdcpp_runtime": true
+  },
+  "imports": [
+    "bcrypt.dll",
+    "dbghelp.dll",
+    "gdi32.dll",
+    "kernel32.dll",
+    "msvcrt.dll",
+    "user32.dll",
+    "winmm.dll"
+  ],
+  "exports": [
+    "D3DPERF_BeginEvent",
+    "D3DPERF_EndEvent",
+    "D3DPERF_GetStatus",
+    "D3DPERF_QueryRepeatFrame",
+    "D3DPERF_SetMarker",
+    "D3DPERF_SetOptions",
+    "D3DPERF_SetRegion",
+    "DebugSetMute",
+    "Direct3DCreate9",
+    "Direct3DCreate9Ex"
+  ],
+  "checked_native_patch_entries": 369,
+  "arena_fragments": 60,
+  "registered_relay_unwind_entries": 46,
+  "native_cxx_tests": {
+    "passed": 19,
+    "failed": 0
+  },
+  "python_tests": {
+    "passed": 31,
+    "failed": 0
+  },
+  "native_fixtures": [
+    "crowd",
+    "resources",
+    "expanded-runtime",
+    "iterator",
+    "animation",
+    "history",
+    "threat",
+    "awareness",
+    "fracture"
+  ],
+  "native_fixtures_passed": 9,
+  "old_startup_read_reproduced_at": "0x645bd",
+  "native_packed_record_equivalence_cases": 1680,
+  "corrected_quarter_unit_renderer_reads": 14,
+  "installer_scripts_parse": "passed",
+  "windows_gameplay_tested": false,
+  "scope": "Exact native glass output, publication, renderer, actor and lifetime fixtures with documented world/D3D substitutions. Reproduces the Test30 glass output overrun mechanism, retains the Test30 renderer regression fixes; Windows gameplay and 256-actor stability require retail testing.",
+  "packaged_installer_fixture": {
+    "host": "PowerShell 7.6.6 on Linux",
+    "dll_hash_and_receipt": "passed",
+    "player_save_backup": "passed",
+    "original_mp_asset_extraction": "passed",
+    "log_zip_contents": "passed",
+    "matching_dll_uninstall": "passed",
+    "saves_settings_backups_logs_preserved": "passed",
+    "windows_installer_execution": false
+  },
+  "native_fracture_results": {
+    "valid_geometry_byte_comparisons": 13,
+    "degenerate_and_output_rejections": 168,
+    "input_rejections": 5,
+    "native_producer_publication_cases": 2,
+    "valid_piece_publications": 1,
+    "output_guard_exact_bytes": 924,
+    "invalid_fragment_counter": 161,
+    "output_rejection_counter": 8,
+    "input_rejection_counter": 5
+  }
+}
