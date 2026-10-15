@@ -116,6 +116,7 @@ std::uintptr_t ExpandedResourceStateAddress() {
 }
 void LogExpandedResources() {
     if(capacity.load(std::memory_order_acquire)!=256)return;
+    ArmStaticCommandWatch();LogStaticWatchHits();
     unsigned clientUsed=0,serverUsed=0,serverGeneration=0,rebuilds=0,ignored=0;
     if(!CheckedReadMemory(host+0x548cf4,&clientUsed,4) ||
        !CheckedReadMemory(host+0x19c3870,&serverUsed,4) ||
@@ -144,6 +145,22 @@ void LogExpandedResources() {
         state.invalidGlassQueries,state.invalidFeatures,state.queryClaim,state.lastInvalidFeature);
     Log("AI_GLASS_FRACTURE invalid_fragments=%u output_limit_rejections=%u invalid_inputs=%u last_vertices=%u last_output_bytes=%u geometry_limit_bytes=924",
         state.invalidFragments,state.fragmentOutputRejections,state.fragmentInputRejections,state.lastFragmentVertices,state.lastFragmentBytes);
+    const auto rva=[](std::uint64_t address)->unsigned long long {
+        return host && address>=host && address<host+0x5000000?address-host:address;
+    };
+    Log("AI_GLASS_STATE missing_place_shatters=%u last_missing_place=%u rejected_place_damage=%u last_rejected_place=%u last_rejected_caller_rva=0x%llx ignored_free_records=%u",
+        state.glassMissingPlaces,state.glassLastMissingPlace,state.glassRejectedDamage,state.glassLastRejectedPlace,
+        rva(state.glassLastRejectedCaller),state.glassFreeRingNext);
+    static std::atomic<std::uint32_t> printedFrees{0};
+    if(state.glassFreeRingNext!=printedFrees.load()) {
+        const auto total=state.glassFreeRingNext;
+        const auto fresh=total-printedFrees.exchange(total);
+        const auto count=std::min<std::uint32_t>(std::min<std::uint32_t>(fresh,total),kGlassFreeRingEntries);
+        for(std::uint32_t n=total-count;n<total;++n) {
+            const auto& record=state.glassFreeRing[n%kGlassFreeRingEntries];
+            Log("AI_GLASS_IGNORED_FREE sequence=%u piece=%u caller_rva=0x%llx",n,record.piece,rva(record.caller));
+        }
+    }
     static std::atomic<bool> reported{false};
     if(state.queryClaim==2 && !reported.exchange(true)) {
         std::array<unsigned,3> center{},axis{};

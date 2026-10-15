@@ -1,29 +1,31 @@
 # BO1 Zombies in MW2
 
 Incremental mod framework for **retail Modern Warfare 2 (2009), single player**.
-Current build: **0.1.30-squad-test31**.
+Current build: **0.1.31-squad-test32**.
 
-Test30's returned run reached **97 actors without reported flickering**, then
-crashed in native glass-fragment construction. Its piece builder emitted
-416 geometry records into a local buffer holding 231, overwriting the saved
-registers and return address. This is distinct from the renderer startup
-regression corrected in Test30. See [Test31 diagnosis](docs/squad-test31.md).
+Test31's returned runs crashed again at 96–98 actors on Estate. Both glass
+dumps (and the Test30 glass dump) go through the same stock path: client glass
+state asks a pane to shatter, the native lookup finds no piece for that pane,
+and stock code fractures an **uninitialized stack index** anyway (0x7ff7 and 0
+in the dumps). Test31's fragment bound only moved that damage downstream.
+See [Test32 diagnosis](docs/squad-test32.md).
 
-Test31 bounds native polygon writes, rejects degenerate two-vertex fragments,
-includes terminator/alignment space, and skips allocation/publication of a
-rejected piece. New AI_GLASS_FRACTURE counters distinguish invalid geometry
-from output exhaustion. The native regression reproduces the old overrun,
-compares valid output byte-for-byte, and checks the parent publication gate.
+Test32 skips fracture when the lookup found nothing, bounds server glass place
+damage, records which native path releases glass pieces it does not own, and
+watches the static console-command entries that a separate, recurring
+crash family (eight dumps, Test24–Test31) finds overwritten. The native
+fixture reproduces the stock uninitialized-index fracture and verifies owned
+pieces still fracture exactly as before.
 
 **The live target remains 256 actors / 274 sentients.** The Test30 renderer
 bridge, 72 MiB GPU/CPU skinning buffers, guarded animated-record storage and
 16-bit handles remain active. Rendering and actor regressions are rerun.
 Windows missions and stable 256-actor retail gameplay require owner testing.
 
-Install the complete Test31 package and start Estate fresh. Follow the
-[Test31 retest instructions](docs/test31-testing-protocol.md), first holding
-at 96 actors and then advancing to 112/128. Perform a separate ordinary-shot
-and glass-impact test before enabling explosives. The
+Install the complete Test32 package (run its Uninstall.cmd first to remove
+Test31) and start Estate fresh. Follow the
+[Test32 retest instructions](docs/test32-testing-protocol.md), first holding
+at 96 actors and then advancing. The
 [full crowd protocol](docs/test31-crowd-protocol.md) covers later stages.
 
 Original MP hitmarker image/sound/fade, menu options, prior animation ownership

@@ -16,6 +16,10 @@ struct CrowdFrameCounters {
     std::uint32_t used=0,peak=0;
     std::uint64_t reverse=0,table=0;
 };
+// Test32: native return address of a glass release the free guard ignored.
+struct GlassFreeRecord {std::uint64_t caller=0;std::uint32_t piece=0,reserved=0;};
+static_assert(sizeof(GlassFreeRecord)==16);
+inline constexpr std::size_t kGlassFreeRingEntries=8;
 struct CrowdResourceState {
     std::uint64_t clientSkeleton=0,serverSkeleton=0;
     std::uint32_t glassRebuilds=0,glassIgnoredFrees=0;
@@ -36,7 +40,13 @@ struct CrowdResourceState {
     std::uint32_t queryStage=0;
     std::uint32_t invalidFragments=0,fragmentOutputRejections=0,fragmentInputRejections=0;
     std::uint32_t lastFragmentVertices=0,lastFragmentBytes=0;
-    std::array<std::uint8_t,0x110> tail{};
+    // Test32 glass place/state diagnostics (+0x2f0).
+    std::uint32_t glassMissingPlaces=0,glassLastMissingPlace=0;
+    std::uint32_t glassRejectedDamage=0,glassLastRejectedPlace=0;
+    std::uint64_t glassLastRejectedCaller=0;
+    std::uint32_t glassFreeRingNext=0,glassReserved=0;
+    std::array<GlassFreeRecord,kGlassFreeRingEntries> glassFreeRing{};
+    std::array<std::uint8_t,0x70> tail{};
 };
 static_assert(sizeof(CrowdFrameCounters)==32 && sizeof(CrowdResourceState)==kCrowdStateBytes);
 static_assert(offsetof(CrowdFrameCounters,used)==8 && offsetof(CrowdFrameCounters,peak)==12);
@@ -48,10 +58,13 @@ static_assert(offsetof(CrowdResourceState,framePointers)==0xc0);
 static_assert(offsetof(CrowdResourceState,invalidGlassQueries)==0x200 && offsetof(CrowdResourceState,query)==0x220);
 static_assert(offsetof(CrowdResourceState,queryStage)==0x2d8);
 static_assert(offsetof(CrowdResourceState,invalidFragments)==0x2dc && offsetof(CrowdResourceState,lastFragmentBytes)==0x2ec);
+static_assert(offsetof(CrowdResourceState,glassMissingPlaces)==0x2f0 && offsetof(CrowdResourceState,glassRejectedDamage)==0x2f8);
+static_assert(offsetof(CrowdResourceState,glassLastRejectedCaller)==0x300 && offsetof(CrowdResourceState,glassFreeRingNext)==0x308);
+static_assert(offsetof(CrowdResourceState,glassFreeRing)==0x310 && offsetof(CrowdResourceState,tail)==0x390);
 // Body-only relays have generated standalone unwind records for the exact
 // already-executed native frames. The warning entry is a true leaf relay.
 struct CrowdRelay {std::uint32_t begin,end,unwind;};
-inline constexpr std::array<CrowdRelay,11> kCrowdRelays{{
+inline constexpr std::array<CrowdRelay,13> kCrowdRelays{{
     {0x4612000,0x4612100,0x4613a00}, // GPU bounded reservation.
     {0x4612100,0x4612200,0x4613a40}, // CPU bounded reservation.
     {0x4612200,0x4612400,0x4613a80}, // Independent skinned surface records.
@@ -63,6 +76,8 @@ inline constexpr std::array<CrowdRelay,11> kCrowdRelays{{
     {0x4615200,0x4615400,0x4615740}, // Bound native polygon output writes.
     {0x4615400,0x4615600,0x4615780}, // Reject degenerate or oversized output.
     {0x4615600,0x4615700,0x46157c0}, // Gate native piece publication.
+    {0x4616000,0x4616100,0x4616700}, // Skip fracture when no piece owns the place.
+    {0x4616100,0x4616200,0x4616740}, // Bound server glass place damage (entry relay).
 }};
 } // namespace mod::expansion
 #include "crowd_bridge_layout.hpp"

@@ -1,0 +1,50 @@
+{
+  "archives": [
+    {
+      "name": "BO1MW2-test-results-20261015-060519.zip",
+      "sha256": "75e2e6bc4acfd17d503efbcca18e390120dd2c943259d7461efbdc8faa386521"
+    },
+    {
+      "name": "BO1MW2-startup-results-20261015-060526-d57ea7b4.zip",
+      "sha256": "c00dd74c655c0135005075bf47bbaf3206662c4260aaa0e71abda7ac410598a8"
+    }
+  ],
+  "shatter_crashes": {
+    "20261015-055729": {
+      "fault_rva": "0x10e903",
+      "shatter_place": 10,
+      "found_flag": 0,
+      "uninitialized_piece_index": "0x7ff7",
+      "place_has_active_piece": false,
+      "place_within_loaded_places": true,
+      "client_glass": {
+        "pieces": 1051,
+        "places": 27,
+        "active_pieces": 21,
+        "free_head": 23
+      },
+      "dump_sha256": "67220cd29f54b2e7aee1e2cc289890431870efc851dddb1504adc183b446efc8",
+      "installed_version": "0.1.30-squad-test31",
+      "installed_dll_sha256": "e9e9b91415b0e138604fc904f51909e72b32c0d565006020c0984f85c1bbc51b"
+    },
+    "20261015-060313": {
+      "fault_rva": "0x104469",
+      "shatter_place": 27,
+      "found_flag": 0,
+      "uninitialized_piece_index": "0x0",
+      "place_has_active_piece": false,
+      "place_within_loaded_places": false,
+      "client_glass": {
+        "pieces": 1051,
+        "places": 27,
+        "active_pieces": 182,
+        "free_head": 0
+      },
+      "dump_sha256": "e35b555a04161500603cf7fd70eedf5af338fdec28a58da236237194a91b2416",
+      "installed_version": "0.1.30-squad-test31",
+      "installed_dll_sha256": "e9e9b91415b0e138604fc904f51909e72b32c0d565006020c0984f85c1bbc51b"
+    }
+  },
+  "diagnosis": "Client glass state 2 reached 0x100870 for a place with no active piece. Stock code ignores its found flag and calls native fracture with an uninitialized stack index, so fracture runs on an inactive or foreign piece record.",
+  "fix": "Test32 skips native fracture when the lookup found no owning piece and records the place."
+}

@@ -1,0 +1,85 @@
+{
+ "version": "0.1.31-squad-test32",
+ "base_commit": "ddeecf116454286f21775104e1e70ca5e1d1a5ec",
+ "executable_sha256": "fb7e8a987c371dea7b666091b0b9e2011c0cd9cd277b191ad453d11d557dd777",
+ "dll_sha256": "7a368d2da1294b241767216474b7bbd56340a71ea705e001fea4d4d445c49adb",
+ "dll_bytes": 5418153,
+ "compiler": "xPack MinGW-w64 GCC 13.2.0 (posix threads, UCRT), RelWithDebInfo, static GCC/C++ runtime",
+ "compiler_note": "Test31 used MinGW-w64 GCC 13 with msvcrt.dll; this build imports the Windows 10+ UCRT API sets instead.",
+ "pe_checks": {
+  "amd64_pe32_plus": true,
+  "exact_ten_exports": true,
+  "aslr_and_nx": true,
+  "version_embedded": true,
+  "no_external_gcc_or_stdcpp_runtime": true
+ },
+ "imports": [
+  "bcrypt.dll",
+  "dbghelp.dll",
+  "gdi32.dll",
+  "kernel32.dll",
+  "api-ms-win-crt-*-l1-1-0.dll (11 UCRT API sets)",
+  "user32.dll",
+  "winmm.dll"
+ ],
+ "checked_native_patch_entries": 371,
+ "arena_fragments": 63,
+ "registered_relay_unwind_entries": 48,
+ "patch_generator_reproduced_test31_header_byte_for_byte": true,
+ "native_cxx_tests": {
+  "passed": 19,
+  "failed": 0
+ },
+ "python_tests": {
+  "passed": 31,
+  "failed": 0
+ },
+ "native_fixtures": [
+  "expanded-runtime",
+  "resources",
+  "iterator",
+  "animation",
+  "history",
+  "awareness",
+  "threat",
+  "crowd",
+  "fracture",
+  "glass-state"
+ ],
+ "native_fixtures_passed": 10,
+ "consumer_audit": "passed",
+ "returned_crash_analysis": "docs/runtime-test32-shatter-evidence.json",
+ "native_glass_state_results": {
+  "owned_shatter_cases": 15,
+  "missing_piece_cases": 5,
+  "server_damage_places": 27,
+  "published_state_changes": 54,
+  "rejected_damage_cases": 5,
+  "ignored_release_records": 4,
+  "missing_place_counter": 5,
+  "rejected_damage_counter": 5
+ },
+ "old_missing_piece_fracture_reproduced": {
+  "fracture_calls": 1,
+  "fractured_piece": 2146926583
+ },
+ "old_out_of_range_damage_reproduced": {
+  "guard_fault_rva": "0x16a0a0",
+  "native_access": "unbounded place-record read; the read-modify-write store follows at 0x16a0e8"
+ },
+ "static_command_watch": "Windows-only diagnostic (debug registers + vectored handler); compiled but not executable in the Linux fixtures.",
+ "packaged_installer_fixture": {
+  "host": "PowerShell 7.5.3 on Linux",
+  "uninstall_previous_receipt": "passed",
+  "dll_hash_and_receipt": "passed",
+  "player_save_backup": "passed",
+  "original_mp_asset_extraction": "passed (synthetic iwd)",
+  "existing_wrapper_refused": "passed",
+  "log_zip_contents": "passed",
+  "matching_dll_uninstall": "passed",
+  "saves_settings_backups_logs_preserved": "passed",
+  "windows_installer_execution": false
+ },
+ "windows_gameplay_tested": false,
+ "scope": "Exact native shatter lookup, server place damage and guarded release code plus all retained actor, renderer, glass and lifetime fixtures. Windows gameplay and 256-actor stability require retail testing."
+}

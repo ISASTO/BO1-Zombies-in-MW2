@@ -19,6 +19,10 @@ void Log(const char* format, ...);
 void InstallCrashHandler();
 void RecordNativeOperation(const char* operation,unsigned entity=0,int actorCount=-1);
 const wchar_t* LogDirectory();
+// Test32 hardware write watch on static console command entries.
+void ArmStaticCommandWatch();
+void LogStaticWatchHits();
+int FormatStaticWatchHits(char* out,int bytes);
 
 enum class LevelState { Unsupported, Unresolved, NoLevel, Transition, PlayerDead, Ready };
 struct FloatDvarSnapshot { bool resolved=false; bool valid=false; float current=0.f; std::uintptr_t dvar=0; };

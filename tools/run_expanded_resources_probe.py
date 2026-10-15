@@ -68,7 +68,9 @@ def unwind_audit(pe,rows):
         for reg in actual_pushes:restored[reg]=stack[rsp];rsp+=8
         if rsp!=0x100000 or any(value!=reg+100 for reg,value in restored.items()):raise ValueError('Glass unwind simulation failed')
         code=list(decoder.disasm(read(begin,end-begin),begin))
-        if sum(i.size for i in code)!=end-begin or any(i.mnemonic in ('push','pop','call') or 'rsp' in i.op_str for i in code):
+        # Test32 reads the native return slot ([rsp+0x28]) for diagnostics;
+        # reads are allowed, but nothing may push, pop, call or write RSP.
+        if sum(i.size for i in code)!=end-begin or any(i.mnemonic in ('push','pop','call') or i.op_str.startswith('rsp,') for i in code):
             raise ValueError('Glass guard changes its native frame or contains undecodable bytes')
     # Actual native prologues, before each relay entry, match these save slots.
     expected={0x100410:'48895c240848896c2410488974241848897c242041564157',

@@ -124,6 +124,17 @@ glass_free_guard:
     jmp free_continue
 free_ignore:
     inc DWORD PTR [rip+glass_ignored_frees]
+    # Test32: record which native path released an inactive or out-of-range
+    # piece. The native frame is push rdi + 0x20, so its return is at +0x28.
+    # EDX (the piece) must survive; the native tail call still receives it.
+    mov eax, DWORD PTR [rip+free_ring_next]
+    inc DWORD PTR [rip+free_ring_next]
+    and eax, 7
+    shl eax, 4
+    lea r8, [rip+free_ring]
+    mov r9, QWORD PTR [rsp+0x28]
+    mov QWORD PTR [r8+rax], r9
+    mov DWORD PTR [r8+rax+8], edx
     mov rcx, r11
     jmp free_epilogue
 
@@ -136,3 +147,5 @@ free_ignore:
 .set free_epilogue, 0x100f69
 .set glass_rebuilds, 0x47e0010
 .set glass_ignored_frees, 0x47e0014
+.set free_ring_next, 0x47e0308
+.set free_ring, 0x47e0310

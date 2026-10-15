@@ -32,7 +32,7 @@ constexpr std::uintptr_t kEngineErrorDepthRva=0x1326134,kEngineErrorMessageRva=0
 constexpr std::size_t kEngineErrorMessageBytes=0x1000;
 struct DumpRange {std::uintptr_t at=0;ULONG bytes=0;};
 struct DumpMemory {
-    std::array<DumpRange,32> ranges{};unsigned count=0,next=0;
+    std::array<DumpRange,48> ranges{};unsigned count=0,next=0;
     void Add(std::uintptr_t at,std::size_t bytes) {
         if(!at || !bytes || count==ranges.size())return;
         MEMORY_BASIC_INFORMATION region{};
@@ -142,6 +142,10 @@ LONG WINAPI CrashFilter(EXCEPTION_POINTERS* info) {
             functionCount,static_cast<unsigned long long>(frame),vm.localId,vm.localCount);
         if(size>0)RawWrite(report,message,static_cast<DWORD>(size));
     }
+    {
+        char watch[2048];const int used=FormatStaticWatchHits(watch,sizeof(watch));
+        if(used>0)RawWrite(report,watch,static_cast<DWORD>(used));
+    }
     const auto last=nextNativeEvent.load(std::memory_order_acquire);
     for(auto n=last>nativeEvents.size()?last-nativeEvents.size()+1:1;n<=last;++n) {
         const auto& event=nativeEvents[(n-1)%nativeEvents.size()];
@@ -197,6 +201,24 @@ LONG WINAPI CrashFilter(EXCEPTION_POINTERS* info) {
                 std::uintptr_t pointer=0;std::memcpy(&pointer,glass.data()+field.first,8);
                 memory.Add(pointer,std::min<std::size_t>(field.second,0x100000));
             }
+        }
+        // Test32: client per-place glass states and the server place records
+        // that drive shatter requests, plus image data any faulting register
+        // references (a corrupted static command entry was not captured).
+        memory.Add(base+0x3fef50,0x1400);
+        std::uintptr_t serverGlass=0;
+        if(ReadProcessMemory(process,reinterpret_cast<void*>(base+0xcf75a8),&serverGlass,sizeof(serverGlass),&read) && serverGlass) {
+            memory.Add(serverGlass,0x40);
+            std::uintptr_t records=0;unsigned places=0;
+            if(ReadProcessMemory(process,reinterpret_cast<void*>(serverGlass),&records,sizeof(records),&read)
+               && ReadProcessMemory(process,reinterpret_cast<void*>(serverGlass+8),&places,sizeof(places),&read)
+               && places && places<=0x400)
+                memory.Add(records,places*12ull+0x40);
+        }
+        const auto* context=info->ContextRecord;
+        for(const auto value:{context->Rax,context->Rbx,context->Rcx,context->Rdx,context->Rsi,context->Rdi,context->Rbp,
+                              context->R8,context->R9,context->R10,context->R11,context->R12,context->R13,context->R14,context->R15}) {
+            if(value>=base+0x3bc000 && value<base+0x4000000)memory.Add((value&~0xffull)-0x100,0x300);
         }
         MINIDUMP_CALLBACK_INFORMATION callbacks{IncludeNativeVmMemory,&memory};
         BOOL ok = MiniDumpWriteDump(GetCurrentProcess(), GetCurrentProcessId(), dump, type,

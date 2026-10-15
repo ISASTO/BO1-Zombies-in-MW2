@@ -1,0 +1,41 @@
+{
+  "executable_sha256": "fb7e8a987c371dea7b666091b0b9e2011c0cd9cd277b191ad453d11d557dd777",
+  "previous_revision": "202b64b0f1dc7f2efcf764c7cb10b3eedbecca9d",
+  "returned_crash_rva": "0x1095e5",
+  "returned_crash_is_corrupted_ret": true,
+  "old_native_overruns": {
+    "old-degenerate": {
+      "guard_fault_rva": "0x10ab15",
+      "exact_native_writer": true
+    },
+    "old-full": {
+      "guard_fault_rva": "0x109e9c",
+      "exact_native_writer": true
+    }
+  },
+  "corrected_native_results": {
+    "valid_geometry_byte_comparisons": 13,
+    "degenerate_and_output_rejections": 168,
+    "input_rejections": 5,
+    "native_producer_publication_cases": 2,
+    "valid_piece_publications": 1,
+    "output_guard_exact_bytes": 924,
+    "invalid_fragment_counter": 161,
+    "output_rejection_counter": 8,
+    "input_rejection_counter": 5
+  },
+  "unwind_audit": {
+    "standalone_unwind_entries": 4,
+    "native_frame_descriptions_match": true,
+    "body_relays_keep_rsp": true,
+    "windows_RtlVirtualUnwind_executed": false
+  },
+  "substitutions": [
+    "CRT memset/memmove use MS-ABI wrappers",
+    "stack probe is a fixture return; native frame sizes stay unchanged",
+    "native producer boundary helper supplies controlled geometry",
+    "native publication callback records valid pieces; no world/asset allocation"
+  ],
+  "scope": "Exact native polygon generation, edge bookkeeping and producer publication decision run on Linux with a guard at the original 924-byte output boundary. Valid polygons compare byte-for-byte with Test30. No Windows mission or actual glass physics/rendering is exercised.",
+  "causal_limit": "The fixture reproduces the two-vertex output overrun mechanism at its native writer. The returned crash occurs later at RET after stack corruption; the first malformed topology update is not captured."
+}
