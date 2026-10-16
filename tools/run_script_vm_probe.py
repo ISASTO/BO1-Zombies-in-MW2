@@ -50,11 +50,20 @@ def run(executable):
     if s['lookup_misses'] or e['lookup_misses']:raise ValueError('Native lookup lost a child')
     if e['children_before_error']<3.9*s['children_before_error']:raise ValueError('Expanded capacity below expectation')
     if s['marked']!=s['mark_chain_objects'] or e['marked']!=e['mark_chain_objects'] or e['mark_highest_id']<0xf000:raise ValueError('Savegame mark incomplete')
+    for name,r in (('stock',s),('expanded',e)):
+        if r['object_keys_referenced']!=2 or r['object_keys_kept_alive']!=2 or r['object_keys_released']!=2 or not r['object_key_marked_for_save'] or not r['array_index_boundary']:
+            raise ValueError(f'{name}: object-keyed children lose references: '+json.dumps({k:v for k,v in r.items() if k.startswith(('object_key','array_index','lowest'))}))
+    if s['saved_object_numbers']!={'4660':'restored','33059':'fault'}:raise ValueError('Stock saved-object-number decode did not reproduce: '+json.dumps(s['saved_object_numbers']))
+    if set(e['saved_object_numbers'].values())!={'restored'} or len(e['saved_object_numbers'])!=3:raise ValueError('Saved object numbers not restored: '+json.dumps(e['saved_object_numbers']))
+    if s['entity_handles_before_error']!=0xfff or 'ENT_HANDLE_COUNT' not in s['entity_handle_error']:raise ValueError('Stock entity handle exhaustion did not reproduce: '+json.dumps({k:v for k,v in s.items() if k.startswith('entity_handle')}))
+    if e['entity_handles_before_error']!=0x7fff or e['entity_handles_linked']!=0x7fff or e['entity_handles_cleared']!=e['entity_handles_before_error'] or e['entity_handles_refill']!=e['entity_handles_before_error']:
+        raise ValueError('Entity handle pool not expanded or not released: '+json.dumps({k:v for k,v in e.items() if k.startswith('entity_handle')}))
+    if e['object_key_high']<0xf000 or e['object_key_marked_id']<0xf000:raise ValueError('Object-key test did not reach high parent ids')
     if s['parent_objects_before_error']>36870 or e['parent_objects_before_error']<65000:raise ValueError('Parent space not expanded')
     if not e.get('mt_routing') or e.get('checkpoint_slot_bytes')!=0x2000000 or e.get('single_pool5_children')!=0xc7ff:raise ValueError('Early capacity checks incomplete')
     return {'executable_sha256':EXACT_SHA256,'metadata':meta,'stock':s,'expanded':e,'header_relocated_region':h,
             'capacity_ratio':round(e['children_before_error']/s['children_before_error'],3),
-            'returned_error':'exceeded maximum number of child1 script variables (Test33 Estate 179 actors, Contingency ~111)',
+            'returned_error':'Test36: exceeded maximum number of child1/parent script variables and VM thread-resume crashes at 0x227ddc with pools at most 25% used',
             'substitutions':['native error reporters 0x2906b0 and 0x1fb5f0 record the message and unwind'],
             'scope':'Exact native InitVariables, AllocObject, GetNewVariable, FindArrayVariable, RemoveVariable, RemoveRefToObject, MT_Init, MT_Alloc, MT_AllocIndex, MT_Free and checkpoint slot init on Linux with guard pages after the relocated list and dobj records. No Windows mission or real level scripts.'}
 

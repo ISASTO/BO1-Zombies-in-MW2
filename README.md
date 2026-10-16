@@ -1,7 +1,15 @@
 # BO1 Zombies in MW2
 
 Incremental mod framework for **retail Modern Warfare 2 (2009), single player**.
-Current build: **0.1.35-squad-test36**.
+Current build: **0.1.36-squad-test37**.
+
+Test37 fixes the cause of the false "child1/parent exceeded" errors and the VM
+crash seen in Test35/36: object ids above 0x8fff were not recognised as
+object keys (notify/endon wait lists), so waiting threads lost their
+references. It also makes saved object numbers unsigned (checkpoints with
+32,768+ objects), expands entity handle records 4,095 → 32,767, adds
+telemetry for the last unmeasured fatal limits, and records the full 32 → 256
+[capacity sweep](docs/capacity-sweep-test37.md). See [Test37](docs/squad-test37.md).
 
 Test36 fixes Test35's checkpoint corruption (false "child0/child1 exceeded"
 errors and a black screen after loading a checkpoint): the savegame marker
@@ -24,8 +32,8 @@ bridge, 72 MiB GPU/CPU skinning buffers, guarded animated-record storage and
 16-bit handles remain active. Rendering and actor regressions are rerun.
 Windows missions and stable 256-actor retail gameplay require owner testing.
 
-Install the complete Test36 package (run its Uninstall.cmd first to remove
-Test35). Follow the [Test36 retest instructions](docs/test36-testing-protocol.md):
+Install the complete Test37 package (run its Uninstall.cmd first to remove
+Test36). Follow the [Test37 retest instructions](docs/test37-testing-protocol.md):
 Estate and Contingency to 256, plus a checkpoint reload with a crowd. The
 [full crowd protocol](docs/test31-crowd-protocol.md) covers later stages.
 

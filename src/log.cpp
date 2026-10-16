@@ -147,9 +147,10 @@ LONG WINAPI CrashFilter(EXCEPTION_POINTERS* info) {
         if(size>0)RawWrite(report,message,static_cast<DWORD>(size));
     }
     if(const auto vm=ReadScriptVmUsage();vm.valid) {
-        size=std::snprintf(message,sizeof(message),"script_vm children=%u/%u peak_pool=%u/%u parents=%u/%u string_nodes=%u/%u pointer_heap=%llu entities=%u/%u dobj_transfers=%u/%u\r\n",
+        size=std::snprintf(message,sizeof(message),"script_vm children=%u/%u peak_pool=%u/%u parents=%u/%u string_nodes=%u/%u pointer_heap=%llu entities=%u/%u dobj_transfers=%u/%u entity_handles=%u/%u model_lighting=%u,%u/%u\r\n",
             vm.childTotal,vm.childCapacity,vm.childPeakPool,vm.poolCapacity,vm.parents,vm.parentCapacity,vm.mtNativeUsedNodes,vm.mtNativeNodes,
-            static_cast<unsigned long long>(vm.heapUsed),vm.entitiesInUse,vm.entityCapacity,vm.dobjTransfers,vm.dobjCapacity);
+            static_cast<unsigned long long>(vm.heapUsed),vm.entitiesInUse,vm.entityCapacity,vm.dobjTransfers,vm.dobjCapacity,
+            vm.entityHandles,vm.entityHandleCapacity,vm.modelLighting[0],vm.modelLighting[1],vm.modelLightingCapacity);
         if(size>0)RawWrite(report,message,static_cast<DWORD>(size<2048?size:2047));
     }
     {

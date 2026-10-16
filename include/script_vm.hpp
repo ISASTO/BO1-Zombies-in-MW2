@@ -2,9 +2,11 @@
 #include <array>
 #include <cstdint>
 namespace mod {
-// Early (DllMain) native capacity: script child-variable pools 2 -> 8, the
-// script memory tree's pointer allocations moved to an owned heap, checkpoint
-// slot buffers 1 MiB -> 32 MiB and dobj transfer records 1024 -> 8192.
+// Early (DllMain) native capacity: script child-variable pools 2 -> 8 and
+// parent objects 36,856 -> 65,526 (with object-key names and saved object
+// numbers covering the full 16-bit id space), the script memory tree's pointer
+// allocations moved to an owned heap, checkpoint slot buffers 1 MiB -> 32 MiB,
+// dobj transfer records 1024 -> 8192 and entity handle records 4095 -> 32767.
 struct ScriptVmStatus {
     bool attempted=false,enabled=false;
     const char* reason="NOT_ATTEMPTED";
@@ -24,6 +26,11 @@ struct ScriptVmUsage {
     std::array<std::uint32_t,2> saveUsed{},saveSize{};
     unsigned entitiesInUse=0,entityCapacity=2046;
     unsigned dobjTransfers=0,dobjCapacity=0;
+    // Entity/sentient handle info records (fatal "ENT_HANDLE_COUNT exceeded").
+    unsigned entityHandles=0,entityHandleCapacity=0;
+    // Per-frame model lighting patches, both native frame slots (fatal
+    // "modelLightingPatchList ran out of elements" at 4096).
+    std::array<unsigned,2> modelLighting{};unsigned modelLightingCapacity=4096;
 };
 bool InstallScriptVmExpansion();
 const ScriptVmStatus& GetScriptVmStatus();

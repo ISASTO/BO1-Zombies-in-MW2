@@ -1,0 +1,108 @@
+{
+ "version": "0.1.36-squad-test37",
+ "base_commit": "1ddcbe96d02edc3722fea52fb593fe59507d5451",
+ "executable_sha256": "fb7e8a987c371dea7b666091b0b9e2011c0cd9cd277b191ad453d11d557dd777",
+ "dll_sha256": "ef92e4373895ba39489c711187645c01e05b51f0cf0ec460163e1958032f3b4c",
+ "dll_bytes": 6208857,
+ "compiler": "xPack MinGW-w64 GCC 13.2.0 (posix threads, UCRT), RelWithDebInfo, static GCC/C++ runtime",
+ "pe_checks": {
+  "amd64_pe32_plus": true,
+  "exact_ten_exports": true,
+  "aslr_and_nx": true,
+  "version_embedded": true,
+  "no_external_gcc_or_stdcpp_runtime": true
+ },
+ "imports": [
+  "bcrypt.dll",
+  "dbghelp.dll",
+  "gdi32.dll",
+  "kernel32.dll",
+  "api-ms-win-crt-*-l1-1-0.dll (11 UCRT API sets)",
+  "user32.dll",
+  "winmm.dll"
+ ],
+ "early_dllmain_native_edits": 691,
+ "early_dllmain_relays_with_unwind": 7,
+ "early_patch_checks": {
+  "parent_objects": 65526,
+  "object_name_end": "0x20000",
+  "object_name_sites": 6,
+  "array_index_sites": 4,
+  "save_id_read": "0x2193b6",
+  "entity_handle_records": 32767,
+  "stock_entity_handle_records": 4095,
+  "entity_handle_references": 7,
+  "struct_relative_map_b_sites": 4,
+  "capacity_rows_checked_disjoint": 508,
+  "runtime_signatures_unchanged": 99
+ },
+ "native_cxx_tests": {
+  "passed": 20,
+  "failed": 0
+ },
+ "python_tests": {
+  "passed": 38,
+  "failed": 0
+ },
+ "native_suites_and_audits_passed": [
+  "animation",
+  "audit",
+  "awareness",
+  "consumers",
+  "crowd",
+  "fracture",
+  "glass_state",
+  "history",
+  "iterator",
+  "resources",
+  "runtime",
+  "script_vm",
+  "sweep",
+  "tables",
+  "threat"
+ ],
+ "native_suites_and_audits_failed": [],
+ "note_runtime_suite": "killed once by the workspace OOM while other fixtures ran concurrently; rerun alone and passed",
+ "capacity_sweep": {
+  "instructions": 821614,
+  "pass1_hits": 251,
+  "pass1_patched": 227,
+  "pass2_relocated_targets": 47,
+  "pass2_unpatched": 0,
+  "pass3_bitmask_sites": 113,
+  "fails_on_test36_patch_set": true
+ },
+ "script_vm_results": {
+  "object_keys_referenced": 2,
+  "object_keys_kept_alive": 2,
+  "object_keys_released": 2,
+  "object_key_marked_for_save": true,
+  "array_index_boundary": true,
+  "lowest_array_index": -8257536,
+  "object_key_high": 65533,
+  "saved_object_numbers": {
+   "4660": "restored",
+   "33059": "restored",
+   "65520": "restored"
+  },
+  "entity_handles_before_error": 32767,
+  "entity_handles_cleared": 32767,
+  "entity_handles_refill": 32767,
+  "parent_objects_before_error": 65526,
+  "children_before_error": 409487,
+  "marked": 65462,
+  "mark_chain_objects": 65462
+ },
+ "stock_reproductions": {
+  "saved_object_numbers": {
+   "4660": "restored",
+   "33059": "fault"
+  },
+  "entity_handles_before_error": 4095,
+  "entity_handle_error": "ENT_HANDLE_COUNT exceeded - increase size",
+  "test36_object_keys": "key 0xfffd: keyed 1 of 2, not marked for save, index boundary overlaps (fixture run on the Test36 patch set)"
+ },
+ "returned_result_analysis": "docs/runtime-test37-evidence.json",
+ "windows_gameplay_tested": false,
+ "scope": "Exact native script-variable, object-key, save-id codec, entity-handle, savegame mark/sweep, memory-tree and checkpoint-slot code; all earlier native suites; static capacity sweep. Windows gameplay requires owner testing."
+}

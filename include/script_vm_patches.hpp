@@ -4,10 +4,11 @@
 #include <cstdint>
 #include <vector>
 namespace mod::script_vm {
-inline constexpr std::uint32_t kRegionRva=0x6000000,kRegionBytes=0xb35000,kCountsRva=0x6001000,kListRva=0x6002000,kUnwindRva=0x6000800;
+inline constexpr std::uint32_t kRegionRva=0x6000000,kRegionBytes=0xbb6000,kCountsRva=0x6001000,kListRva=0x6002000,kUnwindRva=0x6000800;
 inline constexpr std::uint32_t kPools=8,kPoolStride=0xc801,kChildBase=0x10002,kParentEnd=0xffff,kEntries=0x7400a;
 inline constexpr std::uint32_t kMapRvas[2]={0x15a03e8,0x15c4400},kMapBytes=0x20000;
 inline constexpr std::uint32_t kListGuardRva=0x6ae3000,kDobjRva=0x6ae4000,kDobjGuardRva=0x6b34000,kDobjRecords=0x2000,kSaveCellsRva=0x6001100,kSaveBytes=0x2000000,kMtCellsRva=0x6001200;
+inline constexpr std::uint32_t kEntityHandleRva=0x6b35000,kEntityHandleGuardRva=0x6bb5000,kEntityHandleRecords=0x8000,kEntityHandleHeadRva=0xcf6000;
 struct Fixup {unsigned offset,width;std::uint32_t target,end;bool relative;};
 struct Patch {std::uint32_t rva;const char* before;const char* after;std::vector<Fixup> fixups;};
 struct Relay {std::uint32_t begin,end,unwind;};
@@ -21,6 +22,13 @@ inline constexpr std::array<Relay,7> kRelays{{
     {0x6000480,0x60004c0,0x60008f0},
 }};
 inline const std::vector<Patch> kPatches{
+    {0x15aef1,"4c8d0d08b1b800","4c8d0d08b1b800",{{3,4,0x6b35000,0x15aef8,true}}},
+    {0x15afad,"4c8d054cb0b800","4c8d054cb0b800",{{3,4,0x6b35000,0x15afb4,true}}},
+    {0x15b005,"488d150cb0b800","488d150cb0b800",{{3,4,0x6b35018,0x15b00c,true}}},
+    {0x15b01c,"3d00100000","3d00800000",{}},
+    {0x15b031,"668905c0afb900","668905c0afb900",{{3,4,0x6bb4ff8,0x15b038,true}}},
+    {0x15b09a,"4c8d155fafb800","4c8d155fafb800",{{3,4,0x6b35000,0x15b0a1,true}}},
+    {0x15b13a,"4c8d05bfaeb800","4c8d05bfaeb800",{{3,4,0x6b35000,0x15b141,true}}},
     {0x1909d8,"83e001","83e007",{}},
     {0x1909f2,"418d8c2402900000","418d8c2402000100",{}},
     {0x1ad9e0,"81fa00001000","81fa00000002",{}},
@@ -113,6 +121,7 @@ inline const std::vector<Patch> kPatches{
     {0x21917a,"488d157fb23a01","488d157fb23a01",{{3,4,0x6002000,0x219181,true}}},
     {0x219181,"0502900000","0502000100",{}},
     {0x219309,"488d3dd8903901","488d3dd8903901",{{3,4,0x15c4400,0x219310,true}}},
+    {0x2193b6,"0fbf7c2438","0fb77c2438",{}},
     {0x2193c4,"488d347de8235b01","488d347de8235b01",{{4,4,0x15c4400,0x0,false}}},
     {0x219525,"0fb78c45e8235b01","0fb78c45e8235b01",{{4,4,0x15c4400,0x0,false}}},
     {0x219550,"0fb78c7de8235b01","0fb78c7de8235b01",{{4,4,0x15c4400,0x0,false}}},
@@ -185,6 +194,8 @@ inline const std::vector<Patch> kPatches{
     {0x21ba8c,"488dae00445c01","488dae00445c01",{{3,4,0x6002000,0x0,false}}},
     {0x21bac2,"8b843110445c01","8b843110445c01",{{3,4,0x6002010,0x0,false}}},
     {0x21bad4,"6683bc3108445c0100","6683bc3108445c0100",{{4,4,0x6002008,0x0,false}}},
+    {0x21bb11,"8d8200707e00","8d8200007e00",{}},
+    {0x21bb17,"3dff6ffe00","3dfffffd00",{}},
     {0x21bb79,"488d3d80883a01","488d3d80883a01",{{3,4,0x6002000,0x21bb80,true}}},
     {0x21bbb8,"4183e101","4183e107",{}},
     {0x21bc19,"4c8d35e0873a01","4c8d35e0873a01",{{3,4,0x6002000,0x21bc20,true}}},
@@ -340,6 +351,7 @@ inline const std::vector<Patch> kPatches{
     {0x21d112,"43ff842ab4035a01","43ff842ab4035a01",{{4,4,0x6001000,0x0,false}}},
     {0x21d12d,"428b841110445c01","428b841110445c01",{{4,4,0x6002010,0x0,false}}},
     {0x21d140,"6642ff84110a445c01","6642ff84110a445c01",{{5,4,0x600200a,0x0,false}}},
+    {0x21d15d,"4181ff00900100","4181ff00000200",{}},
     {0x21d196,"6641ff84c208445c01","6641ff84c208445c01",{{5,4,0x6002008,0x0,false}}},
     {0x21d22a,"4c8d25cf713a01","4c8d25cf713a01",{{3,4,0x6002000,0x21d231,true}}},
     {0x21d247,"83e001","83e007",{}},
@@ -369,9 +381,12 @@ inline const std::vector<Patch> kPatches{
     {0x21d679,"8d8a02900000","8d8a02000100",{}},
     {0x21d681,"488d05806d3a01","488d05806d3a01",{{3,4,0x6002008,0x21d688,true}}},
     {0x21d6a7,"488d0d626d3a01","488d0d626d3a01",{{3,4,0x6002010,0x21d6ae,true}}},
+    {0x21d6c0,"8d8100707e00","8d8100007e00",{}},
+    {0x21d6c6,"3dff6ffe00","3dfffffd00",{}},
     {0x21d6e8,"4c8d3d116d3a01","4c8d3d116d3a01",{{3,4,0x6002000,0x21d6ef,true}}},
     {0x21d6f4,"83e201","83e207",{}},
     {0x21d709,"81c302900000","81c302000100",{}},
+    {0x21d766,"81f900900100","81f900000200",{}},
     {0x21d915,"81e901900000","81e901000100",{}},
     {0x21d91d,"81f901c800007524","9090909090909090",{}},
     {0x21d983,"4c8d05766a3a01","4c8d05766a3a01",{{3,4,0x6002000,0x21d98a,true}}},
@@ -413,6 +428,7 @@ inline const std::vector<Patch> kPatches{
     {0x21dea2,"83e301","83e307",{}},
     {0x21deb3,"81c602900000","81c602000100",{}},
     {0x21dec8,"83e001","83e007",{}},
+    {0x21df11,"3d00900100","3d00000200",{}},
     {0x21df69,"418d8f02900000","418d8f02000100",{}},
     {0x21df7b,"418d8f02900000","418d8f02000100",{}},
     {0x21e05b,"83e001","83e007",{}},
@@ -431,12 +447,16 @@ inline const std::vector<Patch> kPatches{
     {0x21e4d5,"83e001","83e007",{}},
     {0x21e4df,"418d8002900000","418d8002000100",{}},
     {0x21e4e8,"418d9802900000","418d9802000100",{}},
+    {0x21e550,"3d00900100","3d00000200",{}},
+    {0x21e5b6,"8d8100707e00","8d8100007e00",{}},
+    {0x21e5bc,"3dff6ffe00","3dfffffd00",{}},
     {0x21e5fb,"83e001","83e007",{}},
     {0x21e607,"81c102900000","81c102000100",{}},
     {0x21e616,"83e001","83e007",{}},
     {0x21e62d,"83e001","83e007",{}},
     {0x21e636,"4c8d05c35d3a01","4c8d05c35d3a01",{{3,4,0x6002000,0x21e63d,true}}},
     {0x21e63d,"81c202900000","81c202000100",{}},
+    {0x21e682,"3d00900100","3d00000200",{}},
     {0x21e706,"83e101","83e107",{}},
     {0x21e715,"8d9d02900000","8d9d02000100",{}},
     {0x21e735,"8d8d02900000","8d8d02000100",{}},
@@ -468,6 +488,8 @@ inline const std::vector<Patch> kPatches{
     {0x21f03b,"6641898cc408445c01","6641898cc408445c01",{{5,4,0x6002008,0x0,false}}},
     {0x21f044,"664589acc40a445c01","664589acc40a445c01",{{5,4,0x600200a,0x0,false}}},
     {0x21f198,"488d2d61523a01","488d2d61523a01",{{3,4,0x6002000,0x21f19f,true}}},
+    {0x21f1c6,"418d8100707e00","418d8100007e00",{}},
+    {0x21f1cd,"3dff6ffe00","3dfffffd00",{}},
     {0x21f1e1,"83e001","83e007",{}},
     {0x21f200,"8d8b02900000","8d8b02000100",{}},
     {0x21f21d,"8d8b02900000","8d8b02000100",{}},
@@ -538,6 +560,7 @@ inline const std::vector<Patch> kPatches{
     {0x22108e,"b902900000","b902000100",{}},
     {0x2210cb,"488d353e333a01","488d353e333a01",{{3,4,0x6002010,0x2210d2,true}}},
     {0x2210fc,"81fb00900000","81fbfeff0000",{}},
+    {0x221138,"81fa00900100","81fa00000200",{}},
     {0x2211ea,"83e001","83e007",{}},
     {0x221201,"448db502900000","448db502000100",{}},
     {0x22122e,"8d8d02900000","8d8d02000100",{}},

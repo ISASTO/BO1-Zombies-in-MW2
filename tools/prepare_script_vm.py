@@ -29,6 +29,17 @@ OLD_PARENT_END=0x9001; OLD_CHILD_BASE=0x9002
 # Test35: parents fill the whole 16-bit id space (ids 0..0xfffd); children
 # move above it. Child relative ids stay 16-bit within each pool.
 PARENT_END=0xffff; CHILD_BASE=0x10002
+# Variable names: < 0x10000 string, 0x10000+id an object key (notify/endon
+# wait lists, object-keyed arrays), else an int key (index+0x800000 mod 2^24).
+# Stock decodes object keys as < 0x10000+0x9000; with ids up to 0xfffd that
+# range must end at 0x20000, and the int-index range must shrink to match.
+OLD_OBJECT_NAME_END=0x10000+(OLD_PARENT_END-1); OBJECT_NAME_END=0x10000+PARENT_END+1
+OBJECT_NAME_SITES=(0x21d15d,0x21d766,0x21df11,0x21e550,0x21e682,0x221138)
+# Checkpoint loader: saved object numbers are unsigned 16-bit (written by
+# 0x219bc0 as a raw WORD) but 0x219360 reads them with movsx, so a save with
+# >= 0x8000 objects indexes the save map with 0xffff8000+ and faults.
+SAVE_ID_READ=(0x2193b6,'0fbf7c2438','0fb77c2438')
+ARRAY_INDEX_SITES=((0x21bb11,0x21bb17),(0x21d6c0,0x21d6c6),(0x21e5b6,0x21e5bc),(0x21f1c6,0x21f1cd))
 OLD_LIST=0x15c4400; OLD_ENTRIES=OLD_CHILD_BASE+2*POOL_STRIDE; OLD_END=OLD_LIST+OLD_ENTRIES*24
 # Savegame object maps indexed by parent id / save id (0x9000 WORDs each).
 OLD_MAPS=(0x15a03e8,0x15b23e8); OLD_MAP_BYTES=0x12000; MAP_BYTES=(PARENT_END*2+0xfff)&~0xfff
@@ -50,7 +61,14 @@ LIST_GUARD=(LIST+LIST_BYTES+0xfff)&~0xfff          # inaccessible page after the
 DOBJ_OLD=0x1c0f240; DOBJ_STOCK=0x400; DOBJ_RECORDS=0x2000; DOBJ_STRIDE=40
 DOBJ=LIST_GUARD+0x1000
 DOBJ_GUARD=(DOBJ+DOBJ_RECORDS*DOBJ_STRIDE+0xfff)&~0xfff
-REGION_BYTES=DOBJ_GUARD+0x1000-REGION
+# Entity/sentient handle info records (16 bytes, u16 index, stock 4096 incl.
+# the null record; exhaustion is the fatal "ENT_HANDLE_COUNT exceeded").
+# Every set EntHandle and SentientHandle owns one: ~10-15 per busy actor.
+ENTH_OLD=0xce6000; ENTH_STOCK=0x1000; ENTH_RECORDS=0x8000; ENTH_STRIDE=16; ENTH_HEAD=0xcf6000
+ENTH=DOBJ_GUARD+0x1000
+ENTH_GUARD=(ENTH+ENTH_RECORDS*ENTH_STRIDE+0xfff)&~0xfff
+ENTH_REFERENCES=7      # 4 base leas, init cursor lea, last-record terminator, init bound
+REGION_BYTES=ENTH_GUARD+0x1000-REGION
 CODE_BYTES=0x500; UNWIND=REGION+0x800
 # Checkpoint slots: two static 1 MiB buffers; overflow is the fatal
 # "MemFile_StartSegment: Out of memory". Owned buffers are published through
@@ -252,6 +270,32 @@ def prepare(pe,raw):
         if i.operands[1].imm!=before or i.imm_size!=4:raise ValueError(f'Parent bound differs at {at:x}')
         after=bytearray(i.bytes);after[i.imm_offset:i.imm_offset+4]=struct.pack('<I',value)
         put(at,after,'parent id bound')
+    # 4c. Object-key name range and the int array-index range next to it.
+    # Every operand in .text equal to the stock bounds must be one of these
+    # sites; anything else fails the build.
+    bounds={OLD_OBJECT_NAME_END:'object name end',0x800000-OLD_OBJECT_NAME_END:'array index bias',
+            0x1000000-OLD_OBJECT_NAME_END-1:'array index span'}
+    found=sorted((i.address,bounds[o.imm if o.type==X86_OP_IMM else o.mem.disp]) for i in code for o in i.operands
+                 if (o.type==X86_OP_IMM and o.imm in bounds and not i.mnemonic.startswith(('call','j','loop'))) or (o.type==X86_OP_MEM and o.mem.base!=X86_REG_RIP and o.mem.disp in bounds))
+    want=sorted([(a,'object name end') for a in OBJECT_NAME_SITES]+[(a,'array index bias') for a,_ in ARRAY_INDEX_SITES]+
+                [(b,'array index span') for _,b in ARRAY_INDEX_SITES])
+    if found!=want:raise ValueError(f'Object-key name range inventory differs: {[(hex(a),k) for a,k in found]}')
+    for at in OBJECT_NAME_SITES:
+        i=next(x for x in code if x.address==at)
+        if i.mnemonic!='cmp' or i.operands[1].imm!=OLD_OBJECT_NAME_END or i.imm_size!=4:raise ValueError(f'Object name bound differs at {at:x}')
+        after=bytearray(i.bytes);after[i.imm_offset:i.imm_offset+4]=struct.pack('<I',OBJECT_NAME_END)
+        put(at,after,'object-key names cover every parent id')
+    for bias,span in ARRAY_INDEX_SITES:
+        i=next(x for x in code if x.address==bias);j=next(x for x in code if x.address==span)
+        if (i.mnemonic!='lea' or i.disp_size!=4 or i.operands[1].mem.disp!=0x800000-OLD_OBJECT_NAME_END or
+            j.mnemonic!='cmp' or j.imm_size!=4 or j.operands[1].imm!=0x1000000-OLD_OBJECT_NAME_END-1 or i.address+i.size!=j.address):
+            raise ValueError(f'Array index check differs at {bias:x}')
+        a=bytearray(i.bytes);a[i.disp_offset:i.disp_offset+4]=struct.pack('<I',0x800000-OBJECT_NAME_END)
+        b=bytearray(j.bytes);b[j.imm_offset:j.imm_offset+4]=struct.pack('<I',0x1000000-OBJECT_NAME_END-1)
+        put(bias,a,'int array keys stay clear of object-key names');put(span,b,'int array keys stay clear of object-key names')
+    at,before,after=SAVE_ID_READ
+    if orig(at,len(before)//2).hex()!=before:raise ValueError(f'Saved object number read differs at {at:x}')
+    put(at,bytes.fromhex(after),'saved object numbers are unsigned 16-bit')
     mapref=[]
     for i in code:
         for o in i.operands:
@@ -313,6 +357,22 @@ def prepare(pe,raw):
     if i.mnemonic!='cmp' or i.operands[1].imm!=DOBJ_STOCK or i.imm_size!=4:raise ValueError('Dobj transfer bound differs')
     after=bytearray(i.bytes);after[i.imm_offset:i.imm_offset+4]=struct.pack('<I',DOBJ_RECORDS)
     put(i.address,after,'dobj transfer capacity')
+    # 6b. Entity handle info records.
+    enthrefs=[]
+    for i in code:
+        for o in i.operands:
+            if o.type!=X86_OP_MEM or o.mem.base!=X86_REG_RIP:continue
+            t=i.address+i.size+o.mem.disp
+            if ENTH_OLD<=t<ENTH_OLD+ENTH_STOCK*ENTH_STRIDE:enthrefs.append((i,t))
+    want={0x15aef1:ENTH_OLD,0x15afad:ENTH_OLD,0x15b09a:ENTH_OLD,0x15b13a:ENTH_OLD,0x15b005:ENTH_OLD+0x18,0x15b031:ENTH_OLD+(ENTH_STOCK-1)*ENTH_STRIDE+8}
+    if {i.address:t for i,t in enthrefs}!=want:raise ValueError(f'Entity handle reference inventory differs: {[(hex(i.address),hex(t)) for i,t in enthrefs]}')
+    for i,t in enthrefs:
+        new=ENTH+(ENTH_RECORDS-1)*ENTH_STRIDE+8 if i.address==0x15b031 else ENTH+(t-ENTH_OLD)
+        put(i.address,i.bytes,'relocated entity handle records',[(i.disp_offset,4,new,i.address+i.size,True)])
+    i=next(x for x in code if x.address==0x15b01c)
+    if i.mnemonic!='cmp' or i.operands[1].imm!=ENTH_STOCK or i.imm_size!=4:raise ValueError('Entity handle init bound differs')
+    after=bytearray(i.bytes);after[i.imm_offset:i.imm_offset+4]=struct.pack('<I',ENTH_RECORDS)
+    put(i.address,after,'entity handle capacity')
     # 7. Relay code and unwind data in the owned region.
     blob=build_relays()
     relay_fixups=[]
@@ -346,7 +406,7 @@ def prepare(pe,raw):
           'region_rva':hex(REGION),'region_bytes':REGION_BYTES,'list_references':len(listrefs),
           'selector_masks':len(selectors),'selector_imul_sites':len(imuls),'parent_head_masks':len(PARENT_HEADS),
           'relays':[{'begin':hex(b),'end':hex(e),'native_frame_site':hex(s) if isinstance(s,int) else s} for b,e,s in RELAYS],
-          'list_guard_rva':hex(LIST_GUARD),'struct_relative_map_b_sites':STRUCT_MAP_B_SITES,'dobj_rva':hex(DOBJ),'dobj_records':DOBJ_RECORDS,'stock_dobj_records':DOBJ_STOCK,'dobj_references':len(dobjrefs),
+          'list_guard_rva':hex(LIST_GUARD),'struct_relative_map_b_sites':STRUCT_MAP_B_SITES,'object_name_end':hex(OBJECT_NAME_END),'save_id_read':hex(SAVE_ID_READ[0]),'object_name_sites':len(OBJECT_NAME_SITES),'array_index_sites':len(ARRAY_INDEX_SITES),'dobj_rva':hex(DOBJ),'dobj_records':DOBJ_RECORDS,'stock_dobj_records':DOBJ_STOCK,'dobj_references':len(dobjrefs),'entity_handle_records':ENTH_RECORDS-1,'stock_entity_handle_records':ENTH_STOCK-1,'entity_handle_rva':hex(ENTH),'entity_handle_references':ENTH_REFERENCES,
           'save_slot_bytes':SAVE_BYTES,'stock_save_slot_bytes':SAVE_STOCK,'save_lea_sites':len(SAVE_LEAS),'save_size_sites':len(SAVE_SIZES),
           'mt_cells_rva':hex(MT_CELLS),'save_cells_rva':hex(SAVE_CELLS)}
     return rows,meta
@@ -408,6 +468,7 @@ def generate(rows,meta,output):
         h.write('inline constexpr std::uint32_t kPools=%d,kPoolStride=0x%x,kChildBase=0x%x,kParentEnd=0x%x,kEntries=0x%x;\n'%(POOLS,POOL_STRIDE,CHILD_BASE,PARENT_END,ENTRIES))
         h.write('inline constexpr std::uint32_t kMapRvas[2]={0x%x,0x%x},kMapBytes=0x%x;\n'%(MAPS[0],MAPS[1],MAP_BYTES))
         h.write('inline constexpr std::uint32_t kListGuardRva=0x%x,kDobjRva=0x%x,kDobjGuardRva=0x%x,kDobjRecords=0x%x,kSaveCellsRva=0x%x,kSaveBytes=0x%x,kMtCellsRva=0x%x;\n'%(LIST_GUARD,DOBJ,DOBJ_GUARD,DOBJ_RECORDS,SAVE_CELLS,SAVE_BYTES,MT_CELLS))
+        h.write('inline constexpr std::uint32_t kEntityHandleRva=0x%x,kEntityHandleGuardRva=0x%x,kEntityHandleRecords=0x%x,kEntityHandleHeadRva=0x%x;\n'%(ENTH,ENTH_GUARD,ENTH_RECORDS,ENTH_HEAD))
         h.write('struct Fixup {unsigned offset,width;std::uint32_t target,end;bool relative;};\n')
         h.write('struct Patch {std::uint32_t rva;const char* before;const char* after;std::vector<Fixup> fixups;};\n')
         h.write('struct Relay {std::uint32_t begin,end,unwind;};\n')

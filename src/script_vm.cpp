@@ -6,6 +6,7 @@
 #include "script_vm.hpp"
 #include "script_vm_patches.hpp"
 #include "script_heap.hpp"
+#include "crowd_resources.hpp"
 #include <windows.h>
 #include <atomic>
 #include <algorithm>
@@ -121,7 +122,8 @@ bool Apply(){
     DWORD old=0;
     if(!VirtualProtect(reinterpret_cast<void*>(region),0x1000,PAGE_EXECUTE_READ,&old)
        || !VirtualProtect(reinterpret_cast<void*>(Address(kListGuardRva)),0x1000,PAGE_NOACCESS,&old)
-       || !VirtualProtect(reinterpret_cast<void*>(Address(kDobjGuardRva)),0x1000,PAGE_NOACCESS,&old))return release("REGION_PROTECTION_FAILED");
+       || !VirtualProtect(reinterpret_cast<void*>(Address(kDobjGuardRva)),0x1000,PAGE_NOACCESS,&old)
+       || !VirtualProtect(reinterpret_cast<void*>(Address(kEntityHandleGuardRva)),0x1000,PAGE_NOACCESS,&old))return release("REGION_PROTECTION_FAILED");
     static std::array<RUNTIME_FUNCTION,kRelays.size()> functions{};
     for(std::size_t n=0;n<kRelays.size();++n)functions[n]={kRelays[n].begin-kRegionRva,kRelays[n].end-kRegionRva,kRelays[n].unwind-kRegionRva};
     if(!RtlAddFunctionTable(functions.data(),static_cast<DWORD>(functions.size()),region))return release("RELAY_UNWIND_REGISTRATION_FAILED");
@@ -157,7 +159,8 @@ ScriptVmUsage ReadScriptVmUsage(){
         u.children[k]=Read<unsigned>(Address(kCountsRva)+k*4);u.childTotal+=u.children[k];
         if(u.children[k]>u.childPeakPool)u.childPeakPool=u.children[k];
     }
-    // Parent objects: entries 1..0x9000; the first kPools are list heads.
+    // Parent objects: ids kPools..kParentEnd-2 (the first kPools ids are the
+    // free-list heads); status at entry id+1.
     const auto list=Address(kListRva);
     u.parentCapacity=kParentEnd-1-kPools;
     for(unsigned id=kPools;id<kParentEnd-1;++id)if(Read<std::uint32_t>(list+(id+1)*24+0x10)&0x60)++u.parents;
@@ -173,6 +176,20 @@ ScriptVmUsage ReadScriptVmUsage(){
     }
     for(unsigned n=0;n<2048;++n)if(Read<std::uint8_t>(host+kEntityInUse+n))++u.entitiesInUse;
     u.dobjTransfers=Read<std::uint32_t>(host+kDobjCount);u.dobjCapacity=kDobjRecords;
+    // Entity handle records: walk the free list (u16 next at +8) with a bound;
+    // the logging thread may race the engine, so stop on any invalid link.
+    u.entityHandleCapacity=kEntityHandleRecords-1;
+    {
+        const auto records=Address(kEntityHandleRva);unsigned freeRecords=0;
+        for(unsigned at=Read<std::uint32_t>(host+kEntityHandleHeadRva);at && at<kEntityHandleRecords && freeRecords<kEntityHandleRecords;++freeRecords)
+            at=Read<std::uint16_t>(records+std::uintptr_t(at)*16+8);
+        // Before G_InitGame links the pool its head is 0 (reads as exhausted).
+        u.entityHandles=u.entitiesInUse && freeRecords<=u.entityHandleCapacity?u.entityHandleCapacity-freeRecords:0;
+    }
+    for(unsigned n=0;n<2;++n) {
+        const auto count=Read<std::int32_t>(host+expansion::kRenderFrameBaseRva+n*expansion::kRenderFrameStride+0x41938);
+        u.modelLighting[n]=count>0?static_cast<unsigned>(count):0;
+    }
     u.valid=true;return u;
 }
 const char* ScriptVmSpawnRefusal(const ScriptVmUsage& u){
@@ -186,6 +203,8 @@ const char* ScriptVmSpawnRefusal(const ScriptVmUsage& u){
     if(u.parents+parentMargin>u.parentCapacity)return "SCRIPT_PARENT_VARIABLES";
     if(u.mtNativeUsedNodes+4096>u.mtNativeNodes)return "SCRIPT_STRINGS";
     if(u.entitiesInUse+128>u.entityCapacity)return "ENTITIES";
+    if(u.entityHandles+2048>u.entityHandleCapacity)return "ENTITY_HANDLES";
+    if(std::max(u.modelLighting[0],u.modelLighting[1])+512>u.modelLightingCapacity)return "MODEL_LIGHTING";
     return nullptr;
 }
 const char* ScriptVmEmergency(const ScriptVmUsage& u){
@@ -194,18 +213,23 @@ const char* ScriptVmEmergency(const ScriptVmUsage& u){
     if(u.childPeakPool+1024>u.poolCapacity)return "SCRIPT_CHILD_POOL";
     if(u.mtNativeUsedNodes+1024>u.mtNativeNodes)return "SCRIPT_STRINGS";
     if(u.entitiesInUse+32>u.entityCapacity)return "ENTITIES";
+    if(u.entityHandles+512>u.entityHandleCapacity)return "ENTITY_HANDLES";
+    if(std::max(u.modelLighting[0],u.modelLighting[1])+128>u.modelLightingCapacity)return "MODEL_LIGHTING";
     return nullptr;
 }
 void LogScriptVm(bool detailed){
     if(!status.enabled){Log("SCRIPT_VM enabled=0 attempted=%d reason=%s rva=0x%x",status.attempted,status.reason,status.failedRva);return;}
     if(!detailed){
-        Log("SCRIPT_VM enabled=1 pools=%u pool_capacity=%u parents_capacity=%u region=%p patches=%u relays=%u mt_heap=%p mt_heap_reserve=%llu checkpoint_slot_bytes=%u checkpoint_slots=%p,%p dobj_transfer_records=%u",
+        Log("SCRIPT_VM enabled=1 pools=%u pool_capacity=%u parents_capacity=%u region=%p patches=%u relays=%u mt_heap=%p mt_heap_reserve=%llu checkpoint_slot_bytes=%u checkpoint_slots=%p,%p dobj_transfer_records=%u entity_handle_records=%u object_key_names=0x10000-0x%x",
             kPools,kPoolStride-2,kParentEnd-1-kPools,reinterpret_cast<void*>(region),status.patches,status.relays,reinterpret_cast<void*>(heapBase),
-            static_cast<unsigned long long>(kHeapReserve),kSaveBytes,reinterpret_cast<void*>(status.saves[0]),reinterpret_cast<void*>(status.saves[1]),kDobjRecords);
+            static_cast<unsigned long long>(kHeapReserve),kSaveBytes,reinterpret_cast<void*>(status.saves[0]),reinterpret_cast<void*>(status.saves[1]),kDobjRecords,
+            kEntityHandleRecords-1,0x10000+kParentEnd);
         return;
     }
     const auto u=ReadScriptVmUsage();
-    static unsigned peakChildren=0,peakParents=0,peakNodes=0,peakEntities=0,peakSave=0;
+    static unsigned peakChildren=0,peakParents=0,peakNodes=0,peakEntities=0,peakSave=0,peakHandles=0,peakLighting=0;
+    if(u.entityHandles>peakHandles)peakHandles=u.entityHandles;
+    for(auto v:u.modelLighting)if(v>peakLighting)peakLighting=v;
     if(u.childTotal>peakChildren)peakChildren=u.childTotal;
     if(u.parents>peakParents)peakParents=u.parents;
     if(u.mtNativeUsedNodes>peakNodes)peakNodes=u.mtNativeUsedNodes;
@@ -218,7 +242,8 @@ void LogScriptVm(bool detailed){
         u.mtNativeUsedNodes,u.mtNativeNodes,peakNodes,static_cast<unsigned long long>(u.heapUsed),static_cast<unsigned long long>(u.heapPeak),
         static_cast<unsigned long long>(u.heapCommitted),static_cast<unsigned long long>(u.heapReserved),u.heapAllocations,u.heapFallbacks,
         u.heapRejectedFrees,u.heapSizeMismatches);
-    Log("ENGINE_LIMITS entities=%u/%u peak=%u checkpoint_cursor=%u,%u checkpoint_size=%u,%u checkpoint_peak=%u dobj_transfers=%u/%u",
-        u.entitiesInUse,u.entityCapacity,peakEntities,u.saveUsed[0],u.saveUsed[1],u.saveSize[0],u.saveSize[1],peakSave,u.dobjTransfers,u.dobjCapacity);
+    Log("ENGINE_LIMITS entities=%u/%u peak=%u checkpoint_cursor=%u,%u checkpoint_size=%u,%u checkpoint_peak=%u dobj_transfers=%u/%u entity_handles=%u/%u peak=%u model_lighting=%u,%u/%u peak=%u",
+        u.entitiesInUse,u.entityCapacity,peakEntities,u.saveUsed[0],u.saveUsed[1],u.saveSize[0],u.saveSize[1],peakSave,u.dobjTransfers,u.dobjCapacity,
+        u.entityHandles,u.entityHandleCapacity,peakHandles,u.modelLighting[0],u.modelLighting[1],u.modelLightingCapacity,peakLighting);
 }
 } // namespace mod

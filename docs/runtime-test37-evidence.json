@@ -1,0 +1,49 @@
+{
+ "returned_build": "0.1.35-squad-test36",
+ "installed_dll_sha256": "4e823db558e8cc2e66ac1c207fe637c396dd85eb88ad73f8bb4505c54049ec90",
+ "executable_sha256": "fb7e8a987c371dea7b666091b0b9e2011c0cd9cd277b191ad453d11d557dd777",
+ "owner_observations": [
+  "'exceeded maximum number of child1 script variables' (console and dialog)",
+  "'exceeded maximum number of parent script variables'",
+  "Diagnose.cmd 'LoaderProbe.exe is missing' (an old startup-diagnostic copy; not in the Test36 package)",
+  "capacity seems to be getting worse"
+ ],
+ "sessions": [
+  {
+   "log": "session-20261016-074117.log",
+   "sha256_prefix": "6bd2a028de8f36c8",
+   "map": "estate",
+   "last_owned": 153,
+   "last_usage": "children 83,828/409,592 (pools 10.4k-10.6k of 51,199), parents 27,297/65,526, entities 1,318/2,046",
+   "end": "access violation at iw4sp+0x227ddc resuming a script thread stack (crash-20261016-074117, local_id 16671)"
+  },
+  {
+   "log": "session-20261016-074247.log",
+   "sha256_prefix": "e1cd740db3035132",
+   "map": "estate",
+   "last_owned": 95,
+   "last_usage": "children 88,609 (pools ~11.1k of 51,199), parents 28,578/65,526, entities 1,311/2,046",
+   "end": "engine error dialog"
+  },
+  {
+   "log": "latest.log",
+   "sha256_prefix": "0c71f18712aa468a",
+   "map": "contingency",
+   "last_owned": 81,
+   "last_usage": "children 74,066 (pools ~9.3k of 51,199), parents 24,103/65,526, entities 1,472/2,046",
+   "end": "engine error dialog"
+  }
+ ],
+ "log_conclusion": "Every error came with every pool at most ~25% used: the pools were not full, their contents were corrupt.",
+ "native_reproduction": {
+  "fixture": "docs/script-vm-test37-probe.json",
+  "object_keys": "Test36 patch set: an array keyed by object 0xfffd holds no reference to it (keyed 1 of 2) and the savegame marker skips it; the int array-index check accepts indices whose names collide with object keys. Test37: both keys referenced, kept alive, released, and marked for save.",
+  "allocation_order": "after InitVariables the expanded allocator returns 8,16,24,... from one list: AllocObject balances by child-pool load, so childless thread objects accumulate on one list whose ids rise in steps of 8 and pass 0x9000 long before 36,864 objects are live",
+  "saved_object_numbers": "stock/Test36 reader faults on saved object number 0x8123 (signed 16-bit); Test37 restores 0x1234, 0x8123 and 0xfff0",
+  "entity_handles": "stock pool stops at 4,095 with 'ENT_HANDLE_COUNT exceeded - increase size'; Test37 links 32,767, releases all through the native entity free path and refills"
+ },
+ "cause": "Test35 raised parent object ids to 0xfffd but the engine encodes object keys (notify/endon wait lists, object-keyed arrays) as names 0x10000+id and decodes them with six '< 0x19000' checks sized for 0x9000 ids. Keys >= 0x9000 were treated as integer indices: no reference held, not marked for save, wrong on load. Waiting threads were freed while wait lists still pointed at them; their ids were reused; the VM resumed non-threads (0x227ddc) and double releases corrupted the free lists (false 'exceeded' errors).",
+ "not_established": [
+  "the exact first corrupting notify in each run"
+ ]
+}

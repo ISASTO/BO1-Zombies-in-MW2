@@ -1,0 +1,2330 @@
+{
+ "executable_sha256": "fb7e8a987c371dea7b666091b0b9e2011c0cd9cd277b191ad453d11d557dd777",
+ "instructions_swept": 821614,
+ "pass1_script_vm": {
+  "hits": 251,
+  "patched": 227,
+  "rows": [
+   {
+    "rva": "0xbf7b",
+    "instruction": "mov ecx, 0x9000",
+    "family": "parent count+0",
+    "status": "allocator size argument (non-VM buffer)"
+   },
+   {
+    "rva": "0x2544d",
+    "instruction": "mov edx, 0x9000",
+    "family": "parent count+0",
+    "status": "D3D resource size argument"
+   },
+   {
+    "rva": "0x2714b",
+    "instruction": "movzx edx, word ptr [r14 + rsi*4 + 0x48000]",
+    "family": "parent count x8",
+    "status": "table at +0x48000 (sound/stream)"
+   },
+   {
+    "rva": "0x27170",
+    "instruction": "mov word ptr [r14 + rcx*4 + 0x48000], dx",
+    "family": "parent count x8",
+    "status": "same table"
+   },
+   {
+    "rva": "0x289f7",
+    "instruction": "mov word ptr [rsi + rax*4 + 0x48000], cx",
+    "family": "parent count x8",
+    "status": "same table"
+   },
+   {
+    "rva": "0x28a21",
+    "instruction": "mov word ptr [rsi + rax*4 + 0x48000], cx",
+    "family": "parent count x8",
+    "status": "same table"
+   },
+   {
+    "rva": "0x296d1",
+    "instruction": "cmp edx, dword ptr [r8 + rbp*4 + 0x9000]",
+    "family": "parent count+0",
+    "status": "sound cache table at +0x9000"
+   },
+   {
+    "rva": "0x297f9",
+    "instruction": "mov dword ptr [r8 + rcx*4 + 0x9000], eax",
+    "family": "parent count+0",
+    "status": "sound cache table at +0x9000"
+   },
+   {
+    "rva": "0x5ce35",
+    "instruction": "mov dword ptr [rsp + 0x20], 0x9000",
+    "family": "parent count+0",
+    "status": "D3D call argument"
+   },
+   {
+    "rva": "0xbe666",
+    "instruction": "mov dword ptr [rsp + 0x30], 0x12000",
+    "family": "parent count x2",
+    "status": "UI draw flag argument"
+   },
+   {
+    "rva": "0x1119e1",
+    "instruction": "lea rdx, [r8 + 0x9000]",
+    "family": "parent count+0",
+    "status": "0x9000-byte static array scan (non-VM)"
+   },
+   {
+    "rva": "0x111c56",
+    "instruction": "lea rbp, [rbx + 0x9000]",
+    "family": "parent count+0",
+    "status": "same array"
+   },
+   {
+    "rva": "0x1122b2",
+    "instruction": "lea r9, [rax + 0x9000]",
+    "family": "parent count+0",
+    "status": "same array"
+   },
+   {
+    "rva": "0x11263f",
+    "instruction": "lea r14, [rdi + 0x9000]",
+    "family": "parent count+0",
+    "status": "same array"
+   },
+   {
+    "rva": "0x114b43",
+    "instruction": "lea rax, [rcx + 0x9000]",
+    "family": "parent count+0",
+    "status": "same array"
+   },
+   {
+    "rva": "0x1909f2",
+    "instruction": "lea ecx, [r12 + 0x9002]",
+    "family": "parent count+2",
+    "status": "patched"
+   },
+   {
+    "rva": "0x20ac64",
+    "instruction": "add r13d, 0x9002",
+    "family": "parent count+2",
+    "status": "patched"
+   },
+   {
+    "rva": "0x20b072",
+    "instruction": "lea ecx, [rsi + 0x9002]",
+    "family": "parent count+2",
+    "status": "patched"
+   },
+   {
+    "rva": "0x20b09a",
+    "instruction": "lea ecx, [rsi + 0x9002]",
+    "family": "parent count+2",
+    "status": "patched"
+   },
+   {
+    "rva": "0x20b342",
+    "instruction": "add eax, 0x9002",
+    "family": "parent count+2",
+    "status": "patched"
+   },
+   {
+    "rva": "0x213cb5",
+    "instruction": "add eax, 0x9002",
+    "family": "parent count+2",
+    "status": "patched"
+   },
+   {
+    "rva": "0x213d83",
+    "instruction": "add eax, 0x9002",
+    "family": "parent count+2",
+    "status": "patched"
+   },
+   {
+    "rva": "0x213e6e",
+    "instruction": "add ecx, 0x9002",
+    "family": "parent count+2",
+    "status": "patched"
+   },
+   {
+    "rva": "0x216174",
+    "instruction": "add eax, 0x9002",
+    "family": "parent count+2",
+    "status": "patched"
+   },
+   {
+    "rva": "0x2162f2",
+    "instruction": "add eax, 0x9002",
+    "family": "parent count+2",
+    "status": "patched"
+   },
+   {
+    "rva": "0x217ffc",
+    "instruction": "mov word ptr [r8 + rax*2 + 0x12068], cx",
+    "family": "scrVarPub map B",
+    "status": "patched"
+   },
+   {
+    "rva": "0x218018",
+    "instruction": "lea rdi, [r8 + 0x12068]",
+    "family": "scrVarPub map B",
+    "status": "patched"
+   },
+   {
+    "rva": "0x2180a0",
+    "instruction": "add esi, 0x9002",
+    "family": "parent count+2",
+    "status": "patched"
+   },
+   {
+    "rva": "0x2182da",
+    "instruction": "mov word ptr [rsi + rax*2 + 0x12068], dx",
+    "family": "scrVarPub map B",
+    "status": "patched"
+   },
+   {
+    "rva": "0x218350",
+    "instruction": "mov word ptr [rsi + rcx*2 + 0x12068], ax",
+    "family": "scrVarPub map B",
+    "status": "patched"
+   },
+   {
+    "rva": "0x2186f3",
+    "instruction": "add r14d, 0x9002",
+    "family": "parent count+2",
+    "status": "patched"
+   },
+   {
+    "rva": "0x218e16",
+    "instruction": "add r14d, 0x9002",
+    "family": "parent count+2",
+    "status": "patched"
+   },
+   {
+    "rva": "0x2190ca",
+    "instruction": "mov r8d, 0x12000",
+    "family": "parent count x2",
+    "status": "patched"
+   },
+   {
+    "rva": "0x219158",
+    "instruction": "mov ecx, 0x9002",
+    "family": "parent count+2",
+    "status": "patched"
+   },
+   {
+    "rva": "0x219181",
+    "instruction": "add eax, 0x9002",
+    "family": "parent count+2",
+    "status": "patched"
+   },
+   {
+    "rva": "0x2195a0",
+    "instruction": "add eax, 0x9002",
+    "family": "parent count+2",
+    "status": "patched"
+   },
+   {
+    "rva": "0x2196e3",
+    "instruction": "mov r8d, 0x12000",
+    "family": "parent count x2",
+    "status": "patched"
+   },
+   {
+    "rva": "0x2196f7",
+    "instruction": "mov r8d, 0x12000",
+    "family": "parent count x2",
+    "status": "patched"
+   },
+   {
+    "rva": "0x21971b",
+    "instruction": "add eax, 0x9002",
+    "family": "parent count+2",
+    "status": "patched"
+   },
+   {
+    "rva": "0x2197fc",
+    "instruction": "add edi, 0x9002",
+    "family": "parent count+2",
+    "status": "patched"
+   },
+   {
+    "rva": "0x219884",
+    "instruction": "lea ecx, [r14 + 0x9002]",
+    "family": "parent count+2",
+    "status": "patched"
+   },
+   {
+    "rva": "0x2198dc",
+    "instruction": "add edi, 0x9002",
+    "family": "parent count+2",
+    "status": "patched"
+   },
+   {
+    "rva": "0x2199a1",
+    "instruction": "lea ecx, [r14 + 0x9002]",
+    "family": "parent count+2",
+    "status": "patched"
+   },
+   {
+    "rva": "0x2199c8",
+    "instruction": "add eax, 0x9002",
+    "family": "parent count+2",
+    "status": "patched"
+   },
+   {
+    "rva": "0x219a00",
+    "instruction": "add r15d, 0x9002",
+    "family": "parent count+2",
+    "status": "patched"
+   },
+   {
+    "rva": "0x219a3a",
+    "instruction": "add esi, 0x9002",
+    "family": "parent count+2",
+    "status": "patched"
+   },
+   {
+    "rva": "0x21b461",
+    "instruction": "lea ecx, [rbx + 0x9002]",
+    "family": "parent count+2",
+    "status": "patched"
+   },
+   {
+    "rva": "0x21b47e",
+    "instruction": "lea ecx, [rax + 0x9002]",
+    "family": "parent count+2",
+    "status": "patched"
+   },
+   {
+    "rva": "0x21b496",
+    "instruction": "add eax, 0x9002",
+    "family": "parent count+2",
+    "status": "patched"
+   },
+   {
+    "rva": "0x21b4c0",
+    "instruction": "lea r14d, [r13 + 0x9002]",
+    "family": "parent count+2",
+    "status": "patched"
+   },
+   {
+    "rva": "0x21b528",
+    "instruction": "lea ecx, [rax + 0x9002]",
+    "family": "parent count+2",
+    "status": "patched"
+   },
+   {
+    "rva": "0x21b54b",
+    "instruction": "add ecx, 0x9002",
+    "family": "parent count+2",
+    "status": "patched"
+   },
+   {
+    "rva": "0x21b6eb",
+    "instruction": "sub eax, 0x9001",
+    "family": "parent count+1",
+    "status": "patched"
+   },
+   {
+    "rva": "0x21b79b",
+    "instruction": "cmp ebx, 0x9002",
+    "family": "parent count+2",
+    "status": "patched"
+   },
+   {
+    "rva": "0x21b980",
+    "instruction": "lea ecx, [rdi + 0x9002]",
+    "family": "parent count+2",
+    "status": "patched"
+   },
+   {
+    "rva": "0x21b994",
+    "instruction": "lea ecx, [rax + 0x9002]",
+    "family": "parent count+2",
+    "status": "patched"
+   },
+   {
+    "rva": "0x21b9ba",
+    "instruction": "add eax, 0x9002",
+    "family": "parent count+2",
+    "status": "patched"
+   },
+   {
+    "rva": "0x21bb11",
+    "instruction": "lea eax, [rdx + 0x7e7000]",
+    "family": "array index bias+0",
+    "status": "patched"
+   },
+   {
+    "rva": "0x21bb17",
+    "instruction": "cmp eax, 0xfe6fff",
+    "family": "array index span-1",
+    "status": "patched"
+   },
+   {
+    "rva": "0x21bc48",
+    "instruction": "add ebx, 0x9002",
+    "family": "parent count+2",
+    "status": "patched"
+   },
+   {
+    "rva": "0x21bd5d",
+    "instruction": "lea ecx, [rbx + 0x9002]",
+    "family": "parent count+2",
+    "status": "patched"
+   },
+   {
+    "rva": "0x21bd6e",
+    "instruction": "lea ecx, [rbx + 0x9002]",
+    "family": "parent count+2",
+    "status": "patched"
+   },
+   {
+    "rva": "0x21bd79",
+    "instruction": "lea ecx, [rbx + 0x9002]",
+    "family": "parent count+2",
+    "status": "patched"
+   },
+   {
+    "rva": "0x21be22",
+    "instruction": "lea ecx, [rbp + 0x9002]",
+    "family": "parent count+2",
+    "status": "patched"
+   },
+   {
+    "rva": "0x21be2d",
+    "instruction": "lea ecx, [rax + 0x9002]",
+    "family": "parent count+2",
+    "status": "patched"
+   },
+   {
+    "rva": "0x21be45",
+    "instruction": "add eax, 0x9002",
+    "family": "parent count+2",
+    "status": "patched"
+   },
+   {
+    "rva": "0x21bf7b",
+    "instruction": "add r14d, 0x9002",
+    "family": "parent count+2",
+    "status": "patched"
+   },
+   {
+    "rva": "0x21bf82",
+    "instruction": "add esi, 0x9002",
+    "family": "parent count+2",
+    "status": "patched"
+   },
+   {
+    "rva": "0x21c0e7",
+    "instruction": "add ebp, 0x9002",
+    "family": "parent count+2",
+    "status": "patched"
+   },
+   {
+    "rva": "0x21c0f3",
+    "instruction": "add r15d, 0x9002",
+    "family": "parent count+2",
+    "status": "patched"
+   },
+   {
+    "rva": "0x21c22e",
+    "instruction": "lea ecx, [rbx + 0x9002]",
+    "family": "parent count+2",
+    "status": "patched"
+   },
+   {
+    "rva": "0x21c24b",
+    "instruction": "lea ecx, [rbx + 0x9002]",
+    "family": "parent count+2",
+    "status": "patched"
+   },
+   {
+    "rva": "0x21c2bb",
+    "instruction": "lea ecx, [rbx + 0x9002]",
+    "family": "parent count+2",
+    "status": "patched"
+   },
+   {
+    "rva": "0x21c2d5",
+    "instruction": "lea ecx, [rbx + 0x9002]",
+    "family": "parent count+2",
+    "status": "patched"
+   },
+   {
+    "rva": "0x21c2f8",
+    "instruction": "add eax, 0x9002",
+    "family": "parent count+2",
+    "status": "patched"
+   },
+   {
+    "rva": "0x21c375",
+    "instruction": "lea eax, [r10 + 0x9002]",
+    "family": "parent count+2",
+    "status": "patched"
+   },
+   {
+    "rva": "0x21c37e",
+    "instruction": "lea ecx, [r10 + 0x9002]",
+    "family": "parent count+2",
+    "status": "patched"
+   },
+   {
+    "rva": "0x21c3f9",
+    "instruction": "lea ecx, [rdx + 0x9002]",
+    "family": "parent count+2",
+    "status": "patched"
+   },
+   {
+    "rva": "0x21c437",
+    "instruction": "lea ecx, [rbx + 0x9002]",
+    "family": "parent count+2",
+    "status": "patched"
+   },
+   {
+    "rva": "0x21c454",
+    "instruction": "lea ecx, [rbx + 0x9002]",
+    "family": "parent count+2",
+    "status": "patched"
+   },
+   {
+    "rva": "0x21c4c3",
+    "instruction": "lea ecx, [rbx + 0x9002]",
+    "family": "parent count+2",
+    "status": "patched"
+   },
+   {
+    "rva": "0x21c4e0",
+    "instruction": "lea ecx, [rbx + 0x9002]",
+    "family": "parent count+2",
+    "status": "patched"
+   },
+   {
+    "rva": "0x21c5ec",
+    "instruction": "add ebx, 0x9002",
+    "family": "parent count+2",
+    "status": "patched"
+   },
+   {
+    "rva": "0x21c66c",
+    "instruction": "cmp ebx, 0x9002",
+    "family": "parent count+2",
+    "status": "patched"
+   },
+   {
+    "rva": "0x21c811",
+    "instruction": "cmp edi, 0x9002",
+    "family": "parent count+2",
+    "status": "patched"
+   },
+   {
+    "rva": "0x21c89a",
+    "instruction": "lea ecx, [rdx + 0x9002]",
+    "family": "parent count+2",
+    "status": "patched"
+   },
+   {
+    "rva": "0x21c951",
+    "instruction": "add esi, 0x9002",
+    "family": "parent count+2",
+    "status": "patched"
+   },
+   {
+    "rva": "0x21c9f3",
+    "instruction": "add ecx, 0x9002",
+    "family": "parent count+2",
+    "status": "patched"
+   },
+   {
+    "rva": "0x21ca75",
+    "instruction": "add ecx, 0x9002",
+    "family": "parent count+2",
+    "status": "patched"
+   },
+   {
+    "rva": "0x21cac2",
+    "instruction": "add ecx, 0x9002",
+    "family": "parent count+2",
+    "status": "patched"
+   },
+   {
+    "rva": "0x21cb1e",
+    "instruction": "add ecx, 0x9002",
+    "family": "parent count+2",
+    "status": "patched"
+   },
+   {
+    "rva": "0x21cb5c",
+    "instruction": "add ecx, 0x9002",
+    "family": "parent count+2",
+    "status": "patched"
+   },
+   {
+    "rva": "0x21cbba",
+    "instruction": "add ecx, 0x9002",
+    "family": "parent count+2",
+    "status": "patched"
+   },
+   {
+    "rva": "0x21cc30",
+    "instruction": "add edi, 0x9002",
+    "family": "parent count+2",
+    "status": "patched"
+   },
+   {
+    "rva": "0x21cd2d",
+    "instruction": "add ebx, 0x9002",
+    "family": "parent count+2",
+    "status": "patched"
+   },
+   {
+    "rva": "0x21d0ff",
+    "instruction": "cmp ebx, 0x9002",
+    "family": "parent count+2",
+    "status": "patched"
+   },
+   {
+    "rva": "0x21d15d",
+    "instruction": "cmp r15d, 0x19000",
+    "family": "object-key name end+0",
+    "status": "patched"
+   },
+   {
+    "rva": "0x21d250",
+    "instruction": "add edi, 0x9002",
+    "family": "parent count+2",
+    "status": "patched"
+   },
+   {
+    "rva": "0x21d31a",
+    "instruction": "lea ecx, [rdx + 0x9002]",
+    "family": "parent count+2",
+    "status": "patched"
+   },
+   {
+    "rva": "0x21d441",
+    "instruction": "add esi, 0x9002",
+    "family": "parent count+2",
+    "status": "patched"
+   },
+   {
+    "rva": "0x21d56d",
+    "instruction": "add esi, 0x9002",
+    "family": "parent count+2",
+    "status": "patched"
+   },
+   {
+    "rva": "0x21d5f9",
+    "instruction": "add ecx, 0x9002",
+    "family": "parent count+2",
+    "status": "patched"
+   },
+   {
+    "rva": "0x21d649",
+    "instruction": "lea ecx, [rdx + 0x9002]",
+    "family": "parent count+2",
+    "status": "patched"
+   },
+   {
+    "rva": "0x21d679",
+    "instruction": "lea ecx, [rdx + 0x9002]",
+    "family": "parent count+2",
+    "status": "patched"
+   },
+   {
+    "rva": "0x21d6c0",
+    "instruction": "lea eax, [rcx + 0x7e7000]",
+    "family": "array index bias+0",
+    "status": "patched"
+   },
+   {
+    "rva": "0x21d6c6",
+    "instruction": "cmp eax, 0xfe6fff",
+    "family": "array index span-1",
+    "status": "patched"
+   },
+   {
+    "rva": "0x21d709",
+    "instruction": "add ebx, 0x9002",
+    "family": "parent count+2",
+    "status": "patched"
+   },
+   {
+    "rva": "0x21d766",
+    "instruction": "cmp ecx, 0x19000",
+    "family": "object-key name end+0",
+    "status": "patched"
+   },
+   {
+    "rva": "0x21d915",
+    "instruction": "sub ecx, 0x9001",
+    "family": "parent count+1",
+    "status": "patched"
+   },
+   {
+    "rva": "0x21d99b",
+    "instruction": "lea eax, [rcx + 0x9002]",
+    "family": "parent count+2",
+    "status": "patched"
+   },
+   {
+    "rva": "0x21d9a1",
+    "instruction": "add ecx, 0x9002",
+    "family": "parent count+2",
+    "status": "patched"
+   },
+   {
+    "rva": "0x21da2d",
+    "instruction": "lea ecx, [rbx + 0x9002]",
+    "family": "parent count+2",
+    "status": "patched"
+   },
+   {
+    "rva": "0x21da4a",
+    "instruction": "lea ecx, [rbx + 0x9002]",
+    "family": "parent count+2",
+    "status": "patched"
+   },
+   {
+    "rva": "0x21dd29",
+    "instruction": "lea ecx, [rbx + 0x9002]",
+    "family": "parent count+2",
+    "status": "patched"
+   },
+   {
+    "rva": "0x21dd46",
+    "instruction": "lea ecx, [rbx + 0x9002]",
+    "family": "parent count+2",
+    "status": "patched"
+   },
+   {
+    "rva": "0x21dd8c",
+    "instruction": "lea r8d, [rdx + 0x9002]",
+    "family": "parent count+2",
+    "status": "patched"
+   },
+   {
+    "rva": "0x21de09",
+    "instruction": "lea ecx, [rbx + 0x9002]",
+    "family": "parent count+2",
+    "status": "patched"
+   },
+   {
+    "rva": "0x21de2a",
+    "instruction": "lea ecx, [rbx + 0x9002]",
+    "family": "parent count+2",
+    "status": "patched"
+   },
+   {
+    "rva": "0x21deb3",
+    "instruction": "add esi, 0x9002",
+    "family": "parent count+2",
+    "status": "patched"
+   },
+   {
+    "rva": "0x21df11",
+    "instruction": "cmp eax, 0x19000",
+    "family": "object-key name end+0",
+    "status": "patched"
+   },
+   {
+    "rva": "0x21df69",
+    "instruction": "lea ecx, [r15 + 0x9002]",
+    "family": "parent count+2",
+    "status": "patched"
+   },
+   {
+    "rva": "0x21df7b",
+    "instruction": "lea ecx, [r15 + 0x9002]",
+    "family": "parent count+2",
+    "status": "patched"
+   },
+   {
+    "rva": "0x21e064",
+    "instruction": "lea eax, [rcx + 0x9002]",
+    "family": "parent count+2",
+    "status": "patched"
+   },
+   {
+    "rva": "0x21e06c",
+    "instruction": "lea r14d, [rbx + 0x9002]",
+    "family": "parent count+2",
+    "status": "patched"
+   },
+   {
+    "rva": "0x21e0e6",
+    "instruction": "lea ecx, [rbx + 0x9002]",
+    "family": "parent count+2",
+    "status": "patched"
+   },
+   {
+    "rva": "0x21e4df",
+    "instruction": "lea eax, [r8 + 0x9002]",
+    "family": "parent count+2",
+    "status": "patched"
+   },
+   {
+    "rva": "0x21e4e8",
+    "instruction": "lea ebx, [r8 + 0x9002]",
+    "family": "parent count+2",
+    "status": "patched"
+   },
+   {
+    "rva": "0x21e550",
+    "instruction": "cmp eax, 0x19000",
+    "family": "object-key name end+0",
+    "status": "patched"
+   },
+   {
+    "rva": "0x21e5b6",
+    "instruction": "lea eax, [rcx + 0x7e7000]",
+    "family": "array index bias+0",
+    "status": "patched"
+   },
+   {
+    "rva": "0x21e5bc",
+    "instruction": "cmp eax, 0xfe6fff",
+    "family": "array index span-1",
+    "status": "patched"
+   },
+   {
+    "rva": "0x21e607",
+    "instruction": "add ecx, 0x9002",
+    "family": "parent count+2",
+    "status": "patched"
+   },
+   {
+    "rva": "0x21e63d",
+    "instruction": "add edx, 0x9002",
+    "family": "parent count+2",
+    "status": "patched"
+   },
+   {
+    "rva": "0x21e682",
+    "instruction": "cmp eax, 0x19000",
+    "family": "object-key name end+0",
+    "status": "patched"
+   },
+   {
+    "rva": "0x21e715",
+    "instruction": "lea ebx, [rbp + 0x9002]",
+    "family": "parent count+2",
+    "status": "patched"
+   },
+   {
+    "rva": "0x21e735",
+    "instruction": "lea ecx, [rbp + 0x9002]",
+    "family": "parent count+2",
+    "status": "patched"
+   },
+   {
+    "rva": "0x21e786",
+    "instruction": "lea eax, [rbp + 0x9002]",
+    "family": "parent count+2",
+    "status": "patched"
+   },
+   {
+    "rva": "0x21e89f",
+    "instruction": "lea rdx, [rbx + 0x9002]",
+    "family": "parent count+2",
+    "status": "patched"
+   },
+   {
+    "rva": "0x21e8b3",
+    "instruction": "lea r8, [r9 + 0x9002]",
+    "family": "parent count+2",
+    "status": "patched"
+   },
+   {
+    "rva": "0x21e8db",
+    "instruction": "mov word ptr [rsi + rax*8 + 0xd8030], r9w",
+    "family": "child base x24",
+    "status": "patched"
+   },
+   {
+    "rva": "0x21e958",
+    "instruction": "add eax, 0x9002",
+    "family": "parent count+2",
+    "status": "patched"
+   },
+   {
+    "rva": "0x21ef28",
+    "instruction": "lea r15d, [r14 + 0x9002]",
+    "family": "parent count+2",
+    "status": "patched"
+   },
+   {
+    "rva": "0x21ef45",
+    "instruction": "lea ecx, [rax + 0x9002]",
+    "family": "parent count+2",
+    "status": "patched"
+   },
+   {
+    "rva": "0x21ef63",
+    "instruction": "add eax, 0x9002",
+    "family": "parent count+2",
+    "status": "patched"
+   },
+   {
+    "rva": "0x21efe5",
+    "instruction": "lea ecx, [r14 + 0x9002]",
+    "family": "parent count+2",
+    "status": "patched"
+   },
+   {
+    "rva": "0x21f1c6",
+    "instruction": "lea eax, [r9 + 0x7e7000]",
+    "family": "array index bias+0",
+    "status": "patched"
+   },
+   {
+    "rva": "0x21f1cd",
+    "instruction": "cmp eax, 0xfe6fff",
+    "family": "array index span-1",
+    "status": "patched"
+   },
+   {
+    "rva": "0x21f200",
+    "instruction": "lea ecx, [rbx + 0x9002]",
+    "family": "parent count+2",
+    "status": "patched"
+   },
+   {
+    "rva": "0x21f21d",
+    "instruction": "lea ecx, [rbx + 0x9002]",
+    "family": "parent count+2",
+    "status": "patched"
+   },
+   {
+    "rva": "0x21f24f",
+    "instruction": "lea ecx, [rbx + 0x9002]",
+    "family": "parent count+2",
+    "status": "patched"
+   },
+   {
+    "rva": "0x21f26b",
+    "instruction": "lea ecx, [rbx + 0x9002]",
+    "family": "parent count+2",
+    "status": "patched"
+   },
+   {
+    "rva": "0x21f29d",
+    "instruction": "add ecx, 0x9002",
+    "family": "parent count+2",
+    "status": "patched"
+   },
+   {
+    "rva": "0x21f3ad",
+    "instruction": "lea ecx, [r14 + 0x9002]",
+    "family": "parent count+2",
+    "status": "patched"
+   },
+   {
+    "rva": "0x21f3c2",
+    "instruction": "lea ecx, [rax + 0x9002]",
+    "family": "parent count+2",
+    "status": "patched"
+   },
+   {
+    "rva": "0x21f3ed",
+    "instruction": "add eax, 0x9002",
+    "family": "parent count+2",
+    "status": "patched"
+   },
+   {
+    "rva": "0x21f519",
+    "instruction": "add ecx, 0x9002",
+    "family": "parent count+2",
+    "status": "patched"
+   },
+   {
+    "rva": "0x21f52d",
+    "instruction": "add ecx, 0x9002",
+    "family": "parent count+2",
+    "status": "patched"
+   },
+   {
+    "rva": "0x2200a3",
+    "instruction": "mov ecx, 0x9002",
+    "family": "parent count+2",
+    "status": "patched"
+   },
+   {
+    "rva": "0x220a32",
+    "instruction": "add edx, 0x9002",
+    "family": "parent count+2",
+    "status": "patched"
+   },
+   {
+    "rva": "0x220ace",
+    "instruction": "lea ecx, [rsi + 0x9002]",
+    "family": "parent count+2",
+    "status": "patched"
+   },
+   {
+    "rva": "0x220ae2",
+    "instruction": "lea ecx, [rax + 0x9002]",
+    "family": "parent count+2",
+    "status": "patched"
+   },
+   {
+    "rva": "0x220b09",
+    "instruction": "add eax, 0x9002",
+    "family": "parent count+2",
+    "status": "patched"
+   },
+   {
+    "rva": "0x220d34",
+    "instruction": "lea ecx, [rdx + 0x9002]",
+    "family": "parent count+2",
+    "status": "patched"
+   },
+   {
+    "rva": "0x220e4c",
+    "instruction": "lea ecx, [rbx + 0x9002]",
+    "family": "parent count+2",
+    "status": "patched"
+   },
+   {
+    "rva": "0x220e68",
+    "instruction": "lea ecx, [rbx + 0x9002]",
+    "family": "parent count+2",
+    "status": "patched"
+   },
+   {
+    "rva": "0x220e85",
+    "instruction": "lea edx, [rbx + 0x9002]",
+    "family": "parent count+2",
+    "status": "patched"
+   },
+   {
+    "rva": "0x220fcf",
+    "instruction": "lea ecx, [rsi + 0x9002]",
+    "family": "parent count+2",
+    "status": "patched"
+   },
+   {
+    "rva": "0x220feb",
+    "instruction": "lea ecx, [rsi + 0x9002]",
+    "family": "parent count+2",
+    "status": "patched"
+   },
+   {
+    "rva": "0x221003",
+    "instruction": "add eax, 0x9002",
+    "family": "parent count+2",
+    "status": "patched"
+   },
+   {
+    "rva": "0x22108e",
+    "instruction": "mov ecx, 0x9002",
+    "family": "parent count+2",
+    "status": "patched"
+   },
+   {
+    "rva": "0x2210fc",
+    "instruction": "cmp ebx, 0x9000",
+    "family": "parent count+0",
+    "status": "patched"
+   },
+   {
+    "rva": "0x221138",
+    "instruction": "cmp edx, 0x19000",
+    "family": "object-key name end+0",
+    "status": "patched"
+   },
+   {
+    "rva": "0x221201",
+    "instruction": "lea r14d, [rbp + 0x9002]",
+    "family": "parent count+2",
+    "status": "patched"
+   },
+   {
+    "rva": "0x22122e",
+    "instruction": "lea ecx, [rbp + 0x9002]",
+    "family": "parent count+2",
+    "status": "patched"
+   },
+   {
+    "rva": "0x221377",
+    "instruction": "lea ecx, [rdi + 0x9002]",
+    "family": "parent count+2",
+    "status": "patched"
+   },
+   {
+    "rva": "0x221385",
+    "instruction": "lea ecx, [rdi + 0x9002]",
+    "family": "parent count+2",
+    "status": "patched"
+   },
+   {
+    "rva": "0x22139d",
+    "instruction": "add eax, 0x9002",
+    "family": "parent count+2",
+    "status": "patched"
+   },
+   {
+    "rva": "0x221452",
+    "instruction": "add ecx, 0x9002",
+    "family": "parent count+2",
+    "status": "patched"
+   },
+   {
+    "rva": "0x2214a4",
+    "instruction": "add ecx, 0x9002",
+    "family": "parent count+2",
+    "status": "patched"
+   },
+   {
+    "rva": "0x221609",
+    "instruction": "mov edx, 0x9001",
+    "family": "parent count+1",
+    "status": "dead (replaced InitVariables)"
+   },
+   {
+    "rva": "0x221627",
+    "instruction": "mov edx, 0x9001",
+    "family": "parent count+1",
+    "status": "dead (replaced InitVariables)"
+   },
+   {
+    "rva": "0x221637",
+    "instruction": "mov edx, 0x15802",
+    "family": "pool1 base-1",
+    "status": "dead (replaced InitVariables)"
+   },
+   {
+    "rva": "0x22163c",
+    "instruction": "mov ecx, 0x9002",
+    "family": "parent count+2",
+    "status": "patched"
+   },
+   {
+    "rva": "0x22164f",
+    "instruction": "mov edx, 0x22003",
+    "family": "list end-1",
+    "status": "dead (replaced InitVariables)"
+   },
+   {
+    "rva": "0x221654",
+    "instruction": "mov ecx, 0x15803",
+    "family": "pool1 base+0",
+    "status": "dead (replaced InitVariables)"
+   },
+   {
+    "rva": "0x22173b",
+    "instruction": "lea ecx, [rbx + 0x9002]",
+    "family": "parent count+2",
+    "status": "patched"
+   },
+   {
+    "rva": "0x221758",
+    "instruction": "lea ecx, [rbx + 0x9002]",
+    "family": "parent count+2",
+    "status": "patched"
+   },
+   {
+    "rva": "0x221770",
+    "instruction": "add eax, 0x9002",
+    "family": "parent count+2",
+    "status": "patched"
+   },
+   {
+    "rva": "0x2217b5",
+    "instruction": "lea ebp, [r13 + 0x9002]",
+    "family": "parent count+2",
+    "status": "patched"
+   },
+   {
+    "rva": "0x221810",
+    "instruction": "lea ecx, [rax + 0x9002]",
+    "family": "parent count+2",
+    "status": "patched"
+   },
+   {
+    "rva": "0x221822",
+    "instruction": "add ecx, 0x9002",
+    "family": "parent count+2",
+    "status": "patched"
+   },
+   {
+    "rva": "0x22186e",
+    "instruction": "lea ecx, [rax + 0x9002]",
+    "family": "parent count+2",
+    "status": "patched"
+   },
+   {
+    "rva": "0x2218d0",
+    "instruction": "lea ecx, [rbx + 0x9002]",
+    "family": "parent count+2",
+    "status": "patched"
+   },
+   {
+    "rva": "0x2218ed",
+    "instruction": "lea edx, [rbx + 0x9002]",
+    "family": "parent count+2",
+    "status": "patched"
+   },
+   {
+    "rva": "0x22194a",
+    "instruction": "add eax, 0x9002",
+    "family": "parent count+2",
+    "status": "patched"
+   },
+   {
+    "rva": "0x2219d1",
+    "instruction": "add edi, 0x9002",
+    "family": "parent count+2",
+    "status": "patched"
+   },
+   {
+    "rva": "0x221d19",
+    "instruction": "lea ecx, [rdx + 0x9002]",
+    "family": "parent count+2",
+    "status": "patched"
+   },
+   {
+    "rva": "0x221de3",
+    "instruction": "lea ecx, [rbp + 0x9002]",
+    "family": "parent count+2",
+    "status": "patched"
+   },
+   {
+    "rva": "0x221df7",
+    "instruction": "lea ecx, [rax + 0x9002]",
+    "family": "parent count+2",
+    "status": "patched"
+   },
+   {
+    "rva": "0x221e19",
+    "instruction": "add eax, 0x9002",
+    "family": "parent count+2",
+    "status": "patched"
+   },
+   {
+    "rva": "0x221e65",
+    "instruction": "add eax, 0x9002",
+    "family": "parent count+2",
+    "status": "patched"
+   },
+   {
+    "rva": "0x221e75",
+    "instruction": "lea ecx, [rdx + 0x9002]",
+    "family": "parent count+2",
+    "status": "patched"
+   },
+   {
+    "rva": "0x221ed9",
+    "instruction": "add ecx, 0x9002",
+    "family": "parent count+2",
+    "status": "patched"
+   },
+   {
+    "rva": "0x222497",
+    "instruction": "lea ecx, [rbx + 0x9002]",
+    "family": "parent count+2",
+    "status": "patched"
+   },
+   {
+    "rva": "0x2224a4",
+    "instruction": "lea ecx, [rbx + 0x9002]",
+    "family": "parent count+2",
+    "status": "patched"
+   },
+   {
+    "rva": "0x222d6c",
+    "instruction": "add ebp, 0x9002",
+    "family": "parent count+2",
+    "status": "patched"
+   },
+   {
+    "rva": "0x223276",
+    "instruction": "add esi, 0x9002",
+    "family": "parent count+2",
+    "status": "patched"
+   },
+   {
+    "rva": "0x223692",
+    "instruction": "lea ecx, [rsi + 0x9002]",
+    "family": "parent count+2",
+    "status": "patched"
+   },
+   {
+    "rva": "0x2236a3",
+    "instruction": "lea ecx, [rsi + 0x9002]",
+    "family": "parent count+2",
+    "status": "patched"
+   },
+   {
+    "rva": "0x223718",
+    "instruction": "mov ecx, 0x9002",
+    "family": "parent count+2",
+    "status": "patched"
+   },
+   {
+    "rva": "0x2237eb",
+    "instruction": "mov ecx, 0x9002",
+    "family": "parent count+2",
+    "status": "patched"
+   },
+   {
+    "rva": "0x223b52",
+    "instruction": "lea ecx, [rsi + 0x9002]",
+    "family": "parent count+2",
+    "status": "patched"
+   },
+   {
+    "rva": "0x223b63",
+    "instruction": "lea ecx, [rsi + 0x9002]",
+    "family": "parent count+2",
+    "status": "patched"
+   },
+   {
+    "rva": "0x223bd8",
+    "instruction": "mov ecx, 0x9002",
+    "family": "parent count+2",
+    "status": "patched"
+   },
+   {
+    "rva": "0x223c38",
+    "instruction": "lea ecx, [rbx + 0x9002]",
+    "family": "parent count+2",
+    "status": "patched"
+   },
+   {
+    "rva": "0x223c4a",
+    "instruction": "lea ecx, [rbx + 0x9002]",
+    "family": "parent count+2",
+    "status": "patched"
+   },
+   {
+    "rva": "0x223ca8",
+    "instruction": "lea ecx, [rbx + 0x9002]",
+    "family": "parent count+2",
+    "status": "patched"
+   },
+   {
+    "rva": "0x223cba",
+    "instruction": "lea ecx, [rbx + 0x9002]",
+    "family": "parent count+2",
+    "status": "patched"
+   },
+   {
+    "rva": "0x223d0e",
+    "instruction": "mov ecx, 0x9002",
+    "family": "parent count+2",
+    "status": "patched"
+   },
+   {
+    "rva": "0x223d3d",
+    "instruction": "mov r8d, 0x12000",
+    "family": "parent count x2",
+    "status": "patched"
+   },
+   {
+    "rva": "0x223e97",
+    "instruction": "lea ecx, [rdi + 0x9002]",
+    "family": "parent count+2",
+    "status": "patched"
+   },
+   {
+    "rva": "0x223ea4",
+    "instruction": "lea ecx, [rdi + 0x9002]",
+    "family": "parent count+2",
+    "status": "patched"
+   },
+   {
+    "rva": "0x22402a",
+    "instruction": "mov ecx, 0x9002",
+    "family": "parent count+2",
+    "status": "patched"
+   },
+   {
+    "rva": "0x224864",
+    "instruction": "mov ecx, 0x9002",
+    "family": "parent count+2",
+    "status": "patched"
+   },
+   {
+    "rva": "0x224e71",
+    "instruction": "mov edx, 0x9002",
+    "family": "parent count+2",
+    "status": "patched"
+   },
+   {
+    "rva": "0x224edb",
+    "instruction": "mov r13d, 0x9002",
+    "family": "parent count+2",
+    "status": "patched"
+   },
+   {
+    "rva": "0x2251c1",
+    "instruction": "add r13d, 0x9002",
+    "family": "parent count+2",
+    "status": "patched"
+   },
+   {
+    "rva": "0x225208",
+    "instruction": "add r13d, 0x9002",
+    "family": "parent count+2",
+    "status": "patched"
+   },
+   {
+    "rva": "0x2252ce",
+    "instruction": "add r13d, 0x9002",
+    "family": "parent count+2",
+    "status": "patched"
+   },
+   {
+    "rva": "0x2254ab",
+    "instruction": "add r13d, 0x9002",
+    "family": "parent count+2",
+    "status": "patched"
+   },
+   {
+    "rva": "0x2255f6",
+    "instruction": "add ecx, 0x9002",
+    "family": "parent count+2",
+    "status": "patched"
+   },
+   {
+    "rva": "0x2256a4",
+    "instruction": "add r13d, 0x9002",
+    "family": "parent count+2",
+    "status": "patched"
+   },
+   {
+    "rva": "0x2256e9",
+    "instruction": "add r13d, 0x9002",
+    "family": "parent count+2",
+    "status": "patched"
+   },
+   {
+    "rva": "0x225781",
+    "instruction": "add r13d, 0x9002",
+    "family": "parent count+2",
+    "status": "patched"
+   },
+   {
+    "rva": "0x226efd",
+    "instruction": "mov ecx, 0x9002",
+    "family": "parent count+2",
+    "status": "patched"
+   },
+   {
+    "rva": "0x226f15",
+    "instruction": "mov dword ptr [rsp + 0x2c], 0x9002",
+    "family": "parent count+2",
+    "status": "patched"
+   },
+   {
+    "rva": "0x226f28",
+    "instruction": "mov ecx, 0x9002",
+    "family": "parent count+2",
+    "status": "patched"
+   },
+   {
+    "rva": "0x226f47",
+    "instruction": "mov dword ptr [rsp + 0x2c], 0x9002",
+    "family": "parent count+2",
+    "status": "patched"
+   },
+   {
+    "rva": "0x226f5a",
+    "instruction": "mov ecx, 0x9002",
+    "family": "parent count+2",
+    "status": "patched"
+   },
+   {
+    "rva": "0x226f6a",
+    "instruction": "mov ecx, 0x9002",
+    "family": "parent count+2",
+    "status": "patched"
+   },
+   {
+    "rva": "0x226f8a",
+    "instruction": "mov ecx, 0x9002",
+    "family": "parent count+2",
+    "status": "patched"
+   },
+   {
+    "rva": "0x226f9a",
+    "instruction": "mov ecx, 0x9002",
+    "family": "parent count+2",
+    "status": "patched"
+   },
+   {
+    "rva": "0x2279fb",
+    "instruction": "add r15d, 0x9002",
+    "family": "parent count+2",
+    "status": "patched"
+   },
+   {
+    "rva": "0x227f07",
+    "instruction": "add edi, 0x9002",
+    "family": "parent count+2",
+    "status": "patched"
+   },
+   {
+    "rva": "0x228348",
+    "instruction": "lea ecx, [rsi + 0x9002]",
+    "family": "parent count+2",
+    "status": "patched"
+   },
+   {
+    "rva": "0x228362",
+    "instruction": "lea ecx, [rsi + 0x9002]",
+    "family": "parent count+2",
+    "status": "patched"
+   },
+   {
+    "rva": "0x2283b8",
+    "instruction": "lea ecx, [rdi + 0x9002]",
+    "family": "parent count+2",
+    "status": "patched"
+   },
+   {
+    "rva": "0x2283d3",
+    "instruction": "lea ecx, [rdi + 0x9002]",
+    "family": "parent count+2",
+    "status": "patched"
+   },
+   {
+    "rva": "0x2a2e06",
+    "instruction": "lea r10, [rsi + 0x9000]",
+    "family": "parent count+0",
+    "status": "hash state at +0x9000"
+   },
+   {
+    "rva": "0x2a2fc4",
+    "instruction": "test dword ptr [rsi + rax*4 + 0x9000], edx",
+    "family": "parent count+0",
+    "status": "hash state"
+   },
+   {
+    "rva": "0x2a3024",
+    "instruction": "test dword ptr [rsi + rax*4 + 0x9000], edx",
+    "family": "parent count+0",
+    "status": "hash state"
+   },
+   {
+    "rva": "0x2a3513",
+    "instruction": "or dword ptr [rbx + 0x9000], ecx",
+    "family": "parent count+0",
+    "status": "hash state"
+   }
+  ],
+  "signed_16bit_reads": [
+   {
+    "rva": "0x218cb7",
+    "instruction": "movsx eax, word ptr [rbp + 0x40]",
+    "status": "entity class number (status bits)"
+   },
+   {
+    "rva": "0x218f0d",
+    "instruction": "movsx ebx, word ptr [rbp - 0x3c]",
+    "status": "signed int16 array key"
+   },
+   {
+    "rva": "0x2193b6",
+    "instruction": "movsx edi, word ptr [rsp + 0x38]",
+    "status": "patched to movzx"
+   }
+  ]
+ },
+ "pass2_relocation": {
+  "relocated_targets": 47,
+  "explained_numeric_overlaps": [
+   {
+    "target": "0xd9c4f8",
+    "rva": "0x1723f8",
+    "instruction": "mov qword ptr [rip + 0xc2a0f9], rax",
+    "kind": "rip",
+    "reason": "qword global at sentients[-1]; patched rows use it as an index-1 base"
+   },
+   {
+    "target": "0xd9c4f8",
+    "rva": "0x1a27c2",
+    "instruction": "mov rax, qword ptr [rip + 0xbf9d2f]",
+    "kind": "rip",
+    "reason": "qword global at sentients[-1]; patched rows use it as an index-1 base"
+   },
+   {
+    "target": "0xd9c4f8",
+    "rva": "0x1a283c",
+    "instruction": "mov rax, qword ptr [rip + 0xbf9cb5]",
+    "kind": "rip",
+    "reason": "qword global at sentients[-1]; patched rows use it as an index-1 base"
+   },
+   {
+    "target": "0xd9c4f8",
+    "rva": "0x1a2965",
+    "instruction": "mov rax, qword ptr [rip + 0xbf9b8c]",
+    "kind": "rip",
+    "reason": "qword global at sentients[-1]; patched rows use it as an index-1 base"
+   },
+   {
+    "target": "0xf4e1a0",
+    "rva": "0x131ff9",
+    "instruction": "lea rsi, [rip + 0xe1c1a0]",
+    "kind": "rip",
+    "reason": "animation-globals root; only its +0x1ea0/+0x29a0/+0x2d20/+0x2d90 sub-arrays are relocated"
+   },
+   {
+    "target": "0xf4e1a0",
+    "rva": "0x1332fb",
+    "instruction": "lea r9, [rip + 0xe1ae9e]",
+    "kind": "rip",
+    "reason": "animation-globals root; only its +0x1ea0/+0x29a0/+0x2d20/+0x2d90 sub-arrays are relocated"
+   },
+   {
+    "target": "0xf4e1a0",
+    "rva": "0x13375f",
+    "instruction": "lea r14, [rip + 0xe1aa3a]",
+    "kind": "rip",
+    "reason": "animation-globals root; only its +0x1ea0/+0x29a0/+0x2d20/+0x2d90 sub-arrays are relocated"
+   },
+   {
+    "target": "0xf4e1a0",
+    "rva": "0x171593",
+    "instruction": "lea rcx, [rip + 0xddcc06]",
+    "kind": "rip",
+    "reason": "animation-globals root; only its +0x1ea0/+0x29a0/+0x2d20/+0x2d90 sub-arrays are relocated"
+   },
+   {
+    "target": "0xf4e1a0",
+    "rva": "0x190184",
+    "instruction": "mov ecx, dword ptr [rip + 0xdbe016]",
+    "kind": "rip",
+    "reason": "animation-globals root; only its +0x1ea0/+0x29a0/+0x2d20/+0x2d90 sub-arrays are relocated"
+   },
+   {
+    "target": "0xf4e1a0",
+    "rva": "0x1953ca",
+    "instruction": "mov dword ptr [rip + 0xdb8dd0], edi",
+    "kind": "rip",
+    "reason": "animation-globals root; only its +0x1ea0/+0x29a0/+0x2d20/+0x2d90 sub-arrays are relocated"
+   },
+   {
+    "target": "0xf4e1a0",
+    "rva": "0x1b8647",
+    "instruction": "lea r9, [rip + 0xd95b52]",
+    "kind": "rip",
+    "reason": "animation-globals root; only its +0x1ea0/+0x29a0/+0x2d20/+0x2d90 sub-arrays are relocated"
+   },
+   {
+    "target": "0xf4e1a0",
+    "rva": "0x1b864e",
+    "instruction": "lea rcx, [rax + r9]",
+    "kind": "based",
+    "reason": "animation-globals root; only its +0x1ea0/+0x29a0/+0x2d20/+0x2d90 sub-arrays are relocated"
+   }
+  ],
+  "unpatched": []
+ },
+ "pass3_bit_masks": {
+  "sites": 113,
+  "rows": [
+   {
+    "rva": "0x123be9",
+    "instruction": "shl eax, cl",
+    "count_source": "123be1: mov ecx, dword ptr [rax + 8]"
+   },
+   {
+    "rva": "0x123ca8",
+    "instruction": "shl edx, cl",
+    "count_source": "123ca5: mov ecx, dword ptr [rcx + 8]"
+   },
+   {
+    "rva": "0x1269c4",
+    "instruction": "shl eax, cl",
+    "count_source": "1269bc: mov ecx, dword ptr [rax + 8]"
+   },
+   {
+    "rva": "0x126ae8",
+    "instruction": "shl edx, cl",
+    "count_source": "126ae5: mov ecx, dword ptr [rcx + 8]"
+   },
+   {
+    "rva": "0x126b53",
+    "instruction": "bt r10d, ecx",
+    "count_source": "126b50: mov ecx, dword ptr [rdx + 8]"
+   },
+   {
+    "rva": "0x126e20",
+    "instruction": "shl eax, cl",
+    "count_source": "126e18: mov ecx, dword ptr [rax + 8]"
+   },
+   {
+    "rva": "0x126f8c",
+    "instruction": "shl eax, cl",
+    "count_source": "126f84: mov ecx, dword ptr [rax + 8]"
+   },
+   {
+    "rva": "0x12707a",
+    "instruction": "shl eax, cl",
+    "count_source": "127072: mov ecx, dword ptr [rax + 8]"
+   },
+   {
+    "rva": "0x127208",
+    "instruction": "shl eax, cl",
+    "count_source": "127200: mov ecx, dword ptr [rax + 8]"
+   },
+   {
+    "rva": "0x127254",
+    "instruction": "shl eax, cl",
+    "count_source": "12724c: mov ecx, dword ptr [rax + 8]"
+   },
+   {
+    "rva": "0x1273ed",
+    "instruction": "shl eax, cl",
+    "count_source": "1273e5: mov ecx, dword ptr [rax + 8]"
+   },
+   {
+    "rva": "0x127445",
+    "instruction": "shl eax, cl",
+    "count_source": "12743d: mov ecx, dword ptr [rax + 8]"
+   },
+   {
+    "rva": "0x127568",
+    "instruction": "shl eax, cl",
+    "count_source": "127560: mov ecx, dword ptr [rax + 8]"
+   },
+   {
+    "rva": "0x1278fd",
+    "instruction": "shl eax, cl",
+    "count_source": "1278f6: mov ecx, dword ptr [rdx]"
+   },
+   {
+    "rva": "0x1286ef",
+    "instruction": "bt r10d, edx",
+    "count_source": "1286ec: mov edx, dword ptr [rcx + 8]"
+   },
+   {
+    "rva": "0x12a13d",
+    "instruction": "shl ebp, cl",
+    "count_source": "12a13b: mov ecx, dword ptr [rax]"
+   },
+   {
+    "rva": "0x12a419",
+    "instruction": "shl eax, cl",
+    "count_source": "12a412: mov ecx, dword ptr [rdx]"
+   },
+   {
+    "rva": "0x12ab67",
+    "instruction": "shl r15d, cl",
+    "count_source": "12ab65: mov ecx, dword ptr [rdx]"
+   },
+   {
+    "rva": "0x12b529",
+    "instruction": "bt eax, edx",
+    "count_source": "12b51a: mov edx, dword ptr [rax + 8]"
+   },
+   {
+    "rva": "0x12d457",
+    "instruction": "bt eax, r9d",
+    "count_source": "12d450: mov r9d, dword ptr [rcx + 0x10]"
+   },
+   {
+    "rva": "0x12f155",
+    "instruction": "shl eax, cl",
+    "count_source": "12f14e: mov ecx, dword ptr [rdi]"
+   },
+   {
+    "rva": "0x12f8d8",
+    "instruction": "shl r14d, cl",
+    "count_source": "12f8d6: mov ecx, dword ptr [rbx]"
+   },
+   {
+    "rva": "0x130d6e",
+    "instruction": "shl eax, cl",
+    "count_source": "130d67: mov ecx, dword ptr [rbx]"
+   },
+   {
+    "rva": "0x130dd9",
+    "instruction": "shl eax, cl",
+    "count_source": "130dd2: mov ecx, dword ptr [rbx]"
+   },
+   {
+    "rva": "0x13430c",
+    "instruction": "shl eax, cl",
+    "count_source": "134305: mov ecx, dword ptr [rbx]"
+   },
+   {
+    "rva": "0x1343c4",
+    "instruction": "shl eax, cl",
+    "count_source": "1343b8: mov ecx, dword ptr [rbx]"
+   },
+   {
+    "rva": "0x13502c",
+    "instruction": "shl edi, cl",
+    "count_source": "135029: mov ecx, dword ptr [r14]"
+   },
+   {
+    "rva": "0x1355ad",
+    "instruction": "shl eax, cl",
+    "count_source": "13559f: mov ecx, dword ptr [rdi]"
+   },
+   {
+    "rva": "0x13639c",
+    "instruction": "shl eax, cl",
+    "count_source": "136395: mov ecx, dword ptr [rdi]"
+   },
+   {
+    "rva": "0x13860c",
+    "instruction": "shl r8d, cl",
+    "count_source": "138609: mov ecx, dword ptr [rcx + 8]"
+   },
+   {
+    "rva": "0x138d6e",
+    "instruction": "bt ecx, edx",
+    "count_source": "138d63: mov edx, dword ptr [rax + 8]"
+   },
+   {
+    "rva": "0x139059",
+    "instruction": "shl edx, cl",
+    "count_source": "139056: movzx ecx, al"
+   },
+   {
+    "rva": "0x13908a",
+    "instruction": "shl edx, cl",
+    "count_source": "139087: movzx ecx, al"
+   },
+   {
+    "rva": "0x1390d2",
+    "instruction": "bt eax, r11d",
+    "count_source": "1390ab: mov r11d, ecx"
+   },
+   {
+    "rva": "0x1390ee",
+    "instruction": "bt ebx, eax",
+    "count_source": "1390eb: mov eax, dword ptr [rax + 8]"
+   },
+   {
+    "rva": "0x139334",
+    "instruction": "bt ecx, ebx",
+    "count_source": "139301: mov ebx, edx"
+   },
+   {
+    "rva": "0x139353",
+    "instruction": "bt edi, ecx",
+    "count_source": "139350: mov ecx, dword ptr [rcx + 8]"
+   },
+   {
+    "rva": "0x139496",
+    "instruction": "shl edx, cl",
+    "count_source": "139493: movzx ecx, al"
+   },
+   {
+    "rva": "0x13b3f2",
+    "instruction": "shl r14d, cl",
+    "count_source": "13b3eb: mov ecx, eax"
+   },
+   {
+    "rva": "0x13bb2e",
+    "instruction": "bt ecx, edx",
+    "count_source": "13bb23: mov edx, dword ptr [rax + 8]"
+   },
+   {
+    "rva": "0x13bc38",
+    "instruction": "bt ecx, edx",
+    "count_source": "13bc2d: mov edx, dword ptr [rax + 8]"
+   },
+   {
+    "rva": "0x13c20a",
+    "instruction": "bt r8d, r9d",
+    "count_source": "13c1f2: mov r9d, dword ptr [rdx + 8]"
+   },
+   {
+    "rva": "0x13c9ca",
+    "instruction": "bt eax, edx",
+    "count_source": "13c9a8: mov edx, dword ptr [rax + 8]"
+   },
+   {
+    "rva": "0x13e804",
+    "instruction": "shl edi, cl",
+    "count_source": "13e801: mov ecx, dword ptr [rax + 8]"
+   },
+   {
+    "rva": "0x13ee17",
+    "instruction": "bt eax, edx",
+    "count_source": "13edff: mov edx, dword ptr [rdx + 8]"
+   },
+   {
+    "rva": "0x13f0ca",
+    "instruction": "shl edx, cl",
+    "count_source": "13f0c8: mov ecx, dword ptr [rax]"
+   },
+   {
+    "rva": "0x142ac6",
+    "instruction": "btr edi, eax",
+    "count_source": null
+   },
+   {
+    "rva": "0x142dcf",
+    "instruction": "shl eax, cl",
+    "count_source": "142dcb: mov ecx, dword ptr [rax]"
+   },
+   {
+    "rva": "0x142e18",
+    "instruction": "shl ebp, cl",
+    "count_source": "142e16: mov ecx, dword ptr [rax]"
+   },
+   {
+    "rva": "0x1462be",
+    "instruction": "shl r8d, cl",
+    "count_source": "1462bb: cmovle ecx, eax"
+   },
+   {
+    "rva": "0x147a26",
+    "instruction": "shl r8d, cl",
+    "count_source": "147a23: cmovle ecx, eax"
+   },
+   {
+    "rva": "0x14fe9a",
+    "instruction": "bts ebx, r9d",
+    "count_source": "14fe72: xor r9d, r9d"
+   },
+   {
+    "rva": "0x152f9e",
+    "instruction": "shl r15d, cl",
+    "count_source": "152f9b: mov ecx, dword ptr [rax + 8]"
+   },
+   {
+    "rva": "0x154adf",
+    "instruction": "bt eax, edx",
+    "count_source": "154acd: mov edx, dword ptr [rax + 8]"
+   },
+   {
+    "rva": "0x1558d9",
+    "instruction": "bt ecx, edx",
+    "count_source": "1558cb: mov edx, dword ptr [r8 + 8]"
+   },
+   {
+    "rva": "0x155b19",
+    "instruction": "bt ecx, edx",
+    "count_source": "155b0e: mov edx, dword ptr [rax + 8]"
+   },
+   {
+    "rva": "0x15762c",
+    "instruction": "bt eax, edx",
+    "count_source": "157611: mov edx, dword ptr [r10 + 8]"
+   },
+   {
+    "rva": "0x158733",
+    "instruction": "bt edx, r8d",
+    "count_source": "15871b: mov r8d, dword ptr [rax + 8]"
+   },
+   {
+    "rva": "0x15a27d",
+    "instruction": "btr r8d, ecx",
+    "count_source": "15a27a: mov ecx, dword ptr [rcx + 8]"
+   },
+   {
+    "rva": "0x15a35d",
+    "instruction": "btr ebx, eax",
+    "count_source": "15a35a: mov eax, dword ptr [rax + 8]"
+   },
+   {
+    "rva": "0x15aa35",
+    "instruction": "shl r9d, cl",
+    "count_source": "15aa2c: mov ecx, dword ptr [rax + 8]"
+   },
+   {
+    "rva": "0x15aa68",
+    "instruction": "bt r9d, eax",
+    "count_source": "15aa66: mov eax, dword ptr [rdx]"
+   },
+   {
+    "rva": "0x15ec94",
+    "instruction": "bt eax, r8d",
+    "count_source": "15ec81: mov r8d, dword ptr [rax + 8]"
+   },
+   {
+    "rva": "0x162edc",
+    "instruction": "bts esi, r9d",
+    "count_source": "162ebe: xor r9d, r9d"
+   },
+   {
+    "rva": "0x162f86",
+    "instruction": "bt esi, ecx",
+    "count_source": "162f83: mov ecx, dword ptr [rax + 0x60]"
+   },
+   {
+    "rva": "0x1634d9",
+    "instruction": "shl ebp, cl",
+    "count_source": "1634d7: mov ecx, ebx"
+   },
+   {
+    "rva": "0x16cf2f",
+    "instruction": "shl eax, cl",
+    "count_source": "16cf25: mov ecx, dword ptr [r12 + 0x14]"
+   },
+   {
+    "rva": "0x16cf3c",
+    "instruction": "shl esi, cl",
+    "count_source": "16cf37: mov ecx, dword ptr [r12 + 0x14]"
+   },
+   {
+    "rva": "0x174b30",
+    "instruction": "bt ecx, eax",
+    "count_source": "174b20: movzx eax, byte ptr [rbx]"
+   },
+   {
+    "rva": "0x17ddd9",
+    "instruction": "bt esi, eax",
+    "count_source": "17ddd2: movzx eax, byte ptr [rcx]"
+   },
+   {
+    "rva": "0x1879fd",
+    "instruction": "bt edx, edi",
+    "count_source": null
+   },
+   {
+    "rva": "0x18c554",
+    "instruction": "bts ebx, eax",
+    "count_source": "18c54f: movzx eax, word ptr [rsi]"
+   },
+   {
+    "rva": "0x18c591",
+    "instruction": "shl ebx, cl",
+    "count_source": "18c588: movzx ecx, byte ptr [rbx + 0x7e]"
+   },
+   {
+    "rva": "0x190f77",
+    "instruction": "shl esi, cl",
+    "count_source": "190f70: mov ecx, eax"
+   },
+   {
+    "rva": "0x1910f7",
+    "instruction": "shl esi, cl",
+    "count_source": "1910f0: mov ecx, eax"
+   },
+   {
+    "rva": "0x191309",
+    "instruction": "bt ebp, eax",
+    "count_source": "191302: mov eax, dword ptr [rsi + rdx + 0x178]"
+   },
+   {
+    "rva": "0x196479",
+    "instruction": "shl eax, cl",
+    "count_source": "196472: mov ecx, eax"
+   },
+   {
+    "rva": "0x19ef4c",
+    "instruction": "bt eax, edx",
+    "count_source": null
+   },
+   {
+    "rva": "0x19f145",
+    "instruction": "shl eax, cl",
+    "count_source": "19f13e: mov ecx, ebx"
+   },
+   {
+    "rva": "0x19f361",
+    "instruction": "rol edx, cl",
+    "count_source": "19f35a: mov ecx, ebp"
+   },
+   {
+    "rva": "0x19f3d6",
+    "instruction": "shl eax, cl",
+    "count_source": "19f3bd: mov ecx, ebp"
+   },
+   {
+    "rva": "0x1a5a44",
+    "instruction": "shl ebp, cl",
+    "count_source": "1a5a3d: mov ecx, ebx"
+   },
+   {
+    "rva": "0x1a5c50",
+    "instruction": "shl eax, cl",
+    "count_source": "1a5c4c: mov ecx, dword ptr [r10 - 0x1c]"
+   },
+   {
+    "rva": "0x1a5c91",
+    "instruction": "shl eax, cl",
+    "count_source": "1a5c8a: mov ecx, dword ptr [r10 + 0x8c]"
+   },
+   {
+    "rva": "0x1a5cd6",
+    "instruction": "shl eax, cl",
+    "count_source": "1a5ccf: mov ecx, dword ptr [r10 + 0x134]"
+   },
+   {
+    "rva": "0x1a5d1b",
+    "instruction": "shl eax, cl",
+    "count_source": "1a5d14: mov ecx, dword ptr [r10 + 0x1dc]"
+   },
+   {
+    "rva": "0x1a5da4",
+    "instruction": "shl eax, cl",
+    "count_source": "1a5da0: mov ecx, dword ptr [r8 - 0x1c]"
+   },
+   {
+    "rva": "0x1a6d5e",
+    "instruction": "shl eax, cl",
+    "count_source": "1a6d57: mov ecx, dword ptr [rbx]"
+   },
+   {
+    "rva": "0x1a881b",
+    "instruction": "bt ecx, eax",
+    "count_source": "1a8818: mov eax, dword ptr [r8]"
+   },
+   {
+    "rva": "0x1a9457",
+    "instruction": "bt r9d, eax",
+    "count_source": "1a9455: mov eax, dword ptr [rcx]"
+   },
+   {
+    "rva": "0x1a948a",
+    "instruction": "shl edx, cl",
+    "count_source": "1a9488: mov ecx, dword ptr [rcx]"
+   },
+   {
+    "rva": "0x1a94e0",
+    "instruction": "shl eax, cl",
+    "count_source": "1a94de: mov ecx, dword ptr [rbx]"
+   },
+   {
+    "rva": "0x1a9881",
+    "instruction": "shl edx, cl",
+    "count_source": "1a986e: mov ecx, r8d"
+   },
+   {
+    "rva": "0x1abd3f",
+    "instruction": "bt r14d, eax",
+    "count_source": "1abd38: movzx eax, byte ptr [rcx]"
+   },
+   {
+    "rva": "0x1acb2c",
+    "instruction": "shl r8d, cl",
+    "count_source": "1acb25: mov ecx, dword ptr [rax + 8]"
+   },
+   {
+    "rva": "0x1acbd8",
+    "instruction": "shl r15d, cl",
+    "count_source": "1acbd1: mov ecx, dword ptr [rax + 8]"
+   },
+   {
+    "rva": "0x1acd09",
+    "instruction": "bt eax, edx",
+    "count_source": null
+   },
+   {
+    "rva": "0x1ace26",
+    "instruction": "bt eax, edx",
+    "count_source": "1ace09: mov edx, dword ptr [rax + 0x248]"
+   },
+   {
+    "rva": "0x1b129f",
+    "instruction": "shl eax, cl",
+    "count_source": "1b1298: mov ecx, dword ptr [rdx]"
+   },
+   {
+    "rva": "0x1b1400",
+    "instruction": "shl eax, cl",
+    "count_source": "1b13f9: mov ecx, dword ptr [rdx]"
+   },
+   {
+    "rva": "0x1b1469",
+    "instruction": "bt ecx, eax",
+    "count_source": "1b1467: mov eax, dword ptr [rdx]"
+   },
+   {
+    "rva": "0x1b15fd",
+    "instruction": "shl eax, cl",
+    "count_source": "1b15f6: mov ecx, dword ptr [rdx]"
+   },
+   {
+    "rva": "0x1b1750",
+    "instruction": "shl eax, cl",
+    "count_source": "1b1749: mov ecx, dword ptr [rdx]"
+   },
+   {
+    "rva": "0x1b1c39",
+    "instruction": "bt r9d, ecx",
+    "count_source": "1b1c37: mov ecx, dword ptr [rax]"
+   },
+   {
+    "rva": "0x1b2611",
+    "instruction": "shl esi, cl",
+    "count_source": "1b260f: mov ecx, eax"
+   },
+   {
+    "rva": "0x1b29d2",
+    "instruction": "shl eax, cl",
+    "count_source": "1b29c8: mov ecx, dword ptr [rax + 8]"
+   },
+   {
+    "rva": "0x1babd2",
+    "instruction": "shl dx, cl",
+    "count_source": "1babc4: movzx ecx, r8b"
+   },
+   {
+    "rva": "0x1bac30",
+    "instruction": "shl edx, cl",
+    "count_source": "1bac26: movzx ecx, r8b"
+   },
+   {
+    "rva": "0x1bac70",
+    "instruction": "shl dx, cl",
+    "count_source": "1bac66: movzx ecx, r8b"
+   },
+   {
+    "rva": "0x1bacf0",
+    "instruction": "shl edx, cl",
+    "count_source": "1bace6: movzx ecx, r8b"
+   },
+   {
+    "rva": "0x1bad31",
+    "instruction": "shl dx, cl",
+    "count_source": "1bad27: movzx ecx, r8b"
+   },
+   {
+    "rva": "0x1bc392",
+    "instruction": "shl rax, cl",
+    "count_source": null
+   },
+   {
+    "rva": "0x1bc3bc",
+    "instruction": "shl rdi, cl",
+    "count_source": null
+   }
+  ],
+  "review": "counts come from team fields, entity types, option tables, attachment slots or player client numbers; none from an actor or sentient index (docs/capacity-sweep-test37.md)"
+ },
+ "pass4_limits": [
+  {
+   "limit": "script parent objects",
+   "stock": 36856,
+   "test37": 65526,
+   "fatal": "exceeded maximum number of parent script variables",
+   "status": "expanded; spawn guard + shedding"
+  },
+  {
+   "limit": "script child variables",
+   "stock": 102404,
+   "test37": 409592,
+   "fatal": "exceeded maximum number of child0/child1 script variables",
+   "status": "expanded; guard + shedding"
+  },
+  {
+   "limit": "object-key variable names",
+   "stock": "ids < 0x9000",
+   "test37": "ids < 0x10000",
+   "fatal": "refcount loss -> VM corruption",
+   "status": "fixed in Test37"
+  },
+  {
+   "limit": "saved object numbers",
+   "stock": "signed 16-bit read",
+   "test37": "unsigned",
+   "fatal": "checkpoint load faults past 32767 objects",
+   "status": "fixed in Test37"
+  },
+  {
+   "limit": "entity handle records",
+   "stock": 4095,
+   "test37": 32767,
+   "fatal": "ENT_HANDLE_COUNT exceeded - increase size",
+   "status": "expanded in Test37; telemetry, guard, shedding"
+  },
+  {
+   "limit": "model lighting patches per frame",
+   "stock": 4096,
+   "test37": 4096,
+   "fatal": "modelLightingPatchList ran out of elements (ERR_FATAL)",
+   "status": "~1 per drawn model; telemetry, guard, shedding"
+  },
+  {
+   "limit": "entities",
+   "stock": 2046,
+   "test37": 2046,
+   "fatal": "G_Spawn: no free entities",
+   "status": "shared helper spawners; guard + shedding"
+  },
+  {
+   "limit": "script strings",
+   "stock": 65536,
+   "test37": 65536,
+   "fatal": "exceeded maximum number of script strings",
+   "status": "strings only (pointer data moved to owned heap); guard"
+  },
+  {
+   "limit": "anim info",
+   "stock": 4095,
+   "test37": 16383,
+   "fatal": "exceeded maximum number of anim info",
+   "status": "expanded (Test33)"
+  },
+  {
+   "limit": "anim transfer",
+   "stock": 2048,
+   "test37": 16384,
+   "fatal": "exceeded maximum number of anim transfer info",
+   "status": "expanded (Test33)"
+  },
+  {
+   "limit": "dobj transfer",
+   "stock": 1024,
+   "test37": 8192,
+   "fatal": "exceeded maximum number of dobj transfer info",
+   "status": "expanded (Test34)"
+  },
+  {
+   "limit": "checkpoint buffers",
+   "stock": "1 MiB",
+   "test37": "32 MiB",
+   "fatal": "MemFile_StartSegment: Out of memory",
+   "status": "expanded (Test34)"
+  },
+  {
+   "limit": "client/server skeleton memory",
+   "stock": "576/512 KiB",
+   "test37": "9/8 MiB",
+   "fatal": "CL_SKEL_MEMORY_SIZE exceeded",
+   "status": "expanded (Test28)"
+  },
+  {
+   "limit": "DObjs",
+   "stock": 2047,
+   "test37": 2047,
+   "fatal": "No free DObjs",
+   "status": "one per entity, bounded by entities"
+  },
+  {
+   "limit": "renderer scene/model/surface limits",
+   "stock": "various",
+   "test37": "skin/surface pools expanded",
+   "fatal": "not drawn (warning)",
+   "status": "counted by AI_RENDER_OVERFLOW; 0 at 150 actors"
+  },
+  {
+   "limit": "dropped weapons",
+   "stock": 32,
+   "test37": 32,
+   "fatal": "none (oldest recycled)",
+   "status": "fixed-size ring, not per actor"
+  },
+  {
+   "limit": "FX ents (script spawnFx)",
+   "stock": 768,
+   "test37": 768,
+   "fatal": "Ran out of free FX Ents",
+   "status": "created by map scripts, not actors"
+  },
+  {
+   "limit": "snapshot archive message",
+   "stock": "16 KiB",
+   "test37": "16 KiB",
+   "fatal": "msg overflowed",
+   "status": "carries glass/dynent change records, not actor states"
+  },
+  {
+   "limit": "sound restore buffer",
+   "stock": "16 KiB",
+   "test37": "16 KiB",
+   "fatal": "SND_RESTORE_BUFFER_SIZE exceeded",
+   "status": "bounded by sound channels"
+  }
+ ],
+ "scope": "Static linear sweep of .text against the generated patch headers; complements the native fixtures. Not a proof of Windows gameplay."
+}
