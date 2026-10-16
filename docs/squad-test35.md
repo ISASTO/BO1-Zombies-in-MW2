@@ -1,5 +1,7 @@
 # Test35: the full 16-bit parent space, shared helper spawners, load shedding
 
+> **Superseded by [Test36](squad-test36.md):** Test35 corrupted checkpoint saves (the save marker reached the relocated object maps through a base register the generator did not relocate). Do not use Test35.
+
 Version: **0.1.34-squad-test35**. Actor capacity remains 256 / 274 sentients.
 All Test31–Test34 changes remain.
 

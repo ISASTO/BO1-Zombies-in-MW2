@@ -95,7 +95,9 @@ unsigned ApplyHeader(){
 #endif
 }
 int main(int argc,char** argv){if(argc<3)return 2;const unsigned long listGuard=argc>3?std::stoul(argv[3],nullptr,16):0,dobjGuard=argc>4?std::stoul(argv[4],nullptr,16):0,
-  listRva=argc>5?std::stoul(argv[5],nullptr,16):0,parentEnd=argc>6?std::stoul(argv[6],nullptr,16):0x9001;rlimit none{0,0};setrlimit(RLIMIT_CORE,&none);try{
+  listRva=argc>5?std::stoul(argv[5],nullptr,16):0,parentEnd=argc>6?std::stoul(argv[6],nullptr,16):0x9001,
+  mapB=argc>7?std::stoul(argv[7],nullptr,16):0x15b23e8,mapBytes=argc>8?std::stoul(argv[8],nullptr,16):0x12000,
+  childBase=argc>9?std::stoul(argv[9],nullptr,16):0x9002;rlimit none{0,0};setrlimit(RLIMIT_CORE,&none);try{
  struct sigaction action{};action.sa_sigaction=Fault;action.sa_flags=SA_SIGINFO;sigemptyset(&action.sa_mask);sigaction(SIGSEGV,&action,nullptr);
  image=Load(argv[1]);const std::string mode=argv[2];
  Hook(0x2906b0,std::uintptr_t(&ScriptError));Hook(0x1fb5f0,std::uintptr_t(&EngineError));
@@ -217,6 +219,45 @@ int main(int argc,char** argv){if(argc<3)return 2;const unsigned long listGuard=
   reinterpret_cast<void(ABI*)()>(image+0x2210b0)();
   Check(beforeSweep>=made && Sum(l)==0,"Savegame sweep did not visit every parent object");
   std::cout<<",\"parent_objects_before_error\":"<<objects.size()<<",\"parent_error\":\""<<parentError<<"\",\"highest_parent_id\":"<<highest<<",\"sweep_cleared_children\":"<<beforeSweep;
+ }
+ {
+  // Native savegame mark (0x217fc0 -> 0x218060) and sweep (0x2210b0): every
+  // object reachable from a root through pointer fields must keep its
+  // fields; an unreachable object is cleared. Test35 relocated the maps but
+  // the marker addressed them as scrVarPub+0x68/+0x12068 and marked into
+  // the old storage, so a checkpoint save cleared live objects.
+  phase="savegame mark and sweep";
+  reinterpret_cast<void(ABI*)()>(image+0x221600)();
+  std::memset(image+0x15a03e8,0,mapBytes);std::memset(image+mapB,0,mapBytes);Put<std::uint16_t>(image,0x15a03be,0);
+  const unsigned count=argc>10?std::stoul(argv[10]):parentEnd-1-l.pools-64;
+  std::vector<unsigned> chain;chain.reserve(count);
+  for(unsigned n=0;n<count;++n)chain.push_back(reinterpret_cast<Alloc>(image+0x21b640)());
+  const unsigned unreachable=reinterpret_cast<Alloc>(image+0x21b640)();
+  auto list=At(l.list);
+  for(unsigned n=0;n<count;++n){
+   reinterpret_cast<NewVar>(image+0x21d1e0)(chain[n],0x10001);                 // data field
+   if(n+1<count){
+    const unsigned c=reinterpret_cast<NewVar>(image+0x21d1e0)(chain[n],0x10000);// pointer field (hash id)
+    // As the native marker resolves it: pool base + the slot's value index.
+    const unsigned base=childBase+(chain[n]&(l.pools-1))*0xc801;
+    const unsigned entry=base+Get<std::uint16_t>(list,std::size_t(base+c)*24);
+    Check(Get<std::uint32_t>(list,std::size_t(entry)*24+0x10)&0x60,"Pointer field entry not found");
+    Put<std::uint32_t>(list,std::size_t(entry)*24+0x10,Get<std::uint32_t>(list,std::size_t(entry)*24+0x10)|1);
+    Put<std::uint64_t>(list,std::size_t(entry)*24+0x8,chain[n+1]);
+   }
+  }
+  reinterpret_cast<NewVar>(image+0x21d1e0)(unreachable,0x10001);
+  const unsigned before=Sum(l);
+  reinterpret_cast<void(ABI*)(unsigned)>(image+0x217fc0)(chain[0]);
+  const unsigned marked=Get<std::uint16_t>(image,0x15a03be);
+  std::cerr<<"mark count="<<count<<" marked="<<marked<<"\n";
+  unsigned highest=0;for(auto p:chain)highest=std::max(highest,p);
+  reinterpret_cast<void(ABI*)()>(image+0x2210b0)();
+  const unsigned after=Sum(l);
+  Check(marked==count,"Savegame mark did not reach every chained object");
+  Check(after+1==before,"Savegame sweep cleared a reachable object or kept the unreachable one");
+  for(unsigned n=0;n<count;++n)Check(Get<std::uint16_t>(image,0x15a03e8+std::size_t(chain[n])*2)!=0,"Object missing from the save id map");
+  std::cout<<",\"mark_chain_objects\":"<<count<<",\"marked\":"<<marked<<",\"mark_highest_id\":"<<highest<<",\"sweep_kept_children\":"<<after;
  }
  std::cout<<"}\n";return 0;
 }catch(const std::exception& e){std::cerr<<"SCRIPT_VM_CHECK phase="<<phase<<" "<<e.what()<<"\n";return 1;}}

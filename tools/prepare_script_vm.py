@@ -34,11 +34,15 @@ OLD_LIST=0x15c4400; OLD_ENTRIES=OLD_CHILD_BASE+2*POOL_STRIDE; OLD_END=OLD_LIST+O
 OLD_MAPS=(0x15a03e8,0x15b23e8); OLD_MAP_BYTES=0x12000; MAP_BYTES=(PARENT_END*2+0xfff)&~0xfff
 OLD_COUNTS=0x15a03b4
 REGION=0x6000000; COUNTS=REGION+0x1000
-MAPS=(REGION+0x2000,REGION+0x2000+MAP_BYTES)
-LIST=MAPS[1]+MAP_BYTES
+# Map A grows in place over the old map B; map B moves into the stock
+# variable-list storage, which the relocated list no longer uses. Both stay
+# inside the image, so every short scrVarPub+0x68 access keeps working.
+MAPS=(OLD_MAPS[0],OLD_LIST)
+LIST=REGION+0x2000
 SAVE_CELLS=REGION+0x1100; MT_CELLS=REGION+0x1200
-BASE_SITE_COUNT=199; MAP_REFERENCE_COUNT=31
+BASE_SITE_COUNT=199; MAP_REFERENCE_COUNT=16
 MAP_CLEARS=(0x2190ca,0x2196e3,0x2196f7,0x223d3d)
+STRUCT_MAP_B_SITES=4
 ENTRIES=CHILD_BASE+POOLS*POOL_STRIDE
 LIST_BYTES=ENTRIES*24
 LIST_GUARD=(LIST+LIST_BYTES+0xfff)&~0xfff          # inaccessible page after the list
@@ -105,6 +109,41 @@ def build_relays():
         blob=binary.read_bytes()
     if len(blob)!=CODE_BYTES:raise ValueError('Script VM relay layout differs')
     return blob
+
+
+def zone(t):
+    if OLD_MAPS[0]<=t<OLD_MAPS[0]+OLD_MAP_BYTES:return 'mapA'
+    if OLD_MAPS[1]<=t<OLD_MAPS[1]+OLD_MAP_BYTES:return 'mapB'
+    if OLD_LIST<=t<OLD_LIST+OLD_CHILD_BASE*24:return 'parents'
+    if OLD_LIST+OLD_CHILD_BASE*24<=t<OLD_END:return 'children'
+    if OLD_COUNTS<=t<OLD_COUNTS+8:return 'counts'
+    return 'other'
+
+
+def based_accesses(code):
+    """Memory operands whose base register holds a rip-relative address in the
+    script VM globals (e.g. scrVarPub 0x15a0380) and whose displacement
+    reaches a different relocation zone. Test35 missed exactly these: the
+    save marker addressed the per-parent maps as scrVarPub+0x68/+0x12068."""
+    regs={};out=[]
+    for i in code:
+        if i.mnemonic=='ret' or (i.mnemonic=='jmp' and i.operands and i.operands[0].type!=X86_OP_MEM):regs={}
+        for o in i.operands:
+            if o.type==X86_OP_MEM and o.mem.base!=X86_REG_RIP and o.mem.base in regs:
+                b=regs[o.mem.base];t=b+o.mem.disp
+                if zone(b)!=zone(t):out.append((i,b,t))
+            elif (o.type==X86_OP_MEM and o.mem.base!=X86_REG_RIP and o.mem.index in regs and o.mem.scale==1
+                  and o.mem.base not in regs):
+                b=regs[o.mem.index];t=b+o.mem.disp
+                if zone(b)!=zone(t):out.append((i,b,t))
+        if i.mnemonic=='lea' and i.operands[1].mem.base==X86_REG_RIP:
+            t=i.address+i.size+i.operands[1].mem.disp
+            if 0x15a0380<=t<0x18f4460:regs[i.operands[0].reg]=t;continue
+        if (i.mnemonic=='mov' and len(i.operands)==2 and i.operands[0].type==X86_OP_REG and i.operands[1].type==X86_OP_REG
+            and i.operands[1].reg in regs and i.operands[0].size==8):
+            regs[i.operands[0].reg]=regs[i.operands[1].reg];continue
+        for r in i.regs_access()[1]:regs.pop(r,None)
+    return out
 
 
 def mask_sites(pe,code):
@@ -218,11 +257,26 @@ def prepare(pe,raw):
         for o in i.operands:
             if o.type!=X86_OP_MEM:continue
             t=i.address+i.size+o.mem.disp if o.mem.base==X86_REG_RIP else o.mem.disp
-            for n,b in enumerate(OLD_MAPS):
-                if b<=t<b+OLD_MAP_BYTES:mapref.append((i,o.mem.base==X86_REG_RIP,MAPS[n]+(t-b)))
+            b=OLD_MAPS[1]
+            if b<=t<b+OLD_MAP_BYTES:mapref.append((i,o.mem.base==X86_REG_RIP,MAPS[1]+(t-b)))
     if len(mapref)!=MAP_REFERENCE_COUNT:raise ValueError(f'Save map reference count differs: {len(mapref)}')
     for i,rip,new in mapref:
         put(i.address,i.bytes,'relocated per-parent savegame map',[(i.disp_offset,4,new,i.address+i.size,True)] if rip else [(i.disp_offset,4,new,0,False)])
+    # scrVarPub-relative map B accesses: a register holds &scrVarPub
+    # (0x15a0380), sometimes passed in from a caller, and map B is reached at
+    # +0x12068. Map A (+0x68, often a short displacement) stays in place.
+    rel=OLD_MAPS[1]-0x15a0380
+    struct_refs=[(i,o) for i in code for o in i.operands
+                 if 0x210000<=i.address<0x230000 and o.type==X86_OP_MEM and o.mem.base!=X86_REG_RIP and rel<=o.mem.disp<rel+OLD_MAP_BYTES]
+    for i,b,t in based_accesses(code):
+        z=zone(t)
+        if z=='children' and i.address not in (0x21e8db,0x21e90c):raise ValueError(f'Unhandled based child access at {i.address:x}')
+        if z not in('children','mapA','mapB'):raise ValueError(f'Unhandled based VM access at {i.address:x} {b:x}+{t-b:x}')
+        if z=='mapB' and not any(x.address==i.address for x,_ in struct_refs):raise ValueError(f'Map B access outside inventory at {i.address:x}')
+    if len(struct_refs)!=STRUCT_MAP_B_SITES:raise ValueError(f'scrVarPub-relative map B inventory differs: {len(struct_refs)}')
+    for i,o in struct_refs:
+        if int.from_bytes(i.bytes[i.disp_offset:i.disp_offset+4],'little')!=o.mem.disp:raise ValueError(f'Short displacement at {i.address:x}')
+        put(i.address,i.bytes,'map B via scrVarPub',[(i.disp_offset,4,MAPS[1]+(o.mem.disp-rel),0x15a0380,False)])
     for at in MAP_CLEARS:
         i=next(x for x in code if x.address==at)
         if i.mnemonic!='mov' or i.operands[1].imm!=OLD_MAP_BYTES:raise ValueError(f'Save map clear differs at {at:x}')
@@ -292,7 +346,7 @@ def prepare(pe,raw):
           'region_rva':hex(REGION),'region_bytes':REGION_BYTES,'list_references':len(listrefs),
           'selector_masks':len(selectors),'selector_imul_sites':len(imuls),'parent_head_masks':len(PARENT_HEADS),
           'relays':[{'begin':hex(b),'end':hex(e),'native_frame_site':hex(s) if isinstance(s,int) else s} for b,e,s in RELAYS],
-          'list_guard_rva':hex(LIST_GUARD),'dobj_rva':hex(DOBJ),'dobj_records':DOBJ_RECORDS,'stock_dobj_records':DOBJ_STOCK,'dobj_references':len(dobjrefs),
+          'list_guard_rva':hex(LIST_GUARD),'struct_relative_map_b_sites':STRUCT_MAP_B_SITES,'dobj_rva':hex(DOBJ),'dobj_records':DOBJ_RECORDS,'stock_dobj_records':DOBJ_STOCK,'dobj_references':len(dobjrefs),
           'save_slot_bytes':SAVE_BYTES,'stock_save_slot_bytes':SAVE_STOCK,'save_lea_sites':len(SAVE_LEAS),'save_size_sites':len(SAVE_SIZES),
           'mt_cells_rva':hex(MT_CELLS),'save_cells_rva':hex(SAVE_CELLS)}
     return rows,meta
