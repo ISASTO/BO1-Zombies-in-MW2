@@ -12,7 +12,7 @@
 
 .set POOLS, 8
 .set POOL_STRIDE, 0xc801
-.set CHILD_BASE, 0x9002
+# CHILD_BASE, PARENT_END and variable_list come from the generator (--defsym).
 
 # ---------------------------------------------------------------- init
 .global script_vm_init
@@ -28,7 +28,7 @@ script_vm_init:                 # replaces 0x221600 (InitVariables)
     xor ebx, ebx
 init_parent:
     mov ecx, 1
-    mov edx, 0x9001
+    mov edx, PARENT_END
     mov r8d, ebx
     mov r9d, POOLS
     call init_range
@@ -204,4 +204,5 @@ script_mt_init:                 # entry of MT_Init 0x217780
 .set mt_heap_base, 0x6001218
 .set mt_heap_bytes, 0x6001220
 .set child_counts, 0x6001000
-.set variable_list, 0x6002000
+# Forward-referenced equate: rip-relative uses above get relocations.
+.set variable_list, LIST_RVA

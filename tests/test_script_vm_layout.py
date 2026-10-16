@@ -5,8 +5,11 @@ import prepare_script_vm as vm
 
 class ScriptVmLayoutTests(unittest.TestCase):
     def test_pools_keep_stock_positions_and_16_bit_ids(self):
-        self.assertEqual(vm.CHILD_BASE,0x9002)
-        self.assertEqual(vm.OLD_ENTRIES,vm.CHILD_BASE+2*vm.POOL_STRIDE)
+        self.assertEqual(vm.OLD_CHILD_BASE,0x9002)
+        self.assertEqual(vm.OLD_ENTRIES,vm.OLD_CHILD_BASE+2*vm.POOL_STRIDE)
+        self.assertLessEqual(vm.PARENT_END,0xffff)            # parent ids are 16-bit, 0xffff never used
+        self.assertGreater(vm.CHILD_BASE,vm.PARENT_END)
+        self.assertGreaterEqual(vm.MAP_BYTES,vm.PARENT_END*2)
         self.assertLess(vm.POOL_STRIDE,0x10000)              # relative child ids are 16-bit
         self.assertEqual(vm.POOLS&(vm.POOLS-1),0)            # selectors use and reg,POOLS-1
         self.assertEqual(vm.ENTRIES,vm.CHILD_BASE+vm.POOLS*vm.POOL_STRIDE)
@@ -14,6 +17,7 @@ class ScriptVmLayoutTests(unittest.TestCase):
     def test_region_layout_is_disjoint_and_guarded(self):
         spans=[(vm.REGION,vm.REGION+vm.CODE_BYTES),(vm.UNWIND,vm.UNWIND+0x28*len(vm.RELAYS)),
                (vm.COUNTS,vm.COUNTS+4*vm.POOLS),(vm.SAVE_CELLS,vm.SAVE_CELLS+16),(vm.MT_CELLS,vm.MT_CELLS+40),
+               (vm.MAPS[0],vm.MAPS[0]+vm.MAP_BYTES),(vm.MAPS[1],vm.MAPS[1]+vm.MAP_BYTES),
                (vm.LIST,vm.LIST+vm.LIST_BYTES),(vm.LIST_GUARD,vm.LIST_GUARD+0x1000),
                (vm.DOBJ,vm.DOBJ+vm.DOBJ_RECORDS*vm.DOBJ_STRIDE),(vm.DOBJ_GUARD,vm.DOBJ_GUARD+0x1000)]
         spans.sort()

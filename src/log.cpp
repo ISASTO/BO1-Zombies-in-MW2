@@ -1,6 +1,9 @@
 #include "runtime.hpp"
 #include <dbghelp.h>
+#include <algorithm>
 #include <cstdarg>
+#include <string>
+#include <vector>
 #include <cstdio>
 #include <cwchar>
 #include <mutex>
@@ -249,6 +252,30 @@ void RecordNativeOperation(const char* operation,unsigned entity,int actorCount)
     event.operation.store(operation);event.thread.store(GetCurrentThreadId());event.tick.store(GetTickCount64());
     event.entity.store(entity);event.actors.store(actorCount);event.sequence.store(n,std::memory_order_release);
 }
+// Keep the previous runs: an engine error dialog is not a crash, so the
+// next launch used to overwrite the only log of the failing run.
+void RotateLogs(const wchar_t* folder) {
+    wchar_t latest[4096]{};std::swprintf(latest,4096,L"%ls\\latest.log",folder);
+    WIN32_FILE_ATTRIBUTE_DATA info{};
+    if(GetFileAttributesExW(latest,GetFileExInfoStandard,&info)) {
+        FILETIME local{};SYSTEMTIME t{};
+        FileTimeToLocalFileTime(&info.ftLastWriteTime,&local);FileTimeToSystemTime(&local,&t);
+        wchar_t kept[4096]{};
+        std::swprintf(kept,4096,L"%ls\\session-%04u%02u%02u-%02u%02u%02u.log",folder,t.wYear,t.wMonth,t.wDay,t.wHour,t.wMinute,t.wSecond);
+        MoveFileExW(latest,kept,MOVEFILE_REPLACE_EXISTING);
+    }
+    std::vector<std::wstring> sessions;
+    wchar_t pattern[4096]{};std::swprintf(pattern,4096,L"%ls\\session-*.log",folder);
+    WIN32_FIND_DATAW found{};HANDLE search=FindFirstFileW(pattern,&found);
+    if(search!=INVALID_HANDLE_VALUE) {
+        do sessions.emplace_back(found.cFileName); while(FindNextFileW(search,&found));
+        FindClose(search);
+    }
+    std::sort(sessions.begin(),sessions.end());          // names sort by time
+    for(std::size_t n=0;n+8<sessions.size();++n) {
+        wchar_t old[4096]{};std::swprintf(old,4096,L"%ls\\%ls",folder,sessions[n].c_str());DeleteFileW(old);
+    }
+}
 void InitializeLog() {
     wchar_t game[32768]{};
     GetModuleFileNameW(nullptr, game, 32768);
@@ -259,6 +286,7 @@ void InitializeLog() {
     std::swprintf(directory, 32768, L"%ls\\bo1mw2\\logs", game);
     CreateDirectoryW(directory, nullptr);
     wchar_t file[32768]{};
+    RotateLogs(directory);
     std::swprintf(file, 32768, L"%ls\\latest.log", directory);
     logFile = CreateFileW(file, GENERIC_WRITE, FILE_SHARE_READ | FILE_SHARE_WRITE, nullptr, CREATE_ALWAYS, 0, nullptr);
     if (logFile == INVALID_HANDLE_VALUE) {

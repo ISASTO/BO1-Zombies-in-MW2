@@ -77,7 +77,8 @@ struct AiRuntime {
     bool playerPositionValid=false;
     std::array<AiIdentity,kFriendlyCharacterCount> appearances{};
     int enemyIndex=0,friendlyIndex=0;
-    int nextWorldTime=-1,nextRecoveryTime=-1,allyTeam=kAlliesTeam;
+    int nextWorldTime=-1,nextRecoveryTime=-1,nextResourceCheck=-1,allyTeam=kAlliesTeam;
+    bool reuseHelpers=true;
     std::size_t followCursor=0;
     bool detailed=false,adoptPending=true;
     std::vector<std::uint8_t> worldPool,worldActive;
@@ -564,7 +565,7 @@ void Lifetime(const AiScope& s) {
         nativePending=ai.queue.pending(); ai.status.pending=ai.queue.pending(); ai.owned={}; ai.scopeActive=false;ai.cleanupDeferred=false;
         ai.enemies.clear(); ai.friends.clear(); ai.enemyPoints.clear();ai.lastServiceTime=-1;
         ai.status.ready=false;ai.status.owned=0;ai.status.enemySpawners=0;ai.status.friendlySpawners=0;ai.status.enemyName={};ai.status.friendlyName={};
-        ai.nextWorldTime=-1;ai.nextRecoveryTime=-1;ai.followCursor=0;
+        ai.nextWorldTime=-1;ai.nextRecoveryTime=-1;ai.nextResourceCheck=-1;ai.reuseHelpers=true;ai.followCursor=0;
         ai.names={};
         ai.adoptPending=true;
         ai.status.lastEntity=0;ai.status.lastPosition={};ai.status.lastName={};ai.status.placementAttempts=0;ai.status.lastSpawnDistance=0.f;
@@ -597,6 +598,15 @@ void RestoreCapacity() {
     else if(int count=0; Value(aiProfile.actorCountSlot,count) && count<=ai.capacity.original && SetCount(d.address+0x10,d.current,ai.capacity.original)) {
         Log("AI_CAPACITY restored=%d",ai.capacity.original); ai.capacity.clear();
     }
+}
+// Free a helper spawner only when no other ownership ticket still uses it.
+void ReleaseHelper(const OwnedAi& owner) {
+    const auto users=std::count_if(ai.owned.begin(),ai.owned.end(),[&](const OwnedAi& x){
+        return x.spawner.address==owner.spawner.address && x.spawner.serial==owner.spawner.serial;});
+    if(users>1)return;
+    const auto helper=ReadAiAllocation(owner.spawner,ReadAi);
+    if(SameAiAllocation(owner.spawner,helper) && helper.type==kActorSpawnerType)
+        reinterpret_cast<EntityFn>(aiProfile.freeEntity)(owner.spawner.address);
 }
 unsigned CleanupOwned(const char* reason,bool one) {
     if(cleaningOwned)return 0;
@@ -650,9 +660,7 @@ unsigned CleanupOwned(const char* reason,bool one) {
             if(SameAiAllocation(it->identity,after)) {Log("AI_DELETE refused entity=%u",raw.number);++it;continue;}
             ++removed;++ai.status.deleted;
         } else if(ours) {++it;continue;}
-        const auto helper=ReadAiAllocation(it->spawner,ReadAi);
-        if(SameAiAllocation(it->spawner,helper) && helper.type==kActorSpawnerType)
-            reinterpret_cast<EntityFn>(aiProfile.freeEntity)(it->spawner.address);
+        ReleaseHelper(*it);
         if(epoch!=ai.checkpointEpoch)return removed;
         if(it->tagsHeld)ReleaseAppearance(it->appearance);
         it=ai.owned.erase(it);
@@ -800,8 +808,7 @@ void FollowOwned(const Snapshot& s,const AiScope& scope,int time) {
         if(!tracked())continue;
         const auto raw=ReadAiAllocation(it->identity,ReadAi);
         if(raw.valid && !SameAiAllocation(it->identity,raw)) {
-            const auto helper=ReadAiAllocation(it->spawner,ReadAi);
-            if(SameAiAllocation(it->spawner,helper) && helper.type==kActorSpawnerType)reinterpret_cast<EntityFn>(aiProfile.freeEntity)(it->spawner.address);
+            ReleaseHelper(*it);
             for(auto& x:ai.owned)if(x.identity.address==it->identity.address && x.identity.serial==it->identity.serial && x.tagsHeld)ReleaseAppearance(x.appearance);
             ai.owned.erase(std::remove_if(ai.owned.begin(),ai.owned.end(),[&](const auto& x){return x.identity.address==it->identity.address && x.identity.serial==it->identity.serial;}),ai.owned.end());continue;
         }
@@ -975,6 +982,22 @@ void Service() {
     }
     if(!scope.ready) {Pause(s);WorkWanted();return;}
     ai.lastServiceTime=time;
+    // Load shedding before any fatal native pool error: combat can grow
+    // script threads/objects after spawning stops. Remove owned actors
+    // (corpses and hostiles first) until every pool is back under its limit.
+    if(!ai.owned.empty() && (ai.nextResourceCheck<0 || time>=ai.nextResourceCheck || time<ai.nextResourceCheck-1000)) {
+        ai.nextResourceCheck=time+250;
+        const auto shedEpoch=ai.checkpointEpoch.load();
+        for(unsigned n=0;n<8 && !ai.owned.empty() && shedEpoch==ai.checkpointEpoch;++n) {
+            const auto usage=ReadScriptVmUsage();const char* reason=ScriptVmEmergency(usage);
+            if(!reason)break;
+            if(!n)Log("AI_RESOURCE_SHED reason=%s parents=%u/%u peak_pool=%u/%u string_nodes=%u entities=%u/%u owned=%d",reason,usage.parents,usage.parentCapacity,
+                usage.childPeakPool,usage.poolCapacity,usage.mtNativeUsedNodes,usage.entitiesInUse,usage.entityCapacity,OwnCount());
+            if(!CleanupOwned("RESOURCE_EMERGENCY",true))break;
+            ++ai.status.resourceShed;
+        }
+        if(shedEpoch!=ai.checkpointEpoch) {ai.lastServiceTime=-1;WorkWanted();return;}
+    }
     if(ai.nextWorldTime<0 || time>=ai.nextWorldTime || ai.queue.pending()) {ai.nextWorldTime=time+500;ReadWorld(s,scope);}
     const auto epoch=ai.checkpointEpoch.load();
     Pause(s);ServiceHands(scope);if(epoch==ai.checkpointEpoch)FollowOwned(s,scope,time);
@@ -1080,18 +1103,34 @@ void SpawnOwned(const AiRequest& input,const Snapshot& s,const AiScope& scope,in
     }
     const auto placement=recovery?FindRecoveryPlacement(recovery->position,player,Trace):FindSpawnPlacement(center,nearPlayer,Trace);
     if(!placement) {Finish(AiRequestResult::NoClearPosition);return;}
-    // Allocate a real engine entity and copy registered fields/VM vars through
-    // native helpers. Original mission spawners, origins and budgets stay intact.
-    const auto temporary=reinterpret_cast<AllocateFn>(aiProfile.allocate)();
-    if(!temporary || temporary<scope.pool || (temporary-scope.pool)%kAiEntityStride) {Finish(AiRequestResult::NativeReturnedInvalid);return;}
-    struct Temporary {std::uintptr_t pointer;std::uint64_t epoch;bool keep=false;~Temporary(){if(!keep && epoch==ai.checkpointEpoch)reinterpret_cast<EntityFn>(aiProfile.freeEntity)(pointer);}} cleanup{temporary,epoch};
-    reinterpret_cast<CopyFn>(aiProfile.copyFields)(temporary,source.address);
-    reinterpret_cast<CopyFn>(aiProfile.copyDynamic)(temporary,source.address);
-    if(epoch!=ai.checkpointEpoch) {Finish(AiRequestResult::LifetimeChanged);return;}
-    // Persistent helper spawners must not duplicate a mission targetname or
-    // inherit an encounter's scripted target. Native setter maintains refcounts.
-    reinterpret_cast<ScriptStringFn>(aiProfile.setString)(temporary+kAiTargetname,0);
-    reinterpret_cast<ScriptStringFn>(aiProfile.setString)(temporary+kAiTarget,0);
+    // One persistent helper spawner per (source class, team) serves every owned
+    // actor of that kind, as campaign spawners with count>1 do. Each helper
+    // is a real entity with its own script object; one per actor cost an
+    // entity and its variables per actor (Test34: Contingency 1,395 entities
+    // at 0 actors, ~2.4 more per actor against the fixed 2,046 limit).
+    std::uintptr_t temporary=0;bool reused=false;
+    for(const auto& x:ai.owned) {
+        if(!ai.reuseHelpers || x.team!=team || x.sourceName!=source.classname)continue;
+        const auto helper=ReadAiAllocation(x.spawner,ReadAi);
+        if(SameAiAllocation(x.spawner,helper) && helper.type==kActorSpawnerType){temporary=x.spawner.address;reused=true;break;}
+    }
+    if(!reused) {
+        // Allocate a real engine entity and copy registered fields/VM vars through
+        // native helpers. Original mission spawners, origins and budgets stay intact.
+        temporary=reinterpret_cast<AllocateFn>(aiProfile.allocate)();
+        if(!temporary || temporary<scope.pool || (temporary-scope.pool)%kAiEntityStride) {Finish(AiRequestResult::NativeReturnedInvalid);return;}
+    }
+    // A shared helper still serves other owned actors: never free it here.
+    struct Temporary {std::uintptr_t pointer;std::uint64_t epoch;bool keep=false;~Temporary(){if(!keep && epoch==ai.checkpointEpoch)reinterpret_cast<EntityFn>(aiProfile.freeEntity)(pointer);}} cleanup{temporary,epoch,reused};
+    if(!reused) {
+        reinterpret_cast<CopyFn>(aiProfile.copyFields)(temporary,source.address);
+        reinterpret_cast<CopyFn>(aiProfile.copyDynamic)(temporary,source.address);
+        if(epoch!=ai.checkpointEpoch) {Finish(AiRequestResult::LifetimeChanged);return;}
+        // Persistent helper spawners must not duplicate a mission targetname or
+        // inherit an encounter's scripted target. Native setter maintains refcounts.
+        reinterpret_cast<ScriptStringFn>(aiProfile.setString)(temporary+kAiTargetname,0);
+        reinterpret_cast<ScriptStringFn>(aiProfile.setString)(temporary+kAiTarget,0);
+    }
     std::uint8_t type=0; std::uint32_t flags=0; int count=0,oldTeam=0;
     if(!Value(temporary,type) || !SetByte(temporary,type,kActorSpawnerType)
         || !Value(temporary+kAiSpawnFlags,flags) || !SetCount(temporary+kAiSpawnFlags,static_cast<int>(flags),static_cast<int>(flags&~3u))
@@ -1099,8 +1138,8 @@ void SpawnOwned(const AiRequest& input,const Snapshot& s,const AiScope& scope,in
         || !Value(temporary+kAiSpawnerTeam,oldTeam) || !SetCount(temporary+kAiSpawnerTeam,oldTeam,team)) {Finish(AiRequestResult::NativeReturnedInvalid);return;}
     reinterpret_cast<OriginFn>(aiProfile.setOrigin)(temporary,placement->position.data());
     if(epoch!=ai.checkpointEpoch) {Finish(AiRequestResult::LifetimeChanged);return;}
-    Log("AI_SPAWN_BEGIN team=%d source=%u serial=%u classname=%s point=%u placement_attempts=%d position=%.1f,%.1f,%.1f native_thread=%lu",
-        team,source.number,source.serial,source.classname.c_str(),pointNumber,placement->attempts,
+    Log("AI_SPAWN_BEGIN team=%d source=%u serial=%u classname=%s helper_reused=%d point=%u placement_attempts=%d position=%.1f,%.1f,%.1f native_thread=%lu",
+        team,source.number,source.serial,source.classname.c_str(),reused,pointNumber,placement->attempts,
         placement->position[0],placement->position[1],placement->position[2],GetCurrentThreadId());
     RecordNativeOperation("SPAWN_BEGIN",source.number,actorCount);
     // Argument three skips the factory's visibility/player-distance refusal.
@@ -1109,7 +1148,11 @@ void SpawnOwned(const AiRequest& input,const Snapshot& s,const AiScope& scope,in
     std::uintptr_t spawned=0;{SpawnScope spawnScope;spawned=reinterpret_cast<SpawnFn>(aiProfile.spawn)(temporary,0,1,0);}
     RecordNativeOperation("SPAWN_END",source.number,actorCount+static_cast<int>(spawned!=0));
     if(epoch!=ai.checkpointEpoch) {Finish(AiRequestResult::LifetimeChanged);return;}
-    if(!spawned) {Finish(AiRequestResult::NativeRefused);return;}
+    if(!spawned) {
+        // Never strand spawning on a helper the native factory stopped accepting.
+        if(reused && ai.reuseHelpers){ai.reuseHelpers=false;Log("AI_HELPER_REUSE disabled=1 reason=NATIVE_REFUSED helper=%u",static_cast<unsigned>((temporary-scope.pool)/kAiEntityStride));}
+        Finish(AiRequestResult::NativeRefused);return;
+    }
     if(spawned<scope.pool || (spawned-scope.pool)%kAiEntityStride
         || (spawned-scope.pool)/kAiEntityStride>=static_cast<std::uintptr_t>(kAiEntityCapacity-2)) {Finish(AiRequestResult::NativeReturnedInvalid);return;}
     // Roll back an allocated NPC before its helper if initialization/validation
@@ -1139,7 +1182,7 @@ void SpawnOwned(const AiRequest& input,const Snapshot& s,const AiScope& scope,in
     if(recovery && actor.health!=recovery->health)SetCount(actor.address+kAiHealth,actor.health,recovery->health);
     const auto temp=ReadAiEntity(temporary,static_cast<int>((temporary-scope.pool)/kAiEntityStride),ReadAi);
     if(!temp.valid) {Finish(AiRequestResult::NativeReturnedInvalid);return;}
-    if(!MarkOwned(temporary,kOwnedSpawnerTag) || !MarkOwned(spawned,OwnedActorTag(temp.number))) {
+    if((!reused && !MarkOwned(temporary,kOwnedSpawnerTag)) || !MarkOwned(spawned,OwnedActorTag(temp.number))) {
         Finish(AiRequestResult::NativeReturnedInvalid);return;
     }
     ai.combatants.push_back(actor);
@@ -1195,8 +1238,8 @@ float Distance(const AiEntity& e,const std::array<float,3>& origin) {
 }
 template<class Reader> void AdoptSavedOwned(const AiScope& scope,int count,const std::vector<std::uint8_t>& active,Reader read) {
     unsigned restored=0;
-    // A native corpse may copy an actor's string fields. Prefer a living actor
-    // and never attach the same helper allocation to two ownership tickets.
+    // A native corpse may copy an actor's string fields. Prefer a living actor.
+    // Helpers are shared by every owned actor of one source class and team.
     for(int pass=0;pass<2;++pass)for(int n=2;n<count;++n) {
         if(!active[n])continue;
         const auto address=scope.pool+static_cast<std::uintptr_t>(n)*kAiEntityStride;
@@ -1206,7 +1249,6 @@ template<class Reader> void AdoptSavedOwned(const AiScope& scope,int count,const
         std::string text;if(!ScriptText(tag,text))continue;
         const auto helperNumber=OwnedActorHelper(text);if(!helperNumber)continue;
         const auto helperAddress=scope.pool+static_cast<std::uintptr_t>(*helperNumber)*kAiEntityStride;
-        if(std::any_of(ai.owned.begin(),ai.owned.end(),[&](const auto& x){return x.spawner.address==helperAddress;}))continue;
         auto helper=ReadAiEntity(helperAddress,static_cast<int>(*helperNumber),read);
         helper.classname=ClassName(helper.classnameId);
         std::uint16_t helperTag=0;std::string helperText;
@@ -1518,7 +1560,7 @@ void LogAiState() {
     if(s.friendlySpawners) Log("AI_SELECTED_FRIENDLY name=%s distance_units=%.1f",s.friendlyName.data(),s.friendlyDistance);
     Log("AI_PLACEMENT engine_actors=%d engine_limit=%d friendly_fallback=%d last_entity=%u last_team=%d last_position=%.1f,%.1f,%.1f last_distance=%.1f placement_attempts=%d",
         s.engineActors,s.engineLimit,s.friendlyFallback,s.lastEntity,s.lastTeam,s.lastPosition[0],s.lastPosition[1],s.lastPosition[2],s.lastSpawnDistance,s.placementAttempts);
-    Log("AI_COMBAT_STATS killed=%llu campaign_reclaimed=%llu character_loaded=%d scheduler=SERVER_CLOCK",s.killed,s.reclaimed,s.characterLoaded);
+    Log("AI_COMBAT_STATS killed=%llu campaign_reclaimed=%llu resource_shed=%llu character_loaded=%d scheduler=SERVER_CLOCK",s.killed,s.reclaimed,s.resourceShed,s.characterLoaded);
     Log("AI_DAMAGE_OPTIONS hitmarkers=%d invincible_spawned_friendlies=%d confirmed_hits=%llu protected_hits=%llu",
         hitmarkersEnabled.load(),invincibleFriendlies.load(),confirmedPlayerHits.load(),protectedFriendlyHits.load());
     Log("AI_PERF service_updates=%llu service_average_us=%.1f service_peak_us=%.1f world_reads=%llu world_average_us=%.1f world_peak_us=%.1f max_npcs_per_tick=4 recovery_pending=%d reassertions=%llu render_world_reads=0 disk_flush=CRASH_ONLY",

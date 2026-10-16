@@ -8,7 +8,7 @@ import argparse,hashlib,json,subprocess,tempfile
 from pathlib import Path
 import pefile
 from audit_actor_capacity import EXACT_SHA256
-from prepare_script_vm import prepare,check_capacity_disjoint,check_mod_patterns,REGION,REGION_BYTES,LIST_GUARD,DOBJ_GUARD
+from prepare_script_vm import prepare,check_capacity_disjoint,check_mod_patterns,REGION,REGION_BYTES,LIST_GUARD,DOBJ_GUARD,LIST,PARENT_END,OLD_PARENT_END
 
 HERE=Path(__file__).resolve().parent
 
@@ -40,7 +40,7 @@ def run(executable):
             if patches is None:
                 image=bytearray(pe.get_memory_mapped_image());image.extend(bytes(0x5001000-len(image)));path.write_bytes(bytes(image))
             else:path.write_bytes(fixture(pe,patches))
-            p=subprocess.run([str(program),str(path),mode,hex(LIST_GUARD),hex(DOBJ_GUARD)],capture_output=True,text=True,timeout=600)
+            p=subprocess.run([str(program),str(path),mode,hex(LIST_GUARD),hex(DOBJ_GUARD),hex(LIST),hex(OLD_PARENT_END if mode=='stock' else PARENT_END)],capture_output=True,text=True,timeout=600)
             if p.returncode:raise ValueError(f'{mode} script VM probe failed ({p.returncode}): '+p.stderr)
             results[mode]=json.loads(p.stdout)
     s,e=results['stock'],results['expanded']
@@ -49,6 +49,7 @@ def run(executable):
     if 'child' not in s['error'] or 'child' not in e['error']:raise ValueError('Exhaustion was not reported by the native allocator')
     if s['lookup_misses'] or e['lookup_misses']:raise ValueError('Native lookup lost a child')
     if e['children_before_error']<3.9*s['children_before_error']:raise ValueError('Expanded capacity below expectation')
+    if s['parent_objects_before_error']>36870 or e['parent_objects_before_error']<65000:raise ValueError('Parent space not expanded')
     if not e.get('mt_routing') or e.get('checkpoint_slot_bytes')!=0x2000000 or e.get('single_pool5_children')!=0xc7ff:raise ValueError('Early capacity checks incomplete')
     return {'executable_sha256':EXACT_SHA256,'metadata':meta,'stock':s,'expanded':e,'header_relocated_region':h,
             'capacity_ratio':round(e['children_before_error']/s['children_before_error'],3),

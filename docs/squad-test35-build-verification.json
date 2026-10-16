@@ -1,0 +1,89 @@
+{
+ "version": "0.1.34-squad-test35",
+ "base_commit": "3a15aa8b57d7dc01e3ff4c12b338713f8c87754e",
+ "executable_sha256": "fb7e8a987c371dea7b666091b0b9e2011c0cd9cd277b191ad453d11d557dd777",
+ "dll_sha256": "a20f6ceee46525a7b139fa9de072c2f96cbf77ce70c128199d629032b13e8dee",
+ "dll_bytes": 6195432,
+ "compiler": "xPack MinGW-w64 GCC 13.2.0 (posix threads, UCRT), RelWithDebInfo, static GCC/C++ runtime",
+ "pe_checks": {
+  "amd64_pe32_plus": true,
+  "exact_ten_exports": true,
+  "aslr_and_nx": true,
+  "version_embedded": true,
+  "no_external_gcc_or_stdcpp_runtime": true
+ },
+ "imports": [
+  "bcrypt.dll",
+  "dbghelp.dll",
+  "gdi32.dll",
+  "kernel32.dll",
+  "api-ms-win-crt-*-l1-1-0.dll (11 UCRT API sets)",
+  "user32.dll",
+  "winmm.dll"
+ ],
+ "checked_native_patch_entries": 442,
+ "early_dllmain_native_edits": 680,
+ "early_dllmain_relays_with_unwind": 7,
+ "early_patch_checks": {
+  "parent_objects": 65526,
+  "stock_parent_objects": 36862,
+  "child_base": "0x10002",
+  "variable_list_references_relocated": 291,
+  "pool_selectors_masked": 111,
+  "capacity_rows_disjoint": 508,
+  "runtime_signatures_unchanged": 99,
+  "generated_header_applied_with_relocated_region_matches_manifest": true
+ },
+ "native_cxx_tests": {
+  "passed": 20,
+  "failed": 0
+ },
+ "python_tests": {
+  "passed": 35,
+  "failed": 0
+ },
+ "native_suites_and_audits_passed": [
+  "runtime",
+  "resources",
+  "iterator",
+  "animation",
+  "history",
+  "awareness",
+  "threat",
+  "crowd",
+  "fracture",
+  "glass_state",
+  "tables",
+  "audit",
+  "consumers"
+ ],
+ "native_suites_and_audits_failed": [],
+ "returned_result_analysis": "docs/runtime-test35-evidence.json",
+ "packaged_installer_fixture": {
+  "host": "PowerShell 7.5.3 on Linux",
+  "existing_wrapper_refused": "passed",
+  "uninstall_previous_receipt": "passed (Test34)",
+  "dll_hash_and_receipt": "passed",
+  "session_logs_collected": "passed",
+  "matching_dll_uninstall": "passed",
+  "startup_diagnostic_files_excluded": true,
+  "windows_installer_execution": false
+ },
+ "windows_gameplay_tested": false,
+ "script_vm_results": {
+  "stock_parent_objects_before_error": 36862,
+  "stock_parent_error": "exceeded maximum number of parent script variables",
+  "test35_parent_objects_before_error": 65526,
+  "test35_highest_parent_id": 65533,
+  "savegame_sweep_cleared_objects": 65526,
+  "test35_children_before_error": 409487,
+  "refill_children": 409487,
+  "free_parents_after_release": 65526,
+  "mt_routing": true,
+  "checkpoint_slot_bytes": 33554432
+ },
+ "untested_by_fixture": [
+  "shared helper spawners and load shedding (ai.cpp) need retail missions"
+ ],
+ "scope": "Exact native script-variable, savegame sweep, memory-tree and checkpoint-slot code with the Test35 layout; earlier native suites. Windows gameplay requires owner testing."
+}

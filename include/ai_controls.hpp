@@ -187,6 +187,7 @@ private:
 struct AiStatus {
     bool resolved=false,ready=false,hookInstalled=false,pending=false,spawnPaused=false,pauseWanted=false;
     int enemyAlive=0,friendlyAlive=0,otherAlive=0,nativeCount=0,owned=0;
+    unsigned long long resourceShed=0;
     int enemySpawner=0,enemySpawners=0,friendlySpawner=0,friendlySpawners=0;
     std::array<char,96> enemyName{},friendlyName{};
     float enemyDistance=0.f,friendlyDistance=0.f;

@@ -1,0 +1,38 @@
+{
+ "returned_build": "0.1.33-squad-test34",
+ "installed_dll_sha256": "3a25a3cd85c3edeca1588b136f75efb0bef2983dc3a582a2d0c193501e06466d",
+ "executable_sha256": "fb7e8a987c371dea7b666091b0b9e2011c0cd9cd277b191ad453d11d557dd777",
+ "owner_observations": [
+  "Estate failed around 160 actors with 'exceeded maximum number of parent script variables'",
+  "Contingency failed around 200 actors with the same dialog",
+  "Diagnose.cmd reported 'LoaderProbe.exe is missing' (it belongs to the separate startup-diagnostic package)"
+ ],
+ "log_facts": {
+  "file": "latest.log (Contingency; the Estate run's log was overwritten by the next launch)",
+  "sha256": "74d9d80aacdd9411ffac6f155dd324727455b9355f5f3512772190231e89de8f",
+  "script_vm_enabled": "SCRIPT_VM enabled=1 pools=8 parents_capacity=36856 patches=443 relays=7",
+  "last_spawn": "AI_RESULT result=CREATED owned=199 (actor_count=200)",
+  "parents_at_0_actors": 12459,
+  "parents_by_sample": "108 actors 35,952; 100 actors 31,438; 160 actors 29,169-36,155; 200 actors 36,196/36,856",
+  "children_peak": "121,089 / 409,592",
+  "string_tree_nodes_peak": "21,339 / 65,536",
+  "pointer_heap_peak_bytes": 188048,
+  "entities": "1,395 at 0 actors; 1,883 at 200 actors (peak 1,883 / 2,046)",
+  "checkpoint_bytes_peak": 517388,
+  "dobj_transfers_peak": 658,
+  "anim_info_peak": "3,813 / 16,383",
+  "resource_guard_refusals": "6 (SCRIPT_PARENT_VARIABLES at 137 and 156 actors)",
+  "static_watch_hits": "4, startup command registration only"
+ },
+ "native_reproduction": {
+  "fixture": "docs/script-vm-test35-probe.json",
+  "stock_parent_objects_before_error": 36862,
+  "stock_error": "exceeded maximum number of parent script variables",
+  "test35_parent_objects_before_error": 65526
+ },
+ "inference": "Each actor holds roughly 100-150 script objects (mostly script threads), and combat swings the total by several thousand within seconds. At 200 actors a swing crossed the 36,856 limit after the spawn guard had already allowed spawning to resume. Entity use is ~2.4 per actor, one of which was the per-actor helper spawner.",
+ "not_established": [
+  "the Estate baseline (its log was overwritten)",
+  "exact per-actor parent breakdown"
+ ]
+}

@@ -8,6 +8,7 @@
 #include "script_heap.hpp"
 #include <windows.h>
 #include <atomic>
+#include <algorithm>
 #include <climits>
 #include <cstring>
 #include <cwchar>
@@ -176,14 +177,23 @@ ScriptVmUsage ReadScriptVmUsage(){
 }
 const char* ScriptVmSpawnRefusal(const ScriptVmUsage& u){
     if(!u.valid)return nullptr;
-    // Test33: at most ~570 (Estate) to ~920 (Contingency) children per actor,
-    // level variables included; headroom covers one more actor with margin.
-    constexpr unsigned kActorChildren=2048,kActorParents=256;
-    if(u.childTotal+kActorChildren*4>u.childCapacity)return "SCRIPT_CHILD_VARIABLES";
-    if(u.childPeakPool+kActorChildren>u.poolCapacity)return "SCRIPT_CHILD_POOL";
-    if(u.parents+kActorParents*4>u.parentCapacity)return "SCRIPT_PARENT_VARIABLES";
+    // Headroom is sized to volatility, not one actor: Test34 Contingency at
+    // 160-200 actors swung by ~7,000 parent objects within 10 s of combat
+    // (threads), and ~2.4 entities per actor.
+    const unsigned parentMargin=std::max(4096u,u.parentCapacity/8);
+    if(u.childTotal+16384>u.childCapacity)return "SCRIPT_CHILD_VARIABLES";
+    if(u.childPeakPool+4096>u.poolCapacity)return "SCRIPT_CHILD_POOL";
+    if(u.parents+parentMargin>u.parentCapacity)return "SCRIPT_PARENT_VARIABLES";
     if(u.mtNativeUsedNodes+4096>u.mtNativeNodes)return "SCRIPT_STRINGS";
     if(u.entitiesInUse+128>u.entityCapacity)return "ENTITIES";
+    return nullptr;
+}
+const char* ScriptVmEmergency(const ScriptVmUsage& u){
+    if(!u.valid)return nullptr;
+    if(u.parents+2048>u.parentCapacity)return "SCRIPT_PARENT_VARIABLES";
+    if(u.childPeakPool+1024>u.poolCapacity)return "SCRIPT_CHILD_POOL";
+    if(u.mtNativeUsedNodes+1024>u.mtNativeNodes)return "SCRIPT_STRINGS";
+    if(u.entitiesInUse+32>u.entityCapacity)return "ENTITIES";
     return nullptr;
 }
 void LogScriptVm(bool detailed){

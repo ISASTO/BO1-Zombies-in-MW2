@@ -31,5 +31,8 @@ ScriptVmUsage ReadScriptVmUsage();
 // Spawn governor: nonzero name of the resource that lacks headroom for one
 // more actor (children, parents, script strings, entities), or nullptr.
 const char* ScriptVmSpawnRefusal(const ScriptVmUsage& usage);
+// Load shedding: nonzero when a fatal native pool is about to run out
+// regardless of new spawns (owned actors are removed until it clears).
+const char* ScriptVmEmergency(const ScriptVmUsage& usage);
 void LogScriptVm(bool detailed);
 } // namespace mod

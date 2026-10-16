@@ -94,11 +94,12 @@ unsigned ApplyHeader(){
 }
 #endif
 }
-int main(int argc,char** argv){if(argc<3)return 2;const unsigned long listGuard=argc>3?std::stoul(argv[3],nullptr,16):0,dobjGuard=argc>4?std::stoul(argv[4],nullptr,16):0;rlimit none{0,0};setrlimit(RLIMIT_CORE,&none);try{
+int main(int argc,char** argv){if(argc<3)return 2;const unsigned long listGuard=argc>3?std::stoul(argv[3],nullptr,16):0,dobjGuard=argc>4?std::stoul(argv[4],nullptr,16):0,
+  listRva=argc>5?std::stoul(argv[5],nullptr,16):0,parentEnd=argc>6?std::stoul(argv[6],nullptr,16):0x9001;rlimit none{0,0};setrlimit(RLIMIT_CORE,&none);try{
  struct sigaction action{};action.sa_sigaction=Fault;action.sa_flags=SA_SIGINFO;sigemptyset(&action.sa_mask);sigaction(SIGSEGV,&action,nullptr);
  image=Load(argv[1]);const std::string mode=argv[2];
  Hook(0x2906b0,std::uintptr_t(&ScriptError));Hook(0x1fb5f0,std::uintptr_t(&EngineError));
- Layout l=mode=="stock"?Layout{0x15c4400,0x15a03b4,2}:Layout{0x6002000,0x6001000,8};
+ Layout l=mode=="stock"?Layout{0x15c4400,0x15a03b4,2}:Layout{listRva,0x6001000,8};
  if(mode=="header"){
 #ifdef SCRIPT_VM_HEADER
   const unsigned native=ApplyHeader();std::cerr<<"header native patches="<<native<<" region_delta=0x"<<std::hex<<(region-image)<<std::dec<<"\n";
@@ -194,6 +195,28 @@ int main(int argc,char** argv){if(argc<3)return 2;const unsigned long listGuard=
         Get<std::uint64_t>(image,0x1157800)==kSlots[1] && Get<unsigned>(image,0x1157808)==0x2000000,"Checkpoint slots not published from owned cells");
   std::cout<<",\"mt_routing\":true,\"checkpoint_slot_bytes\":"<<Get<unsigned>(image,0x1157308);
   std::cout<<",\"removed_children\":"<<removed<<",\"free_parents_after_release\":"<<onLists<<",\"refill_children\":"<<second.children<<",\"stock_list_untouched\":true";
+ }
+ {
+  // Parent object space: allocate objects (one child each) until the native
+  // allocator reports parent exhaustion, look up children of the highest
+  // ids, then run the native savegame sweep 0x2210b0 (walks every parent id
+  // through the per-parent save map) and require it to clear every object.
+  phase="parent exhaustion";
+  reinterpret_cast<void(ABI*)()>(image+0x221600)();Check(Sum(l)==0,"Counters not cleared before parent fill");
+  error.clear();std::vector<unsigned> objects;objects.reserve(0x10000);std::vector<unsigned>* out=&objects;
+  if(setjmp(errorJump)==0){for(;;){const unsigned p=reinterpret_cast<Alloc>(image+0x21b640)();out->push_back(p);reinterpret_cast<NewVar>(image+0x21d1e0)(p,0x10000);}}
+  const std::string parentError=error;
+  Check(parentError.find("parent")!=std::string::npos,"Parent exhaustion not reported by the native allocator");
+  const unsigned made=static_cast<unsigned>(objects.size());   // the error is raised inside AllocObject
+  unsigned highest=0;for(unsigned n=0;n<made;++n)highest=std::max(highest,objects[n]);
+  Check(highest==parentEnd-2,"Highest parent id differs from the configured parent space");
+  unsigned misses=0;for(unsigned n=0;n<made;++n)if(!reinterpret_cast<FindArray>(image+0x21c410)(objects[n],0))++misses;
+  Check(misses==0,"Child of a parent object not found");
+  phase="native savegame sweep over every parent";
+  const unsigned beforeSweep=Sum(l);
+  reinterpret_cast<void(ABI*)()>(image+0x2210b0)();
+  Check(beforeSweep>=made && Sum(l)==0,"Savegame sweep did not visit every parent object");
+  std::cout<<",\"parent_objects_before_error\":"<<objects.size()<<",\"parent_error\":\""<<parentError<<"\",\"highest_parent_id\":"<<highest<<",\"sweep_cleared_children\":"<<beforeSweep;
  }
  std::cout<<"}\n";return 0;
 }catch(const std::exception& e){std::cerr<<"SCRIPT_VM_CHECK phase="<<phase<<" "<<e.what()<<"\n";return 1;}}

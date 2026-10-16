@@ -23,11 +23,22 @@ from audit_actor_capacity import EXACT_SHA256
 from prepare_expanded_crowd import native_unwind
 
 POOLS=8
-PARENT_END=0x9001; CHILD_BASE=0x9002; POOL_STRIDE=0xc801
-OLD_LIST=0x15c4400; OLD_ENTRIES=CHILD_BASE+2*POOL_STRIDE; OLD_END=OLD_LIST+OLD_ENTRIES*24
+POOL_STRIDE=0xc801
+# Stock: parents are entries 1..0x9000 (ids 0..0x8fff), children start at 0x9002.
+OLD_PARENT_END=0x9001; OLD_CHILD_BASE=0x9002
+# Test35: parents fill the whole 16-bit id space (ids 0..0xfffd); children
+# move above it. Child relative ids stay 16-bit within each pool.
+PARENT_END=0xffff; CHILD_BASE=0x10002
+OLD_LIST=0x15c4400; OLD_ENTRIES=OLD_CHILD_BASE+2*POOL_STRIDE; OLD_END=OLD_LIST+OLD_ENTRIES*24
+# Savegame object maps indexed by parent id / save id (0x9000 WORDs each).
+OLD_MAPS=(0x15a03e8,0x15b23e8); OLD_MAP_BYTES=0x12000; MAP_BYTES=(PARENT_END*2+0xfff)&~0xfff
 OLD_COUNTS=0x15a03b4
-REGION=0x6000000; COUNTS=REGION+0x1000; LIST=REGION+0x2000
+REGION=0x6000000; COUNTS=REGION+0x1000
+MAPS=(REGION+0x2000,REGION+0x2000+MAP_BYTES)
+LIST=MAPS[1]+MAP_BYTES
 SAVE_CELLS=REGION+0x1100; MT_CELLS=REGION+0x1200
+BASE_SITE_COUNT=199; MAP_REFERENCE_COUNT=31
+MAP_CLEARS=(0x2190ca,0x2196e3,0x2196f7,0x223d3d)
 ENTRIES=CHILD_BASE+POOLS*POOL_STRIDE
 LIST_BYTES=ENTRIES*24
 LIST_GUARD=(LIST+LIST_BYTES+0xfff)&~0xfff          # inaccessible page after the list
@@ -88,7 +99,8 @@ def decode_all(pe):
 def build_relays():
     with tempfile.TemporaryDirectory(prefix='bo1mw2-script-vm-') as d:
         root=Path(d);obj=root/'g.o';binary=root/'g.bin'
-        subprocess.run(['as','--64',str(Path(__file__).with_name('script_vm_guard.S')),'-o',str(obj)],check=True,capture_output=True)
+        subprocess.run(['as','--64','--defsym',f'CHILD_BASE={CHILD_BASE}','--defsym',f'PARENT_END={PARENT_END}',
+                        '--defsym',f'LIST_RVA={LIST}',str(Path(__file__).with_name('script_vm_guard.S')),'-o',str(obj)],check=True,capture_output=True)
         subprocess.run(['ld','-Ttext',hex(REGION),'--oformat=binary','-o',str(binary),str(obj)],check=True,capture_output=True)
         blob=binary.read_bytes()
     if len(blob)!=CODE_BYTES:raise ValueError('Script VM relay layout differs')
@@ -145,7 +157,10 @@ def prepare(pe,raw):
             listrefs.append((i,kind,t))
     if len(listrefs)!=291:raise ValueError(f'Variable list reference count differs: {len(listrefs)}')
     for i,kind,t in listrefs:
-        new=LIST+(t-OLD_LIST)
+        off=t-OLD_LIST
+        if off//24>=OLD_CHILD_BASE:off+=(CHILD_BASE-OLD_CHILD_BASE)*24
+        elif off//24>=OLD_PARENT_END-16:raise ValueError(f'List reference near the parent end at {i.address:x}')
+        new=LIST+off
         if kind=='rip':fx=[(i.disp_offset,4,new,i.address+i.size,True)]
         else:fx=[(i.disp_offset,4,new,0,False)]
         put(i.address,i.bytes,'relocated native variable list reference',fx)
@@ -176,6 +191,43 @@ def prepare(pe,raw):
     for a in selectors+list(PARENT_HEADS):
         i=next(x for x in code if x.address==a)
         put(a,i.bytes[:-1]+bytes((POOLS-1,)),'parent->pool / parent free-list mask')
+    # 4b. Child base / parent bound constants.
+    relay_spans=[(a,a+n) for a,n,_,_ in ENTRIES_SITES]
+    def in_relay(a):return any(b<=a<e for b,e in relay_spans)
+    base_sites=[]
+    for i in code:
+        if in_relay(i.address) or not(0x190000<=i.address<0x230000):continue
+        for o in i.operands:
+            if o.type==X86_OP_IMM and o.imm==OLD_CHILD_BASE and i.imm_size==4:base_sites.append((i,i.imm_offset,CHILD_BASE))
+            if o.type==X86_OP_MEM and o.mem.base!=X86_REG_RIP and o.mem.disp in (OLD_CHILD_BASE,):base_sites.append((i,i.disp_offset,CHILD_BASE))
+            if o.type==X86_OP_MEM and o.mem.base!=X86_REG_RIP and o.mem.disp in (OLD_CHILD_BASE*24,OLD_CHILD_BASE*24+2):
+                base_sites.append((i,i.disp_offset,o.mem.disp+(CHILD_BASE-OLD_CHILD_BASE)*24))
+    # Stock sites outside replaced relays: 197 child-base adds/leas/movs,
+    # two folded tempVariable offsets.
+    if len(base_sites)!=BASE_SITE_COUNT:raise ValueError(f'Child base inventory differs: {len(base_sites)}')
+    for i,off,value in base_sites:
+        after=bytearray(i.bytes);after[off:off+4]=struct.pack('<I',value)
+        put(i.address,after,'child pools above the 16-bit parent id space')
+    for at,before,value in ((0x21b6eb,OLD_CHILD_BASE-1,CHILD_BASE-1),(0x21d915,OLD_CHILD_BASE-1,CHILD_BASE-1),(0x2210fc,OLD_PARENT_END-1,PARENT_END-1)):
+        i=next(x for x in code if x.address==at)
+        if i.operands[1].imm!=before or i.imm_size!=4:raise ValueError(f'Parent bound differs at {at:x}')
+        after=bytearray(i.bytes);after[i.imm_offset:i.imm_offset+4]=struct.pack('<I',value)
+        put(at,after,'parent id bound')
+    mapref=[]
+    for i in code:
+        for o in i.operands:
+            if o.type!=X86_OP_MEM:continue
+            t=i.address+i.size+o.mem.disp if o.mem.base==X86_REG_RIP else o.mem.disp
+            for n,b in enumerate(OLD_MAPS):
+                if b<=t<b+OLD_MAP_BYTES:mapref.append((i,o.mem.base==X86_REG_RIP,MAPS[n]+(t-b)))
+    if len(mapref)!=MAP_REFERENCE_COUNT:raise ValueError(f'Save map reference count differs: {len(mapref)}')
+    for i,rip,new in mapref:
+        put(i.address,i.bytes,'relocated per-parent savegame map',[(i.disp_offset,4,new,i.address+i.size,True)] if rip else [(i.disp_offset,4,new,0,False)])
+    for at in MAP_CLEARS:
+        i=next(x for x in code if x.address==at)
+        if i.mnemonic!='mov' or i.operands[1].imm!=OLD_MAP_BYTES:raise ValueError(f'Save map clear differs at {at:x}')
+        after=bytearray(i.bytes);after[i.imm_offset:i.imm_offset+4]=struct.pack('<I',MAP_BYTES)
+        put(at,after,'per-parent savegame map size')
     # 5. Checkpoint slot buffers.
     for n,at in enumerate(SAVE_LEAS):
         i=next(x for x in code if x.address==at)
@@ -221,6 +273,9 @@ def prepare(pe,raw):
     rows=[]
     for at,(after,fx,role) in sorted(edits.items()):
         rows.append({'rva':at,'before':orig(at,len(after)).hex(),'after':after.hex(),'fixups':fx,'role':role})
+    for f in relay_fixups:
+        t=f[2]
+        if not(t<0x5000000 or REGION<=t<REGION+REGION_BYTES):raise ValueError(f'Relay reference outside image/region: {t:x}')
     # Branches inside the blob are position independent; everything else is rel32.
     external=[f for f in relay_fixups if not REGION<=f[2]<REGION+CODE_BYTES]
     if any(f[1]!=4 or not f[4] for f in external):raise ValueError('Script VM relay leaves the blob without rel32')
@@ -232,7 +287,7 @@ def prepare(pe,raw):
         unwind[n*0x28:n*0x28+len(data)]=data
     rows.append({'rva':UNWIND,'before':'','after':bytes(unwind).hex(),'fixups':[],'role':'script VM relay unwind'})
     meta={'child_pools':POOLS,'stock_child_pools':2,'pool_entries':POOL_STRIDE,'usable_children_per_pool':POOL_STRIDE-2,
-          'parent_objects':PARENT_END-1-POOLS,'stock_parent_objects':PARENT_END-1-2,
+          'parent_objects':PARENT_END-1-POOLS,'stock_parent_objects':OLD_PARENT_END-1-2,'child_base':hex(CHILD_BASE),'stock_child_base':hex(OLD_CHILD_BASE),
           'variable_list_entries':ENTRIES,'stock_variable_list_entries':OLD_ENTRIES,
           'region_rva':hex(REGION),'region_bytes':REGION_BYTES,'list_references':len(listrefs),
           'selector_masks':len(selectors),'selector_imul_sites':len(imuls),'parent_head_masks':len(PARENT_HEADS),
@@ -297,6 +352,7 @@ def generate(rows,meta,output):
         h.write('#include <array>\n#include <cstdint>\n#include <vector>\nnamespace mod::script_vm {\n')
         h.write('inline constexpr std::uint32_t kRegionRva=0x%x,kRegionBytes=0x%x,kCountsRva=0x%x,kListRva=0x%x,kUnwindRva=0x%x;\n'%(REGION,REGION_BYTES,COUNTS,LIST,UNWIND))
         h.write('inline constexpr std::uint32_t kPools=%d,kPoolStride=0x%x,kChildBase=0x%x,kParentEnd=0x%x,kEntries=0x%x;\n'%(POOLS,POOL_STRIDE,CHILD_BASE,PARENT_END,ENTRIES))
+        h.write('inline constexpr std::uint32_t kMapRvas[2]={0x%x,0x%x},kMapBytes=0x%x;\n'%(MAPS[0],MAPS[1],MAP_BYTES))
         h.write('inline constexpr std::uint32_t kListGuardRva=0x%x,kDobjRva=0x%x,kDobjGuardRva=0x%x,kDobjRecords=0x%x,kSaveCellsRva=0x%x,kSaveBytes=0x%x,kMtCellsRva=0x%x;\n'%(LIST_GUARD,DOBJ,DOBJ_GUARD,DOBJ_RECORDS,SAVE_CELLS,SAVE_BYTES,MT_CELLS))
         h.write('struct Fixup {unsigned offset,width;std::uint32_t target,end;bool relative;};\n')
         h.write('struct Patch {std::uint32_t rva;const char* before;const char* after;std::vector<Fixup> fixups;};\n')
