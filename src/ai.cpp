@@ -4,6 +4,7 @@
 #include <vector>
 #include <limits>
 #include <cctype>
+#include <type_traits>
 #include <intrin.h>
 #include "native_hooks.hpp"
 #include "ai_behavior.hpp"
@@ -13,6 +14,9 @@
 #include "script_parameters.hpp"
 #include "friendly_fire.hpp"
 #include "combat_feedback.hpp"
+#include "zombie_bindings.hpp"
+#include "script_call.hpp"
+#include "bo1_zombie_rules.hpp"
 
 namespace mod {
 namespace {
@@ -44,13 +48,16 @@ struct AiProfile {
     std::uintptr_t allocate=0,freeEntity=0,copyFields=0,copyDynamic=0,trace=0,setOrigin=0,setTeam=0,setGoal=0,setEnemy=0;
     std::uintptr_t actorCountSlot=0,actorLimitSlot=0,animationBuilder=0,completeTable=0,definitionTable=0;
     std::uintptr_t setString=0,damage=0,updateModel=0;
+    std::uintptr_t setEntityHandle=0;bool goalEntityReady=false;
 } aiProfile;
+using EntityHandleFn=void(*)(std::uintptr_t,std::uintptr_t);
 struct OwnedAi {
     AiIdentity identity,spawner;int team=0,lastGoalTime=-1;
     std::uintptr_t target=0;AiPoint goal{};bool hasGoal=false;
     AiAppearance appearance;int appearanceAt=0;bool modelApplied=false;
     std::string sourceName;
     bool tagsHeld=false;
+    bool zombie=false;   // serviced by the zombies adapter, not squad following
 };
 struct RecoveryAi {
     AiIdentity previous;
@@ -72,7 +79,7 @@ struct AiRuntime {
     AiRequestQueue queue;
     std::vector<OwnedAi> owned;
     std::deque<RecoveryAi> recovery;
-    std::vector<AiEntity> enemies,friends,enemyPoints,combatants;
+    std::vector<AiEntity> enemies,friends,enemyPoints,combatants,dogPoints,allPoints;
     AiPoint playerPosition{};
     bool playerPositionValid=false;
     std::array<AiIdentity,kFriendlyCharacterCount> appearances{};
@@ -116,8 +123,19 @@ thread_local bool cleaningOwned=false;
 thread_local unsigned checkpointReadDepth=0;
 thread_local int traceIgnoreEntity=-1;
 
+bool ZombieDamage(std::uintptr_t,std::uintptr_t,std::uintptr_t,const float*,const float*,int,int,int,int,int,int,int,bool&);
 bool DamageHook(std::uintptr_t target,std::uintptr_t inflictor,std::uintptr_t attacker,const float* direction,const float* point,
     int damage,int flags,int mod,int weapon,int hitloc,int time,int surface) {
+    {
+        // Test38 zombies: player damage to our zombies scores BO1 points.
+        std::lock_guard<std::recursive_mutex> lock(aiMutex);
+        bool handled=false;
+        const bool result=ZombieDamage(target,inflictor,attacker,direction,point,damage,flags,mod,weapon,hitloc,time,surface,handled);
+        if(handled) {
+            if(hitmarkersEnabled.load(std::memory_order_relaxed) && result) {lastPlayerHit.store(GetTickCount64(),std::memory_order_release);++confirmedPlayerHits;}
+            return result;
+        }
+    }
     const bool feedback=hitmarkersEnabled.load(std::memory_order_relaxed);
     const bool protect=invincibleFriendlies.load(std::memory_order_relaxed);
     const bool friendlyFire=allowFriendlyFire.load(std::memory_order_relaxed);
@@ -377,7 +395,8 @@ std::vector<void*> serviceMemory;
 bool clockInstalled=false;
 void Service();
 bool CompleteServiceInstall();
-unsigned CleanupOwned(const char* reason,bool one=false);
+void ResetZombieGame(const char* reason,bool deleteActors);
+unsigned CleanupOwned(const char* reason,bool one=false,bool onlyZombies=false);
 void CaptureRecovery(const AiIdentity* only=nullptr);
 void ClearRecovery(bool releaseTags);
 void HoldAppearance(AiAppearance& appearance);
@@ -393,6 +412,7 @@ void ClockHook() {
 }
 void BeforeLoad(const char* reason) {
     std::lock_guard<std::recursive_mutex> lock(aiMutex);
+    ResetZombieGame(reason,false);
     if(servicing || cleaningOwned) {
         // Native read replaces the world. Keep active iteration tickets stable
         // until its caller returns, but release DLL-held refs before VM reset.
@@ -553,7 +573,8 @@ int PlayerTeam(const Snapshot& s) {
         && Value(sentient+8,team) && (team==kAxisTeam || team==kAlliesTeam)) return team;
     return kAlliesTeam;
 }
-void WorkWanted() { ai.status.recovering=static_cast<int>(ai.recovery.size());nativePending=ai.queue.pending() || ai.hands.pending || !ai.owned.empty() || !ai.recovery.empty() || ai.cleanupDeferred || ai.adoptPending || ai.detailed || ai.pauseWanted || ai.pause.owned; }
+bool ZombieWorkWanted();
+void WorkWanted() { ai.status.recovering=static_cast<int>(ai.recovery.size());nativePending=ai.queue.pending() || ai.hands.pending || !ai.owned.empty() || !ai.recovery.empty() || ai.cleanupDeferred || ai.adoptPending || ai.detailed || ai.pauseWanted || ai.pause.owned || ZombieWorkWanted(); }
 void RestoreCapacity();
 void Lifetime(const AiScope& s) {
     const bool changed=!s.ready || (ai.scopeActive && (ai.client!=s.client || ai.pool!=s.pool || std::strcmp(ai.map,s.map)
@@ -608,7 +629,7 @@ void ReleaseHelper(const OwnedAi& owner) {
     if(SameAiAllocation(owner.spawner,helper) && helper.type==kActorSpawnerType)
         reinterpret_cast<EntityFn>(aiProfile.freeEntity)(owner.spawner.address);
 }
-unsigned CleanupOwned(const char* reason,bool one) {
+unsigned CleanupOwned(const char* reason,bool one,bool onlyZombies) {
     if(cleaningOwned)return 0;
     NativeScriptParameters parameters{};
     const auto parameterAddress=aiProfile.base+kScriptParametersRva;
@@ -643,6 +664,7 @@ unsigned CleanupOwned(const char* reason,bool one) {
         std::stable_sort(ai.owned.begin(),ai.owned.end(),[&](const auto& a,const auto& b){return priority(a)<priority(b);});
     }
     for(auto it=ai.owned.begin();it!=ai.owned.end();) {
+        if(onlyZombies && !it->zombie) {++it;continue;}
         const auto raw=ReadAiAllocation(it->identity,ReadAi);
         if(!raw.valid) {++it;continue;}
         const bool ours=SameAiAllocation(it->identity,raw);
@@ -788,20 +810,60 @@ void ServiceHands(const AiScope& scope) {
         reinterpret_cast<void*>(right),reinterpret_cast<void*>(left));
 }
 void ReadWorld(const Snapshot&,const AiScope&);
+template<class T> bool SetQword(std::uintptr_t at,T before,T after) {
+    static_assert(sizeof(T)==8);
+    if(before==after)return true;
+    if((at&7) || !Writable(at))return false;
+    LONG64 b=0,a=0;std::memcpy(&b,&before,8);std::memcpy(&a,&after,8);
+    return InterlockedCompareExchange64(reinterpret_cast<volatile LONG64*>(at),a,b)==b;
+}
+bool SetFloat(std::uintptr_t at,float before,float after) {
+    int b=0,a=0;std::memcpy(&b,&before,4);std::memcpy(&a,&after,4);return SetCount(at,b,a);
+}
+// Native setgoalentity without its script parameter reads: clear claimed-node
+// and arrival requests, set the goal entity handle through the native handle
+// record setter, then clear the goal node and goal volume. The engine copies
+// the entity origin into the effective goal each think (0x12b89c).
+bool AssignGoalEntity(const AiEntity& e,std::uintptr_t target) {
+    if(!aiProfile.goalEntityReady || !e.actor || !target)return false;
+    for(std::size_t n=0;n<2;++n) {std::uint8_t keep=0;if(Value(e.actor+kActorKeepClaimedNode+n,keep) && keep<=1)SetByte(e.actor+kActorKeepClaimedNode+n,keep,0);}
+    for(std::size_t n=0;n<2;++n) {int arrival=0;if(Value(e.actor+kActorRequestArrival+n*4,arrival))SetCount(e.actor+kActorRequestArrival+n*4,arrival,0);}
+    reinterpret_cast<EntityHandleFn>(aiProfile.setEntityHandle)(e.actor+kActorGoalEntity,target);
+    std::uintptr_t node=0,volume=0;
+    if(Value(e.actor+kActorGoalNode,node))SetQword(e.actor+kActorGoalNode,node,std::uintptr_t{0});
+    if(Value(e.actor+kActorGoalVolume,volume))SetQword(e.actor+kActorGoalVolume,volume,std::uintptr_t{0});
+    return true;
+}
+std::uint16_t EntityHandleValue(std::uintptr_t entity,std::uintptr_t pool) {
+    return entity>=pool && !((entity-pool)%kAiEntityStride)?static_cast<std::uint16_t>((entity-pool)/kAiEntityStride+1):0;
+}
+bool ClearFixedNode(const AiEntity& e) {
+    std::uint8_t fixed=0;
+    if(!Value(e.actor+kActorFixedNode,fixed) || fixed!=1 || !SetByte(e.actor+kActorFixedNode,fixed,0))return false;
+    int check=0;if(Value(e.actor+kActorFixedNodeCheck,check))SetCount(e.actor+kActorFixedNodeCheck,check,static_cast<int>(0x80000000u));
+    return true;
+}
 void FollowOwned(const Snapshot& s,const AiScope& scope,int time) {
     AiPoint player{};
     if(!scope.ready || !ReadAi(s.entity+kAiOrigin,player.data(),sizeof(player)) || !FinitePoint(player))return;
     const int ally=PlayerTeam(s);
     const auto epoch=ai.checkpointEpoch.load();
+    LARGE_INTEGER batchStart{},frequency{},now{};QueryPerformanceCounter(&batchStart);QueryPerformanceFrequency(&frequency);
+    std::size_t followers=0;
+    for(const auto& x:ai.owned)if(x.team==ally && !x.zombie)++followers;
     // Native notifications may re-enter checkpoint cleanup. Iterate a snapshot,
     // then commit only to a still-owned allocation instead of keeping iterators
     // across engine calls that can erase ownership records.
     std::vector<OwnedAi> ownedSnapshot;
-    const auto count=std::min<std::size_t>(4,ai.owned.size());
+    const auto count=std::min<std::size_t>(kFollowMaximumPerTick,ai.owned.size());
     ownedSnapshot.reserve(count);
     for(std::size_t n=0;n<count;++n)ownedSnapshot.push_back(ai.owned[(ai.followCursor+n)%ai.owned.size()]);
-    if(!ai.owned.empty())ai.followCursor=(ai.followCursor+count)%ai.owned.size();
+    std::size_t done=0;
+    const auto cursorBase=ai.followCursor;
     for(const auto& original:ownedSnapshot) {
+        QueryPerformanceCounter(&now);
+        if(!ContinueFollowBatch(done,ownedSnapshot.size(),(now.QuadPart-batchStart.QuadPart)*1000000.0/frequency.QuadPart))break;
+        ++done;
         auto update=original;
         auto* it=&update;
         auto tracked=[&]() {return epoch==ai.checkpointEpoch && std::any_of(ai.owned.begin(),ai.owned.end(),[&](const auto& x){return x.identity.address==it->identity.address && x.identity.serial==it->identity.serial;});};
@@ -812,6 +874,9 @@ void FollowOwned(const Snapshot& s,const AiScope& scope,int time) {
             for(auto& x:ai.owned)if(x.identity.address==it->identity.address && x.identity.serial==it->identity.serial && x.tagsHeld)ReleaseAppearance(x.appearance);
             ai.owned.erase(std::remove_if(ai.owned.begin(),ai.owned.end(),[&](const auto& x){return x.identity.address==it->identity.address && x.identity.serial==it->identity.serial;}),ai.owned.end());continue;
         }
+        // Zombies are driven by the zombies adapter; only their ownership
+        // records are pruned here once the native allocation is gone.
+        if(it->zombie)continue;
         const auto e=Entity(it->identity,scope.pool,false);
         // A transient invalid actor view or a corpse must not lose its allocation ticket.
         if(!e.valid || e.type!=kActorType || !SameAiAllocation(it->identity,raw) || e.health<=0)continue;
@@ -864,9 +929,29 @@ void FollowOwned(const Snapshot& s,const AiScope& scope,int time) {
             if(target && SetVector(e.actor+kAiEnemySightPosition,chosen.position))SetByte(e.actor+kAiEnemySightValid,sight,1);
             else if(!target)SetByte(e.actor+kAiEnemySightValid,sight,0);
         }
-        // A friendly fights in place when it has a nearby enemy. Replacing its
-        // goal every half-second interrupts native cover/firing state and paths.
-        const bool follow=it->team==ally && (!target || PointDistanceSquared(e.origin,player)>640.f*640.f);
+        // Test38: allies follow the player as their native goal entity. The
+        // engine re-reads the player's position, so following never waits for
+        // this service. The goal radius bounds native cover/combat movement:
+        // crowd-sized, stretched toward the chosen enemy so allies engage it.
+        // Position goals (setGoal) would clear the goal entity again.
+        if(it->team==ally && aiProfile.goalEntityReady) {
+            std::uint16_t goalEntity=0;std::uintptr_t node=0,volume=0;
+            const auto wanted=EntityHandleValue(s.entity,scope.pool);
+            const bool read=Value(e.actor+kActorGoalEntity,goalEntity) && Value(e.actor+kActorGoalNode,node) && Value(e.actor+kActorGoalVolume,volume);
+            if(read && wanted && (goalEntity!=wanted || node || volume)) {
+                RecordNativeOperation("GOAL_ENTITY_BEGIN",e.number);
+                if(AssignGoalEntity(e,s.entity))++ai.status.followGoalEntity;
+                RecordNativeOperation("GOAL_ENTITY_END",e.number);
+                it->hasGoal=false;
+            }
+            if(ClearFixedNode(e))++ai.status.followUnfixed;
+            std::uint8_t pacifist=0;if(Value(e.actor+kActorPacifist,pacifist) && pacifist==1)SetByte(e.actor+kActorPacifist,pacifist,0);
+            const float radius=SquadFollowRadius(followers,target!=0,target?PointDistanceSquared(player,chosen.position):0.f);
+            float current=0.f;
+            if(Value(e.actor+kActorGoalRadius,current) && RadiusNeedsUpdate(current,radius) && SetFloat(e.actor+kActorGoalRadius,current,radius))
+                ++ai.status.followRadius;
+        }
+        const bool follow=it->team==ally && !aiProfile.goalEntityReady && (!target || PointDistanceSquared(e.origin,player)>640.f*640.f);
         const bool advance=it->team!=ally && distance>384.f*384.f;
         if(follow) {
             goal=player;
@@ -878,7 +963,7 @@ void FollowOwned(const Snapshot& s,const AiScope& scope,int time) {
             }
         }
         AiPoint nativeGoal{};
-        const bool nativeGoalRead=ReadAi(e.actor+0x1498,nativeGoal.data(),sizeof(nativeGoal)) && FinitePoint(nativeGoal);
+        const bool nativeGoalRead=ReadAi(e.actor+kActorGoalPosition,nativeGoal.data(),sizeof(nativeGoal)) && FinitePoint(nativeGoal);
         const bool redirected=nativeGoalRead && PointDistanceSquared(nativeGoal,goal)>96.f*96.f;
         if((follow || advance) && (NeedsAiGoal(it->hasGoal,it->goal,goal) || redirected)) {
             RecordNativeOperation("SET_GOAL_BEGIN",e.number);
@@ -907,7 +992,10 @@ void FollowOwned(const Snapshot& s,const AiScope& scope,int time) {
         }
         if(epoch==ai.checkpointEpoch)for(auto& live:ai.owned)if(live.identity.address==it->identity.address && live.identity.serial==it->identity.serial) {live=std::move(update);break;}
     }
-    if(epoch==ai.checkpointEpoch && ai.owned.empty() && ai.recovery.empty())RestoreCapacity();
+    if(epoch!=ai.checkpointEpoch)return;
+    ai.status.followLastBatch=static_cast<int>(done);ai.status.followPeakBatch=std::max(ai.status.followPeakBatch,static_cast<int>(done));
+    if(!ai.owned.empty())ai.followCursor=(cursorBase+done)%ai.owned.size();
+    if(ai.owned.empty() && ai.recovery.empty())RestoreCapacity();
 }
 struct AiMeasure {
     LARGE_INTEGER start{},frequency{};bool world=false;
@@ -919,7 +1007,17 @@ struct AiMeasure {
         else {++ai.status.serviceUpdates;ai.serviceTotalUs+=us;ai.status.serviceAverageUs=ai.serviceTotalUs/ai.status.serviceUpdates;ai.status.servicePeakUs=std::max(ai.status.servicePeakUs,us);}
     }
 };
-void SpawnOwned(const AiRequest& request,const Snapshot& s,const AiScope& scope,int time,const RecoveryAi* recovery=nullptr);
+// Test38: zombies-mode spawns reuse the owned-actor factory with a fixed
+// spawn point, the campaign spawn gate bypassed for this one native call,
+// and no initial enemy (zombies pursue through goals, not combat).
+struct SpawnOptions {
+    const AiPoint* center=nullptr;
+    bool zombie=false,dog=false,bypassPause=false,setEnemy=true;
+    AiIdentity* created=nullptr;
+};
+void SpawnOwned(const AiRequest& request,const Snapshot& s,const AiScope& scope,int time,const RecoveryAi* recovery=nullptr,const SpawnOptions* options=nullptr);
+void ServiceZombies(const Snapshot& s,const AiScope& scope,int time);
+void ResetZombieGame(const char* reason,bool deleteActors);
 void Service() {
     if(servicing || !nativePending.load(std::memory_order_acquire)) return;
     servicing=true;
@@ -975,6 +1073,7 @@ void Service() {
         ai.queue.cancel(AiRequestResult::LifetimeChanged);ai.hands.pending=false;ai.handCache.clear();WorkWanted();
     }
     if(s.state==LevelState::PlayerDead && scope.ready) {
+        ResetZombieGame("PLAYER_DIED",false);
         ClearRecovery(true);
         CleanupOwned("PLAYER_DEATH");ai.queue.cancel(AiRequestResult::LifetimeChanged);
         ai.hands.pending=false;ai.hands.result.state=NativeHandBuildState::Canceled;ai.handCache.clear();
@@ -1001,6 +1100,7 @@ void Service() {
     if(ai.nextWorldTime<0 || time>=ai.nextWorldTime || ai.queue.pending()) {ai.nextWorldTime=time+500;ReadWorld(s,scope);}
     const auto epoch=ai.checkpointEpoch.load();
     Pause(s);ServiceHands(scope);if(epoch==ai.checkpointEpoch)FollowOwned(s,scope,time);
+    if(epoch==ai.checkpointEpoch)ServiceZombies(s,scope,time);
     if(epoch!=ai.checkpointEpoch) {ai.lastServiceTime=-1;WorkWanted();return;}
     if(!ai.queue.pending()) {
         if(!ai.recovery.empty() && (ai.nextRecoveryTime<0 || time>=ai.nextRecoveryTime)) {
@@ -1055,15 +1155,22 @@ void Service() {
     }
     SpawnOwned(*request,s,scope,time);
 }
-void SpawnOwned(const AiRequest& input,const Snapshot& s,const AiScope& scope,int time,const RecoveryAi* recovery) {
+bool DogSpawner(const AiEntity& e) {
+    auto copy=e;copy.flags&=~2u;
+    std::string name=e.classname;std::transform(name.begin(),name.end(),name.begin(),[](unsigned char c){return static_cast<char>(std::tolower(c));});
+    return e.type==kActorSpawnerType && EligibleSpawner(copy,e.team) && name.find("dog")!=std::string::npos;
+}
+void SpawnOwned(const AiRequest& input,const Snapshot& s,const AiScope& scope,int time,const RecoveryAi* recovery,const SpawnOptions* options) {
     const auto epoch=ai.checkpointEpoch.load();
     const auto* request=&input;
     const auto source=Entity(request->source,scope.pool);
     const bool friendly=request->operation==AiOperation::SpawnFriendly;
     const int playerTeam=PlayerTeam(s),team=friendly?playerTeam:(playerTeam==kAlliesTeam?kAxisTeam:kAlliesTeam);
-    if(!request->source.matches(source) || !HumanSpawner(source)) {Finish(AiRequestResult::IdentityChanged);return;}
+    const bool dogSource=options && options->dog;
+    if(!request->source.matches(source) || !(dogSource?DogSpawner(source):HumanSpawner(source))) {Finish(AiRequestResult::IdentityChanged);return;}
     const auto enabled=Bool(aiProfile.spawnEnabledSlot,"g_spawnai"),disabled=Bool(aiProfile.spawnDisabledSlot,"ai_disableSpawn");
-    if(!enabled.valid || !enabled.current || !disabled.valid || disabled.current || ai.pauseWanted) {Finish(AiRequestResult::SpawnPaused);return;}
+    const bool bypass=options && options->bypassPause;
+    if(!enabled.valid || !enabled.current || !disabled.valid || (!bypass && (disabled.current || ai.pauseWanted))) {Finish(AiRequestResult::SpawnPaused);return;}
     const auto limit=ActorLimit(); int actorCount=0;
     if(!limit.valid || !Value(aiProfile.actorCountSlot,actorCount) || actorCount<0 || actorCount>=NativeActorCapacity()) {Finish(AiRequestResult::Limit);return;}
     if(!recovery && actorCount+static_cast<int>(ai.recovery.size())>=NativeActorCapacity()) {Finish(AiRequestResult::Limit);return;}
@@ -1085,7 +1192,8 @@ void SpawnOwned(const AiRequest& input,const Snapshot& s,const AiScope& scope,in
     if(!ReadAi(s.entity+kAiOrigin,center.data(),sizeof(center)) || !FinitePoint(center)) {Finish(AiRequestResult::NotReady);return;}
     const AiPoint player=center;
     bool nearPlayer=friendly; unsigned pointNumber=0;
-    if(!friendly) {
+    if(options && options->center && FinitePoint(*options->center)) {center=*options->center;nearPlayer=false;pointNumber=1;}
+    else if(!friendly) {
         float nearest=std::numeric_limits<float>::max();
         for(const auto& point:ai.enemyPoints) {
             const auto live=Entity(AiIdentity::capture(point),scope.pool);
@@ -1145,7 +1253,11 @@ void SpawnOwned(const AiRequest& input,const Snapshot& s,const AiScope& scope,in
     // Argument three skips the factory's visibility/player-distance refusal.
     // The separate eviction spawnflag2 is cleared; physical clearance was traced.
     struct SpawnScope {SpawnScope(){spawningOwned=true;}~SpawnScope(){spawningOwned=false;}};
+    // A zombies-mode spawn opens the native ai_disableSpawn gate for this call
+    // only; campaign spawners stay closed. The gate is closed again at once.
+    const bool reopen=bypass && disabled.current==1 && SetByte(disabled.address+0x10,1,0);
     std::uintptr_t spawned=0;{SpawnScope spawnScope;spawned=reinterpret_cast<SpawnFn>(aiProfile.spawn)(temporary,0,1,0);}
+    if(reopen) {std::uint8_t now=0;if(Value(disabled.address+0x10,now))SetByte(disabled.address+0x10,now,1);}
     RecordNativeOperation("SPAWN_END",source.number,actorCount+static_cast<int>(spawned!=0));
     if(epoch!=ai.checkpointEpoch) {Finish(AiRequestResult::LifetimeChanged);return;}
     if(!spawned) {
@@ -1175,7 +1287,7 @@ void SpawnOwned(const AiRequest& input,const Snapshot& s,const AiScope& scope,in
     if(!actor.valid || actor.type!=kActorType) {Finish(AiRequestResult::NativeReturnedInvalid);return;}
     reinterpret_cast<TeamFn>(aiProfile.setTeam)(actor.sentient,team);
     if(epoch!=ai.checkpointEpoch) {Finish(AiRequestResult::LifetimeChanged);return;}
-    reinterpret_cast<EnemyFn>(aiProfile.setEnemy)(actor.sentient,friendly?0:s.entity,1,0);
+    if(!options || options->setEnemy)reinterpret_cast<EnemyFn>(aiProfile.setEnemy)(actor.sentient,friendly?0:s.entity,1,0);
     if(epoch!=ai.checkpointEpoch) {Finish(AiRequestResult::LifetimeChanged);return;}
     actor=ReadAiEntity(spawned,actor.number,ReadAi);
     if(!actor.valid || actor.team!=team) {Finish(AiRequestResult::NativeReturnedInvalid);return;}
@@ -1188,6 +1300,8 @@ void SpawnOwned(const AiRequest& input,const Snapshot& s,const AiScope& scope,in
     ai.combatants.push_back(actor);
     ai.owned.push_back({AiIdentity::capture(actor),AiIdentity::capture(temp),team,-1,0,{},false,appearance,time+1000,false,source.classname});cleanup.keep=true;rollback.keep=true;++ai.status.created;
     if(appearance.model) {HoldAppearance(ai.owned.back().appearance);ai.owned.back().tagsHeld=true;}
+    ai.owned.back().zombie=options && options->zombie;
+    if(options && options->created)*options->created=AiIdentity::capture(actor);
     ai.status.lastEntity=actor.number;ai.status.lastTeam=team;ai.status.lastPosition=actor.origin;
     ai.status.lastSpawnDistance=std::sqrt(PointDistanceSquared(actor.origin,player));ai.status.placementAttempts=placement->attempts;
     std::snprintf(ai.status.lastName.data(),ai.status.lastName.size(),"%s",source.classname.c_str());
@@ -1195,6 +1309,529 @@ void SpawnOwned(const AiRequest& input,const Snapshot& s,const AiScope& scope,in
         actor.number,actor.serial,reinterpret_cast<void*>(actor.actor),reinterpret_cast<void*>(actor.sentient),actor.team,actor.health,
         actor.origin[0],actor.origin[1],actor.origin[2],ai.status.lastSpawnDistance);
     Finish(AiRequestResult::Created);
+}
+// =====================================================================
+// Test38 playable zombies: the native adapter. Rules come from the portable
+// BO1 ports in bo1_zombie_rules.hpp; this section only translates them to
+// exact MW2 actors, goals, damage and builtins on the server clock.
+// =====================================================================
+ScriptCallNatives scriptNatives;
+bool zombieBindingsReady=false,cbufReady=false;
+using CbufFn=void(*)(int,const char*);
+struct ZombieActor {
+    AiIdentity identity; bo1::ActorTicket ticket; bool dog=false;
+    bo1::MoveSpeed speed=bo1::MoveSpeed::Walk;
+    int spawned=0,nextRepath=0,failsafeAt=0,attackStart=0,lastMiss=-1000000,nukeAt=-1;
+    AiPoint failsafeOrigin{},lastOrigin{};
+    bool attacking=false,fired=false,sprintApplied=false;
+    int health=0,reconfigureAt=0;bool damaged=false,reconfigured=false;
+};
+struct ZombieDrop { bo1::Powerup type=bo1::Powerup::None; AiPoint origin{}; int spawned=0; };
+struct ZombieGameState {
+    bool running=false,startWanted=false,stopWanted=false;
+    ZombieSettings settings,requested;
+    std::string pendingMap;
+    bo1::RoundController controller; bo1::PowerupDirector powerups; bo1::DogRounds dogs; bo1::ScoreLedger ledger;
+    std::vector<ZombieActor> zombies; std::vector<ZombieDrop> drops;
+    int doublePointsUntil=0,instaKillUntil=0,nextWatch=0,nextCleanup=0,nukePointsAt=-1,startTime=0;
+    int firstRound=1,previousSpawner=-1,dogFailures=0,announcedRound=0,lastPlayerHealth=0;
+    unsigned kills=0,headshots=0,hits=0,campaignRemoved=0,meleeHits=0,meleeMisses=0;
+    std::uint32_t random=0x5eed1u;
+    std::uintptr_t client=0; char map[96]{};
+    bool loadout=false,restorePause=false,pauseBefore=false;
+    int loadoutAt=0,loadoutTries=0;
+    std::string pistol,grenade;
+    std::string event; int eventTime=-1000000;
+    int lastDelta=0,deltaTime=-1000000,gameOverRound=0,lastTime=0;
+    bool dogSpawners=false;
+    AiPoint lastDogOrigin{};bool lastDogKnown=false;
+    int readySince=-1;
+} zg;
+int ZombieRandom(int n) {
+    zg.random^=zg.random<<13;zg.random^=zg.random>>17;zg.random^=zg.random<<5;
+    return n>0?static_cast<int>(zg.random%static_cast<std::uint32_t>(n)):0;
+}
+const bo1::RandomInt& ZombieRng() {static const bo1::RandomInt rng=[](int n){return ZombieRandom(n);};return rng;}
+bool ZombieWorkWanted() {return zg.running || zg.startWanted || zg.stopWanted;}
+void ZombieEvent(const char* text,int time) {zg.event=text;zg.eventTime=time;}
+ScriptCallResult Builtin(const BuiltinBinding& b,unsigned entref,std::initializer_list<ScriptArg> args,ScriptReturn* out=nullptr) {
+    if(!zombieBindingsReady)return ScriptCallResult::Invalid;
+    auto& p=*reinterpret_cast<volatile NativeScriptParameters*>(aiProfile.base+kScriptParametersRva);
+    const auto r=CallScriptBuiltin(p,scriptNatives,reinterpret_cast<ScriptBuiltin>(aiProfile.base+b.rva),entref,args,out);
+    if(r!=ScriptCallResult::Ok)Log("ZOMBIE_BUILTIN name=%s result=%s",b.name,ScriptCallText(r));
+    return r;
+}
+void Announce(const char* text) {Builtin(kBuiltinIPrintLnBold,0,{ScriptArg::String(text)});}
+int ZombieMultiplier(int time) {return time<zg.doublePointsUntil?2:1;}
+void AwardPoints(int points,int time) {
+    if(points<=0)return;
+    zg.ledger.add(points);zg.lastDelta=points;zg.deltaTime=time;
+}
+// World-only point trace (CONTENTS_SOLID): actors and the player never block it.
+AiTraceResult WorldTrace(const AiPoint& start,const AiPoint& end) {
+    alignas(16) std::array<std::uint8_t,48> output{};
+    if(!FinitePoint(start) || !FinitePoint(end))return {};
+    reinterpret_cast<TraceFn>(aiProfile.trace)(output.data(),start.data(),end.data(),&kAiPointBounds,0x7ff,1);
+    return DecodeAiTrace(output);
+}
+bo1::BodyPart PartFromHit(int hit) {
+    switch(hit) {
+        case kHitHelmet: return bo1::BodyPart::Helmet;
+        case kHitHead: return bo1::BodyPart::Head;
+        case kHitNeck: return bo1::BodyPart::Neck;
+        case kHitTorsoUpper: return bo1::BodyPart::TorsoUpper;
+        case kHitTorsoLower: return bo1::BodyPart::TorsoLower;
+        case kHitNone: return bo1::BodyPart::None;
+        default: return bo1::BodyPart::Limb;
+    }
+}
+bo1::DamageKind KindFromMod(int mod) {
+    if(mod==kModMelee)return bo1::DamageKind::Melee;
+    if(mod==kModGrenade || mod==kModGrenadeSplash || mod==kModProjectile || mod==kModProjectileSplash || mod==kModExplosive)return bo1::DamageKind::Explosive;
+    if(mod==kModUnknown)return bo1::DamageKind::Unknown;
+    return bo1::DamageKind::Bullet;
+}
+ZombieActor* FindZombie(std::uintptr_t entity) {
+    for(auto& z:zg.zombies)if(z.identity.address==entity)return &z;
+    return nullptr;
+}
+void QueueDrop(bo1::Powerup type,const AiPoint& at,int time) {
+    // zombie_death_points: ground trace below the zombie, powerup 40 units up.
+    AiPoint start=at,end=at;start[2]+=5.f;end[2]-=300.f;
+    const auto ground=WorldTrace(start,end);
+    AiPoint origin=at;
+    if(ground.valid && !ground.startSolid)origin[2]=start[2]+(end[2]-start[2])*ground.fraction;
+    origin[2]+=bo1::kPowerupHeight;
+    if(zg.drops.size()>=8)zg.drops.erase(zg.drops.begin());
+    zg.drops.push_back({type,origin,time});
+    Log("ZOMBIE_POWERUP_DROP type=%s origin=%.1f,%.1f,%.1f drops_this_round=%d score_to_drop=%d",
+        bo1::PowerupText(type),origin[0],origin[1],origin[2],zg.powerups.dropsThisRound(),zg.powerups.scoreToDrop());
+}
+// Called from the damage hook (server thread) for player damage to a zombie.
+// Mirrors actor_damage_override/zombie_damage: hit points on every hit,
+// insta-kill, grenade/explosive bonus damage, then kill points and drops.
+bool ZombieDamage(std::uintptr_t target,std::uintptr_t inflictor,std::uintptr_t attacker,const float* direction,const float* point,
+    int damage,int flags,int mod,int weapon,int hitloc,int time,int surface,bool& handled) {
+    handled=false;
+    if(!zg.running || !target || attacker!=aiProfile.fixedPool)return false;
+    auto* z=FindZombie(target);
+    if(!z)return false;
+    int health=0,level=0;
+    if(!Value(target+kAiHealth,health) || health<=0 || !Value(aiProfile.timeSlot,level))return false;
+    handled=true;z->damaged=true;
+    const bool insta=level<zg.instaKillUntil;
+    auto kind=KindFromMod(mod);
+    const int round=zg.controller.status().round;
+    if(mod==kModGrenade || mod==kModGrenadeSplash)damage+=round+100+ZombieRandom(100);
+    else if(mod==kModProjectile || mod==kModProjectileSplash || mod==kModExplosive)damage+=round*ZombieRandom(100);
+    // check_for_instakill: a hit that would not kill becomes DoDamage(health*10)
+    // with a stripped (unknown) means of death; outright kills keep their own.
+    if(insta && damage<health) {damage=health*10;kind=bo1::DamageKind::Unknown;}
+    const bool result=originalDamage(target,inflictor,attacker,direction,point,damage,flags,mod,weapon,hitloc,time,surface);
+    if(!result)return result;
+    ++zg.hits;
+    const int multiplier=ZombieMultiplier(level);
+    AwardPoints(bo1::DamagePoints(multiplier),level);
+    int after=1;
+    if(Value(target+kAiHealth,after) && after<=0) {
+        const auto part=PartFromHit(hitloc);
+        AwardPoints(bo1::KillPoints(kind,part,insta,multiplier),level);
+        ++zg.kills;if(part==bo1::BodyPart::Head || part==bo1::BodyPart::Helmet)++zg.headshots;
+        AiPoint origin{};
+        if(ReadAi(target+kAiOrigin,origin.data(),sizeof(origin)) && FinitePoint(origin))
+            if(const auto drop=zg.powerups.zombieDied(ZombieRng()))QueueDrop(*drop,origin,level);
+    }
+    return result;
+}
+// USP .45 first (design contract), then any loaded pistol; BO1's lethal
+// grenade is the frag grenade when the level loaded one.
+void ChooseLoadout() {
+    const auto weapons=LoadedWeapons();
+    zg.pistol.clear();zg.grenade.clear();
+    auto find=[&](const char* name){return std::find_if(weapons.begin(),weapons.end(),[&](const auto& w){return w.name==name;});};
+    for(const char* name:{"usp","usp_silencer","usp_fmj","usp_tactical"})
+        if(auto it=find(name);it!=weapons.end() && it->inventoryType==0) {zg.pistol=it->name;break;}
+    if(zg.pistol.empty())for(const auto& w:weapons)
+        if(w.inventoryType==0 && w.weaponClass==5 && w.clipSize>0 && w.name.find("akimbo")==std::string::npos) {zg.pistol=w.name;break;}
+    for(const char* name:{"fraggrenade","frag_grenade_mp","frag_grenade"})
+        if(auto it=find(name);it!=weapons.end()) {zg.grenade=it->name;break;}
+}
+bool ApplyLoadout() {
+    ChooseLoadout();
+    if(zg.pistol.empty()) {Log("ZOMBIE_LOADOUT pistol=NONE kept_campaign_weapons=1");return true;}
+    if(Builtin(kBuiltinTakeAllWeapons,0,{})!=ScriptCallResult::Ok)return false;
+    Builtin(kBuiltinGiveWeapon,0,{ScriptArg::String(zg.pistol.c_str())});
+    // BO1 starting pistol: full magazine and 80 reserve rounds (M1911 stock).
+    Builtin(kBuiltinSetWeaponAmmoStock,0,{ScriptArg::String(zg.pistol.c_str()),ScriptArg::Int(80)});
+    Builtin(kBuiltinSwitchToWeapon,0,{ScriptArg::String(zg.pistol.c_str())});
+    if(!zg.grenade.empty()) {
+        Builtin(kBuiltinGiveWeapon,0,{ScriptArg::String(zg.grenade.c_str())});
+        Builtin(kBuiltinSetWeaponAmmoClip,0,{ScriptArg::String(zg.grenade.c_str()),ScriptArg::Int(0)});
+    }
+    Log("ZOMBIE_LOADOUT pistol=%s grenade=%s stock=80 method=NATIVE_BUILTINS",zg.pistol.c_str(),zg.grenade.empty()?"NONE":zg.grenade.c_str());
+    return true;
+}
+// award_grenades_for_survivors: 0 -> 2, 1 -> 3, otherwise 4 (BO1 max 4).
+void AwardGrenades() {
+    if(zg.grenade.empty())return;
+    ScriptReturn current;
+    if(Builtin(kBuiltinGetWeaponAmmoClip,0,{ScriptArg::String(zg.grenade.c_str())},&current)!=ScriptCallResult::Ok || !current.present)return;
+    const int have=current.value.type==kScriptInteger?current.asInt():0;
+    const int give=have<=0?2:have==1?3:4;
+    if(give>have)Builtin(kBuiltinSetWeaponAmmoClip,0,{ScriptArg::String(zg.grenade.c_str()),ScriptArg::Int(give)});
+}
+void MaxAmmo() {
+    std::array<std::uint32_t,15> owned{};
+    if(!ReadAi(ai.client+kOwnedWeapons,owned.data(),sizeof(owned)))return;
+    const auto weapons=LoadedWeapons();
+    for(const auto id:owned) {
+        if(!id)continue;
+        const auto it=std::find_if(weapons.begin(),weapons.end(),[&](const auto& w){return w.index==id;});
+        if(it!=weapons.end())Builtin(kBuiltinGiveMaxAmmo,0,{ScriptArg::String(it->name.c_str())});
+    }
+}
+void DeleteActor(const AiEntity& e) {
+    int protectedNumber=-1;
+    if(!Value(aiProfile.protectedSlot,protectedNumber) || protectedNumber==e.number)return;
+    RecordNativeOperation("ZOMBIE_CAMPAIGN_DELETE",e.number);
+    reinterpret_cast<DeleteFn>(aiProfile.remove)(e.number);
+}
+// Remove campaign actors (never ours): enemies always, allies when chosen.
+void ClearCampaignActors(const Snapshot& s,const AiScope& scope) {
+    int count=0;if(!Value(aiProfile.countSlot,count) || count<3 || count>kAiEntityCapacity)return;
+    const int ally=PlayerTeam(s);
+    const auto epoch=ai.checkpointEpoch.load();
+    unsigned removed=0;
+    for(int n=2;n<count && removed<16;++n) {
+        const auto e=ReadAiEntity(scope.pool+static_cast<std::uintptr_t>(n)*kAiEntityStride,n,ReadAi);
+        if(!e.valid || e.type!=kActorType || e.health<=0)continue;
+        if(std::any_of(ai.owned.begin(),ai.owned.end(),[&](const auto& x){return x.identity.address==e.address;}))continue;
+        if(e.team==ally && !zg.settings.removeAllies)continue;
+        if(e.team!=kAxisTeam && e.team!=kAlliesTeam)continue;
+        DeleteActor(e);
+        if(epoch!=ai.checkpointEpoch)return;
+        const auto after=ReadAiAllocation(AiIdentity::capture(e),ReadAi);
+        if(!SameAiAllocation(AiIdentity::capture(e),after) || after.type!=kActorType) {++removed;++zg.campaignRemoved;}
+    }
+    if(removed)Log("ZOMBIE_CAMPAIGN_CLEAR removed=%u total=%u allies_removed=%d",removed,zg.campaignRemoved,zg.settings.removeAllies);
+}
+template<class T> void SetField(std::uintptr_t at,T value) {
+    T current{};if(!Value(at,current) || current==value)return;
+    if constexpr(sizeof(T)==1)SetByte(at,static_cast<std::uint8_t>(current),static_cast<std::uint8_t>(value));
+    else if constexpr(std::is_same_v<T,float>)SetFloat(at,current,value);
+    else SetCount(at,static_cast<int>(current),static_cast<int>(value));
+}
+// zombie_spawn_init + zombie_setup_attack_properties, translated to native
+// actor fields. Zombies keep ignoreall: MW2's soldier combat scripts would
+// shoot, so pursuit and the melee rule are driven from here instead.
+void ConfigureZombie(const AiEntity& e,int health,bool dog,bo1::MoveSpeed speed) {
+    int current=0;
+    if(Value(e.address+kAiHealth,current))SetCount(e.address+kAiHealth,current,health);
+    if(Value(e.address+kEntityMaxHealth,current))SetCount(e.address+kEntityMaxHealth,current,health);
+    SetField<std::uint8_t>(e.sentient+kSentientIgnoreAll,dog?0:1);
+    SetField<std::uint8_t>(e.sentient+kSentientIgnoreMe,0);
+    SetField<int>(e.actor+kActorGrenadeAmmo,0);
+    SetField<float>(e.actor+kActorGrenadeAwareness,0.f);
+    SetField<int>(e.actor+kActorDropWeapon,0);
+    SetField<std::uint8_t>(e.actor+kActorAllowPain,0);       // a.disablepain
+    SetField<int>(e.actor+kActorIgnoreSuppression,1);
+    SetField<std::uint8_t>(e.actor+kActorNoDodgeMove,1);
+    SetField<float>(e.actor+kActorPathEnemyLookahead,0.f);
+    SetField<float>(e.actor+kActorPathEnemyFightDist,bo1::kZombiePathEnemyFightDist);
+    SetField<float>(e.actor+kActorMeleeAttackDist,bo1::kZombieMeleeAttackDist);
+    SetField<float>(e.actor+kActorMaxSightDistSq,bo1::kZombieMaxSightDistSq);
+    SetField<float>(e.actor+kActorGoalRadius,bo1::kZombieGoalRadius);
+    SetField<float>(e.actor+kActorWalkDist,speed==bo1::MoveSpeed::Walk?100000.f:0.f);
+    ClearFixedNode(e);
+}
+// level.enemy_spawns: campaign enemy spawn locations; maps without enemy
+// spawners (e.g. the museum) fall back to every human spawner.
+const std::vector<AiEntity>& ZombieSpawnPoints() {return ai.enemyPoints.empty()?ai.allPoints:ai.enemyPoints;}
+std::vector<AiEntity> SpawnPointBand(const AiPoint& player,float nearest,float farthest) {
+    std::vector<AiEntity> band;
+    for(const auto& p:ZombieSpawnPoints()) {
+        const float d=PointDistanceSquared(p.origin,player);
+        if(d>=nearest*nearest && d<=farthest*farthest)band.push_back(p);
+    }
+    return band;
+}
+bool SpawnZombie(const bo1::SpawnRequest& request,const Snapshot& s,const AiScope& scope,int time) {
+    AiPoint player{};
+    if(!ReadAi(s.entity+kAiOrigin,player.data(),sizeof(player)) || !FinitePoint(player))return false;
+    const auto& templates=request.dogs?ai.dogPoints:ai.enemies.empty()?ai.friends:ai.enemies;
+    if(templates.empty() || ZombieSpawnPoints().empty()) {
+        static int lastLog=-100000;
+        if(time-lastLog>5000) {lastLog=time;Log("ZOMBIE_SPAWN refused=%s dogs=%d",templates.empty()?"NO_TEMPLATE":"NO_SPAWN_POINT",request.dogs);}
+        return false;
+    }
+    // level.enemy_spawns: campaign enemy spawn locations near the player.
+    auto band=SpawnPointBand(player,request.dogs?400.f:400.f,request.dogs?800.f:2500.f);
+    if(band.size()<2)band=SpawnPointBand(player,256.f,4000.f);
+    if(band.empty()) {band=ZombieSpawnPoints();if(band.size()>8)band.resize(8);}
+    const int count=static_cast<int>(band.size());
+    const int draw=ZombieRandom(count);
+    int previous=-1;
+    for(int n=0;n<count;++n)if(band[n].number==zg.previousSpawner)previous=n;
+    const auto pick=bo1::ChooseSpawner(count,previous,draw,ZombieRandom(count));
+    if(!pick)return false;
+    const auto point=band[*pick];
+    const auto& source=templates[static_cast<std::size_t>(ZombieRandom(static_cast<int>(templates.size())))];
+    AiRequest spawn;spawn.operation=AiOperation::SpawnEnemy;spawn.source=AiIdentity::capture(source);
+    AiIdentity created;
+    SpawnOptions options;options.center=&point.origin;options.zombie=true;options.dog=request.dogs;
+    options.bypassPause=true;options.setEnemy=request.dogs;options.created=&created;
+    SpawnOwned(spawn,s,scope,time,nullptr,&options);
+    if(ai.status.lastResult!=AiRequestResult::Created || !created.address)return false;
+    zg.previousSpawner=point.number;
+    const auto e=Entity(created,scope.pool,false);
+    if(!e.valid)return false;
+    const auto speed=request.dogs?bo1::MoveSpeed::Sprint:bo1::RunSpeed(bo1::ZombieMoveSpeed(request.round),ZombieRng());
+    ConfigureZombie(e,request.health,request.dogs,speed);
+    ZombieActor z;z.identity=created;z.ticket=request.ticket;z.dog=request.dogs;z.speed=speed;z.spawned=time;
+    z.health=request.health;z.reconfigureAt=time+300;
+    z.nextRepath=time;z.failsafeAt=time+static_cast<int>(bo1::kFailsafeIntervalMilliseconds);z.failsafeOrigin=e.origin;
+    zg.zombies.push_back(z);
+    Log("ZOMBIE_SPAWN entity=%u round=%d health=%d speed=%s dog=%d point=%u distance=%.0f template=%s alive=%d queued=%d",
+        e.number,request.round,request.health,bo1::MoveSpeedText(speed),request.dogs,point.number,
+        std::sqrt(PointDistanceSquared(point.origin,player)),source.classname.c_str(),zg.controller.status().alive+1,zg.controller.status().queued-1);
+    return true;
+}
+float YawDegrees(const AiPoint& from,const AiPoint& to) {return std::atan2(to[1]-from[1],to[0]-from[0])*57.29578f;}
+float AngleDelta(float a,float b) {float d=std::fmod(a-b,360.f);if(d>180.f)d-=360.f;if(d<-180.f)d+=360.f;return d;}
+// zombie_melee.gsc: admission by the BO1 rule, damage at the "fire" point of
+// the attack, continuation while the target stays in reach.
+void ServiceMelee(ZombieActor& z,const AiEntity& e,const Snapshot& s,const AiPoint& player,int playerHealth,int time) {
+    if(z.dog)return;   // MW2 dogs attack with their own native animscripts
+    const float distance=PointDistanceSquared(e.origin,player);
+    if(z.attacking) {
+        if(!z.fired && time-z.attackStart>=bo1::kAttackFireMilliseconds) {
+            z.fired=true;
+            if(playerHealth>0 && distance<=bo1::kAttackHitRangeSquared) {
+                AiPoint dir{player[0]-e.origin[0],player[1]-e.origin[1],0.f};
+                const float length=std::sqrt(dir[0]*dir[0]+dir[1]*dir[1]);
+                if(length>0.f) {dir[0]/=length;dir[1]/=length;}
+                AiPoint hit=player;hit[2]+=48.f;
+                RecordNativeOperation("ZOMBIE_MELEE_BEGIN",e.number);
+                reinterpret_cast<DamageFn>(aiProfile.damage)(s.entity,e.address,e.address,dir.data(),hit.data(),
+                    bo1::kZombieMeleeDamage,0,kModMelee,-1,kHitTorsoUpper,0,0);
+                RecordNativeOperation("ZOMBIE_MELEE_END",e.number);
+                ++zg.meleeHits;
+            } else {z.lastMiss=time;++zg.meleeMisses;}
+        }
+        if(time-z.attackStart>=bo1::kAttackEndMilliseconds)z.attacking=false;
+        return;
+    }
+    if(playerHealth<=0 || distance>bo1::kLongChargeRangeSquared)return;
+    AiPoint angles{};
+    if(!ReadAi(e.address+kEntityAngles,angles.data(),sizeof(angles)) || !FinitePoint(angles))return;
+    bo1::MeleeInputs inputs;inputs.sentient=true;inputs.alive=true;
+    inputs.yawDegrees=AngleDelta(YawDegrees(e.origin,player),angles[1]);inputs.distanceSquared=distance;
+    inputs.millisecondsSinceMiss=time-z.lastMiss;
+    // Path: knee then eye world trace (zombie_melee CanMeleeInternal fallback).
+    AiPoint from=e.origin,to=player;from[2]+=18.f;to[2]+=18.f;
+    auto clear=WorldTrace(from,to);
+    if(!(clear.valid && !clear.startSolid && clear.fraction>=1.f)) {from[2]+=42.f;to[2]+=42.f;clear=WorldTrace(from,to);}
+    inputs.pathClear=clear.valid && !clear.startSolid && clear.fraction>=1.f;
+    if(bo1::CanMeleePlayer(inputs,bo1::MeleeCheck::Normal)==bo1::MeleeDecision::Allowed) {
+        z.attacking=true;z.fired=false;z.attackStart=time;
+        // OrientMode("face angle", yaw) as the BO1 attack loop does.
+        Builtin(kBuiltinOrientMode,ScriptEntityRef(e.number),{ScriptArg::String("face angle"),ScriptArg::Float(YawDegrees(e.origin,player))});
+    }
+}
+void GrabPowerup(const ZombieDrop& drop,int time) {
+    Log("ZOMBIE_POWERUP_GRAB type=%s age_ms=%d",bo1::PowerupText(drop.type),time-drop.spawned);
+    ZombieEvent(bo1::PowerupText(drop.type),time);
+    Announce(bo1::PowerupText(drop.type));
+    switch(drop.type) {
+        case bo1::Powerup::DoublePoints: zg.doublePointsUntil=time+static_cast<int>(bo1::kPowerupDurationMilliseconds); break;
+        case bo1::Powerup::InstaKill: zg.instaKillUntil=time+static_cast<int>(bo1::kPowerupDurationMilliseconds); break;
+        case bo1::Powerup::MaxAmmo: MaxAmmo(); break;
+        case bo1::Powerup::Nuke: {
+            // nuke_powerup: closest first, 0.1-0.7 s apart, after 0.5 s.
+            std::vector<std::pair<float,ZombieActor*>> order;
+            for(auto& z:zg.zombies) {
+                const auto e=Entity(z.identity,ai.pool,false);
+                if(e.valid)order.push_back({PointDistanceSquared(e.origin,drop.origin),&z});
+            }
+            std::sort(order.begin(),order.end(),[](const auto& a,const auto& b){return a.first<b.first;});
+            int at=time+500;
+            for(auto& [d,z]:order) {(void)d;at+=100+ZombieRandom(601);z->nukeAt=at;}
+            zg.nukePointsAt=at;
+            break;
+        }
+        default: break;
+    }
+}
+void ServicePowerups(const AiPoint& player,int time) {
+    if(time>=zg.nextWatch) {zg.nextWatch=time+static_cast<int>(bo1::kPowerupWatchMilliseconds);zg.powerups.watch(zg.ledger.total);}
+    if(zg.nukePointsAt>=0 && time>=zg.nukePointsAt) {zg.nukePointsAt=-1;AwardPoints(bo1::NukePoints(ZombieMultiplier(time)),time);}
+    for(auto it=zg.drops.begin();it!=zg.drops.end();) {
+        const int age=time-it->spawned;
+        if(age>=bo1::PowerupLifetimeMilliseconds()) {Log("ZOMBIE_POWERUP_TIMEOUT type=%s",bo1::PowerupText(it->type));it=zg.drops.erase(it);continue;}
+        if(PointDistanceSquared(player,it->origin)<bo1::kPowerupGrabRangeSquared) {const auto drop=*it;it=zg.drops.erase(it);GrabPowerup(drop,time);continue;}
+        ++it;
+    }
+}
+void ServiceZombieActors(const Snapshot& s,const AiScope& scope,const AiPoint& player,int playerHealth,int time) {
+    const auto epoch=ai.checkpointEpoch.load();
+    const auto& c=zg.controller.status();
+    for(std::size_t n=0;n<zg.zombies.size();) {
+        auto& z=zg.zombies[n];
+        const auto raw=ReadAiAllocation(z.identity,ReadAi);
+        const auto e=Entity(z.identity,scope.pool,false);
+        if(!SameAiAllocation(z.identity,raw) || raw.type!=kActorType || !e.valid || e.type!=kActorType || e.health<=0) {
+            if(z.dog) {zg.lastDogOrigin=z.lastOrigin;zg.lastDogKnown=true;}
+            zg.controller.retire(z.ticket,bo1::Retirement::Killed);
+            zg.zombies.erase(zg.zombies.begin()+static_cast<std::ptrdiff_t>(n));continue;
+        }
+        // Native initialization may replace the actor brain in the same entity.
+        if(!z.identity.matches(e)) {z.identity=AiIdentity::capture(e);Log("ZOMBIE_BIND refreshed entity=%u",e.number);}
+        if(z.nukeAt>=0 && time>=z.nukeAt) {
+            z.nukeAt=-1;
+            reinterpret_cast<DamageFn>(aiProfile.damage)(e.address,0,0,nullptr,e.origin.data(),e.health+666,0,kModUnknown,-1,0,0,0);
+            if(epoch!=ai.checkpointEpoch)return;
+            ++n;continue;
+        }
+        z.lastOrigin=e.origin;
+        // Campaign spawn functions run in the VM after the native spawn and may
+        // set health/goal fields; apply the BO1 setup once more before any hit.
+        if(!z.reconfigured && time>=z.reconfigureAt) {
+            z.reconfigured=true;
+            if(!z.damaged)ConfigureZombie(e,z.health,z.dog,z.speed);
+        }
+        // zombie_follow_enemy: SetGoalPos(favoriteenemy.origin) on BO1's cadence.
+        const float distance=PointDistanceSquared(e.origin,player);
+        if(time>=z.nextRepath) {
+            z.nextRepath=time+static_cast<int>(bo1::FollowRepathMilliseconds(distance,ZombieRng()));
+            AiPoint goal{};
+            if(!ReadAi(e.actor+kActorGoalPosition,goal.data(),sizeof(goal)) || PointDistanceSquared(goal,player)>8.f*8.f)
+                reinterpret_cast<GoalFn>(aiProfile.setGoal)(e.actor,player.data(),0);
+            float radius=0.f;
+            if(Value(e.actor+kActorGoalRadius,radius) && radius!=bo1::kZombieGoalRadius)SetFloat(e.actor+kActorGoalRadius,radius,bo1::kZombieGoalRadius);
+            if(!z.dog)SetField<std::uint8_t>(e.sentient+kSentientIgnoreAll,1);
+        }
+        if(!z.sprintApplied && bo1::LastZombieSpeedUp(c.round,c.queued,c.alive) && z.speed==bo1::MoveSpeed::Walk) {
+            z.sprintApplied=true;z.speed=bo1::MoveSpeed::Sprint;SetField<float>(e.actor+kActorWalkDist,0.f);
+            Log("ZOMBIE_SPEED_UP entity=%u",e.number);
+        }
+        ServiceMelee(z,e,s,player,playerHealth,time);
+        if(epoch!=ai.checkpointEpoch)return;
+        // round_spawn_failsafe: no progress for 30 s and not attacking -> respawn.
+        if(time>=z.failsafeAt) {
+            if(!z.attacking && PointDistanceSquared(e.origin,z.failsafeOrigin)<bo1::kFailsafeMinimumMoveSquared
+                && distance>bo1::kLongChargeRangeSquared) {
+                Log("ZOMBIE_FAILSAFE entity=%u recycled=1",e.number);
+                zg.controller.retire(z.ticket,bo1::Retirement::Recycle);
+                DeleteActor(e);
+                if(epoch!=ai.checkpointEpoch)return;
+                zg.zombies.erase(zg.zombies.begin()+static_cast<std::ptrdiff_t>(n));continue;
+            }
+            z.failsafeAt=time+static_cast<int>(bo1::kFailsafeIntervalMilliseconds);z.failsafeOrigin=e.origin;
+        }
+        ++n;
+    }
+}
+void ResetZombieGame(const char* reason,bool deleteActors) {
+    // A pending start (e.g. a map launched from the menu) survives loads; only
+    // a running game ends here. RequestZombieStop cancels a pending start.
+    zg.stopWanted=false;
+    if(!zg.running)return;
+    const bool wasRunning=zg.running;
+    if(wasRunning) {
+        zg.gameOverRound=zg.controller.status().round;
+        Log("ZOMBIE_END reason=%s round=%d points=%d total=%d kills=%u headshots=%u hits=%u melee_hits=%u melee_misses=%u campaign_removed=%u",
+            reason,zg.gameOverRound,zg.ledger.score,zg.ledger.total,zg.kills,zg.headshots,zg.hits,zg.meleeHits,zg.meleeMisses,zg.campaignRemoved);
+    }
+    zg.controller.stop(bo1::StopReason::Manual);
+    zg.running=false;zg.drops.clear();
+    if(deleteActors && !zg.zombies.empty())CleanupOwned("ZOMBIES_END",false,true);
+    zg.zombies.clear();
+    for(auto& x:ai.owned)x.zombie=false;
+    if(zg.restorePause) {ai.pauseWanted=zg.pauseBefore;zg.restorePause=false;}
+    ZombieEvent(wasRunning?"GAME OVER":"",zg.lastTime);
+}
+void BeginZombies(const Snapshot& s,const AiScope& scope,int time) {
+    zg.settings=zg.requested;zg.startWanted=false;
+    zg.random=static_cast<std::uint32_t>(GetTickCount64()) | 1u;
+    zg.ledger={};zg.kills=zg.headshots=zg.hits=zg.campaignRemoved=zg.meleeHits=zg.meleeMisses=0;
+    zg.zombies.clear();zg.drops.clear();zg.doublePointsUntil=zg.instaKillUntil=0;zg.nukePointsAt=-1;
+    zg.powerups.start(zg.ledger.total,ZombieRng());zg.dogs.start(ZombieRng());
+    zg.firstRound=zg.settings.startingRound;zg.previousSpawner=-1;zg.dogFailures=0;zg.announcedRound=0;zg.gameOverRound=0;
+    zg.client=scope.client;std::snprintf(zg.map,sizeof(zg.map),"%s",s.map);
+    zg.controller.setPlanner([](int round,bool) -> std::optional<bo1::RoundPlan> {
+        // dog_round_tracker listens from the first "between_round_over".
+        if(!zg.settings.hellhounds || round==zg.firstRound)return std::nullopt;
+        if(!zg.dogs.beginRound(round,ZombieRng()))return std::nullopt;
+        if(!zg.dogSpawners) {Log("ZOMBIE_DOG_ROUND round=%d replaced=NO_DOG_SPAWNER_ON_MAP",round);return std::nullopt;}
+        Log("ZOMBIE_DOG_ROUND round=%d dog_round_count=%d dogs=%d health=%d next=%d",round,zg.dogs.count(),zg.dogs.total(),zg.dogs.health(),zg.dogs.next());
+        return zg.dogs.plan();
+    });
+    if(!zg.controller.start(zg.settings.startingRound,time)) {Log("ZOMBIE_START refused round=%d",zg.settings.startingRound);return;}
+    zg.running=true;zg.startTime=time;zg.nextCleanup=time;zg.nextWatch=time;zg.loadout=false;zg.loadoutAt=time;zg.loadoutTries=0;
+    if(!zg.restorePause) {zg.pauseBefore=ai.pauseWanted;zg.restorePause=true;}
+    ai.pauseWanted=true;   // native ai_disableSpawn: campaign spawners stay closed
+    ZombieEvent("ZOMBIES",time);
+    Log("ZOMBIE_START map=%s round=%d hellhounds=%d remove_allies=%d dog_spawners=%llu enemy_points=%llu templates=%llu",
+        s.map,zg.settings.startingRound,zg.settings.hellhounds,zg.settings.removeAllies,
+        static_cast<unsigned long long>(ai.dogPoints.size()),static_cast<unsigned long long>(ai.enemyPoints.size()),
+        static_cast<unsigned long long>(ai.enemies.size()));
+}
+void ServiceZombies(const Snapshot& s,const AiScope& scope,int time) {
+    zg.lastTime=time;
+    zg.dogSpawners=!ai.dogPoints.empty();
+    if(zg.stopWanted) {ResetZombieGame("MENU_END",true);return;}
+    if(!zg.running) {
+        // A map launched from the menu starts once its player has been ready
+        // for 3 s, so level start-up scripts have placed the player.
+        const bool here=zg.startWanted && zombieBindingsReady && scope.ready && s.state==LevelState::Ready
+            && (zg.pendingMap.empty() || zg.pendingMap==s.map);
+        if(!here) zg.readySince=-1;
+        else if(zg.pendingMap.empty()) BeginZombies(s,scope,time);
+        else if(zg.readySince<0 || time<zg.readySince) zg.readySince=time;
+        else if(time-zg.readySince>=3000) BeginZombies(s,scope,time);
+        return;
+    }
+    if(zg.client!=scope.client || std::strcmp(zg.map,s.map)) {ResetZombieGame("LIFETIME_CHANGED",false);return;}
+    if(time<zg.startTime) {ResetZombieGame("LEVEL_RESTARTED",false);return;}
+    ai.pauseWanted=true;
+    AiPoint player{};int playerHealth=0;
+    if(!ReadAi(s.entity+kAiOrigin,player.data(),sizeof(player)) || !FinitePoint(player) || !Value(s.entity+kAiHealth,playerHealth))return;
+    if(!zg.loadout && time>=zg.loadoutAt) {
+        zg.loadout=ApplyLoadout();
+        if(!zg.loadout && ++zg.loadoutTries<20)zg.loadoutAt=time+250;
+        else zg.loadout=true;
+    }
+    if(time>=zg.nextCleanup) {zg.nextCleanup=time+1000;ClearCampaignActors(s,scope);}
+    const auto oldRound=zg.controller.status().round;const auto oldPhase=zg.controller.status().phase;
+    const auto request=zg.controller.tick(time);
+    const auto& c=zg.controller.status();
+    if(!c.running()) {ResetZombieGame(c.phase==bo1::RoundPhase::Complete?"ROUND_LIMIT":bo1::ReasonText(c.reason),true);return;}
+    if(c.round!=zg.announcedRound && c.phase==bo1::RoundPhase::Intro) {
+        // round_think: chalk_one_up, powerup_round_start, award_grenades_for_survivors.
+        zg.announcedRound=c.round;zg.powerups.roundStart();zg.dogFailures=0;
+        char text[48];std::snprintf(text,sizeof(text),c.dogs?"ROUND %d - HELLHOUNDS":"ROUND %d",c.round);
+        Announce(text);ZombieEvent(text,time);AwardGrenades();
+        Log("ZOMBIE_ROUND round=%d total=%d health=%d interval=%.3f dogs=%d move_speed=%d points=%d",
+            c.round,c.total,c.health,c.interval,c.dogs,bo1::ZombieMoveSpeed(c.round),zg.ledger.score);
+    }
+    if(oldPhase!=c.phase || oldRound!=c.round)Log("ZOMBIE_PHASE round=%d phase=%s alive=%d queued=%d killed=%d wait_ms=%lld",
+        c.round,bo1::PhaseText(c.phase),c.alive,c.queued,c.killed,static_cast<long long>(c.waitMilliseconds));
+    if(request) {
+        const bool created=SpawnZombie(*request,s,scope,time);
+        zg.controller.confirm(request->ticket,created,time);
+        if(!created && request->dogs && ++zg.dogFailures>=3) {
+            Log("ZOMBIE_DOG_ROUND spawn_failed=3 remaining_cancelled=%d",zg.controller.status().queued);
+            zg.controller.cancelQueued();
+        }
+    }
+    ServiceZombieActors(s,scope,player,playerHealth,time);
+    if(!zg.running)return;
+    // dog_round_aftermath: max ammo at the last hellhound.
+    if(c.dogs && c.phase==bo1::RoundPhase::Between && oldPhase!=bo1::RoundPhase::Between) {
+        QueueDrop(bo1::Powerup::MaxAmmo,zg.lastDogKnown?zg.lastDogOrigin:player,time);zg.lastDogKnown=false;
+    }
+    ServicePowerups(player,time);
+    if(!zg.controller.invariant()) {Log("ZOMBIE_INVARIANT_STOP");ResetZombieGame("INVARIANT",true);}
 }
 bool InstallService() {
     if(clockInstalled)return true;
@@ -1293,7 +1930,7 @@ void ReadWorld(const Snapshot& s,const AiScope& scope) {
     ai.allyTeam=friendlyTeam;
     const std::string oldEnemy=ai.enemies.empty()?"":ai.enemies[ai.enemyIndex].classname;
     ai.appearances={};
-    ai.enemies.clear();ai.friends.clear();ai.enemyPoints.clear();ai.combatants.clear();
+    ai.enemies.clear();ai.friends.clear();ai.enemyPoints.clear();ai.combatants.clear();ai.dogPoints.clear();ai.allPoints.clear();
     ai.playerPosition=player;ai.playerPositionValid=true;
     ai.status.enemyAlive=0;ai.status.friendlyAlive=0;ai.status.otherAlive=0;ai.status.nativeCount=0;
     for(int n=2;n<count;++n) {
@@ -1330,6 +1967,8 @@ void ReadWorld(const Snapshot& s,const AiScope& scope) {
             }
         }
         const bool ours=std::any_of(ai.owned.begin(),ai.owned.end(),[&](const auto& x){return x.identity.address==e.address || x.spawner.address==e.address;});
+        if(!ours && e.team==enemyTeam && DogSpawner(e))ai.dogPoints.push_back(e);
+        if(!ours && HumanSpawner(e))ai.allPoints.push_back(e);
         if(ours || !HumanSpawner(e))continue;
         if(e.team==enemyTeam) {
             ai.enemies.push_back(e);
@@ -1485,6 +2124,50 @@ void InitializeAiEngine(std::uintptr_t base,std::size_t size,std::uintptr_t text
         && Rip(base+0x223812,0,3,7)==base+kScriptLocalVariablesBaseRva
         && Rip(base+0x223819,0,3,7)==base+kScriptLocalVariablesPointerRva;
     ai.status.resolved=aiProfile.resolved;
+    // Test38 squad following: the native setgoalentity method and the native
+    // position-goal routine both call this exact entity-handle setter.
+    {
+        std::array<std::uint8_t,15> prologue{};
+        const auto handle=base+kEntityHandleSetRva;
+        aiProfile.goalEntityReady=aiProfile.resolved && ReadAi(handle,prologue.data(),prologue.size()) && prologue==kEntityHandleSetPrologue
+            && Call(base+kSetGoalEntityHandleCallRva,0)==handle && Call(base+kGoalPositionHandleCallRva,0)==handle
+            && aiProfile.setGoal==base+kGoalPositionHandleCallRva-0x21 && MethodEntry("setgoalentity",base+kSetGoalEntityRva);
+        aiProfile.setEntityHandle=aiProfile.goalEntityReady?handle:0;
+        Log("AI_FOLLOW goal_entity_binding=%d handle_rva=0x%llx",aiProfile.goalEntityReady,static_cast<unsigned long long>(kEntityHandleSetRva));
+    }
+    // Test38 zombies: native value pushes, builtins and the command buffer.
+    {
+        struct Prefix {std::uintptr_t rva;std::array<std::uint8_t,6> bytes;};
+        static constexpr Prefix prefixes[]={
+            {kScrAddIntRva,{0x40,0x53,0x48,0x83,0xec,0x20}},{kScrAddFloatRva,{0x48,0x83,0xec,0x38,0x0f,0x29}},
+            {kScrAddStringRva,{0x40,0x53,0x48,0x83,0xec,0x20}},{kScrAddVectorRva,{0x40,0x53,0x48,0x83,0xec,0x20}},
+            {kScrAddEntityNumRva,{0x40,0x53,0x48,0x83,0xec,0x20}},{kScrAddUndefinedRva,{0x48,0x83,0xec,0x28,0xe8,0x67}},
+            {kCbufAddTextRva,{0x48,0x89,0x5c,0x24,0x08,0x57}}};
+        bool ok=aiProfile.resolved;
+        for(const auto& prefix:prefixes) {std::array<std::uint8_t,6> seen{};ok=ok && ReadAi(base+prefix.rva,seen.data(),seen.size()) && seen==prefix.bytes;}
+        // Each push begins with the native IncInParam.
+        for(const auto rva:{kScrAddIntRva,kScrAddFloatRva,kScrAddStringRva,kScrAddVectorRva,kScrAddUndefinedRva}) {
+            std::uint8_t code[24]{};ok=ok && ReadAi(base+rva,code,sizeof(code));
+            std::uintptr_t call=0;for(int n=0;n<19 && ok;++n)if(code[n]==0xe8){call=Call(base+rva,n);break;}
+            ok=ok && call==base+kScrIncInParamRva;
+        }
+        unsigned builtins=0;
+        for(const auto& b:kZombieBuiltins)if(ok && MethodEntry(b.name,base+b.rva))++builtins;
+        ok=ok && builtins==kZombieBuiltins.size();
+        cbufReady=aiProfile.resolved && Call(base+kCbufAddTextCallerRva,0)==base+kCbufAddTextRva;
+        if(ok) {
+            scriptNatives.addInt=reinterpret_cast<decltype(scriptNatives.addInt)>(base+kScrAddIntRva);
+            scriptNatives.addFloat=reinterpret_cast<decltype(scriptNatives.addFloat)>(base+kScrAddFloatRva);
+            scriptNatives.addString=reinterpret_cast<decltype(scriptNatives.addString)>(base+kScrAddStringRva);
+            scriptNatives.addVector=reinterpret_cast<decltype(scriptNatives.addVector)>(base+kScrAddVectorRva);
+            scriptNatives.addEntityNum=reinterpret_cast<decltype(scriptNatives.addEntityNum)>(base+kScrAddEntityNumRva);
+            scriptNatives.addUndefined=reinterpret_cast<decltype(scriptNatives.addUndefined)>(base+kScrAddUndefinedRva);
+            scriptNatives.notify=reinterpret_cast<decltype(scriptNatives.notify)>(base+kScriptNotifyRva);
+        }
+        zombieBindingsReady=ok && aiProfile.goalEntityReady && scriptNatives.complete();
+        Log("ZOMBIE_BINDINGS ready=%d builtins=%u/%llu cbuf=%d goal_entity=%d",zombieBindingsReady,builtins,
+            static_cast<unsigned long long>(kZombieBuiltins.size()),cbufReady,aiProfile.goalEntityReady);
+    }
     InstallExpandedCapacity(base,aiProfile.resolved);
     Log("AI_PROFILE resolved=%d callback_slot_rva=0x%llx spawn_rva=0x%llx delete_rva=0x%llx pool_slot_rva=0x%llx clock_rva=0x%llx",
         aiProfile.resolved,static_cast<unsigned long long>(aiProfile.thinkSlot-base),static_cast<unsigned long long>(spawn-base),
@@ -1563,8 +2246,11 @@ void LogAiState() {
     Log("AI_COMBAT_STATS killed=%llu campaign_reclaimed=%llu resource_shed=%llu character_loaded=%d scheduler=SERVER_CLOCK",s.killed,s.reclaimed,s.resourceShed,s.characterLoaded);
     Log("AI_DAMAGE_OPTIONS hitmarkers=%d invincible_spawned_friendlies=%d confirmed_hits=%llu protected_hits=%llu",
         hitmarkersEnabled.load(),invincibleFriendlies.load(),confirmedPlayerHits.load(),protectedFriendlyHits.load());
-    Log("AI_PERF service_updates=%llu service_average_us=%.1f service_peak_us=%.1f world_reads=%llu world_average_us=%.1f world_peak_us=%.1f max_npcs_per_tick=4 recovery_pending=%d reassertions=%llu render_world_reads=0 disk_flush=CRASH_ONLY",
-        s.serviceUpdates,s.serviceAverageUs,s.servicePeakUs,s.worldReads,s.worldAverageUs,s.worldPeakUs,s.recovering,s.combatReassertions);
+    Log("AI_PERF service_updates=%llu service_average_us=%.1f service_peak_us=%.1f world_reads=%llu world_average_us=%.1f world_peak_us=%.1f max_npcs_per_tick=%llu budget_us=%.0f last_batch=%d peak_batch=%d recovery_pending=%d reassertions=%llu render_world_reads=0 disk_flush=CRASH_ONLY",
+        s.serviceUpdates,s.serviceAverageUs,s.servicePeakUs,s.worldReads,s.worldAverageUs,s.worldPeakUs,static_cast<unsigned long long>(kFollowMaximumPerTick),
+        kFollowBudgetMicroseconds,s.followLastBatch,s.followPeakBatch,s.recovering,s.combatReassertions);
+    Log("AI_FOLLOW mode=%s goal_entity_assigns=%llu radius_updates=%llu fixed_nodes_cleared=%llu",
+        aiProfile.goalEntityReady?"GOAL_ENTITY_PLAYER":"POSITION_FALLBACK",s.followGoalEntity,s.followRadius,s.followUnfixed);
     Log("AI_SCAN_PERF last_pool_us=%.1f last_decode_us=%.1f last_sort_us=%.1f kernel_reads_per_scan=%.1f image_reads_per_scan=%.1f name_cache_hits=%llu name_cache_misses=%llu",
         s.lastPoolUs,s.lastDecodeUs,s.lastSortUs,s.worldReads?double(s.worldKernelReads)/s.worldReads:0.0,s.worldReads?double(s.worldImageReads)/s.worldReads:0.0,s.nameCacheHits,s.nameCacheMisses);
     LogExpandedResources();
@@ -1581,6 +2267,68 @@ std::uint64_t RequestNativeHandDefinitions(const WeaponFields& weapon,std::uintp
     h.lifetime.client=scope.client;h.lifetime.pool=scope.pool;h.lifetime.commandTime=scope.commandTime;
     std::strcpy(h.lifetime.map.data(),scope.map);h.pending=true;h.result.state=NativeHandBuildState::Queued;
     ai.hands=h;WorkWanted();return h.ticket;
+}
+bool ZombieModeAvailable() {std::lock_guard<std::recursive_mutex> lock(aiMutex);return zombieBindingsReady;}
+void RequestZombieStart(const ZombieSettings& settings,const char* map) {
+    std::lock_guard<std::recursive_mutex> lock(aiMutex);
+    if(!zombieBindingsReady || zg.running)return;
+    zg.requested=settings;zg.requested.startingRound=std::clamp(settings.startingRound,bo1::kPreviewMinRound,bo1::kPreviewMaxRound);
+    zg.pendingMap=map && SafeMapName(map)?map:"";zg.startWanted=true;zg.stopWanted=false;zg.gameOverRound=0;
+    if(!InstallService()) {zg.startWanted=false;Log("ZOMBIE_START refused=HOOK_UNAVAILABLE");return;}
+    nativePending.store(true,std::memory_order_release);
+    Log("ZOMBIE_REQUEST start round=%d hellhounds=%d remove_allies=%d map=%s",zg.requested.startingRound,
+        zg.requested.hellhounds,zg.requested.removeAllies,zg.pendingMap.empty()?"CURRENT":zg.pendingMap.c_str());
+}
+void RequestZombieStop() {
+    std::lock_guard<std::recursive_mutex> lock(aiMutex);
+    if(zg.running) {zg.stopWanted=true;nativePending.store(true,std::memory_order_release);}
+    else if(zg.startWanted) {zg.startWanted=false;Log("ZOMBIE_REQUEST cancelled");}
+}
+void SetZombieHellhounds(bool enabled) {
+    std::lock_guard<std::recursive_mutex> lock(aiMutex);
+    zg.requested.hellhounds=enabled;if(zg.running)zg.settings.hellhounds=enabled;
+    Log("ZOMBIE_HELLHOUNDS enabled=%d dog_spawners=%llu",enabled,static_cast<unsigned long long>(ai.dogPoints.size()));
+}
+// Queue "spmap <name>" exactly like the mission flow, then start zombies when
+// that level's player is ready. The command buffer is lock protected.
+bool LaunchZombieMap(const char* map,const ZombieSettings& settings) {
+    if(!SafeMapName(map) || CampaignMapIndex(map)<0)return false;
+    {std::lock_guard<std::recursive_mutex> lock(aiMutex);if(!cbufReady || !zombieBindingsReady || zg.running)return false;}
+    RequestZombieStart(settings,map);
+    char command[64];std::snprintf(command,sizeof(command),"spmap %s\n",map);
+    reinterpret_cast<CbufFn>(aiProfile.base+kCbufAddTextRva)(0,command);
+    Log("ZOMBIE_LAUNCH map=%s command=spmap",map);
+    return true;
+}
+ZombieGameStatus GetZombieGameStatus() {
+    thread_local ZombieGameStatus cached;
+    std::unique_lock<std::recursive_mutex> lock(aiMutex,std::try_to_lock);
+    if(!lock.owns_lock())return cached;
+    ZombieGameStatus s;
+    s.available=zombieBindingsReady;s.running=zg.running;s.pending=zg.startWanted;
+    std::snprintf(s.pendingMap,sizeof(s.pendingMap),"%s",zg.pendingMap.c_str());
+    s.settings=zg.running?zg.settings:zg.requested;s.round=zg.controller.status();
+    s.points=zg.ledger.score;s.pointsTotal=zg.ledger.total;s.kills=zg.kills;s.headshots=zg.headshots;
+    const int now=zg.lastTime;
+    s.doublePointsMs=std::max(0,zg.doublePointsUntil-now);s.instaKillMs=std::max(0,zg.instaKillUntil-now);
+    s.dogSpawners=!ai.dogPoints.empty();s.nextDogRound=zg.dogs.next();
+    for(const auto& d:zg.drops) {
+        if(s.dropCount>=static_cast<int>(s.drops.size()))break;
+        s.drops[static_cast<std::size_t>(s.dropCount++)]={d.type,d.origin,bo1::PowerupVisible(now-d.spawned)};
+    }
+    std::snprintf(s.weapon,sizeof(s.weapon),"%s",zg.pistol.c_str());
+    std::snprintf(s.event,sizeof(s.event),"%s",zg.event.c_str());s.eventAgeMs=now-zg.eventTime;
+    s.gameOverRound=zg.gameOverRound;s.lastPointsDelta=zg.lastDelta;s.pointsDeltaAgeMs=now-zg.deltaTime;
+    cached=s;return s;
+}
+void LogZombieGame() {
+    std::lock_guard<std::recursive_mutex> lock(aiMutex);
+    const auto& c=zg.controller.status();
+    Log("ZOMBIE_STATE available=%d running=%d pending=%d map=%s round=%d phase=%s alive=%d queued=%d killed=%d dogs=%d points=%d total=%d kills=%u headshots=%u hits=%u melee_hits=%u melee_misses=%u drops=%llu double_points_ms=%d insta_kill_ms=%d campaign_removed=%u weapon=%s dog_spawners=%llu next_dog_round=%d",
+        zombieBindingsReady,zg.running,zg.startWanted,zg.running?zg.map:zg.pendingMap.c_str(),c.round,bo1::PhaseText(c.phase),c.alive,c.queued,c.killed,c.dogs,
+        zg.ledger.score,zg.ledger.total,zg.kills,zg.headshots,zg.hits,zg.meleeHits,zg.meleeMisses,static_cast<unsigned long long>(zg.drops.size()),
+        std::max(0,zg.doublePointsUntil-zg.lastTime),std::max(0,zg.instaKillUntil-zg.lastTime),zg.campaignRemoved,zg.pistol.c_str(),
+        static_cast<unsigned long long>(ai.dogPoints.size()),zg.dogs.next());
 }
 NativeHandBuildResult GetNativeHandBuild(std::uint64_t ticket) {
     std::lock_guard<std::recursive_mutex> lock(aiMutex);

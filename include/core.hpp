@@ -8,7 +8,7 @@
 #include "fov_preferences.hpp"
 
 namespace mod {
-inline constexpr const char* kVersion = "0.1.36-squad-test37";
+inline constexpr const char* kVersion = "0.1.37-zombies-test38";
 inline constexpr const char* kExeSha256 = "fb7e8a987c371dea7b666091b0b9e2011c0cd9cd277b191ad453d11d557dd777";
 
 // -1 is a wildcard. Reject malformed patterns rather than matching everything.
@@ -288,7 +288,7 @@ inline constexpr const char* kHeldFireModePattern = "44 8B 4A 64 4C 8B D1 41 83 
 inline constexpr const char* kSemiAutoFireGatePattern = "83 7A 64 00 74 2A 48 6B C0 1C 83 BC 18 00 02 00 00 00";
 inline constexpr int kVisibleMenuRows = 12;
 inline constexpr float MenuPanelHeight(int rows) { return 200.f+26.f*rows; }
-enum class Page { Home, Player, Weapons, World, AI, Zombies, Diagnostics, ZombieRules, View, ZombieController };
+enum class Page { Home, Player, Weapons, World, AI, Zombies, Diagnostics, ZombieRules, View, ZombieController, ZombieGame };
 inline constexpr int MenuRowCount(Page page) {
     switch(page) {
         case Page::Home: case Page::Player: case Page::World: case Page::ZombieRules: return 6;
@@ -297,6 +297,7 @@ inline constexpr int MenuRowCount(Page page) {
         case Page::Diagnostics: return 2;
         case Page::View: return 5;
         case Page::ZombieController: return 12;
+        case Page::ZombieGame: return 12;
     }
     return 0;
 }
@@ -317,7 +318,8 @@ enum class Action { None, ToggleGod, ToggleHud, WriteSnapshot, WriteRoundPreview
     ToggleRehearsal, ChangeRehearsalRound, ToggleRehearsalAutoClear, ToggleRehearsalSpawning,
     KillRehearsalActor, ClearRehearsalActors, WriteRehearsal,
     SpawnAiEnemy, SpawnAiFriendly, PreviousEnemySpawner, NextEnemySpawner, PreviousFriendlySpawner, NextFriendlySpawner,
-    ToggleAiSpawnPause, RemoveSpawnedAi, WriteAiState, KillAllEnemies };
+    ToggleAiSpawnPause, RemoveSpawnedAi, WriteAiState, KillAllEnemies,
+    StartZombies, ChangeZombieMap, ChangeZombieRound, ToggleZombieHellhounds, ToggleZombieAllies, WriteZombieState };
 inline bool IsRehearsalAction(Action action) {
     return action>=Action::ToggleRehearsal && action<=Action::WriteRehearsal;
 }
@@ -329,6 +331,11 @@ struct MenuState {
     int homeSelection = 0;
     int previewRound = bo1::kPreviewMinRound;
     int rehearsalRound = bo1::kPreviewMinRound;
+    // Playable zombies: -1 = the loaded level, otherwise a campaign map index.
+    int zombieMap = -1;
+    int zombieMapCount = 19;
+    int zombieRound = bo1::kPreviewMinRound;
+    bool zombieHellhounds = false, zombieRemoveAllies = true;
     FovPreference fov;
     int count() const { return MenuRowCount(page); }
     int firstVisibleRow() const { return 0; }
@@ -356,6 +363,16 @@ struct MenuState {
             if (key != Input::Left && previewRound < bo1::kPreviewMaxRound) ++previewRound;
             return previewRound == oldRound ? Action::None : Action::WriteRoundPreview;
         }
+        if(page==Page::ZombieGame && selected==1 && (key==Input::Left || key==Input::Right)) {
+            zombieMap=key==Input::Left?(zombieMap<=-1?zombieMapCount-1:zombieMap-1):(zombieMap>=zombieMapCount-1?-1:zombieMap+1);
+            return Action::ChangeZombieMap;
+        }
+        if(page==Page::ZombieGame && selected==2 && (key==Input::Left || key==Input::Right)) {
+            const int old=zombieRound;
+            if(key==Input::Left && zombieRound>bo1::kPreviewMinRound) --zombieRound;
+            if(key==Input::Right && zombieRound<bo1::kPreviewMaxRound) ++zombieRound;
+            return zombieRound==old?Action::None:Action::ChangeZombieRound;
+        }
         if(page==Page::ZombieController && selected==1 && (key==Input::Left || key==Input::Right || key==Input::Select)) {
             const int oldRound=rehearsalRound;
             if(key==Input::Left && rehearsalRound>bo1::kPreviewMinRound) --rehearsalRound;
@@ -368,6 +385,7 @@ struct MenuState {
             if (page == Page::Home) visible = false;
             else if (page == Page::ZombieRules) { page = Page::Zombies; selected = 0; }
             else if (page == Page::ZombieController) { page=Page::Zombies; selected=1; }
+            else if (page == Page::ZombieGame) { page=Page::Zombies; selected=2; }
             else if (page == Page::View) { page = Page::Player; selected = 1; }
             else { page = Page::Home; selected = homeSelection; }
         }
@@ -415,6 +433,15 @@ struct MenuState {
             }
             else if(page==Page::Zombies && selected==1) {
                 page=Page::ZombieController; selected=0; return Action::WriteRehearsal;
+            }
+            else if(page==Page::Zombies && selected==2) {
+                page=Page::ZombieGame; selected=0; return Action::WriteZombieState;
+            }
+            else if(page==Page::ZombieGame) {
+                if(selected==0 || selected==1) return Action::StartZombies;
+                if(selected==3) { zombieHellhounds=!zombieHellhounds; return Action::ToggleZombieHellhounds; }
+                if(selected==4) { zombieRemoveAllies=!zombieRemoveAllies; return Action::ToggleZombieAllies; }
+                if(selected==11) return Action::WriteZombieState;
             }
             else if(page==Page::ZombieController) {
                 if(selected==0) return Action::ToggleRehearsal;

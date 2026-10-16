@@ -203,6 +203,8 @@ struct AiStatus {
     bool characterLoaded=true;
     int recovering=0;
     unsigned long long worldReads=0,serviceUpdates=0,combatReassertions=0;
+    unsigned long long followGoalEntity=0,followRadius=0,followUnfixed=0;
+    int followLastBatch=0,followPeakBatch=0;
     double worldAverageUs=0,worldPeakUs=0,serviceAverageUs=0,servicePeakUs=0;
     double lastPoolUs=0,lastDecodeUs=0,lastSortUs=0;
     unsigned long long worldKernelReads=0,worldImageReads=0,nameCacheHits=0,nameCacheMisses=0;

@@ -1,7 +1,22 @@
 # BO1 Zombies in MW2
 
 Incremental mod framework for **retail Modern Warfare 2 (2009), single player**.
-Current build: **0.1.36-squad-test37**.
+Current build: **0.1.37-zombies-test38**.
+
+**Test38 adds the first playable zombies mode.** Open it with F4 → ZOMBIE MODE
+→ Playable zombies, on the current level or on any campaign map (that also
+works from the main menu). It uses BO1 solo rules ported from the owner's
+local BO1 scripts: rounds, spawning at campaign enemy spawn points, walk/run
+speeds, pursuit, the melee rule, points, the four powerups and optional
+hellhounds. The player starts with only a USP .45.
+
+Test38 also fixes spawned friendlies standing in clumps. They now follow the
+player as their native goal entity, with a crowd- and enemy-scaled goal
+radius, and up to 32 actors are serviced per server frame.
+
+The zombies are still the map's soldiers, with no BO1 animations or models
+yet. See [Test38](docs/zombies-test38.md) and the
+[Test38 test instructions](docs/test38-testing-protocol.md).
 
 Test37 fixes the cause of the false "child1/parent exceeded" errors and the VM
 crash seen in Test35/36: object ids above 0x8fff were not recognised as
@@ -32,9 +47,11 @@ bridge, 72 MiB GPU/CPU skinning buffers, guarded animated-record storage and
 16-bit handles remain active. Rendering and actor regressions are rerun.
 Windows missions and stable 256-actor retail gameplay require owner testing.
 
-Install the complete Test37 package (run its Uninstall.cmd first to remove
-Test36). Follow the [Test37 retest instructions](docs/test37-testing-protocol.md):
-Estate and Contingency to 256, plus a checkpoint reload with a crowd. The
+Install the complete Test38 package (run its Uninstall.cmd first to remove
+Test37). Follow the [Test38 instructions](docs/test38-testing-protocol.md):
+friendlies on Estate, then zombies on the current level and from the main
+menu. The [Test37 retest instructions](docs/test37-testing-protocol.md) still
+cover the 256-actor and checkpoint checks. The
 [full crowd protocol](docs/test31-crowd-protocol.md) covers later stages.
 
 Original MP hitmarker image/sound/fade, menu options, prior animation ownership

@@ -1,0 +1,12 @@
+{
+  "probe": "exact-native builtin call",
+  "argument_order_native_readers": true,
+  "returned_value_read_then_released": true,
+  "exact_min_max_gettime": true,
+  "busy_vm_untouched": true,
+  "invalid_requests_refused": true,
+  "repeated_calls_balanced": 1000,
+  "native_dependencies_substituted": false,
+  "scope": "Scr_AddInt/Scr_AddFloat, Scr_GetNumParam/Scr_GetFloat/Scr_GetInt, exact min/max/gettime and the zero-object notify cleanup. String, vector and entity pushes need the live script string/memory tables and are exercised only in game.",
+  "executable_sha256": "fb7e8a987c371dea7b666091b0b9e2011c0cd9cd277b191ad453d11d557dd777"
+}

@@ -5,6 +5,7 @@
 #include "control_extensions.hpp"
 #include "weapon_inventory.hpp"
 #include "zombie_rehearsal.hpp"
+#include "zombie_game.hpp"
 #include "ai_controls.hpp"
 #include "native_animation.hpp"
 #include <windows.h>
@@ -130,10 +131,20 @@ void SetHitmarkers(bool enabled);
 void SetSpawnedFriendliesInvincible(bool enabled);
 std::uint8_t GetHitmarkerAlpha(ULONGLONG now);
 AiStatus GetAiStatus();
+// Test38 playable zombies (native work runs on the server clock).
+bool ZombieModeAvailable();
+void RequestZombieStart(const ZombieSettings& settings,const char* map);
+void RequestZombieStop();
+void SetZombieHellhounds(bool enabled);
+bool LaunchZombieMap(const char* map,const ZombieSettings& settings);
+ZombieGameStatus GetZombieGameStatus();
+void LogZombieGame();
 void LogAiState();
 std::uint64_t RequestNativeHandDefinitions(const WeaponFields&,std::uintptr_t names,std::uintptr_t normalTree,
     std::uintptr_t cache,const Snapshot&);
 NativeHandBuildResult GetNativeHandBuild(std::uint64_t ticket);
+struct LoadedWeapon { unsigned index=0; std::string name; int type=-1,weaponClass=-1,inventoryType=-1,clipSize=0; };
+std::vector<LoadedWeapon> LoadedWeapons();
 bool SetFov(int value);
 void LogSnapshot();
 void LoadFovPreference(FovPreference& preference);

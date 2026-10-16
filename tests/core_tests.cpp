@@ -82,7 +82,16 @@ int main() {
     Check(m.selected==11 && m.firstVisibleRow()==0 && m.input(Input::Select)==Action::WriteRehearsal,"controller shows final row without scrolling");
     m.input(Input::Back);
     Check(m.page==Page::Zombies && m.selected==1,"controller back returns to parent row");
-    m.input(Input::Down); Check(m.input(Input::Select)==Action::None,"playable Zombies remains locked");
+    m.input(Input::Down); Check(m.input(Input::Select)==Action::WriteZombieState && m.page==Page::ZombieGame && m.count()==12,"playable zombies page opens");
+    Check(m.input(Input::Select)==Action::StartZombies,"start/end routing");
+    m.input(Input::Down); Check(m.input(Input::Right)==Action::ChangeZombieMap && m.zombieMap==0,"map selector moves from this level to the first campaign map");
+    Check(m.input(Input::Left)==Action::ChangeZombieMap && m.zombieMap==-1 && m.input(Input::Left)==Action::ChangeZombieMap && m.zombieMap==18,"map selector wraps");
+    m.input(Input::Down); Check(m.input(Input::Left)==Action::None && m.input(Input::Right)==Action::ChangeZombieRound && m.zombieRound==2,"starting round bounds");
+    m.input(Input::Down); Check(m.input(Input::Select)==Action::ToggleZombieHellhounds && m.zombieHellhounds,"hellhound toggle");
+    m.input(Input::Down); Check(m.input(Input::Select)==Action::ToggleZombieAllies && !m.zombieRemoveAllies,"campaign allies toggle");
+    for(int i=0;i<6;++i) { m.input(Input::Down); Check(m.input(Input::Select)==Action::None,"zombie status rows are read-only"); }
+    m.input(Input::Down); Check(m.selected==11 && m.input(Input::Select)==Action::WriteZombieState,"zombie log row");
+    m.input(Input::Back); Check(m.page==Page::Zombies && m.selected==2,"zombie page back returns to parent row");
     m.input(Input::Back);
     Check(m.page==Page::Home && m.selected==4, "second back returns to remembered home category");
     m.page=Page::AI; m.selected=0;

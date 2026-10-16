@@ -328,6 +328,23 @@ bool ReadInventory(std::uintptr_t client,InventoryData& d) {
     }
     return true;
 }
+} // namespace
+// Test38: every loaded weapon, for the zombies loadout (pistol, frag grenade)
+// and max ammo. Reads the same exact-build table as the weapon menu.
+std::vector<LoadedWeapon> LoadedWeapons() {
+    std::vector<LoadedWeapon> result; unsigned count=0;
+    if (!profile.supported || !profile.resolved || !profile.weaponResolved || !ReadValue(profile.weaponCount,count) || !count || count>=kWeaponCapacity) return result;
+    for (unsigned n=1;n<=count;++n) {
+        const auto w=ReadWeapon(n,false);
+        if (!w.valid) continue;
+        LoadedWeapon out; out.index=n; out.name=w.name; out.type=w.type;
+        if (!ReadValue(w.definition+kWeaponClass,out.weaponClass) || !ReadValue(w.definition+kInventoryType,out.inventoryType)
+            || !ReadValue(w.complete+kClipSize,out.clipSize)) continue;
+        result.push_back(std::move(out));
+    }
+    return result;
+}
+namespace {
 std::vector<WeaponCandidate> ReadCatalog() {
     std::vector<WeaponCandidate> result; unsigned count=0;
     if (!profile.inventoryResolved || !ReadValue(profile.weaponCount,count) || count>=kWeaponCapacity) return result;

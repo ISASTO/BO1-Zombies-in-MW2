@@ -1,4 +1,6 @@
 #include "runtime.hpp"
+#include "checked_memory.hpp"
+#include "zombie_bindings.hpp"
 #include <algorithm>
 #include <cmath>
 #include <cstdio>
@@ -154,6 +156,7 @@ const char* PageName(Page page) {
         case Page::ZombieRules: return "BO1 ROUND RULES PREVIEW";
         case Page::View: return "VIEW / FOV SETTINGS";
         case Page::ZombieController: return "BO1 CONTROLLER REHEARSAL";
+        case Page::ZombieGame: return "PLAYABLE ZOMBIES";
     }
     return "";
 }
@@ -163,10 +166,11 @@ const char* Row(Page page, int n) {
     static constexpr const char* weapons[] = {"Give All (usable banks)", "Infinite Ammo", "No Reload", "Infinite Grenades (linked)", "Rapid Fire", "Explosive Bullets", "Force Dual Wield", "No Recoil", "Hitmarkers", "Make Semi-Auto Full-Auto", "Weapon info to log", "Reset weapon toggles"};
     static constexpr const char* world[] = {"World Speed", "Freeze AI", "Gravity", "Kill All Enemies", "Allow Friendly Fire", "Reset world toggles"};
     static constexpr const char* ai[] = {"Spawn Enemy (nearest point)", "Spawn Friendly (near you)", "Enemy model", "Friendly model", "Pause AI spawning", "Freeze AI (linked)", "Invincible Spawned Friendlies", "Alive enemy / friendly", "Our spawned actors", "Remove our spawned actors", "AI info to log", "Engine actor slots"};
-    static constexpr const char* zombies[] = {"Round rules preview", "Controller rehearsal", "Playable Zombies / actors"};
+    static constexpr const char* zombies[] = {"Round rules preview", "Controller rehearsal", "Playable zombies"};
     static constexpr const char* diag[] = {"Status HUD", "Write State to Log"};
     static constexpr const char* rules[] = {"Preview round", "Total zombies", "Zombie health", "Simultaneous cap", "Spawn interval", "Between rounds"};
     static constexpr const char* view[] = {"Base FOV", "Save for next launch", "Restore default / clear saved", "Live base FOV", "Saved base FOV"};
+    static constexpr const char* game[] = {"Start / End zombies", "Map", "Starting round", "Hellhounds", "Campaign allies", "Round", "Points", "Zombies left", "Kills / headshots", "Powerups", "Starting weapon", "Zombies info to log"};
     static constexpr const char* controller[] = {"Start / End rehearsal", "Starting round", "Auto-clear simulated actors", "Pause spawn queue", "Simulate one kill", "Clear simulated alive", "Current round", "Simulated alive", "Unspawned queue", "Phase / timer", "Zombie health", "Controller info to log"};
     switch (page) {
         case Page::Home: return MenuText<Page::Home>(home,n); case Page::Player: return MenuText<Page::Player>(player,n);
@@ -176,6 +180,7 @@ const char* Row(Page page, int n) {
         case Page::ZombieRules: return MenuText<Page::ZombieRules>(rules,n);
         case Page::View: return MenuText<Page::View>(view,n);
         case Page::ZombieController: return MenuText<Page::ZombieController>(controller,n);
+        case Page::ZombieGame: return MenuText<Page::ZombieGame>(game,n);
     }
     return "";
 }
@@ -185,6 +190,33 @@ void LogRoundPreview(int round) {
     Log("BO1_RULES source=LOCAL_CSV_PLUS_GSC_FALLBACK tuning_csv=PRESENT column=2 profile=NORMAL_SOLO "
         "round=%d first_round=%d total=%d health=%d concurrent_limit=%d spawn_interval=%.9f between_round_seconds=%d",
         p->round, round == 1, p->total, p->health, p->concurrentLimit, p->spawnInterval, p->betweenRoundSeconds);
+}
+// Projects a world point with the player's view (playerState viewangles,
+// eye height and cg_fov, which is the horizontal field of view at 4:3).
+bool ProjectToScreen(const Snapshot& s,const AiPoint& point,float width,float height,float& x,float& y,float& distance) {
+    if(!s.client.valid || !s.fov.valid || !s.entity) return false;
+    AiPoint origin{},angles{};float eyeHeight=0.f;
+    if(!CheckedReadMemory(s.entity+kAiOrigin,origin.data(),sizeof(origin)) || !CheckedReadMemory(s.client.address+kClientViewAngles,angles.data(),sizeof(angles))
+        || !CheckedReadMemory(s.client.address+kClientViewHeight,&eyeHeight,sizeof(eyeHeight)) || !FinitePoint(origin) || !FinitePoint(angles)
+        || !std::isfinite(eyeHeight) || std::abs(eyeHeight)>200.f) return false;
+    origin[2]+=eyeHeight;
+    const float rad=.017453292f;
+    const float sp=std::sin(angles[0]*rad),cp=std::cos(angles[0]*rad),sy=std::sin(angles[1]*rad),cy=std::cos(angles[1]*rad),sr=std::sin(angles[2]*rad),cr=std::cos(angles[2]*rad);
+    const AiPoint forward{cp*cy,cp*sy,-sp};
+    const AiPoint right{-sr*sp*cy+cr*sy,-sr*sp*sy-cr*cy,-sr*cp};
+    const AiPoint up{cr*sp*cy+sr*sy,cr*sp*sy-sr*cy,cr*cp};
+    const AiPoint d{point[0]-origin[0],point[1]-origin[1],point[2]-origin[2]};
+    auto dot=[&](const AiPoint& a){return a[0]*d[0]+a[1]*d[1]+a[2]*d[2];};
+    const float z=dot(forward);distance=std::sqrt(PointDistanceSquared(point,origin));
+    if(z<4.f) return false;
+    const float tanY=std::tan(std::clamp(s.fov.current,1.f,170.f)*.5f*rad)*.75f,tanX=tanY*(width/height);
+    x=width*.5f+dot(right)/z/tanX*width*.5f; y=height*.5f-dot(up)/z/tanY*height*.5f;
+    return std::isfinite(x) && std::isfinite(y) && x>-200.f && x<width+200.f && y>-200.f && y<height+200.f;
+}
+const char* ZombieMapText(int index,char* buffer,std::size_t size,const char* current) {
+    if(index<0) std::snprintf(buffer,size,"This level%s%.20s",current && current[0]?": ":"",current?current:"");
+    else std::snprintf(buffer,size,"%s",kCampaignMaps[static_cast<std::size_t>(index)].name);
+    return buffer;
 }
 void Configure(IDirect3DDevice9* device) {
     device->SetVertexShader(nullptr); device->SetPixelShader(nullptr); device->SetFVF(kFvf);
@@ -313,6 +345,24 @@ void Overlay::frame() {
         else if (action == Action::WriteSnapshot) LogSnapshot();
         else if (action == Action::WriteRoundPreview) LogRoundPreview(menu.previewRound);
         else if(IsRehearsalAction(action)) HandleZombieRehearsal(action,ReadSnapshot(),menu.rehearsalRound);
+        else if(action==Action::StartZombies) {
+            const auto zs=GetZombieGameStatus();
+            if(zs.running || zs.pending) RequestZombieStop();
+            else {
+                ZombieSettings settings; settings.startingRound=menu.zombieRound; settings.hellhounds=menu.zombieHellhounds; settings.removeAllies=menu.zombieRemoveAllies;
+                const auto snap=ReadSnapshot();
+                const char* map=menu.zombieMap<0?nullptr:kCampaignMaps[static_cast<std::size_t>(menu.zombieMap)].name;
+                bool started=false;
+                if(map && std::strcmp(map,snap.map)!=0) started=LaunchZombieMap(map,settings);
+                else if(snap.state==LevelState::Ready) { RequestZombieStart(settings,nullptr); started=true; }
+                Log("ZOMBIE_MENU start map=%s round=%d hellhounds=%d remove_allies=%d accepted=%d",map?map:snap.map,settings.startingRound,settings.hellhounds,settings.removeAllies,started);
+                if(started) menu.visible=false;
+            }
+        }
+        else if(action==Action::ToggleZombieHellhounds) SetZombieHellhounds(menu.zombieHellhounds);
+        else if(action==Action::WriteZombieState) LogZombieGame();
+        else if(action==Action::ChangeZombieMap || action==Action::ChangeZombieRound || action==Action::ToggleZombieAllies)
+            Log("ZOMBIE_MENU map=%d round=%d hellhounds=%d remove_allies=%d",menu.zombieMap,menu.zombieRound,menu.zombieHellhounds,menu.zombieRemoveAllies);
         else if (action == Action::ChangeFov) {
             nextFovAttempt=0; settingsResult="Session FOV selected";
             Log("FOV_PREF selected=%d saved=%d active=1",menu.fov.selected,menu.fov.saved.value_or(0));
@@ -340,6 +390,7 @@ void Overlay::frame() {
     const auto aiStatus=GetAiStatus();
     UpdateZombieRehearsal(s);
     const auto rehearsal=GetZombieRehearsalStatus();
+    const auto zombie=GetZombieGameStatus();
     const auto playerPreferences=GetPlayerPreferences();
     const auto extraPreferences=GetExtraPreferences();
     const auto weaponMode=GetWeaponModeStatus();
@@ -353,6 +404,7 @@ void Overlay::frame() {
             presents, endScenes, draws, inputs, resets, menu.visible, lastRenderThread);
         LogSnapshot();
         LogZombieRehearsal();
+        LogZombieGame();
         LogAiState();
         Log("FOV_PREF selected=%d saved=%d active=%d reset_pending=%d",
             menu.fov.selected,menu.fov.saved.value_or(0),menu.fov.desired.has_value(),menu.fov.releaseAfterDefault);
@@ -371,7 +423,10 @@ void Overlay::frame() {
     }
     PrepareMpFeedback(*this);
     const auto hitAlpha=GetHitmarkerAlpha(now);
-    if (!menu.visible && !menu.hud && !hitAlpha) return;
+    static int seenGameOver=0; static ULONGLONG gameOverAt=0;
+    if(zombie.gameOverRound!=seenGameOver) { seenGameOver=zombie.gameOverRound; gameOverAt=now; }
+    const bool showGameOver=zombie.gameOverRound>0 && !zombie.running && now-gameOverAt<10000;
+    if (!menu.visible && !menu.hud && !hitAlpha && !zombie.running && !showGameOver) return;
     IDirect3DStateBlock9* state = nullptr;
     if (FAILED(device->CreateStateBlock(D3DSBT_ALL, &state)) || !state) return;
     if (FAILED(state->Capture())) { state->Release(); return; }
@@ -406,6 +461,44 @@ void Overlay::frame() {
             text(20,39,kAccent,line,.7f);
         }
     }
+    // BO1-style zombies HUD: round bottom-left, points bottom-right, active
+    // powerups bottom-centre, dropped powerups marked where they lie.
+    if(zombie.running || showGameOver) {
+        const float W=static_cast<float>(size.Width),H=static_cast<float>(size.Height),u=H/480.f;
+        const D3DCOLOR blood=D3DCOLOR_ARGB(235,170,18,12),white=D3DCOLOR_ARGB(240,236,232,220),gold=D3DCOLOR_ARGB(240,236,198,92);
+        char hud[96]{};
+        if(zombie.running) {
+            std::snprintf(hud,sizeof(hud),"%d",zombie.round.round);
+            Text(*this,18.f*u,H-66.f*u,1.7f*u,blood,hud);
+            Text(*this,20.f*u,H-82.f*u,.6f*u,blood,zombie.round.dogs?"HELLHOUNDS":"ROUND");
+            std::snprintf(hud,sizeof(hud),"%d",zombie.points);
+            const float pw=11.f*1.1f*u*static_cast<float>(std::strlen(hud));
+            Rect(device,W-pw-34.f*u,H-58.f*u,pw+22.f*u,34.f*u,D3DCOLOR_ARGB(150,0,0,0));
+            Text(*this,W-pw-23.f*u,H-56.f*u,1.1f*u,gold,hud);
+            if(zombie.pointsDeltaAgeMs>=0 && zombie.pointsDeltaAgeMs<900 && zombie.lastPointsDelta>0) {
+                std::snprintf(hud,sizeof(hud),"+%d",zombie.lastPointsDelta);
+                Text(*this,W-pw-23.f*u-60.f*u,H-74.f*u-zombie.pointsDeltaAgeMs*.02f*u,.8f*u,gold,hud);
+            }
+            float px=W*.5f-120.f*u;
+            if(zombie.doublePointsMs>0) { std::snprintf(hud,sizeof(hud),"x2 %ds",(zombie.doublePointsMs+999)/1000); Text(*this,px,H-40.f*u,.8f*u,gold,hud); px+=110.f*u; }
+            if(zombie.instaKillMs>0) { std::snprintf(hud,sizeof(hud),"INSTA %ds",(zombie.instaKillMs+999)/1000); Text(*this,px,H-40.f*u,.8f*u,white,hud); }
+            if(zombie.round.phase==bo1::RoundPhase::Between) {
+                std::snprintf(hud,sizeof(hud),"Next round in %llds",static_cast<long long>((zombie.round.waitMilliseconds+999)/1000));
+                Text(*this,20.f*u,H-110.f*u,.6f*u,white,hud);
+            }
+            for(int d=0;d<zombie.dropCount;++d) {
+                const auto& drop=zombie.drops[static_cast<std::size_t>(d)];
+                float x=0,y=0,distance=0;
+                if(!drop.visible || !ProjectToScreen(s,drop.origin,W,H,x,y,distance)) continue;
+                Rect(device,x-7.f*u,y-7.f*u,14.f*u,14.f*u,D3DCOLOR_ARGB(220,90,230,90));
+                std::snprintf(hud,sizeof(hud),"%s %.0fm",bo1::PowerupText(drop.type),distance*.0254f);
+                Text(*this,x-60.f*u,y-26.f*u,.6f*u,D3DCOLOR_ARGB(240,150,255,150),hud);
+            }
+        } else {
+            std::snprintf(hud,sizeof(hud),"GAME OVER  -  You survived %d round%s",zombie.gameOverRound,zombie.gameOverRound==1?"":"s");
+            Text(*this,W*.5f-11.f*1.2f*u*static_cast<float>(std::strlen(hud))*.5f,H*.32f,1.2f*u,blood,hud);
+        }
+    }
     if (menu.visible) {
         rect(24,54,660,panelHeight,D3DCOLOR_ARGB(240,10,13,9));
         rect(24,54,660,3,kAccent);
@@ -421,6 +514,11 @@ void Overlay::frame() {
                 std::snprintf(line,sizeof(line),"R%d | Virtual %d | Queue %d | %s",rehearsal.controller.round,
                     rehearsal.controller.alive,rehearsal.controller.queued,bo1::PhaseText(rehearsal.controller.phase));
             else std::snprintf(line,sizeof(line),"Clock: commandTime | Stop: %s",bo1::ReasonText(rehearsal.controller.reason));
+            text(40,143,kMuted,line,.7f);
+        } else if(menu.page==Page::ZombieGame) {
+            text(40,121,kMuted,!zombie.available?"Native zombie bindings unavailable; see log":
+                zombie.running?"Running | BO1 rules on native MW2 actors":zombie.pending?"Waiting for the level to be ready":"Ready | Spawns at campaign enemy spawn points",.7f);
+            std::snprintf(line,sizeof(line),"Map: %.24s | Dog spawners: %s",s.map[0]?s.map:"main menu",zombie.dogSpawners?"yes":"none");
             text(40,143,kMuted,line,.7f);
         } else if(menu.page==Page::AI) {
             std::snprintf(line,sizeof(line),"Native mission AI | %s | Recovering: %d",AiResultText(aiStatus.lastResult),aiStatus.recovering);
@@ -472,7 +570,25 @@ void Overlay::frame() {
                 else status=s.client.valid && s.damageRead?"OFF":"OFF*";
             }
             else if (menu.page==Page::Diagnostics) status=n==0?(menu.hud?"ON":"OFF"):"ENTER";
-            else if (menu.page==Page::Zombies) status=n<2?"ENTER":"LOCKED";
+            else if (menu.page==Page::Zombies) status=n<2 || zombie.available?"ENTER":"LOCKED";
+            else if(menu.page==Page::ZombieGame) {
+                const auto& c=zombie.round;
+                if(n==0) status=!zombie.available?"LOCKED":zombie.running?"END":zombie.pending?"CANCEL":menu.zombieMap<0 && s.state!=LevelState::Ready?"PICK MAP":"START";
+                else if(n==1) status=ZombieMapText(menu.zombieMap,value,sizeof(value),s.map);
+                else if(n==2) { std::snprintf(value,sizeof(value),"%d",menu.zombieRound); status=value; }
+                else if(n==3) status=!menu.zombieHellhounds?"OFF":zombie.dogSpawners?"ON":"ON (NO DOGS)";
+                else if(n==4) status=menu.zombieRemoveAllies?"REMOVE":"KEEP";
+                else if(n==5) { if(zombie.running) std::snprintf(value,sizeof(value),"%d %s",c.round,bo1::PhaseText(c.phase)); else std::snprintf(value,sizeof(value),"-"); status=value; }
+                else if(n==6) { std::snprintf(value,sizeof(value),"%d",zombie.points); status=zombie.running?value:"-"; }
+                else if(n==7) { std::snprintf(value,sizeof(value),"%d + %d",c.alive,c.queued); status=zombie.running?value:"-"; }
+                else if(n==8) { std::snprintf(value,sizeof(value),"%u / %u",zombie.kills,zombie.headshots); status=zombie.running?value:"-"; }
+                else if(n==9) {
+                    if(!zombie.running) status="-";
+                    else { std::snprintf(value,sizeof(value),"%s%s%d out",zombie.doublePointsMs>0?"x2 ":"",zombie.instaKillMs>0?"INSTA ":"",zombie.dropCount); status=value; }
+                }
+                else if(n==10) status=zombie.weapon[0]?zombie.weapon:"USP .45";
+                else status="ENTER";
+            }
             else if(menu.page==Page::ZombieController) {
                 const auto& c=rehearsal.controller;
                 if(n==0) status=c.running()?"END":rehearsal.ready?"START":"LOCKED";
@@ -583,11 +699,30 @@ void Overlay::frame() {
             ? "LEFT/RIGHT: FOV  UP/DOWN: Row  ENTER: Act" : (menu.page==Page::Player || menu.page==Page::World)
             ? "LEFT/RIGHT: Value  ENTER: Toggle  UP/DOWN: Row" : menu.page==Page::Weapons
             ? "LEFT/RIGHT: Bank / Rate  ENTER: Toggle" : menu.page==Page::AI
-            ? "LEFT/RIGHT: Template  ENTER: Act  UP/DOWN: Row" : "UP/DOWN: Select  ENTER: Toggle / Open",.7f);
+            ? "LEFT/RIGHT: Template  ENTER: Act  UP/DOWN: Row" : menu.page==Page::ZombieGame
+            ? "LEFT/RIGHT: Map / Round  ENTER: Act  UP/DOWN: Row" : "UP/DOWN: Select  ENTER: Toggle / Open",.7f);
         text(40,divider+29,kMuted,"BACKSPACE/ESC: Back   F4: Close",.7f);
         const char* footer="Game keeps running. WASD and mouse work.";
         if (menu.page==Page::ZombieRules) footer="Read-only preview. No zombies spawned.";
-        if(menu.page==Page::Zombies) footer="Controller rehearsal ready. Native actors pending.";
+        if(menu.page==Page::Zombies) footer=zombie.available?"Playable zombies: BO1 rules on native MW2 actors.":"Controller rehearsal ready. Native actors pending.";
+        if(menu.page==Page::ZombieGame) {
+            static constexpr const char* hints[]={
+                "Clears campaign AI, USP .45 only, BO1 rounds from round shown.",
+                "LEFT/RIGHT: map. ENTER loads it (works from the main menu).",
+                "LEFT/RIGHT: 1-100. BO1 normal solo counts and health.",
+                "BO1 dog rounds; needs a map with dog spawners.",
+                "REMOVE deletes Price, Soap etc. KEEP lets them fight.",
+                "Rounds, intro and 10 s break follow BO1 timings.",
+                "500 start, 10 per hit, 50-130 per kill (x2 doubles).",
+                "Alive now + still to spawn this round (24 at once).",
+                "Headshot kills give the 50 point bonus.",
+                "Kaboom, insta-kill, double points, max ammo.",
+                "Falls back to another loaded pistol if no USP.",
+                "Logs round, points, powerups and native results."
+            };
+            footer=MenuText<Page::ZombieGame>(hints,menu.selected);
+            if(!zombie.available) footer="Exact native zombie bindings unavailable; see log.";
+        }
         if(menu.page==Page::ZombieController) {
             static constexpr const char* hints[]={
                 "Rehearsal only. Campaign AI and assets are untouched.",

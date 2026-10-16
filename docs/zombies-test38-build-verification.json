@@ -1,0 +1,81 @@
+{
+ "version": "0.1.37-zombies-test38",
+ "base_commit": "0e3910e18bb70112f88c0244e3810d0106451017",
+ "executable_sha256": "fb7e8a987c371dea7b666091b0b9e2011c0cd9cd277b191ad453d11d557dd777",
+ "dll_sha256": "6f0ec08d4ec1ef0fda260fc46ac0118a6786a9892bd3801ded1da5fadde7c423",
+ "dll_bytes": 6924881,
+ "compiler": "xPack MinGW-w64 GCC 13.2.0 (posix threads, UCRT), RelWithDebInfo, static GCC/C++ runtime",
+ "pe_checks": {
+  "amd64_pe32_plus": true,
+  "exact_ten_exports": true,
+  "imports_unchanged_from_test37": true
+ },
+ "imports": [
+  "bcrypt.dll",
+  "dbghelp.dll",
+  "gdi32.dll",
+  "kernel32.dll",
+  "api-ms-win-crt-*-l1-1-0.dll (11 UCRT API sets)",
+  "user32.dll",
+  "winmm.dll"
+ ],
+ "early_dllmain_native_edits_unchanged": true,
+ "native_cxx_tests": {
+  "passed": 21,
+  "failed": 0,
+  "new": [
+   "bo1_zombie_rules_tests"
+  ],
+  "updated": [
+   "ai_behavior_tests",
+   "core_tests"
+  ]
+ },
+ "python_tests": {
+  "passed": 42,
+  "failed": 0,
+  "new": [
+   "test_zombie_bindings"
+  ]
+ },
+ "native_suites_and_audits_passed": [
+  "runtime",
+  "resources",
+  "iterator",
+  "animation",
+  "history",
+  "awareness",
+  "threat",
+  "crowd",
+  "fracture",
+  "glass_state",
+  "tables",
+  "audit",
+  "consumers",
+  "script_vm",
+  "sweep"
+ ],
+ "native_suites_and_audits_failed": [],
+ "script_call_probe": {
+  "probe": "exact-native builtin call",
+  "argument_order_native_readers": true,
+  "returned_value_read_then_released": true,
+  "exact_min_max_gettime": true,
+  "busy_vm_untouched": true,
+  "invalid_requests_refused": true,
+  "repeated_calls_balanced": 1000,
+  "native_dependencies_substituted": false
+ },
+ "zombie_bindings": {
+  "actor_fields": 18,
+  "builtins": 11
+ },
+ "squad_follow": {
+  "mode": "native goal entity = player (setgoalentity replica via 0x15b190)",
+  "radius": "384-1024 by squad size, up to 1536 toward the enemy",
+  "max_per_server_frame": 32,
+  "budget_us": 1500
+ },
+ "windows_gameplay_tested": false,
+ "scope": "Portable BO1 rule fixtures, exact-native builtin-call probe, static exact-build binding verification and all earlier native suites. Windows gameplay requires owner testing."
+}

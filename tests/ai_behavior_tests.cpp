@@ -1,6 +1,8 @@
 #include "ai_behavior.hpp"
 #include "native_hooks.hpp"
+#include <cmath>
 #include <cstdlib>
+#include <limits>
 #include <iostream>
 #include <vector>
 void Check(bool value,const char* why) {if(!value){std::cerr<<"FAIL: "<<why<<'\n';std::exit(1);}}
@@ -51,5 +53,14 @@ int main() {
     Check(!RelativeCall(0x1000,0x900000000ULL,code),"far call is rejected until a near relay exists");
     const auto jump=AbsoluteJump(0x123456789ULL);std::uintptr_t pointer=0;std::memcpy(&pointer,jump.data()+6,8);
     Check(jump[0]==0xff && jump[1]==0x25 && pointer==0x123456789ULL,"absolute relay preserves full target pointer");
+    // Test38 squad following: crowd-scaled radius, stretched toward the enemy.
+    Check(SquadFollowRadius(1,false,0.f)==kSquadMinimumRadius,"a small squad stays within the minimum follow radius");
+    Check(SquadFollowRadius(240,false,0.f)>700.f && SquadFollowRadius(240,false,0.f)<=kSquadCrowdRadius,"a 240-actor squad gets room instead of a clump");
+    Check(SquadFollowRadius(4,true,1000.f*1000.f)>SquadFollowRadius(4,false,0.f),"an enemy stretches the radius so allies engage it");
+    Check(SquadFollowRadius(240,true,5000.f*5000.f)==kSquadEngageRadius,"engagement radius is bounded");
+    Check(SquadFollowRadius(4,true,std::numeric_limits<float>::infinity())==SquadFollowRadius(4,false,0.f),"invalid distances fall back to the follow radius");
+    Check(!RadiusNeedsUpdate(500.f,520.f) && RadiusNeedsUpdate(500.f,600.f) && RadiusNeedsUpdate(std::nanf(""),500.f),"radius rewrites only on real changes");
+    Check(ContinueFollowBatch(0,240,1e9) && ContinueFollowBatch(3,240,1e9) && !ContinueFollowBatch(4,240,2000.0),"budget always serves the minimum batch");
+    Check(ContinueFollowBatch(20,240,100.0) && !ContinueFollowBatch(32,240,0.0) && !ContinueFollowBatch(5,5,0.0),"batch stops at the cap or the end of the squad");
     std::cout<<"AI combat, occupancy, allocation lifetime and native relay fixtures passed\n";
 }
