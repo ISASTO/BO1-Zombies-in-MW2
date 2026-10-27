@@ -40,7 +40,9 @@ static void TestIwi() {
     auto flat=Iwi13(0xd,2,8,8);
     Check(ParseIwi13(flat.data(),flat.size(),t) && t.levels==1 && t.format==kD3dDxt5 && t.data.size()==64,"IWI without mips");
     auto broken=file;broken.pop_back();
-    Check(!ParseIwi13(broken.data(),broken.size(),t),"IWI size mismatch refused");
+    Check(!ParseIwi13(broken.data(),broken.size(),t),"IWI shorter than its mips refused");
+    auto padded=file;padded.push_back(0);
+    Check(ParseIwi13(padded.data(),padded.size(),t) && t.data.size()==64+16+8+8+8,"IWI trailing bytes ignored");
     auto cube=Iwi13(0xb,4,8,8);
     Check(!ParseIwi13(cube.data(),cube.size(),t),"IWI cube refused");
     auto rgba=Iwi13(0xb,0,8,8);rgba[4]=1;
@@ -212,7 +214,7 @@ static void TestPipeline() {
     Check(BuildCharacterFastFile(raw.data(),raw.size(),archives,ff,report,&error) && report.fallbacks.size()==4,"colour-only build uses fallbacks");
     const auto none=MakeZip({{"images/other.iwi",dxt1(16),0}});
     archives={archive("iw_00.iwd",none)};
-    Check(!BuildCharacterFastFile(raw.data(),raw.size(),archives,ff,report,&error) && error.find("colour")!=std::string::npos,"no colour map refused");
+    Check(BuildCharacterFastFile(raw.data(),raw.size(),archives,ff,report,&error) && report.fallbacks.size()==7 && !report.textures,"untextured build uses grey");
 }
 
 int main() {

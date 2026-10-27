@@ -159,7 +159,8 @@ void VerifyModel(const ModelSpec& spec,const ZoneSpec& zone,Report& report) {
     for(std::size_t lod=0;lod<4;++lod) {
         const auto* l=h+0x60+mw2::kLodBytes*lod;
         if(lod>=m.numLods) {Check(!Ptr(l,8) && !At<std::uint16_t>(l,4),where+"unused lod");continue;}
-        Check(At<float>(l,0)==m.lods[lod].dist && At<std::uint16_t>(l,4)==m.lods[lod].numsurfs && At<std::uint16_t>(l,6)==m.lods[lod].surfIndex,where+"lod range");
+        Check(At<float>(l,0)==m.lods[lod].dist && At<std::uint16_t>(l,4)==m.lods[lod].numsurfs && At<std::uint16_t>(l,6)==m.lods[lod].surfIndex
+            && l[0x30]==lod,where+"lod range");
         const auto surfsAsset=byName.find({3,spec.name+"_lod"+std::to_string(lod)});
         Check(surfsAsset!=byName.end() && Ptr(l,8)==surfsAsset->second->header.data(),where+"lod surfaces asset");
         const auto* ms=surfsAsset->second->header.data();
@@ -230,7 +231,7 @@ void VerifyMaterials(const ZoneSpec& zone,Report& report) {
         const std::string* images[3]={&want.spec,&want.normal,&want.color};
         for(std::size_t n=0;n<3;++n) {
             const auto* d=defs+16*n;
-            Check(At<std::uint32_t>(d,0)==hashes[n] && d[6]==mw2::kSamplerDefault && d[7]==sem[n],where+"texture def");
+            Check(At<std::uint32_t>(d,0)==hashes[n] && d[6]==(*images[n]==mw2::kIdentityNormal?mw2::kSamplerIdentity:mw2::kSamplerDefault) && d[7]==sem[n],where+"texture def");
             const std::string name=(*images[n])[0]==','?images[n]->substr(1):*images[n];
             const auto img=byName.find({10,name});
             Check(img!=byName.end() && Ptr(d,8)==img->second->header.data(),where+"image "+name);

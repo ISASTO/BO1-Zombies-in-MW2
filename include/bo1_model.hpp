@@ -457,7 +457,7 @@ inline bool ParseIwi13(const std::uint8_t* p,std::size_t n,Texture& out,std::str
         offsets[static_cast<std::size_t>(level)]=at;
         at+=MipBytes(out.format,w>>level,h>>level);
     }
-    if(at!=n) return Fail(error,"image size does not match its mips");
+    if(at>n) return Fail(error,"image is shorter than its mips");
     out.data.clear();out.data.reserve(at-48);
     for(unsigned level=0;level<levels;++level)
         out.data.insert(out.data.end(),p+offsets[level],p+offsets[level]+MipBytes(out.format,w>>level,h>>level));
@@ -557,7 +557,7 @@ inline constexpr std::array<std::uint8_t,48> kStateBitsEntry={
     0x03,0x03,0x03,0x03,0x03,0x03,0x03,0x03,0x03,0x03,0x03,0x03,0x03,0x04,0x04,0x04,0xff,0xff,0xff,0xff,0x05,0xff,0x03,0x03};
 inline constexpr std::array<std::uint64_t,6> kStateBits={0xe49e490d00128812ull,0x0000000d18128812ull,0x0000003d00128812ull,
     0x0000000d58128812ull,0xe004004858128922ull,0xe49e492c88128812ull};
-inline constexpr std::uint8_t kGameFlags=0x50,kSortOpaque=1,kStateFlags=0x79,kSamplerDefault=0x0b;
+inline constexpr std::uint8_t kGameFlags=0x50,kSortOpaque=1,kStateFlags=0x79,kSamplerDefault=0x0b,kSamplerIdentity=0x01;
 inline constexpr std::uint32_t kSurfaceFlesh=1u<<6;
 } // namespace mw2
 
@@ -692,7 +692,9 @@ public:
             s_.align(3);
             for(const auto& d:defs) {
                 std::uint8_t t[mw2::kTextureDefBytes]{};
-                Put<std::uint32_t>(t,d.hash);t[4]=d.start;t[5]=d.end;t[6]=mw2::kSamplerDefault;t[7]=d.semantic;
+                Put<std::uint32_t>(t,d.hash);t[4]=d.start;t[5]=d.end;t[7]=d.semantic;
+                // MW2 samples its flat $identitynormalmap with state 0x01, its own maps with 0x0b.
+                t[6]=*d.image==mw2::kIdentityNormal?mw2::kSamplerIdentity:mw2::kSamplerDefault;
                 Put<std::uint64_t>(t+8,mw2::kInline);
                 s_.read(t,sizeof(t));
             }
@@ -784,6 +786,7 @@ public:
             if(n<m.numLods) {
                 Put<float>(l,m.lods[n].dist);Put<std::uint16_t>(l+4,m.lods[n].numsurfs);Put<std::uint16_t>(l+6,m.lods[n].surfIndex);
                 Put<std::uint64_t>(l+8,mw2::kInline);
+                l[0x30]=static_cast<std::uint8_t>(n);    // XModelLodInfo::lod (MW2 zones carry the index)
             } else Put<float>(l,1000000.f);
         }
         h[0x140]=0;h[0x141]=static_cast<std::uint8_t>(m.numLods);h[0x142]=static_cast<std::uint8_t>(m.collLod);h[0x143]=0;
@@ -946,20 +949,22 @@ inline std::vector<std::uint8_t> FastFile(const ZoneResult& zone) {
 inline constexpr std::array<const char*,2> kBodyModels={"c_ger_honorguard_body1","c_ger_honorguard_body2"};
 inline constexpr std::array<const char*,4> kHeadModels={"c_ger_zombie_head1","c_ger_zombie_head2","c_ger_zombie_head3","c_ger_zombie_head4"};
 inline constexpr const char* kImagePrefix="bo1_";
-// Colour maps are required; a missing normal map falls back to MW2's flat
-// $identitynormalmap and a missing specular map to a dull constant one.
+// Missing textures never stop the models: a colour map falls back to plain
+// grey, a normal map to MW2's flat $identitynormalmap and a specular map to a
+// dull constant one (each reported in `fallbacks`).
 inline constexpr const char* kFallbackSpecular="bo1_fallback_specular";
+inline constexpr const char* kFallbackColor="bo1_fallback_color";
 inline bool CharacterSpec(const Character& c,const std::map<std::string,Texture>& textures,ZoneSpec& spec,std::string* error=nullptr,
                           std::vector<std::string>* fallbacks=nullptr) {
-    using detail::Fail;
     spec=ZoneSpec{};
+    if(error) error->clear();
     enum class Kind {Color,Normal,Specular};
     auto take=[&](const std::string& source,const char* role,Kind kind,std::string& name)->bool {
         const auto found=source.empty()?textures.end():textures.find(source);
         if(found==textures.end()) {
-            if(kind==Kind::Color) return Fail(error,std::string("missing BO1 texture for ")+role+": "+source);
             if(fallbacks) fallbacks->push_back(std::string(role)+":"+source);
-            if(kind==Kind::Normal) name=mw2::kIdentityNormal;
+            if(kind==Kind::Color) {name=kFallbackColor;spec.images[name]=SolidDxt5(4,0x8410,0xff);}
+            else if(kind==Kind::Normal) name=mw2::kIdentityNormal;
             else {name=kFallbackSpecular;spec.images[name]=SolidDxt5(4,0x2104,0x30);}
             return true;
         }
