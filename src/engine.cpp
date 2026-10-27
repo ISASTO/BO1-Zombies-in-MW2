@@ -1478,4 +1478,13 @@ void LogSnapshot() {
             t.updates?double(t.kernel)/t.updates:0.0,t.updates?double(t.image)/t.updates:0.0);
     }
 }
+// The "mapname" dvar of the level being loaded or played (set before the
+// level's scripts are compiled). Used by the Test39 level-load hook.
+bool ReadCurrentMapName(char* out,std::size_t size) {
+    if(!out || !size) return false;
+    out[0]=0;
+    std::uintptr_t map=0,mapString=0;
+    if(!profile.resolved || !NamedDvar(profile.mapDvarSlot,"mapname",7,map) || !ReadValue(map+0x10,mapString)) return false;
+    return ReadString(mapString,out,size) && out[0];
+}
 } // namespace mod

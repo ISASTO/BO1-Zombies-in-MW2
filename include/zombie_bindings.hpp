@@ -64,4 +64,55 @@ inline constexpr int kModUnknown=0,kModPistolBullet=1,kModRifleBullet=2,kModExpl
     kModGrenadeSplash=5,kModProjectile=6,kModProjectileSplash=7,kModMelee=8,kModHeadShot=9,kModCrush=10,
     kModFalling=11,kModSuicide=12,kModTriggerHurt=13,kModExplosive=14,kModImpact=15;
 inline constexpr int kHitNone=0,kHitHelmet=1,kHitHead=2,kHitNeck=3,kHitTorsoUpper=4,kHitTorsoLower=5,kHitShield=19;
+
+// ---- Test39: Spec Ops level preparation and the BO1 animation import ----
+// GScr_LoadScripts (0x195200) ends with a tail jump to Scr_EndLoadScripts;
+// that jump is redirected so the level's compiled scripts can be queried
+// while the compiler's file/function table (scriptsPos) still exists.
+inline constexpr std::uintptr_t kLevelScriptsLoadedJumpRva=0x1953f8,kScrEndLoadScriptsRva=0x2166d0;
+inline constexpr std::array<std::uint8_t,15> kScrEndLoadScriptsPrologue={
+    0x40,0x53,0x48,0x83,0xec,0x20,0xe8,0xd5,0x3c,0x00,0x00,0xb9,0x02,0x00,0x00};
+// Scr_GetFunctionHandle(filename, name) -> offset of the compiled function in
+// the script program buffer (0 when absent); valid only until Scr_EndLoadScripts.
+inline constexpr std::uintptr_t kScrGetFunctionHandleRva=0x216920;
+inline constexpr std::array<std::uint8_t,15> kScrGetFunctionHandlePrologue={
+    0x48,0x89,0x5c,0x24,0x08,0x48,0x89,0x74,0x24,0x10,0x57,0x48,0x83,0xec,0x30};
+inline constexpr std::uintptr_t kScrProgramBufferRva=0x15a03e0,kScrProgramSizeRva=0x1463bc8;
+// VM_Execute: opcode byte from fs.pos, 0x8c opcodes; opcode 0 (OP_End) kills
+// the thread's locals and unwinds the stack to the caller's code position.
+inline constexpr std::uintptr_t kVmDispatchRva=0x2249c4,kVmOpcodeTableRva=0x227650,kVmOpEndHandlerRva=0x2249f7;
+inline constexpr std::uint8_t kVmOpEnd=0x00;
+struct ScriptFunctionRef { const char* file; const char* function; };
+// The Spec Ops end-of-mission paths. Entered with OP_End while zombies run,
+// so objectives, timers and kill counters can no longer end the level.
+inline constexpr std::array<ScriptFunctionRef,3> kSpecOpsEndFunctions={{
+    {"maps/_specialops","fade_challenge_out"},
+    {"maps/_specialops_code","specialops_mission_over_setup"},
+    {"maps/_specialops_code","failure_summary_display"}}};
+
+// Asset database: DB_FindXAssetEntry(type, name) -> entry {type, header@8}.
+inline constexpr std::uintptr_t kDbFindXAssetEntryRva=0xef500;
+inline constexpr std::array<std::uint8_t,15> kDbFindXAssetEntryPrologue={
+    0x48,0x89,0x5c,0x24,0x08,0x48,0x89,0x6c,0x24,0x10,0x48,0x89,0x74,0x24,0x18};
+inline constexpr int kAssetTypeXAnimParts=2;            // g_assetNames[2] == "xanim"
+inline constexpr std::uintptr_t kAssetNamesRva=0x3bf360;
+inline constexpr std::size_t kAssetEntryHeader=0x8;
+// SL_GetString(str, user, type) -> script string id (adds a reference).
+inline constexpr std::uintptr_t kSlGetStringRva=0x21b2d0;
+inline constexpr std::array<std::uint8_t,10> kSlGetStringPrologue={0x45,0x8b,0xc8,0x48,0xc7,0xc0,0xff,0xff,0xff,0xff};
+inline constexpr unsigned kSlGetStringType=4;
+// Scr_AddAnim(value): VAR_ANIMATION (13) push used by animscripted's anim argument.
+inline constexpr std::uintptr_t kScrAddAnimRva=0x222070;
+inline constexpr std::array<std::uint8_t,9> kScrAddAnimPrologue={0x40,0x53,0x48,0x83,0xec,0x20,0x48,0x8b,0xd9};
+// Entity anim tree (XAnimTree_s*, first field XAnim_s*) and the script animtree table.
+inline constexpr std::uintptr_t kEntAnimTreeRva=0x19fd90,kAnimTreeByIndexRva=0x20b0d0,kAnimTreeIndexRva=0x20b0e0;
+inline constexpr std::array<std::uint8_t,9> kEntAnimTreePrologue={0x40,0x53,0x48,0x83,0xec,0x20,0x0f,0xb6,0x11};
+// XAnim_s: u32 size, then 16-byte entries {u16 numAnims, u16 parent, pad, XAnimParts* @8}
+// from +8 (XAnimIsLeafNode 0x29d110, XAnimGetLength 0x29c920).
+inline constexpr std::size_t kXAnimEntries=0x8,kXAnimEntryStride=0x10,kXAnimEntryParts=0x8;
+inline constexpr BuiltinBinding kBuiltinAnimScripted{"animscripted",0x181c60};
+inline constexpr BuiltinBinding kBuiltinStopAnimScripted{"stopanimscripted",0x181c40};
+inline constexpr BuiltinBinding kBuiltinHide{"hide",0x192860};
+inline constexpr BuiltinBinding kBuiltinShow{"show",0x192830};
+inline constexpr std::array<BuiltinBinding,4> kAnimBuiltins={kBuiltinAnimScripted,kBuiltinStopAnimScripted,kBuiltinHide,kBuiltinShow};
 } // namespace mod

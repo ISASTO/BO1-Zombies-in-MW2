@@ -137,6 +137,9 @@ void RequestZombieStart(const ZombieSettings& settings,const char* map);
 void RequestZombieStop();
 void SetZombieHellhounds(bool enabled);
 bool LaunchZombieMap(const char* map,const ZombieSettings& settings);
+// Test39: relaunches the Spec Ops map after GAME OVER (called every frame).
+void TickZombieRelaunch();
+bool ReadCurrentMapName(char* out,std::size_t size);
 ZombieGameStatus GetZombieGameStatus();
 void LogZombieGame();
 void LogAiState();

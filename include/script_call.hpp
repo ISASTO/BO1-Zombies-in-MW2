@@ -31,22 +31,26 @@ struct ScriptCallNatives {
     void (MOD_NATIVE_ABI* addEntityNum)(unsigned,unsigned)=nullptr;
     void (MOD_NATIVE_ABI* addUndefined)()=nullptr;
     void (MOD_NATIVE_ABI* notify)(unsigned,unsigned,unsigned)=nullptr;
+    // Scr_AddAnim: pushes a VAR_ANIMATION (13) value (tree index << 16 | anim
+    // index). Optional: only animation arguments need it.
+    void (MOD_NATIVE_ABI* addAnim)(std::uint32_t)=nullptr;
     bool complete() const { return addInt && addFloat && addString && addVector && addEntityNum && addUndefined && notify; }
 };
 using ScriptBuiltin=void(MOD_NATIVE_ABI*)(unsigned);
 struct ScriptArg {
-    enum class Kind { Int, Float, String, Vector, Entity, Undefined } kind=Kind::Undefined;
+    enum class Kind { Int, Float, String, Vector, Entity, Undefined, Anim } kind=Kind::Undefined;
     int integer=0; float number=0.f; const char* text=nullptr; std::array<float,3> vector{}; unsigned entity=0;
     static ScriptArg Int(int v) { ScriptArg a; a.kind=Kind::Int; a.integer=v; return a; }
     static ScriptArg Float(float v) { ScriptArg a; a.kind=Kind::Float; a.number=v; return a; }
     static ScriptArg String(const char* v) { ScriptArg a; a.kind=Kind::String; a.text=v; return a; }
     static ScriptArg Vector(const std::array<float,3>& v) { ScriptArg a; a.kind=Kind::Vector; a.vector=v; return a; }
     static ScriptArg Entity(unsigned number) { ScriptArg a; a.kind=Kind::Entity; a.entity=number; return a; }
+    static ScriptArg Anim(std::uint32_t value) { ScriptArg a; a.kind=Kind::Anim; a.entity=value; return a; }
 };
 // Native VariableValue: 8-byte union then the 32-bit type.
 struct ScriptValue { std::uint64_t raw=0; std::uint32_t type=0,padding=0; };
 static_assert(sizeof(ScriptValue)==16);
-inline constexpr std::uint32_t kScriptUndefined=0,kScriptString=2,kScriptVector=4,kScriptFloat=5,kScriptInteger=6;
+inline constexpr std::uint32_t kScriptUndefined=0,kScriptString=2,kScriptVector=4,kScriptFloat=5,kScriptInteger=6,kScriptAnimation=13;
 struct ScriptReturn {
     bool present=false; ScriptValue value;
     float asFloat() const { float f=0.f; std::memcpy(&f,&value.raw,4); return value.type==kScriptInteger?static_cast<float>(asInt()):f; }
@@ -69,7 +73,10 @@ inline ScriptCallResult CallScriptBuiltin(volatile NativeScriptParameters& p,con
     unsigned entref,std::initializer_list<ScriptArg> args,ScriptReturn* out=nullptr) {
     if(out) *out={};
     if(!builtin || !n.complete() || args.size()>kMaxScriptCallArgs) return ScriptCallResult::Invalid;
-    for(const auto& a:args) if(a.kind==ScriptArg::Kind::String && !a.text) return ScriptCallResult::Invalid;
+    for(const auto& a:args) {
+        if(a.kind==ScriptArg::Kind::String && !a.text) return ScriptCallResult::Invalid;
+        if(a.kind==ScriptArg::Kind::Anim && !n.addAnim) return ScriptCallResult::Invalid;
+    }
     if(p.incoming || p.outgoing || !p.top || (p.top&15)) return ScriptCallResult::Busy;
     const auto top=p.top;
     for(auto it=args.end();it!=args.begin();) {
@@ -81,6 +88,7 @@ inline ScriptCallResult CallScriptBuiltin(volatile NativeScriptParameters& p,con
             case ScriptArg::Kind::Vector: n.addVector(it->vector.data()); break;
             case ScriptArg::Kind::Entity: n.addEntityNum(it->entity,0); break;
             case ScriptArg::Kind::Undefined: n.addUndefined(); break;
+            case ScriptArg::Kind::Anim: n.addAnim(it->entity); break;
         }
     }
     if(p.incoming!=args.size() || p.top!=top+16*args.size()) {

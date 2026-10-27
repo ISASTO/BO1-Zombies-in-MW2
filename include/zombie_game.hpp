@@ -6,24 +6,33 @@
 #include <cstring>
 
 namespace mod {
-// The Test38 playable zombies adapter: settings chosen in the F4 menu and the
+// The playable zombies adapter: settings chosen in the F4 menu and the
 // snapshot the overlay HUD draws. Native work happens on the server thread.
 struct ZombieSettings {
     int startingRound=1;
     bool hellhounds=false;      // BO1 dog rounds, when the map has a dog spawner
     bool removeAllies=true;     // campaign allies are deleted like campaign enemies
+    bool autoRestart=true;      // after GAME OVER the Spec Ops map is loaded again
 };
-// Every MW2 campaign level in mission order (the "spmap" names).
-struct CampaignMap { const char* name; const char* title; };
-inline constexpr std::array<CampaignMap,19> kCampaignMaps{{
-    {"trainer","S.S.D.D."},{"roadkill","Team Player"},{"cliffhanger","Cliffhanger"},{"airport","No Russian"},
-    {"favela","Takedown"},{"invasion","Wolverines!"},{"favela_escape","The Hornet's Nest"},{"arcadia","Exodus"},
-    {"oilrig","The Only Easy Day"},{"gulag","The Gulag"},{"dcburning","Of Their Own Accord"},{"contingency","Contingency"},
-    {"dcemp","Second Sun"},{"dc_whitehouse","Whiskey Hotel"},{"estate","Loose Ends"},{"boneyard","The Enemy of My Enemy"},
-    {"af_caves","Just Like Old Times"},{"af_chase","Endgame"},{"ending","Museum"}}};
-inline int CampaignMapIndex(const char* name) {
+// Test39: zombies are played on the Spec Ops maps, which are campaign
+// locations cut down to a small play area (the zone file is so_<mission>).
+// Excluded: the two co-op-only missions (AC-130 and helicopter gunner) and
+// the two snowmobile races, which put the player in a vehicle.
+struct SpecOpsMap { const char* name; const char* title; };
+inline constexpr std::array<SpecOpsMap,19> kSpecOpsMaps{{
+    {"so_killspree_trainer","Training pit"},{"so_hidden_so_ghillies","Pripyat (Hidden)"},
+    {"so_forest_contingency","Contingency forest"},{"so_rooftop_contingency","Contingency rooftops"},
+    {"so_crossing_so_bridge","Bridge crossing"},{"so_demo_so_bridge","Bridge demolition"},
+    {"so_killspree_favela","Favela"},{"so_juggernauts_favela","Favela (Juggernauts)"},
+    {"so_defuse_favela_escape","Favela rooftops (Bomb Squad)"},{"so_killspree_invasion","Invasion"},
+    {"so_defense_invasion","Invasion (Homeland Security)"},{"so_download_arcadia","Arcadia (Wardriving)"},
+    {"so_escape_airport","Airport (Terminal)"},{"so_showers_gulag","Gulag showers"},
+    {"so_intel_boneyard","Boneyard"},{"so_takeover_estate","Estate"},
+    {"so_takeover_oilrig","Oil rig deck"},{"so_assault_oilrig","Oil rig (Wetwork)"},
+    {"so_sabotage_cliffhanger","Cliffhanger base"}}};
+inline int SpecOpsMapIndex(const char* name) {
     if(!name) return -1;
-    for(std::size_t n=0;n<kCampaignMaps.size();++n) if(!std::strcmp(kCampaignMaps[n].name,name)) return static_cast<int>(n);
+    for(std::size_t n=0;n<kSpecOpsMaps.size();++n) if(!std::strcmp(kSpecOpsMaps[n].name,name)) return static_cast<int>(n);
     return -1;
 }
 inline bool SafeMapName(const char* name) {
@@ -49,5 +58,11 @@ struct ZombieGameStatus {
     int eventAgeMs=1000000;
     int gameOverRound=0;
     int lastPointsDelta=0,pointsDeltaAgeMs=1000000;
+    // Test39: BO1 animation import and Spec Ops preparation of this level.
+    char bo1Assets[16]{};        // READY, LOADING, MISSING, FAILED
+    int bo1AnimsFound=0,bo1AnimsWanted=0,animSlotsApplied=0,animSlotsWanted=0;
+    int specOpsGuards=0;         // Spec Ops end paths disabled (3 on a prepared level)
+    bool levelPrepared=false;    // this level was loaded by a zombies launch
+    int restartInMs=-1;          // GAME OVER relaunch countdown, -1 when none
 };
 } // namespace mod

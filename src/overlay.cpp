@@ -170,7 +170,7 @@ const char* Row(Page page, int n) {
     static constexpr const char* diag[] = {"Status HUD", "Write State to Log"};
     static constexpr const char* rules[] = {"Preview round", "Total zombies", "Zombie health", "Simultaneous cap", "Spawn interval", "Between rounds"};
     static constexpr const char* view[] = {"Base FOV", "Save for next launch", "Restore default / clear saved", "Live base FOV", "Saved base FOV"};
-    static constexpr const char* game[] = {"Start / End zombies", "Map", "Starting round", "Hellhounds", "Campaign allies", "Round", "Points", "Zombies left", "Kills / headshots", "Powerups", "Starting weapon", "Zombies info to log"};
+    static constexpr const char* game[] = {"Start / End zombies", "Spec Ops map", "Starting round", "Hellhounds", "Campaign allies", "Round", "Points", "Zombies left", "Kills / headshots", "Powerups", "BO1 animations", "Zombies info to log"};
     static constexpr const char* controller[] = {"Start / End rehearsal", "Starting round", "Auto-clear simulated actors", "Pause spawn queue", "Simulate one kill", "Clear simulated alive", "Current round", "Simulated alive", "Unspawned queue", "Phase / timer", "Zombie health", "Controller info to log"};
     switch (page) {
         case Page::Home: return MenuText<Page::Home>(home,n); case Page::Player: return MenuText<Page::Player>(player,n);
@@ -215,7 +215,7 @@ bool ProjectToScreen(const Snapshot& s,const AiPoint& point,float width,float he
 }
 const char* ZombieMapText(int index,char* buffer,std::size_t size,const char* current) {
     if(index<0) std::snprintf(buffer,size,"This level%s%.20s",current && current[0]?": ":"",current?current:"");
-    else std::snprintf(buffer,size,"%s",kCampaignMaps[static_cast<std::size_t>(index)].name);
+    else std::snprintf(buffer,size,"%s",kSpecOpsMaps[static_cast<std::size_t>(index)].title);
     return buffer;
 }
 void Configure(IDirect3DDevice9* device) {
@@ -351,9 +351,12 @@ void Overlay::frame() {
             else {
                 ZombieSettings settings; settings.startingRound=menu.zombieRound; settings.hellhounds=menu.zombieHellhounds; settings.removeAllies=menu.zombieRemoveAllies;
                 const auto snap=ReadSnapshot();
-                const char* map=menu.zombieMap<0?nullptr:kCampaignMaps[static_cast<std::size_t>(menu.zombieMap)].name;
+                const char* map=menu.zombieMap<0?nullptr:kSpecOpsMaps[static_cast<std::size_t>(menu.zombieMap)].name;
+                // "This level" on a Spec Ops map loads it again so the level is
+                // prepared (BO1 animations, Spec Ops end screens disabled).
+                if(!map && snap.state==LevelState::Ready && SpecOpsMapIndex(snap.map)>=0) map=kSpecOpsMaps[static_cast<std::size_t>(SpecOpsMapIndex(snap.map))].name;
                 bool started=false;
-                if(map && std::strcmp(map,snap.map)!=0) started=LaunchZombieMap(map,settings);
+                if(map) started=LaunchZombieMap(map,settings);
                 else if(snap.state==LevelState::Ready) { RequestZombieStart(settings,nullptr); started=true; }
                 Log("ZOMBIE_MENU start map=%s round=%d hellhounds=%d remove_allies=%d accepted=%d",map?map:snap.map,settings.startingRound,settings.hellhounds,settings.removeAllies,started);
                 if(started) menu.visible=false;
@@ -390,6 +393,7 @@ void Overlay::frame() {
     const auto aiStatus=GetAiStatus();
     UpdateZombieRehearsal(s);
     const auto rehearsal=GetZombieRehearsalStatus();
+    TickZombieRelaunch();
     const auto zombie=GetZombieGameStatus();
     const auto playerPreferences=GetPlayerPreferences();
     const auto extraPreferences=GetExtraPreferences();
@@ -497,6 +501,10 @@ void Overlay::frame() {
         } else {
             std::snprintf(hud,sizeof(hud),"GAME OVER  -  You survived %d round%s",zombie.gameOverRound,zombie.gameOverRound==1?"":"s");
             Text(*this,W*.5f-11.f*1.2f*u*static_cast<float>(std::strlen(hud))*.5f,H*.32f,1.2f*u,blood,hud);
+            if(zombie.restartInMs>=0) {
+                std::snprintf(hud,sizeof(hud),"New game in %d s  (F4 > Start to cancel)",(zombie.restartInMs+999)/1000);
+                Text(*this,W*.5f-11.f*.7f*u*static_cast<float>(std::strlen(hud))*.5f,H*.32f+40.f*u,.7f*u,D3DCOLOR_ARGB(230,235,225,200),hud);
+            }
         }
     }
     if (menu.visible) {
@@ -517,7 +525,8 @@ void Overlay::frame() {
             text(40,143,kMuted,line,.7f);
         } else if(menu.page==Page::ZombieGame) {
             text(40,121,kMuted,!zombie.available?"Native zombie bindings unavailable; see log":
-                zombie.running?"Running | BO1 rules on native MW2 actors":zombie.pending?"Waiting for the level to be ready":"Ready | Spawns at campaign enemy spawn points",.7f);
+                zombie.running?(zombie.levelPrepared?"Running | Spec Ops map | BO1 animations":"Running | BO1 rules on native MW2 actors"):
+                zombie.pending?"Loading the Spec Ops map...":zombie.restartInMs>=0?"GAME OVER | new game soon (Start cancels)":"Ready | Zombies rise at the map's enemy spawns",.7f);
             std::snprintf(line,sizeof(line),"Map: %.24s | Dog spawners: %s",s.map[0]?s.map:"main menu",zombie.dogSpawners?"yes":"none");
             text(40,143,kMuted,line,.7f);
         } else if(menu.page==Page::AI) {
@@ -586,7 +595,11 @@ void Overlay::frame() {
                     if(!zombie.running) status="-";
                     else { std::snprintf(value,sizeof(value),"%s%s%d out",zombie.doublePointsMs>0?"x2 ":"",zombie.instaKillMs>0?"INSTA ":"",zombie.dropCount); status=value; }
                 }
-                else if(n==10) status=zombie.weapon[0]?zombie.weapon:"USP .45";
+                else if(n==10) {
+                    if(zombie.levelPrepared) std::snprintf(value,sizeof(value),"BO1 %d/%d SO %d",zombie.animSlotsApplied,zombie.animSlotsWanted,zombie.specOpsGuards);
+                    else std::snprintf(value,sizeof(value),"%s %d/%d",zombie.bo1Assets,zombie.bo1AnimsFound,zombie.bo1AnimsWanted);
+                    status=value;
+                }
                 else status="ENTER";
             }
             else if(menu.page==Page::ZombieController) {
@@ -707,8 +720,8 @@ void Overlay::frame() {
         if(menu.page==Page::Zombies) footer=zombie.available?"Playable zombies: BO1 rules on native MW2 actors.":"Controller rehearsal ready. Native actors pending.";
         if(menu.page==Page::ZombieGame) {
             static constexpr const char* hints[]={
-                "Clears campaign AI, USP .45 only, BO1 rounds from round shown.",
-                "LEFT/RIGHT: map. ENTER loads it (works from the main menu).",
+                "Loads the Spec Ops map, clears its AI, USP .45, BO1 rounds.",
+                "LEFT/RIGHT: Spec Ops map. ENTER loads it (also from main menu).",
                 "LEFT/RIGHT: 1-100. BO1 normal solo counts and health.",
                 "BO1 dog rounds; needs a map with dog spawners.",
                 "REMOVE deletes Price, Soap etc. KEEP lets them fight.",
@@ -717,7 +730,7 @@ void Overlay::frame() {
                 "Alive now + still to spawn this round (24 at once).",
                 "Headshot kills give the 50 point bonus.",
                 "Kaboom, insta-kill, double points, max ammo.",
-                "Falls back to another loaded pistol if no USP.",
+                "BO1 zombie anims from your Black Ops install (applied/total).",
                 "Logs round, points, powerups and native results."
             };
             footer=MenuText<Page::ZombieGame>(hints,menu.selected);

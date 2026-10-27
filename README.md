@@ -1,9 +1,29 @@
 # BO1 Zombies in MW2
 
 Incremental mod framework for **retail Modern Warfare 2 (2009), single player**.
-Current build: **0.1.37-zombies-test38**.
+Current build: **0.1.38-zombies-test39**.
 
-**Test38 adds the first playable zombies mode.** Open it with F4 → ZOMBIE MODE
+**Test39 moves zombies onto the Spec Ops maps and imports the first BO1
+animations.** The map list is now 19 Spec Ops missions, which are small,
+bounded play areas. They load with the Spec Ops menu's own command sequence,
+including from the main menu. The missions' end-of-level paths are disabled
+while the level's scripts load, so objectives, timers and leaving the area no
+longer end a game. Dying loads the map again for a new game.
+
+The animations come from the owner's own Black Ops install (located by the
+installer; nothing BO1 is shipped). Zombies:
+
+- climb out of the ground with BO1's rise animations;
+- walk, run, sprint and idle with BO1's animations;
+- swing with BO1's attack animations, landing the hit at the anim's `fire`
+  notetrack;
+- die with BO1's death animations.
+
+These animations are converted into MW2's own XAnimParts at run time. BO1
+models are the next step. See [Test39](docs/zombies-test39.md) and the
+[Test39 test instructions](docs/test39-testing-protocol.md).
+
+**Test38 added the first playable zombies mode.** Open it with F4 → ZOMBIE MODE
 → Playable zombies, on the current level or on any campaign map (that also
 works from the main menu). It uses BO1 solo rules ported from the owner's
 local BO1 scripts: rounds, spawning at campaign enemy spawn points, walk/run
@@ -47,10 +67,12 @@ bridge, 72 MiB GPU/CPU skinning buffers, guarded animated-record storage and
 16-bit handles remain active. Rendering and actor regressions are rerun.
 Windows missions and stable 256-actor retail gameplay require owner testing.
 
-Install the complete Test38 package (run its Uninstall.cmd first to remove
-Test37). Follow the [Test38 instructions](docs/test38-testing-protocol.md):
-friendlies on Estate, then zombies on the current level and from the main
-menu. The [Test37 retest instructions](docs/test37-testing-protocol.md) still
+Install the complete Test39 package (run its Uninstall.cmd first to remove
+Test38). Follow the [Test39 instructions](docs/test39-testing-protocol.md):
+zombies on Spec Ops maps from the main menu, the BO1 rise, attacks and
+deaths, and the GAME OVER reload. The
+[Test38 instructions](docs/test38-testing-protocol.md) still cover the
+squad-follow checks, and the [Test37 retest instructions](docs/test37-testing-protocol.md) still
 cover the 256-actor and checkpoint checks. The
 [full crowd protocol](docs/test31-crowd-protocol.md) covers later stages.
 

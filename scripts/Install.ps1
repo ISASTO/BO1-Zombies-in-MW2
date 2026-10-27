@@ -16,7 +16,7 @@ try {
         $source = Join-Path (Split-Path $PSScriptRoot -Parent) $relative
     }
     if (-not (Test-Path -LiteralPath $source)) { throw 'd3d9.dll was not found. Extract the full test ZIP first.' }
-    $version = if ($Build -eq 'startup') { '0.1.1-startup-test2' } else { '0.1.37-zombies-test38' }
+    $version = if ($Build -eq 'startup') { '0.1.1-startup-test2' } else { '0.1.38-zombies-test39' }
     $payloadPath = Join-Path $PSScriptRoot 'payload.json'
     if (Test-Path -LiteralPath $payloadPath) {
         $payload = Get-Content -LiteralPath $payloadPath -Raw | ConvertFrom-Json
@@ -31,7 +31,7 @@ try {
     New-Item -ItemType Directory -Force -Path $logs | Out-Null
     $players = Join-Path $root 'players'
     if ($Build -eq 'menu' -and (Test-Path -LiteralPath $players -PathType Container)) {
-        $saveBackup = Join-Path $root ('bo1mw2\backups\before-test38-' + [DateTime]::UtcNow.ToString('yyyyMMdd-HHmmss-fff'))
+        $saveBackup = Join-Path $root ('bo1mw2\backups\before-test39-' + [DateTime]::UtcNow.ToString('yyyyMMdd-HHmmss-fff'))
         New-Item -ItemType Directory -Path $saveBackup | Out-Null
         Copy-Item -LiteralPath $players -Destination $saveBackup -Recurse
         Write-Host "Local player/save backup: $saveBackup"
@@ -65,6 +65,56 @@ try {
         if (-not $found) {
             if (Test-Path -LiteralPath $asset) { Remove-Item -LiteralPath $asset }
             Write-Host 'Original MP hitmarker image was not found in main/*.iwd. Hitmarkers will remain unavailable.'
+        }
+    }
+    if ($Build -eq 'menu') {
+        # Test39: BO1 zombie animations are read at run time from the owner's own
+        # Black Ops install (zone\Common\common_zombie.ff); nothing is copied.
+        $candidates = New-Object System.Collections.Generic.List[string]
+        $parent = Split-Path $root -Parent
+        # Plain string paths: Join-Path throws for a drive letter that does not exist.
+        foreach ($name in @('Call of Duty Black Ops','Call of Duty - Black Ops','Call of Duty Black Ops 1','Black Ops')) { $candidates.Add($parent + '\' + $name) }
+        foreach ($key in @('HKLM:\SOFTWARE\WOW6432Node\Microsoft\Windows\CurrentVersion\Uninstall\Steam App 42700',
+                           'HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\Steam App 42700')) {
+            $location = (Get-ItemProperty -LiteralPath $key -ErrorAction SilentlyContinue).InstallLocation
+            if ($location) { $candidates.Add($location) }
+        }
+        $steam = (Get-ItemProperty -LiteralPath 'HKCU:\Software\Valve\Steam' -ErrorAction SilentlyContinue).SteamPath
+        if ($steam) {
+            $steam = $steam.Replace('/','\').TrimEnd('\')
+            $libraries = $steam + '\steamapps\libraryfolders.vdf'
+            $paths = @($steam)
+            if (Test-Path -LiteralPath $libraries) {
+                $paths += (Select-String -LiteralPath $libraries -Pattern '"path"\s+"([^"]+)"' -AllMatches).Matches | ForEach-Object { $_.Groups[1].Value.Replace('\\','\') }
+            }
+            foreach ($library in $paths) { $candidates.Add($library.TrimEnd('\','/') + '\steamapps\common\Call of Duty Black Ops') }
+        }
+        foreach ($drive in @('C:','D:','E:','F:')) {
+            foreach ($name in @('Games\Call of Duty - Black Ops','Games\Call of Duty Black Ops','Program Files (x86)\Steam\steamapps\common\Call of Duty Black Ops','SteamLibrary\steamapps\common\Call of Duty Black Ops')) {
+                $candidates.Add($drive + '\' + $name)
+            }
+        }
+        $bo1 = $null
+        foreach ($candidate in $candidates) {
+            if (-not $candidate) { continue }
+            $folder = $candidate.TrimEnd('\','/')
+            if (Test-Path -LiteralPath ($folder + '\zone\Common\common_zombie.ff') -PathType Leaf) { $bo1 = $folder; break }
+        }
+        if (-not $bo1) {
+            $answer = Read-Host 'Paste your Black Ops folder (it contains zone\Common\common_zombie.ff), or press Enter to skip'
+            if ($answer) {
+                $answer = $answer.Trim().Trim('"').TrimEnd('\','/')
+                if (Test-Path -LiteralPath ($answer + '\zone\Common\common_zombie.ff') -PathType Leaf) { $bo1 = $answer }
+                else { Write-Host 'That folder does not contain zone\Common\common_zombie.ff.' }
+            }
+        }
+        $pointer = Join-Path $root 'bo1mw2\bo1_path.txt'
+        if ($bo1) {
+            [IO.File]::WriteAllText($pointer, $bo1)
+            Write-Host "Black Ops found: $bo1 (zombie animations are read from it while MW2 runs)"
+        } else {
+            if (Test-Path -LiteralPath $pointer) { Remove-Item -LiteralPath $pointer }
+            Write-Host 'Black Ops was not found. Zombies will use MW2 animations; run Install.cmd again to retry.'
         }
     }
     Copy-Item -LiteralPath $source -Destination $dest

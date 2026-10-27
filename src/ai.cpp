@@ -17,6 +17,12 @@
 #include "zombie_bindings.hpp"
 #include "script_call.hpp"
 #include "bo1_zombie_rules.hpp"
+#include "bo1_assets.hpp"
+#include <memory>
+#include <optional>
+#include <algorithm>
+#include <iterator>
+#include <unordered_map>
 
 namespace mod {
 namespace {
@@ -1325,6 +1331,10 @@ struct ZombieActor {
     AiPoint failsafeOrigin{},lastOrigin{};
     bool attacking=false,fired=false,sprintApplied=false;
     int health=0,reconfigureAt=0;bool damaged=false,reconfigured=false;
+    // Test39: BO1 rise out of the ground and animated attacks.
+    int risingUntil=0,showAt=-1;bool rose=false;
+    int attackFireMs=static_cast<int>(bo1::kAttackFireMilliseconds),attackEndMs=static_cast<int>(bo1::kAttackEndMilliseconds);
+    bool animatedAttack=false;
 };
 struct ZombieDrop { bo1::Powerup type=bo1::Powerup::None; AiPoint origin{}; int spawned=0; };
 struct ZombieGameState {
@@ -1346,6 +1356,9 @@ struct ZombieGameState {
     bool dogSpawners=false;
     AiPoint lastDogOrigin{};bool lastDogKnown=false;
     int readySince=-1;
+    // Test39: the Spec Ops map this game was launched on, for GAME OVER relaunch.
+    std::string launchedMap; ULONGLONG relaunchAt=0; ZombieSettings launchSettings;
+    unsigned rises=0,animatedAttacks=0,riseFailures=0;
 } zg;
 int ZombieRandom(int n) {
     zg.random^=zg.random<<13;zg.random^=zg.random>>17;zg.random^=zg.random<<5;
@@ -1362,6 +1375,254 @@ ScriptCallResult Builtin(const BuiltinBinding& b,unsigned entref,std::initialize
     return r;
 }
 void Announce(const char* text) {Builtin(kBuiltinIPrintLnBold,0,{ScriptArg::String(text)});}
+// ---- Test39: Spec Ops level preparation and the BO1 animation import ----
+// When a zombies launch loads its Spec Ops map, the level's scripts are
+// prepared while they are still being linked (Scr_EndLoadScripts):
+//  * the three Spec Ops end-of-mission functions are entered with OP_End, so
+//    objectives, timers, kill counts and leaving the area cannot end the level;
+//  * MW2 soldier animations that zombies play are replaced, in place, by BO1
+//    zombie animations read from the owner's own common_zombie.ff. The MW2
+//    XAnimParts headers are restored when the next level loads, before any
+//    actor of that level exists.
+enum class AnimRole : int {Move,Idle,Death,RiseWalk,RiseRun,RiseSprint,Attack1,Attack2,Count};
+struct AnimSlot { const char* mw2; const char* bo1; AnimRole role; };
+// MW2 animscripts: walk.gsc (walk_cqb_f), run.gsc (run_lowready_f, CQB run,
+// sprints), stop.gsc idles, death.gsc standing deaths. The five flashbang
+// reactions (flashed.gsc; zombies are never flashed) carry the BO1 rise and
+// attack anims so animscripted can reference them in the generic_human tree.
+inline constexpr AnimSlot kAnimSlots[]={
+    {"walk_cqb_f","ai_zombie_walk_v1",AnimRole::Move},{"walk_forward","ai_zombie_walk_v2",AnimRole::Move},
+    {"walk_lowready_f","ai_zombie_walk_v4",AnimRole::Move},
+    {"run_lowready_f","ai_zombie_run_v2",AnimRole::Move},{"run_cqb_f_search_v1","ai_zombie_walk_fast_v1",AnimRole::Move},
+    {"heat_run_loop","ai_zombie_run_v3",AnimRole::Move},
+    {"sprint_loop_distant","ai_zombie_sprint_v1",AnimRole::Move},{"sprint1_loop","ai_zombie_sprint_v2",AnimRole::Move},
+    {"casual_stand_idle","ai_zombie_idle_v1",AnimRole::Idle},{"casual_stand_v2_idle","ai_zombie_idle_v1",AnimRole::Idle},
+    {"exposed_idle_alert_v1","ai_zombie_idle_v1",AnimRole::Idle},{"exposed_idle_alert_v2","ai_zombie_idle_v1",AnimRole::Idle},
+    {"exposed_idle_alert_v3","ai_zombie_idle_v1",AnimRole::Idle},
+    {"exposed_death_twist","ai_zombie_death_v1",AnimRole::Death},{"stand_death_shoulder_spin","ai_zombie_death_v2",AnimRole::Death},
+    {"stand_death_tumbleforward","ai_zombie_death_v1",AnimRole::Death},{"stand_death_stumbleforward","ai_zombie_death_v2",AnimRole::Death},
+    {"exposed_death_falltoknees","ai_zombie_death_v1",AnimRole::Death},{"exposed_death_falltoknees_02","ai_zombie_death_v2",AnimRole::Death},
+    {"exposed_death_02","ai_zombie_death_v1",AnimRole::Death},{"exposed_death_headshot","ai_zombie_death_v2",AnimRole::Death},
+    {"exposed_death_flop","ai_zombie_death_v1",AnimRole::Death},{"exposed_death_neckgrab","ai_zombie_death_v2",AnimRole::Death},
+    {"exposed_death_groin","ai_zombie_death_v1",AnimRole::Death},{"exposed_death_blowback","ai_zombie_death_v2",AnimRole::Death},
+    {"stand_death_face","ai_zombie_death_v1",AnimRole::Death},{"stand_death_headshot_slowfall","ai_zombie_death_v2",AnimRole::Death},
+    {"stand_death_tumbleback","ai_zombie_death_v1",AnimRole::Death},{"stand_death_shoulderback","ai_zombie_death_v2",AnimRole::Death},
+    {"stand_death_leg","ai_zombie_death_v1",AnimRole::Death},
+    {"exposed_flashbang_v1","ai_zombie_traverse_ground_v1_walk",AnimRole::RiseWalk},
+    {"exposed_flashbang_v2","ai_zombie_traverse_ground_v1_run",AnimRole::RiseRun},
+    {"exposed_flashbang_v3","ai_zombie_traverse_ground_climbout_fast",AnimRole::RiseSprint},
+    {"exposed_flashbang_v4","ai_zombie_attack_v1",AnimRole::Attack1},
+    {"exposed_flashbang_v5","ai_zombie_attack_v2",AnimRole::Attack2}};
+inline constexpr int kAnimRoleCount=static_cast<int>(AnimRole::Count);
+using FindAssetEntryFn=std::uintptr_t(*)(int,const char*);
+using SlGetStringFn=unsigned(*)(const char*,unsigned,unsigned);
+using GetFunctionHandleFn=int(*)(const char*,const char*);
+using EntAnimTreeFn=std::uintptr_t(*)(std::uintptr_t);
+using AnimTreeIndexFn=int(*)(std::uintptr_t);
+using AnimTreeByIndexFn=std::uintptr_t(*)(int);
+using EndLoadFn=void(*)();
+struct AppliedAnim { std::uintptr_t parts=0; std::array<std::uint8_t,bo1xanim::kMw2XAnimBytes> original{},written{}; std::string mw2,bo1; };
+struct TreeAnims { bool valid=false; int tree=-1; std::array<int,kAnimRoleCount> index{}; };
+struct LevelPrep {
+    bool bindings=false,hookInstalled=false;
+    bool prepared=false; std::string map;
+    std::vector<std::unique_ptr<bo1xanim::Image>> images;
+    std::vector<AppliedAnim> applied;
+    std::array<std::uintptr_t,kAnimRoleCount> roleParts{};
+    std::array<const bo1xanim::Anim*,kAnimRoleCount> roleAnim{};
+    std::vector<std::pair<std::uintptr_t,std::uint8_t>> guards;
+    std::unordered_map<std::uintptr_t,TreeAnims> trees;
+    unsigned slotsWanted=0;
+} prep;
+bool WriteProtected(std::uintptr_t at,const void* bytes,std::size_t size) {
+    DWORD old=0;
+    if(!VirtualProtect(reinterpret_cast<void*>(at),size,PAGE_READWRITE,&old)) return false;
+    std::memcpy(reinterpret_cast<void*>(at),bytes,size);
+    DWORD ignored=0;VirtualProtect(reinterpret_cast<void*>(at),size,old,&ignored);
+    return true;
+}
+const bo1xanim::Anim* RoleAnim(AnimRole role) {return prep.roleAnim[static_cast<std::size_t>(role)];}
+// BO1 sound notetracks ("sndnt#alias") name BO1 aliases MW2 does not have.
+bo1xanim::Anim ForMw2(const bo1xanim::Anim& source) {
+    bo1xanim::Anim a=source;
+    a.notify.erase(std::remove_if(a.notify.begin(),a.notify.end(),[](const auto& n){return n.first.rfind("sndnt#",0)==0;}),a.notify.end());
+    return a;
+}
+void RestoreLevelPrep(const char* reason) {
+    // Restore only headers that are still ours, in the asset the database
+    // still returns (the common zone stays loaded between levels).
+    const auto find=reinterpret_cast<FindAssetEntryFn>(aiProfile.base+kDbFindXAssetEntryRva);
+    unsigned skipped=0;
+    for(auto it=prep.applied.rbegin();it!=prep.applied.rend();++it) {
+        const auto entry=find(kAssetTypeXAnimParts,it->mw2.c_str());
+        std::uintptr_t parts=0;std::array<std::uint8_t,bo1xanim::kMw2XAnimBytes> current{};
+        if(!entry || !Value(entry+kAssetEntryHeader,parts) || parts!=it->parts || !ReadAi(parts,current.data(),current.size()) || current!=it->written) {++skipped;continue;}
+        if(!WriteProtected(it->parts,it->original.data(),it->original.size())) Log("BO1_ANIM restore_failed mw2=%s",it->mw2.c_str());
+    }
+    if(skipped)Log("BO1_ANIM restore_skipped=%u (asset replaced or reloaded)",skipped);
+    if(!prep.applied.empty() || prep.prepared)
+        Log("LEVEL_PREP restored=1 reason=%s anims=%llu map=%s",reason,static_cast<unsigned long long>(prep.applied.size()),prep.map.c_str());
+    prep.applied.clear();prep.images.clear();prep.trees.clear();
+    prep.roleParts.fill(0);prep.roleAnim.fill(nullptr);prep.guards.clear();prep.prepared=false;prep.map.clear();
+}
+unsigned ApplySpecOpsGuards() {
+    const auto base=aiProfile.base;
+    std::uintptr_t program=0;std::uint32_t size=0;
+    if(!Value(base+kScrProgramBufferRva,program) || !Value(base+kScrProgramSizeRva,size) || !program || !size) {Log("SO_GUARD program_buffer=UNAVAILABLE");return 0;}
+    const auto handleOf=reinterpret_cast<GetFunctionHandleFn>(base+kScrGetFunctionHandleRva);
+    unsigned applied=0;
+    for(const auto& f:kSpecOpsEndFunctions) {
+        const int handle=handleOf(f.file,f.function);
+        if(handle<=0 || static_cast<std::uint32_t>(handle)>=size) {Log("SO_GUARD function=%s::%s present=0",f.file,f.function);continue;}
+        const auto code=program+static_cast<std::uint32_t>(handle);
+        std::uint8_t op=0;
+        if(!Value(code,op) || op==kVmOpEnd || op>0x8b) {Log("SO_GUARD function=%s::%s refused opcode=0x%02x",f.file,f.function,op);continue;}
+        if(!WriteProtected(code,&kVmOpEnd,1)) {Log("SO_GUARD function=%s::%s write_failed=1",f.file,f.function);continue;}
+        prep.guards.push_back({code,op});++applied;
+        Log("SO_GUARD function=%s::%s handle=0x%x first_opcode=0x%02x -> OP_End",f.file,f.function,handle,op);
+    }
+    return applied;
+}
+unsigned ApplyAnimSwaps() {
+    prep.slotsWanted=static_cast<unsigned>(std::size(kAnimSlots));
+    if(!bo1assets::WaitReady(15000)) {
+        const auto st=bo1assets::GetStatus();
+        Log("BO1_ANIM swap=0 assets=%s detail=%s",bo1assets::StateText(st.state),st.detail.c_str());return 0;
+    }
+    const auto base=aiProfile.base;
+    const auto find=reinterpret_cast<FindAssetEntryFn>(base+kDbFindXAssetEntryRva);
+    const auto slGet=reinterpret_cast<SlGetStringFn>(base+kSlGetStringRva);
+    std::unordered_map<std::string,std::uint16_t> interned;
+    auto intern=[&](const std::string& text) -> std::uint16_t {
+        const auto it=interned.find(text);if(it!=interned.end())return it->second;
+        const unsigned id=slGet(text.c_str(),0,kSlGetStringType);
+        const auto value=static_cast<std::uint16_t>(id>0 && id<=0xffffu?id:0u);
+        interned.emplace(text,value);return value;
+    };
+    std::unordered_map<std::string,bo1xanim::Image*> built;
+    unsigned applied=0;
+    for(const auto& slot:kAnimSlots) {
+        const auto* source=bo1assets::Find(slot.bo1);
+        const auto entry=find(kAssetTypeXAnimParts,slot.mw2);
+        std::uintptr_t parts=0;
+        if(!source || !entry || !Value(entry+kAssetEntryHeader,parts) || !parts) {
+            Log("BO1_ANIM slot=%s source=%s missing=%s",slot.mw2,slot.bo1,!source?"BO1":"MW2");continue;
+        }
+        std::array<std::uint8_t,bo1xanim::kMw2XAnimBytes> original{};
+        if(!ReadAi(parts,original.data(),original.size())) continue;
+        // Never re-apply onto a header we already replaced (shared MW2 aliases).
+        if(std::any_of(prep.applied.begin(),prep.applied.end(),[&](const auto& a){return a.parts==parts;})) continue;
+        const auto frames=bo1xanim::Get<std::uint16_t>(original.data()+bo1xanim::mw2::kNumFrames);
+        const auto rate=bo1xanim::Get<float>(original.data()+bo1xanim::mw2::kFramerate);
+        if(!frames || !(rate>0.f && rate<=1000.f)) {Log("BO1_ANIM slot=%s refused=MW2_HEADER",slot.mw2);continue;}
+        auto& image=built[slot.bo1];
+        if(!image) {
+            auto owned=std::make_unique<bo1xanim::Image>();
+            if(!bo1xanim::Build(ForMw2(*source),intern,0,*owned)) {Log("BO1_ANIM source=%s refused=BUILD",slot.bo1);continue;}
+            image=owned.get();prep.images.push_back(std::move(owned));
+        }
+        auto header=image->header;
+        std::memcpy(header.data(),original.data(),8);                 // keep MW2's asset name
+        if(!WriteProtected(parts,header.data(),header.size())) {Log("BO1_ANIM slot=%s write_failed=1",slot.mw2);continue;}
+        prep.applied.push_back({parts,original,header,slot.mw2,slot.bo1});++applied;
+        const auto r=static_cast<std::size_t>(slot.role);
+        if(!prep.roleParts[r]) {prep.roleParts[r]=parts;prep.roleAnim[r]=source;}
+    }
+    Log("BO1_ANIM swap=%u/%u images=%llu strings=%llu rise=%d/%d/%d attack=%d/%d",applied,prep.slotsWanted,
+        static_cast<unsigned long long>(prep.images.size()),static_cast<unsigned long long>(interned.size()),
+        prep.roleParts[3]!=0,prep.roleParts[4]!=0,prep.roleParts[5]!=0,prep.roleParts[6]!=0,prep.roleParts[7]!=0);
+    return applied;
+}
+void PrepareLevelScripts() {
+    char map[96]{};bool launch=false;
+    {
+        std::lock_guard<std::recursive_mutex> lock(aiMutex);
+        RestoreLevelPrep("NEXT_LOAD");
+        const bool named=ReadCurrentMapName(map,sizeof(map));
+        launch=named && zg.startWanted && !zg.pendingMap.empty() && zg.pendingMap==map;
+        Log("LEVEL_SCRIPTS_LOADED map=%s zombies_launch=%d",named?map:"?",launch);
+        if(!launch || !prep.bindings) return;
+    }
+    // The animation load started at boot; wait for it without holding the
+    // AI lock (the render thread keeps drawing the loading screen).
+    bo1assets::WaitReady(15000);
+    std::lock_guard<std::recursive_mutex> lock(aiMutex);
+    prep.map=map;
+    const auto guards=SpecOpsMapIndex(map)>=0?ApplySpecOpsGuards():0u;
+    const auto anims=ApplyAnimSwaps();
+    prep.prepared=true;
+    Log("LEVEL_PREP map=%s so_guards=%u/%llu anims=%u",map,guards,static_cast<unsigned long long>(kSpecOpsEndFunctions.size()),anims);
+}
+void LevelScriptsLoadedHook() {
+    try {PrepareLevelScripts();}
+    catch(...) {Log("LEVEL_PREP C++ failure; level continues unprepared");}
+    reinterpret_cast<EndLoadFn>(aiProfile.base+kScrEndLoadScriptsRva)();
+}
+bool InstallLevelScriptHook() {
+    if(prep.hookInstalled) return true;
+    if(!prep.bindings) return false;
+    const auto at=aiProfile.base+kLevelScriptsLoadedJumpRva;
+    auto* relay=Relay(at,reinterpret_cast<std::uintptr_t>(&LevelScriptsLoadedHook));
+    std::array<std::uint8_t,5> code{};
+    if(!relay || !RelativeCall(at,reinterpret_cast<std::uintptr_t>(relay),code)) {Log("LEVEL_PREP hook=RELAY_UNAVAILABLE");return false;}
+    code[0]=0xe9;
+    CodeEdit edit;edit.at=at&~std::uintptr_t(15);
+    if(at-edit.at+code.size()>16 || !ReadAi(edit.at,edit.before.data(),16)) return false;
+    edit.after=edit.before;std::memcpy(edit.after.data()+(at-edit.at),code.data(),code.size());
+    // Only reached while a level loads; a 16-byte exchange is atomic for it.
+    prep.hookInstalled=ExchangeCode(edit,true);
+    Log("LEVEL_PREP hook_installed=%d",prep.hookInstalled);
+    return prep.hookInstalled;
+}
+// %anim value (script animtree index << 16 | index in the tree) for one of the
+// replaced flashbang slots, in the tree this actor animates with.
+std::optional<std::uint32_t> AnimValue(const AiEntity& e,AnimRole role) {
+    const auto r=static_cast<std::size_t>(role);
+    if(!prep.prepared || !prep.roleParts[r]) return std::nullopt;
+    const auto base=aiProfile.base;
+    const auto tree=reinterpret_cast<EntAnimTreeFn>(base+kEntAnimTreeRva)(e.address);
+    std::uintptr_t anims=0;
+    if(!tree || !Value(tree,anims) || !anims) return std::nullopt;
+    auto& t=prep.trees[anims];
+    if(!t.valid && t.tree==-1) {
+        t.tree=-2;t.index.fill(-1);
+        std::uint32_t size=0;
+        if(!Value(anims,size) || !size || size>16384) {Log("BO1_ANIM tree=0x%llx size=%u refused=1",static_cast<unsigned long long>(anims),size);return std::nullopt;}
+        std::vector<std::uint8_t> entries(static_cast<std::size_t>(size)*kXAnimEntryStride);
+        if(!ReadAi(anims+kXAnimEntries,entries.data(),entries.size())) return std::nullopt;
+        for(std::uint32_t i=0;i<size;++i) {
+            const auto* entry=entries.data()+static_cast<std::size_t>(i)*kXAnimEntryStride;
+            if(bo1xanim::Get<std::uint16_t>(entry)!=0) continue;     // only leaf anims
+            const auto parts=bo1xanim::Get<std::uint64_t>(entry+kXAnimEntryParts);
+            for(int k=0;k<kAnimRoleCount;++k) if(prep.roleParts[static_cast<std::size_t>(k)]==parts && t.index[static_cast<std::size_t>(k)]<0) t.index[static_cast<std::size_t>(k)]=static_cast<int>(i);
+        }
+        const int index=reinterpret_cast<AnimTreeIndexFn>(base+kAnimTreeIndexRva)(anims);
+        if(index>=0 && index<0x10000 && reinterpret_cast<AnimTreeByIndexFn>(base+kAnimTreeByIndexRva)(index)==anims) {t.tree=index;t.valid=true;}
+        Log("BO1_ANIM tree=0x%llx script_tree=%d size=%u rise=%d/%d/%d attack=%d/%d",static_cast<unsigned long long>(anims),t.tree,size,
+            t.index[3],t.index[4],t.index[5],t.index[6],t.index[7]);
+    }
+    if(!t.valid || t.index[r]<0) return std::nullopt;
+    return (static_cast<std::uint32_t>(t.tree)<<16)|static_cast<std::uint32_t>(t.index[r]);
+}
+int AnimMilliseconds(AnimRole role,int fallback) {
+    const auto* a=RoleAnim(role);
+    return a && a->lengthSeconds()>0.f?static_cast<int>(a->lengthSeconds()*1000.f):fallback;
+}
+// do_zombie_rise: the anim starts 45 units under the spawn spot, facing the
+// player; hidden for the first moment like BO1's hide_pop.
+void StartRise(ZombieActor& z,const AiEntity& e,const AiPoint& player,int time) {
+    if(z.dog) return;
+    const auto role=z.speed==bo1::MoveSpeed::Walk?AnimRole::RiseWalk:z.speed==bo1::MoveSpeed::Run?AnimRole::RiseRun:AnimRole::RiseSprint;
+    const auto value=AnimValue(e,role);
+    if(!value) return;
+    const auto ref=ScriptEntityRef(e.number);
+    AiPoint origin=e.origin;origin[2]-=45.f;
+    const float yaw=std::atan2(player[1]-e.origin[1],player[0]-e.origin[0])*57.29578f;
+    Builtin(kBuiltinHide,ref,{});
+    const auto r=Builtin(kBuiltinAnimScripted,ref,{ScriptArg::String("zombie_rise"),ScriptArg::Vector(origin),ScriptArg::Vector({0.f,yaw,0.f}),ScriptArg::Anim(*value)});
+    if(r!=ScriptCallResult::Ok) {Builtin(kBuiltinShow,ref,{});++zg.riseFailures;return;}
+    z.risingUntil=time+AnimMilliseconds(role,3000)+150;z.showAt=time+350;z.rose=true;++zg.rises;
+}
 int ZombieMultiplier(int time) {return time<zg.doublePointsUntil?2:1;}
 void AwardPoints(int points,int time) {
     if(points<=0)return;
@@ -1591,9 +1852,10 @@ bool SpawnZombie(const bo1::SpawnRequest& request,const Snapshot& s,const AiScop
     z.health=request.health;z.reconfigureAt=time+300;
     z.nextRepath=time;z.failsafeAt=time+static_cast<int>(bo1::kFailsafeIntervalMilliseconds);z.failsafeOrigin=e.origin;
     zg.zombies.push_back(z);
-    Log("ZOMBIE_SPAWN entity=%u round=%d health=%d speed=%s dog=%d point=%u distance=%.0f template=%s alive=%d queued=%d",
+    StartRise(zg.zombies.back(),e,player,time);
+    Log("ZOMBIE_SPAWN entity=%u round=%d health=%d speed=%s dog=%d point=%u distance=%.0f template=%s rise=%d alive=%d queued=%d",
         e.number,request.round,request.health,bo1::MoveSpeedText(speed),request.dogs,point.number,
-        std::sqrt(PointDistanceSquared(point.origin,player)),source.classname.c_str(),zg.controller.status().alive+1,zg.controller.status().queued-1);
+        std::sqrt(PointDistanceSquared(point.origin,player)),source.classname.c_str(),zg.zombies.back().rose,zg.controller.status().alive+1,zg.controller.status().queued-1);
     return true;
 }
 float YawDegrees(const AiPoint& from,const AiPoint& to) {return std::atan2(to[1]-from[1],to[0]-from[0])*57.29578f;}
@@ -1604,7 +1866,7 @@ void ServiceMelee(ZombieActor& z,const AiEntity& e,const Snapshot& s,const AiPoi
     if(z.dog)return;   // MW2 dogs attack with their own native animscripts
     const float distance=PointDistanceSquared(e.origin,player);
     if(z.attacking) {
-        if(!z.fired && time-z.attackStart>=bo1::kAttackFireMilliseconds) {
+        if(!z.fired && time-z.attackStart>=z.attackFireMs) {
             z.fired=true;
             if(playerHealth>0 && distance<=bo1::kAttackHitRangeSquared) {
                 AiPoint dir{player[0]-e.origin[0],player[1]-e.origin[1],0.f};
@@ -1618,7 +1880,7 @@ void ServiceMelee(ZombieActor& z,const AiEntity& e,const Snapshot& s,const AiPoi
                 ++zg.meleeHits;
             } else {z.lastMiss=time;++zg.meleeMisses;}
         }
-        if(time-z.attackStart>=bo1::kAttackEndMilliseconds)z.attacking=false;
+        if(time-z.attackStart>=z.attackEndMs)z.attacking=false;
         return;
     }
     if(playerHealth<=0 || distance>bo1::kLongChargeRangeSquared)return;
@@ -1634,8 +1896,21 @@ void ServiceMelee(ZombieActor& z,const AiEntity& e,const Snapshot& s,const AiPoi
     inputs.pathClear=clear.valid && !clear.startSolid && clear.fraction>=1.f;
     if(bo1::CanMeleePlayer(inputs,bo1::MeleeCheck::Normal)==bo1::MeleeDecision::Allowed) {
         z.attacking=true;z.fired=false;z.attackStart=time;
+        z.attackFireMs=static_cast<int>(bo1::kAttackFireMilliseconds);z.attackEndMs=static_cast<int>(bo1::kAttackEndMilliseconds);z.animatedAttack=false;
+        // zombie_melee: AnimScripted the BO1 attack facing the target; the hit
+        // lands at the anim's "fire" notetrack. Without the imported anims,
         // OrientMode("face angle", yaw) as the BO1 attack loop does.
-        Builtin(kBuiltinOrientMode,ScriptEntityRef(e.number),{ScriptArg::String("face angle"),ScriptArg::Float(YawDegrees(e.origin,player))});
+        const auto role=ZombieRandom(2)?AnimRole::Attack1:AnimRole::Attack2;
+        const auto value=AnimValue(e,role);
+        const float yaw=YawDegrees(e.origin,player);
+        if(value && Builtin(kBuiltinAnimScripted,ScriptEntityRef(e.number),{ScriptArg::String("zombie_attack"),ScriptArg::Vector(e.origin),
+            ScriptArg::Vector({0.f,yaw,0.f}),ScriptArg::Anim(*value)})==ScriptCallResult::Ok) {
+            const auto* a=RoleAnim(role);
+            const float fire=a?a->notetrack("fire"):-1.f;
+            z.attackEndMs=AnimMilliseconds(role,z.attackEndMs);
+            if(fire>0.f && fire<1.f)z.attackFireMs=static_cast<int>(fire*static_cast<float>(z.attackEndMs));
+            z.animatedAttack=true;++zg.animatedAttacks;
+        } else Builtin(kBuiltinOrientMode,ScriptEntityRef(e.number),{ScriptArg::String("face angle"),ScriptArg::Float(yaw)});
     }
 }
 void GrabPowerup(const ZombieDrop& drop,int time) {
@@ -1693,6 +1968,12 @@ void ServiceZombieActors(const Snapshot& s,const AiScope& scope,const AiPoint& p
             ++n;continue;
         }
         z.lastOrigin=e.origin;
+        // do_zombie_rise: no pursuit, attack or failsafe while climbing out.
+        if(z.showAt>=0 && time>=z.showAt) {z.showAt=-1;Builtin(kBuiltinShow,ScriptEntityRef(e.number),{});}
+        if(time<z.risingUntil) {
+            z.failsafeAt=time+static_cast<int>(bo1::kFailsafeIntervalMilliseconds);z.failsafeOrigin=e.origin;
+            ++n;continue;
+        }
         // Campaign spawn functions run in the VM after the native spawn and may
         // set health/goal fields; apply the BO1 setup once more before any hit.
         if(!z.reconfigured && time>=z.reconfigureAt) {
@@ -1749,6 +2030,12 @@ void ResetZombieGame(const char* reason,bool deleteActors) {
     for(auto& x:ai.owned)x.zombie=false;
     if(zg.restorePause) {ai.pauseWanted=zg.pauseBefore;zg.restorePause=false;}
     ZombieEvent(wasRunning?"GAME OVER":"",zg.lastTime);
+    // Spec Ops end screens are disabled on a prepared level, so GAME OVER
+    // loads the same map again for a new game (F4 -> Start cancels it).
+    if(!std::strcmp(reason,"PLAYER_DIED") && zg.settings.autoRestart && !zg.launchedMap.empty()) {
+        zg.relaunchAt=GetTickCount64()+9000;zg.launchSettings=zg.settings;
+        Log("ZOMBIE_RELAUNCH scheduled map=%s in_ms=9000",zg.launchedMap.c_str());
+    }
 }
 void BeginZombies(const Snapshot& s,const AiScope& scope,int time) {
     zg.settings=zg.requested;zg.startWanted=false;
@@ -1758,6 +2045,8 @@ void BeginZombies(const Snapshot& s,const AiScope& scope,int time) {
     zg.powerups.start(zg.ledger.total,ZombieRng());zg.dogs.start(ZombieRng());
     zg.firstRound=zg.settings.startingRound;zg.previousSpawner=-1;zg.dogFailures=0;zg.announcedRound=0;zg.gameOverRound=0;
     zg.client=scope.client;std::snprintf(zg.map,sizeof(zg.map),"%s",s.map);
+    zg.launchedMap=!zg.pendingMap.empty() && zg.pendingMap==s.map?zg.pendingMap:std::string();zg.relaunchAt=0;
+    zg.rises=zg.animatedAttacks=zg.riseFailures=0;
     zg.controller.setPlanner([](int round,bool) -> std::optional<bo1::RoundPlan> {
         // dog_round_tracker listens from the first "between_round_over".
         if(!zg.settings.hellhounds || round==zg.firstRound)return std::nullopt;
@@ -1771,8 +2060,9 @@ void BeginZombies(const Snapshot& s,const AiScope& scope,int time) {
     if(!zg.restorePause) {zg.pauseBefore=ai.pauseWanted;zg.restorePause=true;}
     ai.pauseWanted=true;   // native ai_disableSpawn: campaign spawners stay closed
     ZombieEvent("ZOMBIES",time);
-    Log("ZOMBIE_START map=%s round=%d hellhounds=%d remove_allies=%d dog_spawners=%llu enemy_points=%llu templates=%llu",
-        s.map,zg.settings.startingRound,zg.settings.hellhounds,zg.settings.removeAllies,
+    Log("ZOMBIE_START map=%s round=%d hellhounds=%d remove_allies=%d prepared=%d anims=%llu so_guards=%llu dog_spawners=%llu enemy_points=%llu templates=%llu",
+        s.map,zg.settings.startingRound,zg.settings.hellhounds,zg.settings.removeAllies,prep.prepared && prep.map==s.map,
+        static_cast<unsigned long long>(prep.applied.size()),static_cast<unsigned long long>(prep.guards.size()),
         static_cast<unsigned long long>(ai.dogPoints.size()),static_cast<unsigned long long>(ai.enemyPoints.size()),
         static_cast<unsigned long long>(ai.enemies.size()));
 }
@@ -2168,6 +2458,37 @@ void InitializeAiEngine(std::uintptr_t base,std::size_t size,std::uintptr_t text
         Log("ZOMBIE_BINDINGS ready=%d builtins=%u/%llu cbuf=%d goal_entity=%d",zombieBindingsReady,builtins,
             static_cast<unsigned long long>(kZombieBuiltins.size()),cbufReady,aiProfile.goalEntityReady);
     }
+    // Test39: level-load hook, Spec Ops end paths, asset database, script
+    // strings, Scr_AddAnim and the anim-tree accessors used by animscripted.
+    {
+        auto bytesAt=[&](std::uintptr_t rva,const auto& expected) {
+            std::array<std::uint8_t,64> seen{};
+            return expected.size()<=seen.size() && ReadAi(base+rva,seen.data(),expected.size()) && std::equal(expected.begin(),expected.end(),seen.begin());
+        };
+        static constexpr std::array<std::uint8_t,51> dispatch={0x48,0x8b,0x0d,0xad,0xc1,0x6d,0x01,0x44,0x0f,0xb6,0x01,0x48,0x8d,0x51,0x01,0x44,0x89,0x05,0xbe,0xc1,0x6d,0x01,
+            0x48,0x89,0x15,0x97,0xc1,0x6d,0x01,0x41,0x81,0xf8,0x8b,0x00,0x00,0x00,0x77,0xda,0x43,0x8b,0x8c,0x87,0x50,0x76,0x22,0x00,0x49,0x03,0xcf,0xff,0xe1};
+        static constexpr std::array<std::uint8_t,15> leaf={0x8b,0xc2,0x48,0x03,0xc0,0x66,0x83,0x7c,0xc1,0x08,0x00,0x0f,0x94,0xc0,0xc3};
+        static constexpr std::array<std::uint8_t,32> length={0x48,0x8b,0xc1,0x8b,0xca,0x48,0xff,0xc1,0x48,0x03,0xc9,0x48,0x8b,0x0c,0xc8,0x0f,0xb7,0x41,0x12,
+            0x66,0x0f,0x6e,0xc0,0x0f,0x5b,0xc0,0xf3,0x0f,0x5e,0x41,0x2c,0xc3};
+        std::uint32_t opEnd=0;
+        bool ok=zombieBindingsReady
+            && bytesAt(kScrEndLoadScriptsRva,kScrEndLoadScriptsPrologue) && Jump(base+kLevelScriptsLoadedJumpRva,0)==base+kScrEndLoadScriptsRva
+            && bytesAt(kScrGetFunctionHandleRva,kScrGetFunctionHandlePrologue)
+            && Rip(base+0x21698d,0,2,6)==base+kScrProgramBufferRva && Rip(base+0x216993,0,2,6)==base+kScrProgramSizeRva
+            && bytesAt(kVmDispatchRva,dispatch) && Value(base+kVmOpcodeTableRva,opEnd) && base+opEnd==base+kVmOpEndHandlerRva
+            && bytesAt(kDbFindXAssetEntryRva,kDbFindXAssetEntryPrologue) && bytesAt(kSlGetStringRva,kSlGetStringPrologue)
+            && bytesAt(kScrAddAnimRva,kScrAddAnimPrologue) && Call(base+kScrAddAnimRva,9)==base+kScrIncInParamRva
+            && bytesAt(kEntAnimTreeRva,kEntAnimTreePrologue) && bytesAt(0x29d110,leaf) && bytesAt(0x29c920,length);
+        std::uint64_t xanimName=0;
+        ok=ok && Value(base+kAssetNamesRva+8*kAssetTypeXAnimParts,xanimName) && xanimName>base && xanimName<base+aiProfile.size;
+        char xanim[8]{};ok=ok && ReadAi(static_cast<std::uintptr_t>(xanimName),xanim,6) && !std::strcmp(xanim,"xanim");
+        unsigned anims=0;
+        for(const auto& b:kAnimBuiltins)if(ok && MethodEntry(b.name,base+b.rva))++anims;
+        prep.bindings=ok && anims==kAnimBuiltins.size();
+        if(prep.bindings)scriptNatives.addAnim=reinterpret_cast<decltype(scriptNatives.addAnim)>(base+kScrAddAnimRva);
+        Log("LEVEL_PREP bindings=%d anim_builtins=%u/%llu",prep.bindings,anims,static_cast<unsigned long long>(kAnimBuiltins.size()));
+        if(prep.bindings)bo1assets::StartLoad();
+    }
     InstallExpandedCapacity(base,aiProfile.resolved);
     Log("AI_PROFILE resolved=%d callback_slot_rva=0x%llx spawn_rva=0x%llx delete_rva=0x%llx pool_slot_rva=0x%llx clock_rva=0x%llx",
         aiProfile.resolved,static_cast<unsigned long long>(aiProfile.thinkSlot-base),static_cast<unsigned long long>(spawn-base),
@@ -2275,12 +2596,15 @@ void RequestZombieStart(const ZombieSettings& settings,const char* map) {
     zg.requested=settings;zg.requested.startingRound=std::clamp(settings.startingRound,bo1::kPreviewMinRound,bo1::kPreviewMaxRound);
     zg.pendingMap=map && SafeMapName(map)?map:"";zg.startWanted=true;zg.stopWanted=false;zg.gameOverRound=0;
     if(!InstallService()) {zg.startWanted=false;Log("ZOMBIE_START refused=HOOK_UNAVAILABLE");return;}
+    if(!zg.pendingMap.empty())InstallLevelScriptHook();
+    zg.relaunchAt=0;
     nativePending.store(true,std::memory_order_release);
     Log("ZOMBIE_REQUEST start round=%d hellhounds=%d remove_allies=%d map=%s",zg.requested.startingRound,
         zg.requested.hellhounds,zg.requested.removeAllies,zg.pendingMap.empty()?"CURRENT":zg.pendingMap.c_str());
 }
 void RequestZombieStop() {
     std::lock_guard<std::recursive_mutex> lock(aiMutex);
+    if(zg.relaunchAt) {zg.relaunchAt=0;zg.launchedMap.clear();Log("ZOMBIE_RELAUNCH cancelled");}
     if(zg.running) {zg.stopWanted=true;nativePending.store(true,std::memory_order_release);}
     else if(zg.startWanted) {zg.startWanted=false;Log("ZOMBIE_REQUEST cancelled");}
 }
@@ -2289,16 +2613,30 @@ void SetZombieHellhounds(bool enabled) {
     zg.requested.hellhounds=enabled;if(zg.running)zg.settings.hellhounds=enabled;
     Log("ZOMBIE_HELLHOUNDS enabled=%d dog_spawners=%llu",enabled,static_cast<unsigned long long>(ai.dogPoints.size()));
 }
-// Queue "spmap <name>" exactly like the mission flow, then start zombies when
-// that level's player is ready. The command buffer is lock protected.
+// Load a Spec Ops map the way the Spec Ops menu does (ui.ff: specialops 1,
+// ui_load_so_level, coop_mapName, solo_play 1, then "devmap so_<mission>"),
+// plus so_nofail. Zombies start when that level's player is ready. The
+// command buffer is lock protected.
 bool LaunchZombieMap(const char* map,const ZombieSettings& settings) {
-    if(!SafeMapName(map) || CampaignMapIndex(map)<0)return false;
+    if(!SafeMapName(map) || SpecOpsMapIndex(map)<0)return false;
     {std::lock_guard<std::recursive_mutex> lock(aiMutex);if(!cbufReady || !zombieBindingsReady || zg.running)return false;}
     RequestZombieStart(settings,map);
-    char command[64];std::snprintf(command,sizeof(command),"spmap %s\n",map);
+    {std::lock_guard<std::recursive_mutex> lock(aiMutex);if(!zg.startWanted)return false;}
+    char command[384];
+    std::snprintf(command,sizeof(command),"set specialops 1; set solo_play 1; set so_nofail 1; set start \"\"; set ui_load_so_level %s; set coop_mapName %s; devmap %s\n",map,map,map);
     reinterpret_cast<CbufFn>(aiProfile.base+kCbufAddTextRva)(0,command);
-    Log("ZOMBIE_LAUNCH map=%s command=spmap",map);
+    Log("ZOMBIE_LAUNCH map=%s command=devmap specialops=1 so_nofail=1 level_hook=%d bo1_assets=%s",map,prep.hookInstalled,
+        bo1assets::StateText(bo1assets::GetStatus().state));
     return true;
+}
+void TickZombieRelaunch() {
+    std::string map;ZombieSettings settings;
+    {
+        std::unique_lock<std::recursive_mutex> lock(aiMutex,std::try_to_lock);
+        if(!lock.owns_lock() || !zg.relaunchAt || GetTickCount64()<zg.relaunchAt || zg.running || zg.startWanted)return;
+        map=zg.launchedMap;settings=zg.launchSettings;zg.relaunchAt=0;
+    }
+    if(!map.empty())Log("ZOMBIE_RELAUNCH map=%s accepted=%d",map.c_str(),LaunchZombieMap(map.c_str(),settings));
 }
 ZombieGameStatus GetZombieGameStatus() {
     thread_local ZombieGameStatus cached;
@@ -2319,11 +2657,22 @@ ZombieGameStatus GetZombieGameStatus() {
     std::snprintf(s.weapon,sizeof(s.weapon),"%s",zg.pistol.c_str());
     std::snprintf(s.event,sizeof(s.event),"%s",zg.event.c_str());s.eventAgeMs=now-zg.eventTime;
     s.gameOverRound=zg.gameOverRound;s.lastPointsDelta=zg.lastDelta;s.pointsDeltaAgeMs=now-zg.deltaTime;
+    const auto assets=bo1assets::GetStatus();
+    std::snprintf(s.bo1Assets,sizeof(s.bo1Assets),"%s",bo1assets::StateText(assets.state));
+    s.bo1AnimsFound=static_cast<int>(assets.found);s.bo1AnimsWanted=static_cast<int>(assets.wanted);
+    s.animSlotsApplied=static_cast<int>(prep.applied.size());s.animSlotsWanted=static_cast<int>(std::size(kAnimSlots));
+    s.specOpsGuards=static_cast<int>(prep.guards.size());s.levelPrepared=prep.prepared;
+    if(zg.relaunchAt) {const auto now64=GetTickCount64();s.restartInMs=now64>=zg.relaunchAt?0:static_cast<int>(zg.relaunchAt-now64);}
     cached=s;return s;
 }
 void LogZombieGame() {
     std::lock_guard<std::recursive_mutex> lock(aiMutex);
     const auto& c=zg.controller.status();
+    const auto assets=bo1assets::GetStatus();
+    Log("ZOMBIE_PREP prepared=%d map=%s anims=%llu/%llu so_guards=%llu bo1_assets=%s found=%u/%u zone=%s rises=%u rise_failures=%u animated_attacks=%u relaunch_pending=%d",
+        prep.prepared,prep.map.c_str(),static_cast<unsigned long long>(prep.applied.size()),static_cast<unsigned long long>(std::size(kAnimSlots)),
+        static_cast<unsigned long long>(prep.guards.size()),bo1assets::StateText(assets.state),assets.found,assets.wanted,
+        assets.zone.empty()?"NONE":assets.zone.c_str(),zg.rises,zg.riseFailures,zg.animatedAttacks,zg.relaunchAt!=0);
     Log("ZOMBIE_STATE available=%d running=%d pending=%d map=%s round=%d phase=%s alive=%d queued=%d killed=%d dogs=%d points=%d total=%d kills=%u headshots=%u hits=%u melee_hits=%u melee_misses=%u drops=%llu double_points_ms=%d insta_kill_ms=%d campaign_removed=%u weapon=%s dog_spawners=%llu next_dog_round=%d",
         zombieBindingsReady,zg.running,zg.startWanted,zg.running?zg.map:zg.pendingMap.c_str(),c.round,bo1::PhaseText(c.phase),c.alive,c.queued,c.killed,c.dogs,
         zg.ledger.score,zg.ledger.total,zg.kills,zg.headshots,zg.hits,zg.meleeHits,zg.meleeMisses,static_cast<unsigned long long>(zg.drops.size()),

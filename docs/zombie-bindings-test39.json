@@ -1,0 +1,72 @@
+{
+  "executable_sha256": "fb7e8a987c371dea7b666091b0b9e2011c0cd9cd277b191ad453d11d557dd777",
+  "actor_fields": [
+    "allowpain",
+    "desiredangle",
+    "dropweapon",
+    "fixednode",
+    "goalheight",
+    "goalradius",
+    "grenadeammo",
+    "grenadeawareness",
+    "ignoresuppression",
+    "keepclaimednode",
+    "maxsightdistsqrd",
+    "meleeattackdist",
+    "nododgemove",
+    "pacifist",
+    "pathenemyfightdist",
+    "pathenemylookahead",
+    "requestarrivalnotify",
+    "walkdist"
+  ],
+  "builtins": {
+    "giveweapon": "0x15fba0",
+    "takeallweapons": "0x15fd70",
+    "switchtoweapon": "0x1603c0",
+    "givemaxammo": "0x1606c0",
+    "setweaponammoclip": "0x161b30",
+    "setweaponammostock": "0x161cb0",
+    "iprintlnbold": "0x190ad0",
+    "orientmode": "0x14e560",
+    "getweaponammoclip": "0x161e10",
+    "min": "0x189d50",
+    "distance": "0x18a250",
+    "animscripted": "0x181c60",
+    "stopanimscripted": "0x181c40",
+    "hide": "0x192860",
+    "show": "0x192830"
+  },
+  "level_prep": {
+    "load_hook": "0x1953f8",
+    "get_function_handle": "0x216920",
+    "op_end": "0x2249f7",
+    "find_asset_entry": "0xef500",
+    "sl_get_string": "0x21b2d0",
+    "scr_add_anim": "0x222070",
+    "anim_builtins": {
+      "animscripted": "0x181c60",
+      "stopanimscripted": "0x181c40",
+      "hide": "0x192860",
+      "show": "0x192830"
+    },
+    "specops_end_functions": [
+      [
+        "maps/_specialops",
+        "fade_challenge_out"
+      ],
+      [
+        "maps/_specialops_code",
+        "specialops_mission_over_setup"
+      ],
+      [
+        "maps/_specialops_code",
+        "failure_summary_display"
+      ]
+    ]
+  },
+  "goal_entity": "setgoalentity replica: 0x1244b0 clear, 0x15b190 handle, node/volume zero",
+  "command_buffer": "Cbuf_AddText(0,\"spmap <map>\\n\") (critical section 0x24)",
+  "damage_args": "G_Damage(targ,inflictor,attacker,dir,point,damage,dflags,mod,weapon,hitloc,...)",
+  "scope": "Static exact-build checks; gameplay requires owner testing"
+}

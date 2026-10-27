@@ -1,0 +1,12 @@
+{
+  "probe": "exact-native level preparation",
+  "converted_header_found_by_db": true,
+  "db_lookup_case_insensitive": true,
+  "xanim_get_length_reads_converted_header": true,
+  "xanim_entry_layout": true,
+  "script_animtree_index": true,
+  "scr_add_anim_scr_get_anim_round_trip": true,
+  "anim_value": "0x50011",
+  "scope": "DB_FindXAssetEntry, XAnimGetLength, XAnimIsLeafNode, animtree index helpers, Scr_AddAnim/Scr_GetAnim with the tree check. SL_GetString, Scr_GetFunctionHandle, animscripted and XAnim sampling need the live game and are exercised only in game.",
+  "executable_sha256": "fb7e8a987c371dea7b666091b0b9e2011c0cd9cd277b191ad453d11d557dd777"
+}
