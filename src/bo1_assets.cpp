@@ -22,14 +22,14 @@ Status status;
 std::vector<bo1xanim::Anim> anims;
 bool started=false;
 
-std::wstring GameDirectory() {
+std::wstring GameDirectoryImpl() {
     wchar_t exe[32768]{};
     const auto count=GetModuleFileNameW(nullptr,exe,32768);
     std::wstring path(exe,count);
     const auto slash=path.find_last_of(L"\\/");
     return slash==std::wstring::npos?std::wstring():path.substr(0,slash+1);
 }
-std::string Utf8(const std::wstring& text) {
+std::string Utf8Impl(const std::wstring& text) {
     if(text.empty()) return {};
     const int size=WideCharToMultiByte(CP_UTF8,0,text.c_str(),static_cast<int>(text.size()),nullptr,0,nullptr,nullptr);
     std::string out(static_cast<std::size_t>(size>0?size:0),'\0');
@@ -61,7 +61,7 @@ std::wstring ReadRegistryPath(HKEY root,const wchar_t* key,const wchar_t* value)
 // bo1mw2\bo1_path.txt (written by the installer), then the usual install
 // locations next to MW2, in Steam (app 42700) and common retail folders.
 std::wstring FindZone() {
-    const auto game=GameDirectory();
+    const auto game=GameDirectoryImpl();
     std::vector<std::wstring> folders;
     if(FILE* f=_wfopen((game+L"bo1mw2\\bo1_path.txt").c_str(),L"rb")) {
         char line[4096]{};const auto read=std::fread(line,1,sizeof(line)-1,f);std::fclose(f);
@@ -98,7 +98,7 @@ std::wstring FindZone() {
     }
     return {};
 }
-bool ReadFile(const std::wstring& path,std::vector<std::uint8_t>& out,std::string& error) {
+bool ReadWholeFile(const std::wstring& path,std::vector<std::uint8_t>& out,std::string& error) {
     HANDLE file=CreateFileW(path.c_str(),GENERIC_READ,FILE_SHARE_READ,nullptr,OPEN_EXISTING,FILE_FLAG_SEQUENTIAL_SCAN,nullptr);
     if(file==INVALID_HANDLE_VALUE) {error="open failed";return false;}
     LARGE_INTEGER size{};
@@ -132,9 +132,9 @@ void Load() {
     if(zone.empty()) {
         result.state=State::Missing;result.detail="common_zombie.ff not found (set bo1mw2\\bo1_path.txt to your Black Ops folder)";
     } else {
-        result.zone=Utf8(zone);
+        result.zone=Utf8Impl(zone);
         std::vector<std::uint8_t> file,raw;std::string error;
-        if(ReadFile(zone,file,error) && Inflate(file,raw,error)) {
+        if(ReadWholeFile(zone,file,error) && Inflate(file,raw,error)) {
             file.clear();file.shrink_to_fit();
             if(const auto strings=bo1xanim::ParseZoneStrings(raw.data(),raw.size())) {
                 const std::unordered_set<std::string> wanted(WantedAnims().begin(),WantedAnims().end());
@@ -157,6 +157,19 @@ void Load() {
         result.rejected,result.seconds,result.zone.empty()?"NONE":result.zone.c_str(),result.detail.c_str());
 }
 } // namespace
+
+std::wstring GameDirectory() {return GameDirectoryImpl();}
+std::string Utf8(const std::wstring& text) {return Utf8Impl(text);}
+std::wstring BlackOpsFolder() {
+    static const std::wstring suffix=L"\\zone\\Common\\common_zombie.ff";
+    const auto zone=FindZone();
+    if(zone.size()<=suffix.size() || _wcsicmp(zone.c_str()+zone.size()-suffix.size(),suffix.c_str())) return {};
+    return zone.substr(0,zone.size()-suffix.size());
+}
+bool ReadFastFile(const std::wstring& path,std::vector<std::uint8_t>& raw,std::string& error) {
+    std::vector<std::uint8_t> file;
+    return ReadWholeFile(path,file,error) && Inflate(file,raw,error);
+}
 
 const char* StateText(State state) {
     switch(state) {

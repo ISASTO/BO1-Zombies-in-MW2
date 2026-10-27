@@ -63,6 +63,10 @@ struct ZombieGameStatus {
     int bo1AnimsFound=0,bo1AnimsWanted=0,animSlotsApplied=0,animSlotsWanted=0;
     int specOpsGuards=0;         // Spec Ops end paths disabled (3 on a prepared level)
     bool levelPrepared=false;    // this level was loaded by a zombies launch
+    // Test40: BO1 character models generated from the Black Ops install.
+    char bo1Models[16]{};        // READY, BUILDING, MISSING, FAILED
+    int modelsPrecached=0;       // BO1 bodies + heads usable on this level
+    unsigned zombiesDressed=0;
     int restartInMs=-1;          // GAME OVER relaunch countdown, -1 when none
 };
 } // namespace mod

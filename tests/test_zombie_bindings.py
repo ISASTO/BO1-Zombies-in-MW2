@@ -21,11 +21,12 @@ class ZombieBindingTableTests(unittest.TestCase):
 
     def test_builtin_list_matches_declarations(self):
         declared=self.builtins()
-        names=self.listed('kZombieBuiltins')+self.listed('kAnimBuiltins')
+        names=self.listed('kZombieBuiltins')+self.listed('kAnimBuiltins')+self.listed('kModelBuiltins')
         self.assertEqual(len(names),len(declared))
         self.assertEqual(len(set(names)),len(names))
         self.assertEqual(len(set(declared.values())),len(declared),'two builtins share one routine')
-        for required in ('giveweapon','takeallweapons','switchtoweapon','givemaxammo','iprintlnbold','orientmode','animscripted','hide','show'):
+        for required in ('giveweapon','takeallweapons','switchtoweapon','givemaxammo','iprintlnbold','orientmode','animscripted','hide','show',
+                         'setmodel','attach','detachall'):
             self.assertIn(required,declared)
 
     def test_probe_gate_covers_the_value_pushes(self):
@@ -108,3 +109,43 @@ class SetupFunctionTests(unittest.TestCase):
 
 
 if __name__=='__main__':unittest.main()
+
+
+class ModelImportTests(unittest.TestCase):
+    """Test40: names shared by the zone writer, the DLL and the bindings."""
+    def setUp(self):
+        self.models=(ROOT/'include'/'bo1_models.hpp').read_text()
+        self.model=(ROOT/'include'/'bo1_model.hpp').read_text()
+        self.source=(ROOT/'src'/'bo1_models.cpp').read_text()
+        self.bindings=(ROOT/'include'/'zombie_bindings.hpp').read_text()
+
+    def names(self,text,table):
+        return re.findall(r'"([^"]+)"',re.search(table+r'=\{([^}]+)\}',text)[1])
+
+    def test_aliases_name_models_the_zone_contains(self):
+        bodies=self.names(self.model,'kBodyModels');heads=self.names(self.model,'kHeadModels')
+        self.assertEqual(sorted(set(self.names(self.models,'kBodyAlias'))),sorted(bodies))
+        self.assertEqual(self.names(self.models,'kHeadAlias'),heads)
+        # BO1 c_ger_honorguard_zomb_bodyalias: body1 once, body2 three times.
+        self.assertEqual(self.names(self.models,'kBodyAlias').count(bodies[1]),3)
+
+    def test_zone_name_reaches_the_cached_file(self):
+        zone=re.search(r'kZoneName="([^"]+)"',self.models)[1].replace('\\\\','\\')
+        self.assertTrue(zone.startswith('..\\..\\bo1mw2\\'),zone)
+        self.assertLess(len(zone),64,'zone names are copied into 64-byte slots')
+        written=re.search(r'cacheDir\+L"\\\\([a-z0-9_]+)\.ff"',self.source)[1]
+        self.assertTrue(zone.endswith('cache\\'+written),(zone,written))
+
+    def test_level_zone_flags_and_helmet_note(self):
+        self.assertIn('kLevelZoneAllocFlags=4',self.bindings)
+        self.assertIn('"swap taghelmet to tagleft"',self.bindings)
+        self.assertIn('kHelmetSwapFunction{"animscripts/shared","handlenotetrack"}',self.bindings)
+
+    def test_helmet_note_exists_in_local_mw2_scripts(self):
+        import os
+        scripts=os.environ.get('MW2_SCRIPTS')
+        if not scripts: self.skipTest('MW2_SCRIPTS not set (local extracted animscripts)')
+        shared=(Path(scripts)/'animscripts'/'shared.gsc').read_text(errors='replace')
+        self.assertRegex(shared,r'(?i)\nHandleNoteTrack\(\s*note')
+        case=shared[shared.index('case "swap taghelmet to tagleft":'):]
+        self.assertIn('self.hatModel = undefined;',case[:400])

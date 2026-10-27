@@ -196,6 +196,52 @@ def verify(path,include=Path('include')):
         'op_end':hex(end),'find_asset_entry':hex(value('kDbFindXAssetEntryRva')),'sl_get_string':hex(value('kSlGetStringRva')),
         'scr_add_anim':hex(value('kScrAddAnimRva')),'anim_builtins':anim_builtins,
         'specops_end_functions':re.findall(r'\{"(maps/[a-z_]+)","([a-z_]+)"\}',text)}
+    # ---- Test40: BO1 character models ----
+    # SV_SpawnServer -> Com_LoadLevelFastFiles(map); its last call loads the
+    # level zone as XZoneInfo{name=rsi, allocFlags=4, freeFlags=0}, 1 zone, async.
+    if call_target(0x23284a)!=value('kLoadLevelFastFilesRva'):raise ValueError('Com_LoadLevelFastFiles caller differs')
+    zone_call=value('kLevelZoneLoadCallRva')
+    if call_target(zone_call)!=value('kDbLoadXAssetsRva'):raise ValueError('Level zone DB_LoadXAssets call differs')
+    if not value('kLoadLevelFastFilesRva')<zone_call<value('kDbLoadXAssetsRva'):raise ValueError('Level zone call is outside Com_LoadLevelFastFiles')
+    if get(zone_call-0x1a,0x1a)!=bytes.fromhex('45 33 c0 48 89 74 24 20 48 8d 4c 24 20 48 c7 44 24 28 04 00 00 00 41 8d 50 01'):
+        raise ValueError('Level zone XZoneInfo layout differs')
+    if value('kLevelZoneAllocFlags')!=4:raise ValueError('Level zone allocation flags differ')
+    if get(value('kDbLoadXAssetsRva'),15)!=bytes_of('kDbLoadXAssetsPrologue'):raise ValueError('DB_LoadXAssets prologue differs')
+    # DB_LoadXAssets queues each zone: name copied (64 chars), allocFlags kept, 16-byte XZoneInfo stride.
+    if get(0xf0f6c,6)!=bytes.fromhex('41 b8 40 00 00 00') or get(0xf0f7f,2)!=bytes.fromhex('8b 07') or get(0xf0f91,4)!=bytes.fromhex('48 83 c7 10'):
+        raise ValueError('DB_LoadXAssets queue layout differs')
+    # The database thread opens <exe dir>\zone\<language>\<name>.ff (names starting mp_ use zone\dlc).
+    for rva,text_ in ((0x332468,'%s.ff'),(0x35a1c8,'zone\\%s\\'),(0x357060,'%s\\%s%s')):
+        if cstring(rva)!=text_:raise ValueError(f'Zone path literal at {rva:#x} differs')
+    if call_target(0xf1810)!=0x290a80 or call_target(0xf181d)!=0x2740c0 or call_target(0x2740d3)!=0x274420:
+        raise ValueError('Zone file path construction differs')
+    # Unsigned fastfiles (IWffu100) at version 0x114 with a zlib stream.
+    if get(0xdb82a,10)!=bytes.fromhex('48 bd 49 57 66 66 75 31 30 30') or get(0xdb85d,7)!=bytes.fromhex('41 81 f9 14 01 00 00'):
+        raise ValueError('Fastfile header check differs')
+    # G_ModelIndex: model configstrings 0x897+i for i<0x200, adding only while level.initializing.
+    if get(value('kGModelIndexRva'),12)!=bytes_of('kGModelIndexPrologue'):raise ValueError('G_ModelIndex prologue differs')
+    if get(0x1a02e0,6)!=bytes.fromhex('8d 8b 97 08 00 00') or get(0x1a02fc,6)!=bytes.fromhex('81 fb 00 02 00 00'):
+        raise ValueError('G_ModelIndex configstring range differs')
+    if value('kModelConfigstringBase')!=0x897 or value('kMaxModels')!=0x200:raise ValueError('Model configstring constants differ')
+    if rip(0x1a0304,2,7)!=value('kLevelInitializingRva') or rip(0x1a02eb,3,7)!=value('kEmptyStringIdRva'):
+        raise ValueError('G_ModelIndex initializing/empty-string references differ')
+    if rip(0x2321d3,3,7)!=value('kConfigstringsRva'):raise ValueError('Configstring table differs')
+    # G_InitGame sets level.initializing before GScr_LoadScripts (via 0x170b20).
+    if get(0x1713d3,10)!=bytes.fromhex('c7 05 db 5a c2 00 01 00 00 00') or call_target(0x1715e7)!=0x170b20 or rip(0x1713d3,2,10)!=value('kLevelInitializingRva'):
+        raise ValueError('G_InitGame initializing window differs')
+    if cstring(struct.unpack('<Q',get(value('kAssetNamesRva')+8*value('kAssetTypeXModel'),8))[0]-IMAGE_BASE)!='xmodel':raise ValueError('xmodel asset type differs')
+    model_builtins={}
+    for name,const in (('setmodel','kBuiltinSetModel'),('attach','kBuiltinAttach'),('detachall','kBuiltinDetachAll')):
+        rva=int(builtins[name],16)
+        if sum(1 for _,f in pairs(name) if f==rva)!=1:raise ValueError(f'Method {name} not at {rva:#x}')
+        model_builtins[name]=hex(rva)
+    # setmodel -> G_SetModel -> G_ModelIndex; attach reads (model, tag, ignoreCollision).
+    if call_target(0x18731a)!=0x1a0580 or call_target(0x1a05a0)!=value('kGModelIndexRva') or call_target(0x187567)!=0x18f180:
+        raise ValueError('setmodel/attach implementation differs')
+    if get(0x2958ba,6)!=bytes.fromhex('81 f9 c0 00 00 00'):raise ValueError('DObj bone limit differs')
+    report['bo1_models']={'level_zone_call':hex(zone_call),'db_load_xassets':hex(value('kDbLoadXAssetsRva')),
+        'g_model_index':hex(value('kGModelIndexRva')),'model_builtins':model_builtins,'dobj_bone_limit':0xc0,
+        'helmet_swap':re.search(r'kHelmetSwapFunction\{"([^"]+)","([^"]+)"\}',text).groups()}
     report.update({'goal_entity':'setgoalentity replica: 0x1244b0 clear, 0x15b190 handle, node/volume zero',
         'command_buffer':'Cbuf_AddText(0,"set specialops 1; ...; devmap <so_map>\\n") (critical section 0x24)',
         'damage_args':'G_Damage(targ,inflictor,attacker,dir,point,damage,dflags,mod,weapon,hitloc,...)',

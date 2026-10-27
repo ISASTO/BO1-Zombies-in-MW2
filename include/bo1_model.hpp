@@ -512,6 +512,18 @@ inline bool CombineSpecGloss(const Texture& spec,const Texture& gloss,Texture& o
     }
     return out.data.size()==spec.data.size()*2;
 }
+// A DXT1 specular map without a gloss map: the same colours, constant gloss.
+inline bool WithGloss(const Texture& spec,std::uint8_t gloss,Texture& out) {
+    if(spec.format!=kD3dDxt1) return false;
+    out.width=spec.width;out.height=spec.height;out.levels=spec.levels;out.format=kD3dDxt5;
+    out.data.clear();out.data.reserve(spec.data.size()*2);
+    for(std::size_t n=0;n+8<=spec.data.size();n+=8) {
+        const std::uint8_t alpha[8]={gloss,gloss,0,0,0,0,0,0};
+        out.data.insert(out.data.end(),alpha,alpha+8);
+        out.data.insert(out.data.end(),spec.data.begin()+static_cast<std::ptrdiff_t>(n),spec.data.begin()+static_cast<std::ptrdiff_t>(n+8));
+    }
+    return true;
+}
 // A small constant-colour DXT5 texture (all mips), for maps BO1 has no file for.
 inline Texture SolidDxt5(std::uint16_t size,std::uint16_t rgb565,std::uint8_t alpha) {
     Texture t;t.width=size;t.height=size;t.format=kD3dDxt5;t.levels=static_cast<std::uint8_t>(MipCount(size,size));
@@ -934,21 +946,33 @@ inline std::vector<std::uint8_t> FastFile(const ZoneResult& zone) {
 inline constexpr std::array<const char*,2> kBodyModels={"c_ger_honorguard_body1","c_ger_honorguard_body2"};
 inline constexpr std::array<const char*,4> kHeadModels={"c_ger_zombie_head1","c_ger_zombie_head2","c_ger_zombie_head3","c_ger_zombie_head4"};
 inline constexpr const char* kImagePrefix="bo1_";
-inline bool CharacterSpec(const Character& c,const std::map<std::string,Texture>& textures,ZoneSpec& spec,std::string* error=nullptr) {
+// Colour maps are required; a missing normal map falls back to MW2's flat
+// $identitynormalmap and a missing specular map to a dull constant one.
+inline constexpr const char* kFallbackSpecular="bo1_fallback_specular";
+inline bool CharacterSpec(const Character& c,const std::map<std::string,Texture>& textures,ZoneSpec& spec,std::string* error=nullptr,
+                          std::vector<std::string>* fallbacks=nullptr) {
     using detail::Fail;
     spec=ZoneSpec{};
-    auto take=[&](const std::string& source,const char* role,std::string& name)->bool {
-        const auto found=textures.find(source);
-        if(found==textures.end()) return Fail(error,std::string("missing BO1 texture for ")+role+": "+source);
+    enum class Kind {Color,Normal,Specular};
+    auto take=[&](const std::string& source,const char* role,Kind kind,std::string& name)->bool {
+        const auto found=source.empty()?textures.end():textures.find(source);
+        if(found==textures.end()) {
+            if(kind==Kind::Color) return Fail(error,std::string("missing BO1 texture for ")+role+": "+source);
+            if(fallbacks) fallbacks->push_back(std::string(role)+":"+source);
+            if(kind==Kind::Normal) name=mw2::kIdentityNormal;
+            else {name=kFallbackSpecular;spec.images[name]=SolidDxt5(4,0x2104,0x30);}
+            return true;
+        }
         name=kImagePrefix+source;
         for(auto& ch:name) if(ch=='~' || ch=='&' || ch=='-') ch='_';
         spec.images[name]=found->second;return true;
     };
     MaterialSpec body,head,eyes;
     body.name="mc/bo1_c_ger_honorguard_body1";head.name="mc/bo1_c_ger_zombie_head1";eyes.name="mc/bo1_c_ger_zombie_eyes";
-    if(!take(c.bodyColor,"body colour",body.color) || !take(c.bodyNormal,"body normal",body.normal) || !take(c.bodySpec,"body specular",body.spec)
-        || !take(c.headColor,"head colour",head.color) || !take(c.headNormal,"head normal",head.normal) || !take(c.headSpec,"head specular",head.spec)
-        || !take(c.eyeColor,"eye colour",eyes.color)) return false;
+    if(!take(c.bodyColor,"body colour",Kind::Color,body.color) || !take(c.bodyNormal,"body normal",Kind::Normal,body.normal)
+        || !take(c.bodySpec,"body specular",Kind::Specular,body.spec) || !take(c.headColor,"head colour",Kind::Color,head.color)
+        || !take(c.headNormal,"head normal",Kind::Normal,head.normal) || !take(c.headSpec,"head specular",Kind::Specular,head.spec)
+        || !take(c.eyeColor,"eye colour",Kind::Color,eyes.color)) return false;
     eyes.normal=mw2::kIdentityNormal;
     eyes.spec="bo1_zombie_eye_specular";spec.images[eyes.spec]=SolidDxt5(4,0x4208,0x40);
     head.envMapParms={0.f,0.4f,0.05f,2.f};eyes.envMapParms={0.2f,1.f,0.2f,2.f};body.envMapParms={0.f,0.6f,0.05f,2.f};

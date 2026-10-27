@@ -18,6 +18,7 @@
 #include "script_call.hpp"
 #include "bo1_zombie_rules.hpp"
 #include "bo1_assets.hpp"
+#include "bo1_models.hpp"
 #include <memory>
 #include <optional>
 #include <algorithm>
@@ -1340,6 +1341,8 @@ struct ZombieActor {
     bool animatedAttack=false;
     // MW2 maps/_utility setup (gun_remove, disable_pain, ...) after spawn init.
     bool scriptSetup=false;
+    // Test40: wearing a BO1 body and head.
+    bool dressed=false;
 };
 struct ZombieDrop { bo1::Powerup type=bo1::Powerup::None; AiPoint origin{}; int spawned=0; };
 struct ZombieGameState {
@@ -1479,6 +1482,16 @@ struct LevelPrep {
     std::array<int,static_cast<std::size_t>(SetupFunction::Count)> setup{};
     unsigned setupCalls=0,setupFailures=0;
 } prep;
+// ---- Test40: BO1 zombie character models ----
+struct ModelPrep {
+    bool bindings=false,hookInstalled=false;
+    bool appended=false;            // the generated zone is part of this level's load
+    std::string zoneFor;            // the level zone it was loaded with
+    bool precached=false;
+    std::vector<std::string> bodies,heads;   // precached, in BO1 alias order
+    int helmetSwap=0;               // animscripts\shared::HandleNoteTrack
+    unsigned dressed=0,dressFailures=0,helmetSwaps=0;
+} models;
 bool WriteProtected(std::uintptr_t at,const void* bytes,std::size_t size) {
     DWORD old=0;
     if(!VirtualProtect(reinterpret_cast<void*>(at),size,PAGE_READWRITE,&old)) return false;
@@ -1606,6 +1619,8 @@ unsigned CaptureSetupFunctions() {
     }
     return found;
 }
+unsigned PrecacheModels();
+int CaptureHelmetSwap();
 void PrepareLevelScripts() {
     char map[96]{};bool launch=false;
     {
@@ -1625,8 +1640,11 @@ void PrepareLevelScripts() {
     prep.map=map;
     const auto guards=SpecOpsMapIndex(map)>=0?ApplySpecOpsGuards():0u;
     const auto anims=ApplyAnimSwaps();
+    models.helmetSwap=prep.threads?CaptureHelmetSwap():0;
+    const auto precached=PrecacheModels();
     prep.prepared=true;
-    Log("LEVEL_PREP map=%s so_guards=%u/%llu anims=%u",map,guards,static_cast<unsigned long long>(kSpecOpsEndFunctions.size()),anims);
+    Log("LEVEL_PREP map=%s so_guards=%u/%llu anims=%u bo1_models=%u zone_loaded=%d",map,guards,static_cast<unsigned long long>(kSpecOpsEndFunctions.size()),anims,
+        precached,models.appended);
 }
 void LevelScriptsLoadedHook() {
     try {PrepareLevelScripts();}
@@ -1648,6 +1666,118 @@ bool InstallLevelScriptHook() {
     prep.hookInstalled=ExchangeCode(edit,true);
     Log("LEVEL_PREP hook_installed=%d",prep.hookInstalled);
     return prep.hookInstalled;
+}
+// ---- Test40: BO1 zombie character models ----
+// Com_LoadLevelFastFiles loads "so_<mode>_<base>" and then <base> last.
+std::string LevelZoneOf(const std::string& map) {
+    if(map.rfind("so_",0)==0) {const auto u=map.find('_',3);if(u!=std::string::npos && u+1<map.size()) return map.substr(u+1);}
+    return map;
+}
+struct XZoneInfo {const char* name;int allocFlags;int freeFlags;};
+using LoadXAssetsFn=void(*)(XZoneInfo*,unsigned,int);
+using ModelIndexFn=int(*)(const char*);
+// The level zone of a zombies launch loads together with the generated BO1
+// model fastfile (same allocation flags, so the next level frees both).
+void LevelZoneLoadHook(XZoneInfo* info,unsigned count,int sync) {
+    const auto load=reinterpret_cast<LoadXAssetsFn>(aiProfile.base+kDbLoadXAssetsRva);
+    bool add=false;std::string zone;
+    try {
+        bool wanted=false;
+        {
+            std::lock_guard<std::recursive_mutex> lock(aiMutex);
+            models.appended=false;models.precached=false;models.bodies.clear();models.heads.clear();models.zoneFor.clear();
+            if(count==1 && info && info[0].name) zone=info[0].name;
+            wanted=!zone.empty() && info[0].allocFlags==kLevelZoneAllocFlags && zg.startWanted && !zg.pendingMap.empty()
+                && LevelZoneOf(zg.pendingMap)==zone;
+        }
+        if(wanted) {
+            add=bo1models::WaitReady(30000);
+            const auto st=bo1models::GetStatus();
+            Log("BO1_MODELS level_zone=%s append=%d state=%s cached=%d detail=%s",zone.c_str(),add,bo1models::StateText(st.state),st.cached,st.detail.c_str());
+        }
+    } catch(...) {add=false;}
+    if(!add) {load(info,count,sync);return;}
+    XZoneInfo zones[2]={info[0],{bo1models::kZoneName,info[0].allocFlags,0}};
+    {std::lock_guard<std::recursive_mutex> lock(aiMutex);models.appended=true;models.zoneFor=zone;}
+    load(zones,2,sync);
+}
+bool InstallLevelZoneHook() {
+    if(models.hookInstalled) return true;
+    if(!models.bindings) return false;
+    const auto at=aiProfile.base+kLevelZoneLoadCallRva;
+    auto* relay=Relay(at,reinterpret_cast<std::uintptr_t>(&LevelZoneLoadHook));
+    std::array<std::uint8_t,5> code{};
+    if(!relay || !RelativeCall(at,reinterpret_cast<std::uintptr_t>(relay),code)) {Log("BO1_MODELS hook=RELAY_UNAVAILABLE");return false;}
+    CodeEdit edit;edit.at=at&~std::uintptr_t(15);
+    if(at-edit.at+code.size()>16 || !ReadAi(edit.at,edit.before.data(),16)) return false;
+    edit.after=edit.before;std::memcpy(edit.after.data()+(at-edit.at),code.data(),code.size());
+    models.hookInstalled=ExchangeCode(edit,true);
+    Log("BO1_MODELS hook_installed=%d",models.hookInstalled);
+    return models.hookInstalled;
+}
+// Precache (G_ModelIndex) the zone's models while level.initializing, after
+// checking each one is the real converted XModel and model slots remain.
+unsigned PrecacheModels() {
+    if(!models.appended || !models.bindings) return 0;
+    const auto base=aiProfile.base;
+    int initializing=0;
+    if(!Value(base+kLevelInitializingRva,initializing) || !initializing) {Log("BO1_MODELS precache=0 reason=NOT_INITIALIZING");return 0;}
+    std::uint16_t empty=0;unsigned free=0;
+    if(!Value(base+kEmptyStringIdRva,empty)) return 0;
+    for(unsigned i=1;i<kMaxModels;++i) {std::uint16_t v=0;if(Value(base+kConfigstringsRva+2*(kModelConfigstringBase+i),v) && v==empty) ++free;}
+    if(free<16) {Log("BO1_MODELS precache=0 reason=MODEL_SLOTS free=%u",free);return 0;}
+    const auto find=reinterpret_cast<FindAssetEntryFn>(base+kDbFindXAssetEntryRva);
+    const auto index=reinterpret_cast<ModelIndexFn>(base+kGModelIndexRva);
+    auto precache=[&](const char* name)->bool {
+        const auto entry=find(kAssetTypeXModel,name);
+        std::uintptr_t header=0,namePtr=0;std::uint8_t bones=0;char text[64]{};
+        const auto length=std::strlen(name);
+        if(!entry || length>=sizeof(text) || !Value(entry+kAssetEntryHeader,header) || !header || !Value(header,namePtr) || !namePtr
+            || !ReadAi(namePtr,text,length+1) || std::strcmp(text,name) || !Value(header+8,bones) || !bones) {
+            Log("BO1_MODELS model=%s present=0",name);return false;
+        }
+        return index(name)>0;
+    };
+    for(const auto* name:bo1models::kBodyAlias) if(precache(name)) models.bodies.emplace_back(name);
+    for(const auto* name:bo1models::kHeadAlias) if(precache(name)) models.heads.emplace_back(name);
+    models.precached=!models.bodies.empty() && !models.heads.empty();
+    Log("BO1_MODELS precache=%d bodies=%llu heads=%llu model_slots_free=%u helmet_swap=%d",models.precached,
+        static_cast<unsigned long long>(models.bodies.size()),static_cast<unsigned long long>(models.heads.size()),free,models.helmetSwap!=0);
+    return static_cast<unsigned>(models.bodies.size()+models.heads.size());
+}
+int CaptureHelmetSwap() {
+    const auto handleOf=reinterpret_cast<GetFunctionHandleFn>(aiProfile.base+kScrGetFunctionHandleRva);
+    std::uintptr_t program=0;std::uint32_t size=0;std::uint8_t op=0xff;
+    if(!Value(aiProfile.base+kScrProgramBufferRva,program) || !Value(aiProfile.base+kScrProgramSizeRva,size) || !program || !size) return 0;
+    const int handle=handleOf(kHelmetSwapFunction.file,kHelmetSwapFunction.function);
+    if(handle>0 && static_cast<std::uint32_t>(handle)<size && Value(program+static_cast<std::uint32_t>(handle),op) && op<=0x8b) return handle;
+    Log("BO1_MODELS function=%s::%s present=0",kHelmetSwapFunction.file,kHelmetSwapFunction.function);
+    return 0;
+}
+// character\c_ger_honorguard_zt: a random body (1 in 4 body1) and head,
+// the head attached with no tag so its j_spine4/j_neck/j_head follow the body.
+// The MW2 helmet is moved off self.hatModel first (helmetPop would look for
+// it), then every MW2 attachment is removed.
+void DressZombie(ZombieActor& z,const AiEntity& e) {
+    if(z.dog || z.dressed || !models.precached) return;
+    z.dressed=true;
+    const auto ref=ScriptEntityRef(e.number);
+    if(models.helmetSwap && prep.threads) {
+        auto& p=*reinterpret_cast<volatile NativeScriptParameters*>(aiProfile.base+kScriptParametersRva);
+        const auto r=CallScriptThread(p,scriptNatives,reinterpret_cast<ScriptExecEntThread>(aiProfile.base+kScrExecEntThreadNumRva),
+            reinterpret_cast<ScriptFreeThread>(aiProfile.base+kScrFreeThreadRva),e.number,models.helmetSwap,{ScriptArg::String(kHelmetSwapNote)});
+        if(r==ScriptCallResult::Ok) ++models.helmetSwaps;
+        else Log("BO1_MODELS helmet_swap entity=%u result=%s",e.number,ScriptCallText(r));
+    }
+    const auto& body=models.bodies[static_cast<std::size_t>(ZombieRandom(static_cast<int>(models.bodies.size())))];
+    const auto& head=models.heads[static_cast<std::size_t>(ZombieRandom(static_cast<int>(models.heads.size())))];
+    if(Builtin(kBuiltinDetachAll,ref,{})!=ScriptCallResult::Ok
+        || Builtin(kBuiltinSetModel,ref,{ScriptArg::String(body.c_str())})!=ScriptCallResult::Ok
+        || Builtin(kBuiltinAttach,ref,{ScriptArg::String(head.c_str()),ScriptArg::String(""),ScriptArg::Int(1)})!=ScriptCallResult::Ok) {
+        if(++models.dressFailures<=8) Log("BO1_MODELS dress entity=%u failed=1 body=%s head=%s",e.number,body.c_str(),head.c_str());
+        return;
+    }
+    ++models.dressed;
 }
 // %anim value (script animtree index << 16 | index in the tree) for one of the
 // replaced flashbang slots, in the tree this actor animates with.
@@ -1949,6 +2079,7 @@ bool SpawnZombie(const bo1::SpawnRequest& request,const Snapshot& s,const AiScop
     z.health=request.health;z.reconfigureAt=time+300;
     z.nextRepath=time;z.failsafeAt=time+static_cast<int>(bo1::kFailsafeIntervalMilliseconds);z.failsafeOrigin=e.origin;
     zg.zombies.push_back(z);
+    DressZombie(zg.zombies.back(),e);
     StartRise(zg.zombies.back(),e,player,time);
     Log("ZOMBIE_SPAWN entity=%u round=%d health=%d speed=%s dog=%d point=%u distance=%.0f template=%s rise=%d alive=%d queued=%d",
         e.number,request.round,request.health,bo1::MoveSpeedText(speed),request.dogs,point.number,
@@ -2628,12 +2759,24 @@ void InitializeAiEngine(std::uintptr_t base,std::size_t size,std::uintptr_t text
             && Rip(base+0x22270a,0,3,7)==base+kScrProgramBufferRva && Call(base+0x22274a,0)==base+0x224700
             && Rip(base+0x22278b,0,2,6)==base+kScriptParametersRva+8;
         Log("ZOMBIE_SETUP thread_calls=%d functions=%llu",prep.threads,static_cast<unsigned long long>(kSetupFunctions.size()));
+        // Test40: the level-zone DB_LoadXAssets call, G_ModelIndex and the model methods.
+        unsigned modelBuiltins=0;
+        for(const auto& b:kModelBuiltins)if(prep.bindings && MethodEntry(b.name,base+b.rva))++modelBuiltins;
+        std::uint64_t xmodelName=0;char xmodel[8]{};
+        models.bindings=prep.bindings && modelBuiltins==kModelBuiltins.size()
+            && bytesAt(kDbLoadXAssetsRva,kDbLoadXAssetsPrologue) && Call(base+kLevelZoneLoadCallRva,0)==base+kDbLoadXAssetsRva
+            && bytesAt(kGModelIndexRva,kGModelIndexPrologue)
+            && Value(base+kAssetNamesRva+8*kAssetTypeXModel,xmodelName) && xmodelName>base && xmodelName<base+aiProfile.size
+            && ReadAi(static_cast<std::uintptr_t>(xmodelName),xmodel,7) && !std::strcmp(xmodel,"xmodel");
+        Log("BO1_MODELS bindings=%d model_builtins=%u/%llu",models.bindings,modelBuiltins,static_cast<unsigned long long>(kModelBuiltins.size()));
+        if(models.bindings)bo1models::StartBuild();
     }
     InstallExpandedCapacity(base,aiProfile.resolved);
     // Installed after the capacity arena is placed (unchanged layout), before
     // any level loads, so every level's setup functions are known (zombies
     // started on "This level" use them too).
     if(prep.bindings && IsProcessorFeaturePresent(PF_COMPARE_EXCHANGE128)) InstallLevelScriptHook();
+    if(models.bindings && IsProcessorFeaturePresent(PF_COMPARE_EXCHANGE128)) InstallLevelZoneHook();
     Log("AI_PROFILE resolved=%d callback_slot_rva=0x%llx spawn_rva=0x%llx delete_rva=0x%llx pool_slot_rva=0x%llx clock_rva=0x%llx",
         aiProfile.resolved,static_cast<unsigned long long>(aiProfile.thinkSlot-base),static_cast<unsigned long long>(spawn-base),
         static_cast<unsigned long long>(remove-base),static_cast<unsigned long long>(aiProfile.poolSlot-base),static_cast<unsigned long long>(aiProfile.timeSlot-base));
@@ -2806,6 +2949,8 @@ ZombieGameStatus GetZombieGameStatus() {
     s.bo1AnimsFound=static_cast<int>(assets.found);s.bo1AnimsWanted=static_cast<int>(assets.wanted);
     s.animSlotsApplied=static_cast<int>(prep.applied.size());s.animSlotsWanted=static_cast<int>(std::size(kAnimSlots));
     s.specOpsGuards=static_cast<int>(prep.guards.size());s.levelPrepared=prep.prepared;
+    std::snprintf(s.bo1Models,sizeof(s.bo1Models),"%s",bo1models::StateText(bo1models::GetStatus().state));
+    s.modelsPrecached=models.precached?static_cast<int>(models.bodies.size()+models.heads.size()):0;s.zombiesDressed=models.dressed;
     if(zg.relaunchAt) {const auto now64=GetTickCount64();s.restartInMs=now64>=zg.relaunchAt?0:static_cast<int>(zg.relaunchAt-now64);}
     cached=s;return s;
 }
@@ -2819,6 +2964,11 @@ void LogZombieGame() {
         static_cast<unsigned long long>(prep.guards.size()),bo1assets::StateText(assets.state),assets.found,assets.wanted,
         assets.zone.empty()?"NONE":assets.zone.c_str(),zg.rises,zg.riseFailures,zg.animatedAttacks,zg.attacksBrokenOff,prep.threads,setupHandles,
         static_cast<unsigned long long>(kSetupFunctions.size()),zg.setupZombies,prep.setupCalls,prep.setupFailures,zg.relaunchAt!=0);
+    const auto modelStatus=bo1models::GetStatus();
+    Log("ZOMBIE_MODELS state=%s cached=%d zone_loaded=%d level_zone=%s precached=%d bodies=%llu heads=%llu dressed=%u dress_failures=%u helmet_swaps=%u textures=%u fallbacks=%u file=%s",
+        bo1models::StateText(modelStatus.state),modelStatus.cached,models.appended,models.zoneFor.empty()?"-":models.zoneFor.c_str(),models.precached,
+        static_cast<unsigned long long>(models.bodies.size()),static_cast<unsigned long long>(models.heads.size()),models.dressed,models.dressFailures,
+        models.helmetSwaps,modelStatus.textures,modelStatus.fallbacks,modelStatus.file.empty()?"-":modelStatus.file.c_str());
     Log("ZOMBIE_STATE available=%d running=%d pending=%d map=%s round=%d phase=%s alive=%d queued=%d killed=%d dogs=%d points=%d total=%d kills=%u headshots=%u hits=%u melee_hits=%u melee_misses=%u drops=%llu double_points_ms=%d insta_kill_ms=%d campaign_removed=%u weapon=%s dog_spawners=%llu next_dog_round=%d",
         zombieBindingsReady,zg.running,zg.startWanted,zg.running?zg.map:zg.pendingMap.c_str(),c.round,bo1::PhaseText(c.phase),c.alive,c.queued,c.killed,c.dogs,
         zg.ledger.score,zg.ledger.total,zg.kills,zg.headshots,zg.hits,zg.meleeHits,zg.meleeMisses,static_cast<unsigned long long>(zg.drops.size()),

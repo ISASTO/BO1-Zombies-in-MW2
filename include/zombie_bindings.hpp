@@ -141,4 +141,29 @@ inline constexpr std::array<ScriptFunctionBinding,static_cast<std::size_t>(Setup
     {"maps/_utility","disable_pain",0},{"maps/_utility","disable_long_death",0},{"maps/_utility","disable_surprise",0},
     {"maps/_utility","disable_bulletwhizbyreaction",0},{"maps/_utility","disable_danger_react",0},
     {"maps/_utility","set_battlechatter",1},{"maps/_utility","enable_sprint",0}}};
+
+// ---- Test40: BO1 zombie character models ----
+// Com_LoadLevelFastFiles (0xf09b0) ends with DB_LoadXAssets({level zone,
+// allocFlags 4, freeFlags 0}, 1, async). That call is redirected so the
+// generated BO1 model fastfile loads with the level, and is freed with it.
+inline constexpr std::uintptr_t kLevelZoneLoadCallRva=0xf0ac3,kDbLoadXAssetsRva=0xf0ae0,kLoadLevelFastFilesRva=0xf09b0;
+inline constexpr std::array<std::uint8_t,15> kDbLoadXAssetsPrologue={
+    0x48,0x8b,0xc4,0x44,0x89,0x40,0x18,0x89,0x50,0x10,0x48,0x89,0x48,0x08,0x48};
+inline constexpr int kLevelZoneAllocFlags=4;
+// G_ModelIndex(name): finds or adds the model configstring (0x897+index,
+// index 1..0x1ff); adding is only legal while level.initializing.
+inline constexpr std::uintptr_t kGModelIndexRva=0x1a02b0,kLevelInitializingRva=0xd96eb8;
+inline constexpr std::array<std::uint8_t,12> kGModelIndexPrologue={0x40,0x56,0x48,0x83,0xec,0x20,0x80,0x39,0x00,0x48,0x8b,0xf1};
+inline constexpr std::uintptr_t kConfigstringsRva=0x19b58f2,kEmptyStringIdRva=0x1157900;
+inline constexpr unsigned kModelConfigstringBase=0x897,kMaxModels=0x200;
+inline constexpr int kAssetTypeXModel=4;
+inline constexpr BuiltinBinding kBuiltinSetModel{"setmodel",0x1872e0};
+inline constexpr BuiltinBinding kBuiltinAttach{"attach",0x187540};
+inline constexpr BuiltinBinding kBuiltinDetachAll{"detachall",0x187800};
+inline constexpr std::array<BuiltinBinding,3> kModelBuiltins={kBuiltinSetModel,kBuiltinAttach,kBuiltinDetachAll};
+// animscripts\shared::HandleNoteTrack(note): the "swap taghelmet to tagleft"
+// case moves the MW2 helmet (self.hatModel) to TAG_WEAPON_LEFT and clears
+// self.hatModel, so death/pain helmetPop() never looks for it afterwards.
+inline constexpr ScriptFunctionRef kHelmetSwapFunction{"animscripts/shared","handlenotetrack"};
+inline constexpr const char* kHelmetSwapNote="swap taghelmet to tagleft";
 } // namespace mod

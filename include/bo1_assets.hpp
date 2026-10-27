@@ -25,4 +25,10 @@ bool WaitReady(unsigned milliseconds);
 Status GetStatus();
 // Valid once Ready; the records live for the rest of the process.
 const bo1xanim::Anim* Find(const std::string& name);
+// Shared with the Test40 model import (bo1_models.cpp).
+std::wstring GameDirectory();                       // MW2 folder, trailing backslash
+std::wstring BlackOpsFolder();                      // Black Ops install (empty when not found)
+std::string Utf8(const std::wstring& text);
+// Read and inflate a Black Ops PC fastfile (IWffu100, version 473).
+bool ReadFastFile(const std::wstring& path,std::vector<std::uint8_t>& raw,std::string& error);
 } // namespace mod::bo1assets
