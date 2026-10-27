@@ -1,16 +1,14 @@
 #include "bo1_models.hpp"
 #include "bo1_assets.hpp"
-#include "bo1_model.hpp"
-#include "zip_reader.hpp"
+#include "bo1_model_build.hpp"
 #include "runtime.hpp"
 #include <windows.h>
 #include <algorithm>
 #include <chrono>
 #include <condition_variable>
 #include <cstdio>
-#include <map>
+#include <memory>
 #include <mutex>
-#include <set>
 #include <thread>
 
 namespace mod::bo1models {
@@ -88,39 +86,29 @@ bool FastFileHeaderOk(const std::wstring& path) {
     if(!::ReadFile(f.handle,h,sizeof(h),&read,nullptr) || read!=sizeof(h)) return false;
     return !std::memcmp(h,"IWffu100",8) && bo1model::Get<std::uint32_t>(h+8)==bo1model::mw2::kVersion && h[21]==0x78;
 }
-// images/<name>.iwi for every wanted name, from the last archive that has it.
-std::map<std::string,bo1model::Texture> ReadTextures(const std::vector<std::wstring>& iwds,const std::set<std::string>& wanted,std::string& notes) {
-    std::map<std::string,bo1model::Texture> found;
-    for(auto it=iwds.rbegin();it!=iwds.rend() && found.size()<wanted.size();++it) {
-        File f;f.handle=CreateFileW(it->c_str(),GENERIC_READ,FILE_SHARE_READ,nullptr,OPEN_EXISTING,FILE_FLAG_RANDOM_ACCESS,nullptr);
-        if(f.handle==INVALID_HANDLE_VALUE) continue;
-        LARGE_INTEGER size{};
-        if(!GetFileSizeEx(f.handle,&size)) continue;
-        const HANDLE h=f.handle;
-        zip::ReadAt read=[h](std::uint64_t at,void* out,std::size_t n) {
+// An open .iwd for the pipeline's reads (offset reads on a synchronous handle).
+struct OpenArchive {
+    std::unique_ptr<File> file;
+    bo1model::Archive archive;
+};
+bool Open(const std::wstring& path,OpenArchive& out) {
+    out.file=std::make_unique<File>();
+    out.file->handle=CreateFileW(path.c_str(),GENERIC_READ,FILE_SHARE_READ,nullptr,OPEN_EXISTING,FILE_FLAG_RANDOM_ACCESS,nullptr);
+    LARGE_INTEGER size{};
+    if(out.file->handle==INVALID_HANDLE_VALUE || !GetFileSizeEx(out.file->handle,&size)) return false;
+    const HANDLE h=out.file->handle;
+    out.archive.name=bo1assets::Utf8(path);out.archive.size=static_cast<std::uint64_t>(size.QuadPart);
+    out.archive.read=[h](std::uint64_t at,void* buffer,std::size_t n) {
+        auto* p=static_cast<std::uint8_t*>(buffer);
+        while(n) {
             OVERLAPPED o{};o.Offset=static_cast<DWORD>(at);o.OffsetHigh=static_cast<DWORD>(at>>32);
-            auto* p=static_cast<std::uint8_t*>(out);
-            while(n) {
-                DWORD got=0;const auto chunk=static_cast<DWORD>(std::min<std::size_t>(n,1u<<24));
-                if(!::ReadFile(h,p,chunk,&got,&o) || !got) return false;
-                p+=got;n-=got;at+=got;o.Offset=static_cast<DWORD>(at);o.OffsetHigh=static_cast<DWORD>(at>>32);
-            }
-            return true;
-        };
-        std::vector<zip::Entry> entries;std::string error;
-        if(!zip::ReadDirectory(read,static_cast<std::uint64_t>(size.QuadPart),entries,&error)) {notes+=" "+bo1assets::Utf8(*it)+":"+error;continue;}
-        for(const auto& e:entries) {
-            if(e.name.size()<12) continue;
-            for(const auto& name:wanted) {
-                if(found.count(name) || !zip::SameName(e.name,"images/"+name+".iwi")) continue;
-                std::vector<std::uint8_t> bytes;bo1model::Texture t;
-                if(!zip::ReadEntry(read,static_cast<std::uint64_t>(size.QuadPart),e,bytes,&error)) {notes+=" "+name+":"+error;continue;}
-                if(!bo1model::ParseIwi13(bytes.data(),bytes.size(),t,&error)) {notes+=" "+name+":"+error;continue;}
-                found.emplace(name,std::move(t));
-            }
+            DWORD got=0;const auto chunk=static_cast<DWORD>(std::min<std::size_t>(n,1u<<24));
+            if(!::ReadFile(h,p,chunk,&got,&o) || !got) return false;
+            p+=got;n-=got;at+=got;
         }
-    }
-    return found;
+        return true;
+    };
+    return true;
 }
 void Build() {
     const auto begin=std::chrono::steady_clock::now();
@@ -145,31 +133,16 @@ void Build() {
         }
         std::vector<std::uint8_t> raw;
         if(!bo1assets::ReadFastFile(theater,raw,error)) {result.detail="zombie_theater.ff: "+error;return;}
-        const auto strings=bo1xanim::ParseZoneStrings(raw.data(),raw.size());
-        if(!strings) {result.detail="zombie_theater.ff string table unreadable";return;}
-        auto character=bo1model::CarveCharacter(raw.data(),raw.size(),strings->strings,strings->assetsOffset,&error);
-        if(!character) {result.detail=error;return;}
-        raw.clear();raw.shrink_to_fit();
-        const auto& c=*character;
-        std::set<std::string> wanted{c.headColor,c.headNormal,c.headSpec,c.eyeColor,c.bodyColor,c.bodyNormal,c.bodySpec};
-        if(!c.headGloss.empty()) wanted.insert(c.headGloss);
+        std::vector<OpenArchive> open(iwds.size());
+        std::vector<bo1model::Archive> archives;
+        for(std::size_t n=0;n<iwds.size();++n) if(Open(iwds[n],open[n])) archives.push_back(open[n].archive);
+        std::vector<std::uint8_t> file;bo1model::BuildReport report;
+        const bool built=bo1model::BuildCharacterFastFile(raw.data(),raw.size(),archives,file,report,&error);
+        result.textures=report.textures;result.fallbacks=static_cast<unsigned>(report.fallbacks.size());
         std::string notes;
-        auto textures=ReadTextures(iwds,wanted,notes);
-        result.textures=static_cast<unsigned>(textures.size());
-        // MW2 keeps gloss in the specular map's alpha.
-        const auto spec=textures.find(c.headSpec);
-        if(spec!=textures.end() && spec->second.format==bo1model::kD3dDxt1) {
-            bo1model::Texture combined;const auto gloss=textures.find(c.headGloss);
-            if(gloss!=textures.end() && bo1model::CombineSpecGloss(spec->second,gloss->second,combined)) spec->second=std::move(combined);
-            else if(bo1model::WithGloss(spec->second,0x60,combined)) {spec->second=std::move(combined);notes+=" head gloss: constant";}
-        }
-        bo1model::ZoneSpec zone;std::vector<std::string> fallbacks;
-        if(!bo1model::CharacterSpec(c,textures,zone,&error,&fallbacks)) {result.detail=error+(notes.empty()?"":" |"+notes);return;}
-        result.fallbacks=static_cast<unsigned>(fallbacks.size());
-        for(const auto& f:fallbacks) notes+=" fallback "+f;
-        bo1model::ZoneResult built;
-        if(!bo1model::BuildZone(zone,built,&error)) {result.detail=error;return;}
-        const auto file=bo1model::FastFile(built);
+        for(const auto& n:report.notes) notes+=" | "+n;
+        for(const auto& f:report.fallbacks) notes+=" | fallback "+f;
+        if(!built) {result.detail=error+notes;return;}
         CreateDirectoryW((bo1assets::GameDirectory()+L"bo1mw2").c_str(),nullptr);
         CreateDirectoryW(cacheDir.c_str(),nullptr);
         if(!Replace(zonePath,file.data(),file.size())) {result.detail="cannot write "+result.file;return;}
@@ -177,7 +150,7 @@ void Build() {
         result.state=State::Ready;result.bytes=file.size();
         char summary[160];
         std::snprintf(summary,sizeof(summary),"built models=%zu images=%zu image_bytes=%zu strings=%zu",
-            zone.models.size(),zone.images.size(),built.imageBytes,built.scriptStrings);
+            report.models,report.images,report.imageBytes,report.scriptStrings);
         result.detail=summary+notes;
     }();
     result.seconds=std::chrono::duration<double>(std::chrono::steady_clock::now()-begin).count();

@@ -1,8 +1,7 @@
 // Test40: BO1 model conversion, IWI v13 textures, the MW2 zone writer, the
 // zlib store and the .iwd (zip) reader. BO1_THEATER_DEC may name a local
 // decompressed zombie_theater zone for a full carve of the Kino character.
-#include "bo1_model.hpp"
-#include "zip_reader.hpp"
+#include "bo1_model_build.hpp"
 #include "bo1_model_synthetic.hpp"
 #include <cstdio>
 #include <cstdlib>
@@ -84,16 +83,23 @@ static void TestZlib() {
 }
 
 // A zip with one stored and one deflated (stored-block deflate) entry.
-static std::vector<std::uint8_t> Zip() {
+struct ZipFile {std::string name;std::vector<std::uint8_t> data;std::uint16_t method;};
+static std::vector<std::uint8_t> MakeZip(std::vector<ZipFile> files) {
     std::vector<std::uint8_t> z,dir;
     auto put16=[](std::vector<std::uint8_t>& v,std::uint16_t x){v.push_back(static_cast<std::uint8_t>(x));v.push_back(static_cast<std::uint8_t>(x>>8));};
     auto put32=[&](std::vector<std::uint8_t>& v,std::uint32_t x){put16(v,static_cast<std::uint16_t>(x));put16(v,static_cast<std::uint16_t>(x>>16));};
     auto crc32=[](const std::vector<std::uint8_t>& d){std::uint32_t c=0xffffffffu;for(auto b:d){c^=b;for(int k=0;k<8;++k)c=(c>>1)^(0xedb88320u&(0u-(c&1u)));}return c^0xffffffffu;};
-    struct File {std::string name;std::vector<std::uint8_t> data;std::uint16_t method;};
-    std::vector<File> files={{"images/stored.iwi",{1,2,3,4,5},0},{"images/Deflated.IWI",std::vector<std::uint8_t>(3000,7),8}};
     for(auto& f:files) {
         std::vector<std::uint8_t> packed=f.data;
-        if(f.method==8) {packed={1};put16(packed,static_cast<std::uint16_t>(f.data.size()));put16(packed,static_cast<std::uint16_t>(~f.data.size()));packed.insert(packed.end(),f.data.begin(),f.data.end());}
+        if(f.method==8) {   // stored deflate blocks (<= 65535 bytes each)
+            packed.clear();std::size_t at=0;
+            do {
+                const std::size_t n=std::min<std::size_t>(65535,f.data.size()-at);
+                packed.push_back(at+n==f.data.size()?1:0);
+                put16(packed,static_cast<std::uint16_t>(n));put16(packed,static_cast<std::uint16_t>(~n));
+                packed.insert(packed.end(),f.data.begin()+static_cast<std::ptrdiff_t>(at),f.data.begin()+static_cast<std::ptrdiff_t>(at+n));at+=n;
+            } while(at<f.data.size());
+        }
         const auto offset=static_cast<std::uint32_t>(z.size());
         put32(z,0x04034b50u);put16(z,20);put16(z,0);put16(z,f.method);put32(z,0);put32(z,crc32(f.data));
         put32(z,static_cast<std::uint32_t>(packed.size()));put32(z,static_cast<std::uint32_t>(f.data.size()));
@@ -106,9 +112,12 @@ static std::vector<std::uint8_t> Zip() {
     }
     const auto dirOffset=static_cast<std::uint32_t>(z.size());
     z.insert(z.end(),dir.begin(),dir.end());
-    put32(z,0x06054b50u);put16(z,0);put16(z,0);put16(z,2);put16(z,2);put32(z,static_cast<std::uint32_t>(dir.size()));put32(z,dirOffset);put16(z,4);
+    put32(z,0x06054b50u);put16(z,0);put16(z,0);put16(z,static_cast<std::uint16_t>(files.size()));put16(z,static_cast<std::uint16_t>(files.size()));put32(z,static_cast<std::uint32_t>(dir.size()));put32(z,dirOffset);put16(z,4);
     z.insert(z.end(),{'z','i','p','!'});
     return z;
+}
+static std::vector<std::uint8_t> Zip() {
+    return MakeZip({{"images/stored.iwi",{1,2,3,4,5},0},{"images/Deflated.IWI",std::vector<std::uint8_t>(3000,7),8}});
 }
 static void TestZip() {
     const auto z=Zip();
@@ -168,8 +177,46 @@ static void TestCharacter() {
     std::printf("kino zone: %zu bytes, %zu strings\n",z.stream.size(),z.scriptStrings);
 }
 
+static void TestPipeline() {
+    const char* path=std::getenv("BO1_THEATER_DEC");
+    if(!path) {std::puts("SKIP real zombie_theater pipeline (set BO1_THEATER_DEC)");return;}
+    std::ifstream in(path,std::ios::binary);std::vector<std::uint8_t> raw((std::istreambuf_iterator<char>(in)),{});
+    // An older archive with a broken head colour map, a newer one with the
+    // good textures; the body specular map is missing (MW2 fallback).
+    auto dxt1=[](std::uint16_t w){return Iwi13(0xb,0,w,w);};
+    auto dxt5=[](std::uint16_t w){return Iwi13(0xd,0,w,w);};
+    auto broken=dxt1(64);broken.resize(100);
+    const auto older=MakeZip({{"images/c_ger_zombie_head1_c.iwi",broken,8},{"images/zombie_unrelated.iwi",dxt1(8),0}});
+    const auto newer=MakeZip({{"images/c_ger_zombie_head1_c.iwi",dxt1(64),8},{"IMAGES/C_GER_ZOMBIE_HEAD1_N.IWI",dxt5(64),8},
+        {"images/c_ger_zombie_head1_s.iwi",dxt1(64),8},{"images/c_ger_zombie_head1_g.iwi",dxt1(64),8},{"images/~-gzombie_eye.iwi",dxt1(32),0},
+        {"images/~-gchar_ger_honorguard_body1_c.iwi",dxt1(128),8},{"images/char_ger_honorguard_body1_n.iwi",dxt5(128),8}});
+    auto archive=[](const std::string& name,const std::vector<std::uint8_t>& bytes) {
+        Archive a;a.name=name;a.size=bytes.size();
+        const auto* data=&bytes;
+        a.read=[data](std::uint64_t at,void* out,std::size_t n){if(at+n>data->size())return false;std::memcpy(out,data->data()+at,n);return true;};
+        return a;
+    };
+    std::vector<Archive> archives={archive("iw_00.iwd",older),archive("iw_01.iwd",newer)};
+    std::vector<std::uint8_t> ff;BuildReport report;std::string error;
+    const bool built=BuildCharacterFastFile(raw.data(),raw.size(),archives,ff,report,&error);
+    if(!built) std::printf("pipeline error: %s\n",error.c_str());
+    for(const auto& n:report.notes) std::printf("  note: %s\n",n.c_str());
+    Check(built,"pipeline builds");
+    Check(report.textures==7 && report.fallbacks.size()==1 && report.fallbacks[0].find("body specular")==0,"pipeline textures and fallback");
+    Check(report.models==6 && report.images==8 && !std::memcmp(ff.data(),"IWffu100",8),"pipeline fastfile");
+    std::printf("pipeline: %zu byte fastfile, %zu images (%zu bytes), notes=%zu\n",ff.size(),report.images,report.imageBytes,report.notes.size());
+    // Every texture missing except colour maps -> still builds; no colour -> refused.
+    const auto colours=MakeZip({{"images/c_ger_zombie_head1_c.iwi",dxt1(16),0},{"images/~-gzombie_eye.iwi",dxt1(16),0},
+        {"images/~-gchar_ger_honorguard_body1_c.iwi",dxt1(16),0}});
+    archives={archive("iw_00.iwd",colours)};
+    Check(BuildCharacterFastFile(raw.data(),raw.size(),archives,ff,report,&error) && report.fallbacks.size()==4,"colour-only build uses fallbacks");
+    const auto none=MakeZip({{"images/other.iwi",dxt1(16),0}});
+    archives={archive("iw_00.iwd",none)};
+    Check(!BuildCharacterFastFile(raw.data(),raw.size(),archives,ff,report,&error) && error.find("colour")!=std::string::npos,"no colour map refused");
+}
+
 int main() {
-    TestIwi();TestSpecGloss();TestZlib();TestZip();TestZone();TestCharacter();
+    TestIwi();TestSpecGloss();TestZlib();TestZip();TestZone();TestCharacter();TestPipeline();
     if(failures) {std::printf("%d failure(s)\n",failures);return 1;}
     std::puts("bo1_model_tests: all passed");
     return 0;
