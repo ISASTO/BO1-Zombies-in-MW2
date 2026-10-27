@@ -98,7 +98,7 @@ When the game starts, a background thread:
 
 1. reads the 51 MB fastfile;
 2. inflates it with the bundled miniz (MIT);
-3. carves out the 16 BO1 animations the mod uses.
+3. carves out the 27 BO1 animations the mod uses.
 
 This takes well under a second.
 
@@ -133,10 +133,13 @@ The zombie skeleton uses MW2's bone names. Of the 108 bones in a BO1 walk,
 ### How the animations are applied
 
 When a zombies launch loads its map, the MW2 animations zombies play are
-replaced in place. The tables below show which ones. Each original 136-byte
-header is saved and restored when the next level loads, before any actor of
-that level exists. A header is restored only if it is still the one the mod
-wrote.
+replaced in place, 68 of them in all. Each original 136-byte header is saved
+and restored when the next level loads, before any actor of that level
+exists. A header is restored only if it is still the one the mod wrote.
+
+All 68 MW2 names were checked against the owner's MW2 `common.ff`: each is
+an `XAnimParts` there (the optional `MW2_COMMON_DEC` test repeats the check
+locally).
 
 **What MW2 plays → the BO1 animation**
 
@@ -144,42 +147,52 @@ wrote.
 | --- | --- |
 | `walk_cqb_f` (walk) | `ai_zombie_walk_v1` |
 | `walk_forward` | `ai_zombie_walk_v2` |
-| `walk_lowready_f` | `ai_zombie_walk_v4` |
 | `run_lowready_f` (run) | `ai_zombie_run_v2` |
 | `run_cqb_f_search_v1` | `ai_zombie_walk_fast_v1` |
 | `heat_run_loop` | `ai_zombie_run_v3` |
-| `sprint_loop_distant` | `ai_zombie_sprint_v1` |
-| `sprint1_loop` | `ai_zombie_sprint_v2` |
+| `sprint_loop_distant` (sprint) | `ai_zombie_sprint_v1` |
+| `sprint1_loop` (short sprint) | `ai_zombie_sprint_v2` |
 | standing idles (5) | `ai_zombie_idle_v1` |
-| standing deaths (17) | `ai_zombie_death_v1` / `ai_zombie_death_v2` |
+| `death.gsc` deaths (39: standing, extended, running, shotgun/sniper) | `ai_zombie_death_v1` / `ai_zombie_death_v2` |
+
+Explosion deaths stay MW2's, which throw the body like BO1's explosive
+deaths.
 
 **Rise and attack slots**
 
-The five flashbang reactions (`exposed_flashbang_v1`–`v5`) carry the rise and
-attack animations. Zombies are never flashed, and these reactions are in
-every level's `generic_human` tree, so they can be played with
-`animscripted`.
+BO1's rise and attack animations have no MW2 counterpart, so each one takes
+over a leaf of every level's `generic_human` tree that a zombie never plays
+itself. That lets `animscripted` name it.
 
-| Flashbang slot | BO1 animation | Used for |
+| MW2 leaf (why a zombie never plays it) | BO1 animation | Used for |
 | --- | --- | --- |
-| `exposed_flashbang_v1` | `ai_zombie_traverse_ground_v1_walk` | rise (walker) |
-| `exposed_flashbang_v2` | `ai_zombie_traverse_ground_v1_run` | rise (runner) |
-| `exposed_flashbang_v3` | `ai_zombie_traverse_ground_climbout_fast` | rise (sprinter) |
-| `exposed_flashbang_v4` | `ai_zombie_attack_v1` | attack |
-| `exposed_flashbang_v5` | `ai_zombie_attack_v2` | attack |
+| `exposed_flashbang_v1` (no flashbangs) | `ai_zombie_traverse_ground_v1_walk` | rise, walker, version 1 |
+| `exposed_idle_twitch` (surprise disabled) | `ai_zombie_traverse_ground_v2_walk_alta` | rise, walker, version 2 |
+| `exposed_flashbang_v2` | `ai_zombie_traverse_ground_v1_run` | rise, runner |
+| `exposed_flashbang_v3` | `ai_zombie_traverse_ground_climbout_fast` | rise, sprinter |
+| `exposed_flashbang_v4` / `v5` | `ai_zombie_attack_v1` / `v2` | `_zombie_melee` |
+| `grenade_return_*` (3; grenadeawareness 0) | `ai_zombie_attack_v4`, `v6`, `attack_forward_v1` | `_zombie_melee` |
+| `exposed_squat_down_grenade_f` | `ai_zombie_attack_forward_v2` | `_zombie_melee` |
+| `exposed_squat_idle_grenade_f`, `exposed_dive_grenade_b`, `exposed_idle_reacta`/`b` | `ai_zombie_walk_attack_v1`–`v4` | `_zombie_walk_melee` |
+| `exposed_dive_grenade_f`, `run_react_duck`, `run_react_flinch` (bullet reactions disabled) | `ai_zombie_run_attack_v1`–`v3` | `_zombie_run_melee` |
 
 ### Rising out of the ground (`do_zombie_rise`)
 
 Every new zombie plays the BO1 rise for its speed, as in
 `_zombiemode_spawner::do_zombie_rise`:
 
-- The animation starts 45 units under the spawn spot, facing the player.
-- The zombie is hidden for the first 0.35 s, like BO1's `hide_pop`.
+- Walkers use version 1 or 2 at random; runners and sprinters always use
+  version 1.
+- The animation starts under the spawn spot (45 units for version 1, 14 for
+  version 2), facing the player.
+- The zombie is hidden for the first 0.5 s, like BO1's `hide_pop`.
+- When the animation has ended, `stopanimscripted` makes sure the actor has
+  left scripted mode (a no-op if it already has).
 
 The `%anim` value is built natively. The DLL:
 
 1. reads the actor's anim tree (`0x19fd90`);
-2. finds the replaced flashbang entry in its `XAnim_s`;
+2. finds the replaced leaf in its `XAnim_s`;
 3. takes the script animtree index (`0x20b0e0`);
 4. pushes the result with `Scr_AddAnim` (`0x222070`, `VAR_ANIMATION`) into the
    native `animscripted`.
@@ -187,52 +200,85 @@ The `%anim` value is built natively. The DLL:
 While a zombie is rising it does not chase, attack, or count towards the
 failsafe.
 
-### Attacks (`zombie_melee`)
+### Attacks (`zombie_melee::MeleeCombat`)
 
 The attack decision is unchanged from Test38. Once a zombie attacks:
 
-- It plays a BO1 attack animation facing the player, and stays in place.
-- The hit lands at that animation's own `fire` notetrack: 46% of 1.8 s for
-  `attack_v1`.
+- It picks at random from BO1's `_zombie_melee` set (6 attacks) plus the
+  walk set (4) for walkers or the run set (3) for runners and sprinters,
+  exactly as `pick_zombie_melee_anim` does.
+- Every `fire` notetrack in that animation is one hit check (`self melee()`
+  in BO1): `attack_v2` swings five times over 7.2 s, `attack_v4` once.
+- The engine ends BO1's melee animscript when the target leaves melee range.
+  Here the swing is broken off (with `stopanimscripted`) once you are more
+  than 96 units away, after the first 250 ms; the zombie then chases again.
 - Without the import, the Test38 timing is used instead.
+
+## 3. BO1's zombie setup, through MW2's own scripts
+
+BO1's `zombie_spawn_init` turns a spawned AI into a zombie. Most of what it
+sets lives in script variables, which native code cannot write directly. But
+MW2's `maps/_utility` has a function for nearly each of them. The DLL runs
+those functions on every zombie, the way the engine runs its own callbacks:
+
+- `Scr_GetFunctionHandle` finds each function while the level's scripts link
+  (the same hook as the Spec Ops guard, now installed at startup so every
+  level's handles are known);
+- `Scr_ExecEntThreadNum` (`0x2226f0`) runs it as a thread on the zombie and
+  `Scr_FreeThread` (`0x222830`) releases it. `animscripted` itself runs
+  `animscripts\scripted::init` exactly this way (`0x183365`/`0x18336d`).
+
+| BO1 `zombie_spawn_init` | MW2 function |
+| --- | --- |
+| no weapon (zombie character) | `gun_remove()` |
+| `disableArrivals`, `disableExits` | `disable_arrivals()`, `disable_exits()` |
+| `a.disablepain` | `disable_pain()` |
+| no long death | `disable_long_death()` |
+| `disable_react()` | `disable_surprise()`, `disable_bulletwhizbyreaction()`, `disable_danger_react()` |
+| `chatInitialized = false` | `set_battlechatter(false)` |
+| sprint run cycle | `enable_sprint()` for sprinters |
+
+They run 300 ms after the spawn, once the actor's animscripts are set up and
+while it is still hidden underground. In addition, `allowdeath` (actor field
+`0x165`) is set at spawn so a zombie can die while rising or swinging, as
+BO1 sets it.
+
+## Physics
+
+BO1 zombies does not change player movement: its `_zombiemode.gsc` only sets
+fire damage, revive and last-stand dvars. MW2 and BO1 share the same player
+speed and jump values, so nothing is changed. Zombie movement speed comes
+from the imported animations' root motion, so walkers, runners and sprinters
+now move at BO1's speeds. Deaths ragdoll at BO1's own `start_ragdoll`
+notetracks.
 
 ## Not in this build
 
-**Models**
+**Models.** Zombies still have an MW2 soldier's body and head. The BO1
+zombie characters are not in `common_zombie.ff`. Kino der Toten's
+`zombie_theater.ff` (also transferred and checked against its CRC) holds
+them: `c_ger_honorguard_body1`/`body2` with heads `c_ger_zombie_head1`–`4`,
+plus the gib pieces. Their textures are in BO1's `.iwd` image archives, not
+in the zone. Importing them means converting the model, its surfaces and
+skinning, and building MW2 materials and Direct3D textures from BO1's
+images. That is the next milestone.
 
-- Zombies are still the map's MW2 soldiers.
-- They still hold a rifle, because MW2's animscripts attach and detach the
-  weapon model themselves.
+**Effects and sounds.** There are no dirt or rise effects, and no BO1 zombie
+sounds (BO1's sound notetracks are dropped).
 
-Importing the BO1 zombie models and their materials and textures (from
-`zombie_theater.ff` and others) is the next milestone.
+**Animation variety.** One animation per MW2 slot for the whole level, so
+every walker uses the same walk. BO1 picks one of 8 walks per zombie.
 
-**Rise effects**
+**Spec Ops HUD.** The Spec Ops timer, kill counter and objective text still
+show.
 
-- There are no dirt or rise effects.
-- There are no BO1 zombie sounds.
-
-**Animation choice**
-
-- One animation per MW2 slot for the whole level, so every walker uses the
-  same walk. BO1 picks one of 8 walks per zombie.
-- The sprint speed class uses the run animation: MW2 only sprints when a
-  script sets `self.sprint`.
-
-**Spec Ops HUD**
-
-The Spec Ops timer, kill counter and objective text still show.
-
-**Testing**
-
-No Windows gameplay test has been done yet.
+**Testing.** No Windows gameplay test has been done yet.
 
 ## Validation
 
 **Fixtures**
 
-New `bo1_xanim_tests` uses a synthetic BO1 zone with every part type. It
-checks:
+`bo1_xanim_tests` uses a synthetic BO1 zone with every part type. It checks:
 
 - the header and delta reads;
 - exact pool consumption;
@@ -240,17 +286,24 @@ checks:
 - the x64 image layout and its pointers.
 
 With `BO1_ZONE_DEC` set it also carves and rebuilds the real animations
-(local only).
+(local only). All 27 BO1 animations the mod uses carve cleanly from the
+owner's `common_zombie.ff`.
+
+`bo1_zombie_rules_tests` adds the attack hit times from `fire` notetracks,
+the break-off rule and the rise offsets.
 
 **Suites**
 
-All 22 C++ and 44 Python tests pass. The Python tests cover:
+All 22 C++ and 46 Python tests pass (one runs only where the owner's MW2
+`common.ff` is available locally; it passed here). The Python tests cover:
 
 - the Spec Ops map list;
 - the three Spec Ops end functions;
-- the animation slot table.
+- the animation slot table: one donor per BO1-only role, BO1's melee set
+  sizes, and (locally) every MW2 name present in `common.ff`;
+- the setup-function table.
 
-**Exact-native probe**
+**Exact-native probes**
 
 [level-prep-test39-probe.json](level-prep-test39-probe.json) runs the
 `tools/level_prep_probe.cpp` code against the retail code, mapped at its
@@ -261,9 +314,16 @@ preferred base. It confirms:
 - The animtree index helpers resolve the tree.
 - An anim pushed with `Scr_AddAnim` passes `Scr_GetAnim`'s tree check.
 
+[script-call-test39-probe.json](script-call-test39-probe.json) adds thread
+calls: arguments pushed with the exact `Scr_AddInt`, received in script
+order, the thread freed and the stack restored. The thread routine itself is
+a stand-in that applies `VM_Execute`'s parameter accounting, which the
+binding verifier checks byte for byte; running a compiled thread needs the
+live VM.
+
 **Binding verification**
 
-[zombie-bindings-test39.json](zombie-bindings-test39.json) adds these checks:
+[zombie-bindings-test39.json](zombie-bindings-test39.json) checks:
 
 - the loader tail jump;
 - `Scr_EndLoadScripts` releasing `scriptsPos`;
@@ -274,4 +334,16 @@ preferred base. It confirms:
 - `Scr_AddAnim` and `Scr_GetAnim`;
 - the `animscripted` argument layout;
 - the `XAnim_s` readers;
-- the four new method entries.
+- the four new method entries;
+- `Scr_ExecEntThread`/`Scr_ExecEntThreadNum`/`Scr_FreeThread`, their use by
+  `animscripted`, and `VM_Execute`'s parameter accounting;
+- the `allowdeath` actor field.
+
+**Native suites**
+
+All earlier exact-native suites and audits still pass: runtime, resources,
+iterator, animation, history, awareness, threat, crowd, fracture,
+glass_state, tables, layout, lifecycle, actor audit, consumer audit,
+script_vm, capacity sweep, script_parameters, capacity, fire_mode and
+owned_strings, plus the script_call, level_prep and binding checks above.
+The DllMain patches and generated capacity tables are unchanged from Test38.

@@ -103,4 +103,46 @@ inline ScriptCallResult CallScriptBuiltin(volatile NativeScriptParameters& p,con
     n.notify(0,0,p.incoming);
     return !p.incoming && !p.outgoing && p.top==top?ScriptCallResult::Ok:ScriptCallResult::Unbalanced;
 }
+
+// Runs a compiled script function as a thread on an entity, the way the
+// engine runs callbacks (e.g. animscripted -> animscripts\scripted::init):
+// arguments pushed last-to-first with Scr_Add*, Scr_ExecEntThreadNum(entnum,
+// class 0, handle, count) executes until the thread waits or ends and pops its
+// return value, Scr_FreeThread releases the thread id. Afterwards the stack
+// and both counters must be exactly as before.
+using ScriptExecEntThread=std::uint16_t(MOD_NATIVE_ABI*)(int,unsigned,int,unsigned);
+using ScriptFreeThread=void(MOD_NATIVE_ABI*)(std::uint16_t);
+inline ScriptCallResult CallScriptThread(volatile NativeScriptParameters& p,const ScriptCallNatives& n,ScriptExecEntThread exec,
+    ScriptFreeThread release,unsigned entnum,int handle,std::initializer_list<ScriptArg> args) {
+    if(!exec || !release || handle<=0 || entnum>0xffffu || !n.complete() || args.size()>kMaxScriptCallArgs) return ScriptCallResult::Invalid;
+    for(const auto& a:args) {
+        if(a.kind==ScriptArg::Kind::String && !a.text) return ScriptCallResult::Invalid;
+        if(a.kind==ScriptArg::Kind::Anim && !n.addAnim) return ScriptCallResult::Invalid;
+    }
+    if(p.incoming || p.outgoing || !p.top || (p.top&15)) return ScriptCallResult::Busy;
+    const auto top=p.top;
+    for(auto it=args.end();it!=args.begin();) {
+        --it;
+        switch(it->kind) {
+            case ScriptArg::Kind::Int: n.addInt(it->integer); break;
+            case ScriptArg::Kind::Float: n.addFloat(it->number); break;
+            case ScriptArg::Kind::String: n.addString(it->text); break;
+            case ScriptArg::Kind::Vector: n.addVector(it->vector.data()); break;
+            case ScriptArg::Kind::Entity: n.addEntityNum(it->entity,0); break;
+            case ScriptArg::Kind::Undefined: n.addUndefined(); break;
+            case ScriptArg::Kind::Anim: n.addAnim(it->entity); break;
+        }
+    }
+    if(p.incoming!=args.size() || p.top!=top+16*args.size()) {
+        n.notify(0,0,p.incoming);
+        return ScriptCallResult::Unbalanced;
+    }
+    const auto thread=exec(static_cast<int>(entnum),0,handle,static_cast<unsigned>(args.size()));
+    release(thread);
+    if(p.incoming || p.outgoing || p.top!=top) {
+        if(p.incoming) n.notify(0,0,p.incoming);
+        return ScriptCallResult::Unbalanced;
+    }
+    return ScriptCallResult::Ok;
+}
 } // namespace mod

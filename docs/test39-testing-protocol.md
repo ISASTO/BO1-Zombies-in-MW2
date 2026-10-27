@@ -1,7 +1,7 @@
 # Test39 install and test
 
 Build **0.1.38-zombies-test39**: zombies on Spec Ops maps, with BO1 zombie
-animations read from your own Black Ops install.
+animations read from your own Black Ops install and BO1's zombie setup.
 
 ## Install
 
@@ -25,22 +25,25 @@ What should happen:
 
 - **Loading.** The map loads by itself, and after about 3 s "ROUND 1"
   appears.
-- **The menu row.** The **BO1 animations** row shows something like
-  `BO1 35/35 SO 3`: animations applied, and the 3 Spec Ops end paths
-  disabled.
+- **The menu row.** The **BO1 animations** row shows `BO1 68/68 SO 3`:
+  every animation applied, and the 3 Spec Ops end paths disabled.
 - **Rising.** Zombies climb out of the ground at the map's enemy spawn
-  points. Walkers take about 10 s to rise; fast ones are quicker.
-- **Moving.** They walk, run and idle with BO1 zombie animations. They still
-  carry an MW2 rifle and have an MW2 soldier's body.
-- **Attacking.** They stop, swing at you with a BO1 attack, and the hit lands
-  partway through the swing.
-- **Dying.** They fall with BO1 death animations, or ragdoll.
+  points. Walkers take up to 10 s to rise; runners and sprinters are quicker.
+- **No rifles.** About a third of a second after a zombie appears, its rifle
+  is removed. Zombies do not talk (no MW2 battle chatter).
+- **Moving.** They walk, run, sprint and idle with BO1 zombie animations.
+  They still have an MW2 soldier's body.
+- **Attacking.** They stop and swing at you with one of BO1's attacks. Each
+  swing in the animation is a separate hit. If you back away, they stop
+  swinging and follow you.
+- **Dying.** They fall with BO1 death animations and then ragdoll. They can
+  be killed while rising or swinging.
 
 Then:
 
-1. Play a few rounds and walk around the whole area, including the place
-   where the Spec Ops mission would normally end. Check that no "Mission
-   complete" or "Mission failed" screen ever appears.
+1. Play to round 4 or 5 so you see runners and sprinters, and walk around
+   the whole area, including where the Spec Ops mission would normally end.
+   No "Mission complete" or "Mission failed" screen should appear.
 2. Select **Zombies info to log** once.
 3. Die on purpose. You should see GAME OVER, then "New game in N s", and the
    map should load again with a new game.
@@ -61,23 +64,26 @@ Run **CollectLogs.cmd** once at the end. For each map, write down:
 
 - **Rising.** Did zombies rise out of the ground? Did they pop up, or get
   stuck under the floor?
-- **Animations.** Did the walk, run, attack and death animations look
-  right?
+- **Rifles.** Were the rifles gone?
+- **Animations.** Did the walk, run, sprint, attack and death animations look
+  right? Did any zombie freeze in a pose?
 - **Mission screens.** Did any Spec Ops end screen appear?
 - **Errors.** Any dialog text, exactly as shown.
 
 Useful log lines:
 
 - **Startup:**
-  - `BO1_ASSETS state=READY found=16/16 …`
+  - `BO1_ASSETS state=READY found=27/27 …`
   - `LEVEL_PREP bindings=1 anim_builtins=4/4`
+  - `ZOMBIE_SETUP thread_calls=1 functions=10`
+  - `LEVEL_PREP hook_installed=1`
 - **Map load:**
-  - `LEVEL_SCRIPTS_LOADED map=so_… zombies_launch=1`
+  - `LEVEL_SCRIPTS_LOADED map=so_… zombies_launch=1 setup_functions=10/10`
   - `SO_GUARD function=… -> OP_End` (3 lines)
-  - `BO1_ANIM swap=35/35 …`
-  - `LEVEL_PREP map=… so_guards=3/3 anims=35`
+  - `BO1_ANIM swap=68/68 … special=17/17`
+  - `LEVEL_PREP map=… so_guards=3/3 anims=68`
 - **In play:**
-  - `BO1_ANIM tree=… script_tree=… rise=…`
+  - `BO1_ANIM tree=… script_tree=… special_leaves=17/17`
   - `ZOMBIE_SPAWN … rise=1`
-  - `ZOMBIE_PREP … rises=… animated_attacks=…`
+  - `ZOMBIE_PREP … rises=… animated_attacks=… setup_zombies=… setup_failures=0`
 - **After death:** `ZOMBIE_RELAUNCH …`

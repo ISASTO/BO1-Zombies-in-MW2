@@ -1,3 +1,6 @@
+#include <utility>
+#include <vector>
+#include <string>
 #include "bo1_zombie_rules.hpp"
 #include <cstdlib>
 #include <deque>
@@ -94,5 +97,22 @@ int main() {
     Check(q.cancelQueued()==6 && q.status().queued==0 && q.status().killed==6 && q.invariant(),"cancelled obligations count as killed");
     q.tick(1000); q.tick(9250); q.tick(10250);
     Check(q.status().phase==RoundPhase::Between,"a cancelled round ends at the next completion poll");
+    // zombie_melee: one hit per "fire" notetrack (BO1 attack_v2 has five,
+    // attack_v4 one, walk attacks a footstep after the swing).
+    {
+        std::vector<std::pair<std::string,float>> v2{{"sndnt#zmb_attack_whoosh",.07f},{"fire",.1f},{"fire",.33f},{"fire",.53f},
+            {"fire",.62f},{"fire",.74f},{"end",1.f}};
+        int fires[8]{};
+        Check(AttackFireTimes(v2,7166,fires,8)==5 && fires[0]==716 && fires[4]==5302,"attack_v2 swings five times");
+        Check(AttackFireTimes(v2,7166,fires,2)==2,"fire list is bounded");
+        std::vector<std::pair<std::string,float>> walk{{"fire",.19f},{"footstep_right_small",.56f},{"end",1.f}};
+        Check(AttackFireTimes(walk,1066,fires,8)==1 && fires[0]==202,"walk attack swings once");
+        Check(AttackFireTimes(walk,0,fires,8)==0,"no length, no swings");
+        std::vector<std::pair<std::string,float>> unsorted{{"fire",.6f},{"fire",.2f}};
+        Check(AttackFireTimes(unsorted,1000,fires,8)==2 && fires[0]==200 && fires[1]==600,"fire times are in time order");
+    }
+    Check(!BreakOffAttack(100,500.f*500.f),"a swing is never cancelled in its first 250 ms");
+    Check(BreakOffAttack(300,97.f*97.f) && !BreakOffAttack(300,95.f*95.f),"break off beyond melee distance + 32");
+    Check(RiseDepth(1)==45.f && RiseDepth(2)==14.f && kRiseShowMilliseconds==500,"do_zombie_rise offsets and hide_pop");
     std::cout<<"BO1 zombie rules fixtures passed\n";
 }

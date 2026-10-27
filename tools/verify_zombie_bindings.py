@@ -20,7 +20,7 @@ def verify(path,include=Path('include')):
     data=path.read_bytes()
     if hashlib.sha256(data).hexdigest()!=EXPECTED_SHA256:raise ValueError('Exact executable SHA256 mismatch')
     pe=pefile.PE(data=data)
-    text=(include/'zombie_bindings.hpp').read_text()
+    text=(include/'zombie_bindings.hpp').read_text()+(include/'native_hooks.hpp').read_text()
     def value(name):
         m=re.search(r'\b'+name+r'\s*=\s*(0x[0-9a-fA-F]+|[0-9.]+f?)',text)
         if not m:raise ValueError(f'{name} missing from zombie_bindings.hpp')
@@ -62,7 +62,8 @@ def verify(path,include=Path('include')):
         'dropweapon':('kActorDropWeapon',0),'maxsightdistsqrd':('kActorMaxSightDistSq',3),
         'keepclaimednode':('kActorKeepClaimedNode',2),'requestarrivalnotify':('kActorRequestArrival',0),
         'desiredangle':('kActorDesiredAngle',3),'allowpain':('kActorAllowPain',2),
-        'ignoresuppression':('kActorIgnoreSuppression',0),'nododgemove':('kActorNoDodgeMove',2)}
+        'ignoresuppression':('kActorIgnoreSuppression',0),'nododgemove':('kActorNoDodgeMove',2),
+        'allowdeath':('kActorAllowDeath',2)}
     for name,(constant,kind) in fields.items():
         matched=False
         for at,_ in pairs(name):
@@ -171,12 +172,32 @@ def verify(path,include=Path('include')):
         rva=int(rva,16) if isinstance(rva,str) else rva
         if sum(1 for _,f in pairs(name) if f==rva)!=1:raise ValueError(f'Method {name} not at {rva:#x}')
         anim_builtins[name]=hex(rva)
+    # Script threads on entities, as animscripted runs animscripts\scripted::init:
+    # Scr_ExecEntThread(ent,handle,count) -> Scr_ExecEntThreadNum(ent->number,0,handle,count),
+    # then Scr_FreeThread(id) -> RemoveRefToObject.
+    for rva,prologue in (('kScrExecEntThreadNumRva','kScrExecEntThreadNumPrologue'),('kScrExecEntThreadRva','kScrExecEntThreadPrologue'),
+                         ('kScrFreeThreadRva','kScrFreeThreadPrologue')):
+        expected=bytes_of(prologue)
+        if get(value(rva),len(expected))!=expected:raise ValueError(f'{rva} prologue differs')
+    if jump_target(value('kScrExecEntThreadRva')+12)!=value('kScrExecEntThreadNumRva'):raise ValueError('Scr_ExecEntThread tail differs')
+    if jump_target(value('kScrFreeThreadRva')+3)!=0x21db10:raise ValueError('Scr_FreeThread tail differs')
+    if call_target(value('kAnimScriptedExecCallRva'))!=value('kScrExecEntThreadRva') or call_target(value('kAnimScriptedFreeCallRva'))!=value('kScrFreeThreadRva'):
+        raise ValueError('animscripted no longer runs scripted::init through the thread routines')
+    # Handle is program-buffer relative; VM_Execute runs it; the return value is
+    # popped and inparamcount (scrVmPub+8) decremented before returning the id.
+    if rip(0x22270a,3,7)!=value('kScrProgramBufferRva') or call_target(0x22274a)!=0x224700 or rip(0x22278b,2,6)!=value('kScriptParametersRva')+8:
+        raise ValueError('Scr_ExecEntThreadNum layout differs')
+    # VM_Execute releases pending outparams first and leaves inparamcount = remaining + 1.
+    if rip(0x224712,2,7)!=value('kScriptParametersRva')+12 or get(0x22485b,9)!=bytes.fromhex('8d 4e 01 89 0d 54 fc 6c 01'):
+        raise ValueError('VM_Execute parameter accounting differs')
+    report['script_threads']={'exec_ent_thread_num':hex(value('kScrExecEntThreadNumRva')),'free_thread':hex(value('kScrFreeThreadRva')),
+        'setup_functions':re.findall(r'\{"(maps/[a-z_]+)","([a-z_]+)",([0-9])\}',text)}
     report['level_prep']={'load_hook':hex(value('kLevelScriptsLoadedJumpRva')),'get_function_handle':hex(value('kScrGetFunctionHandleRva')),
         'op_end':hex(end),'find_asset_entry':hex(value('kDbFindXAssetEntryRva')),'sl_get_string':hex(value('kSlGetStringRva')),
         'scr_add_anim':hex(value('kScrAddAnimRva')),'anim_builtins':anim_builtins,
         'specops_end_functions':re.findall(r'\{"(maps/[a-z_]+)","([a-z_]+)"\}',text)}
     report.update({'goal_entity':'setgoalentity replica: 0x1244b0 clear, 0x15b190 handle, node/volume zero',
-        'command_buffer':'Cbuf_AddText(0,"spmap <map>\\n") (critical section 0x24)',
+        'command_buffer':'Cbuf_AddText(0,"set specialops 1; ...; devmap <so_map>\\n") (critical section 0x24)',
         'damage_args':'G_Damage(targ,inflictor,attacker,dir,point,damage,dflags,mod,weapon,hitloc,...)',
         'scope':'Static exact-build checks; gameplay requires owner testing'})
     return report

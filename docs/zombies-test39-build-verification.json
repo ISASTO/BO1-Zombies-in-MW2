@@ -1,0 +1,93 @@
+{
+ "version": "0.1.38-zombies-test39",
+ "base_commit": "262298f",
+ "executable_sha256": "fb7e8a987c371dea7b666091b0b9e2011c0cd9cd277b191ad453d11d557dd777",
+ "dll_sha256": "4ff1fc41dfccd695738dacea18c3b641770b4b98300ad882c83062bc0553393e",
+ "dll_bytes": 9200764,
+ "compiler": "xPack MinGW-w64 GCC 13.2.0 (posix threads, UCRT), RelWithDebInfo, static GCC/C++ runtime",
+ "pe_checks": {
+  "amd64_pe32_plus": true,
+  "exact_ten_exports": true,
+  "aslr_nx": true,
+  "no_gcc_runtime_dlls": true
+ },
+ "exports": [
+  "D3DPERF_BeginEvent",
+  "D3DPERF_EndEvent",
+  "D3DPERF_GetStatus",
+  "D3DPERF_QueryRepeatFrame",
+  "D3DPERF_SetMarker",
+  "D3DPERF_SetOptions",
+  "D3DPERF_SetRegion",
+  "DebugSetMute",
+  "Direct3DCreate9",
+  "Direct3DCreate9Ex"
+ ],
+ "imports": [
+  "advapi32.dll",
+  "bcrypt.dll",
+  "dbghelp.dll",
+  "gdi32.dll",
+  "kernel32.dll",
+  "user32.dll",
+  "winmm.dll",
+  "api-ms-win-crt-*-l1-1-0.dll (11 UCRT API sets)"
+ ],
+ "imports_added_since_test38": [
+  "advapi32.dll (registry lookup of the Black Ops install)"
+ ],
+ "early_dllmain_native_edits_unchanged": true,
+ "third_party": {
+  "miniz": "tinfl inflate only, MIT, third_party/miniz (VERSION records the upstream commit)"
+ },
+ "native_cxx_tests": {
+  "passed": 22,
+  "failed": 0,
+  "new": [
+   "bo1_xanim_tests"
+  ],
+  "updated": [
+   "bo1_zombie_rules_tests"
+  ]
+ },
+ "python_tests": {
+  "passed": 46,
+  "failed": 0,
+  "locally_gated": [
+   "test_mw2_slot_anims_exist_when_local_zone_is_available (passed with the owner's common.ff)"
+  ]
+ },
+ "native_suites_and_audits_passed": [
+  "runtime",
+  "resources",
+  "iterator",
+  "animation",
+  "history",
+  "awareness",
+  "threat",
+  "crowd",
+  "fracture",
+  "glass_state",
+  "tables",
+  "layout",
+  "lifecycle",
+  "audit",
+  "consumers",
+  "script_vm",
+  "sweep",
+  "script_call",
+  "level_prep",
+  "bindings",
+  "script_parameters",
+  "capacity",
+  "fire_mode",
+  "owned_strings"
+ ],
+ "native_suites_and_audits_failed": [],
+ "installer_fixture": "pwsh 7.5.3 on Linux: Test38 installed, Test39 refuses to overwrite, Test38 uninstalled, Test39 installed (Black Ops folder found next to MW2, bo1_path.txt written), CollectLogs zipped 2 logs, Test39 uninstalled keeping logs/backups/settings",
+ "bo1_inputs": {
+  "common_zombie.ff_sha256": "f812069ef2ff446b97051e75d6a5ee49687a8085218b8f79dc2d8237e543117e",
+  "anims_carved": "27/27",
+  "note": "owner's file, read at run time, never shipped"
+ }
+}

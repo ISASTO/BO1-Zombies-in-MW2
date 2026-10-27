@@ -6,6 +6,7 @@
 #include <cstdint>
 #include <functional>
 #include <optional>
+#include <string>
 
 namespace mod::bo1 {
 // Portable ports of the solo BO1 zombie rules, from the owner's local
@@ -79,10 +80,36 @@ inline std::int64_t FollowRepathMilliseconds(float distanceSquared,const RandomI
 
 // ---- Melee: zombie_melee.gsc; damage is self.meleeDamage (zombie_spawn_init)
 inline constexpr int kZombieMeleeDamage=60,kDogMeleeDamage=40;
-// No BO1 attack animation is loaded, so these stand in for the "fire" and
-// "end" notetracks of the attack animation (an adapter value, not BO1 data).
+// When no BO1 attack animation is available these stand in for the "fire"
+// and "end" notetracks of the attack animation (adapter values).
 inline constexpr std::int64_t kAttackFireMilliseconds=450,kAttackEndMilliseconds=1100;
 inline constexpr float kAttackHitRangeSquared=72.f*72.f;
+// MeleeCombat: every "fire" notetrack of the attack anim is one melee() hit
+// check; the anim ends at "end" (one cycle for looping run attacks). Times
+// in milliseconds from the attack start, in notetrack order, at most `limit`.
+template<class Notes> std::size_t AttackFireTimes(const Notes& notes,int lengthMs,int* out,std::size_t limit) {
+    std::size_t count=0;
+    if(lengthMs<=0) return 0;
+    for(const auto& [name,time]:notes) {
+        if(count>=limit) break;
+        if(name=="fire" && time>=0.f && time<=1.f) out[count++]=static_cast<int>(time*static_cast<float>(lengthMs));
+    }
+    std::sort(out,out+count);
+    return count;
+}
+// The engine ends the melee animscript when the enemy leaves melee range
+// (zombie_melee.gsc loops only while melee continues): an attack is broken
+// off once the target is beyond the melee distance plus a 32-unit margin,
+// after a short grace period so a swing is not cancelled on its first frame.
+inline constexpr float kAttackBreakOffSquared=(kZombieMeleeAttackDist+32.f)*(kZombieMeleeAttackDist+32.f);
+inline constexpr int kAttackBreakOffGraceMs=250;
+inline bool BreakOffAttack(int elapsedMs,float distanceSquared) {
+    return elapsedMs>=kAttackBreakOffGraceMs && distanceSquared>kAttackBreakOffSquared;
+}
+// do_zombie_rise: version 2 (walkers only, 50%) starts 14 units under the
+// spot, version 1 45 units; hide_pop shows the zombie after 0.5 s.
+inline float RiseDepth(int version) {return version==2?14.f:45.f;}
+inline constexpr int kRiseShowMilliseconds=500;
 
 // ---- Failsafe: round_spawn_failsafe (_zombiemode.gsc)
 inline constexpr std::int64_t kFailsafeIntervalMilliseconds=30000;

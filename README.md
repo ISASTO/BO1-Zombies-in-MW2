@@ -15,12 +15,14 @@ installer; nothing BO1 is shipped). Zombies:
 
 - climb out of the ground with BO1's rise animations;
 - walk, run, sprint and idle with BO1's animations;
-- swing with BO1's attack animations, landing the hit at the anim's `fire`
-  notetrack;
-- die with BO1's death animations.
+- swing with BO1's full attack set (walker and runner variants), one hit per
+  swing in the animation, and break off to chase when you back away;
+- die with BO1's death animations, and can die while rising or swinging.
 
-These animations are converted into MW2's own XAnimParts at run time. BO1
-models are the next step. See [Test39](docs/zombies-test39.md) and the
+These animations are converted into MW2's own XAnimParts at run time. Each
+zombie is also set up the way BO1's `zombie_spawn_init` does it, through
+MW2's own script functions: no rifle, no pain or battle chatter, and real
+sprinters. BO1 models are the next step. See [Test39](docs/zombies-test39.md) and the
 [Test39 test instructions](docs/test39-testing-protocol.md).
 
 **Test38 added the first playable zombies mode.** Open it with F4 → ZOMBIE MODE

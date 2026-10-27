@@ -1332,9 +1332,14 @@ struct ZombieActor {
     bool attacking=false,fired=false,sprintApplied=false;
     int health=0,reconfigureAt=0;bool damaged=false,reconfigured=false;
     // Test39: BO1 rise out of the ground and animated attacks.
-    int risingUntil=0,showAt=-1;bool rose=false;
-    int attackFireMs=static_cast<int>(bo1::kAttackFireMilliseconds),attackEndMs=static_cast<int>(bo1::kAttackEndMilliseconds);
+    int risingUntil=0,showAt=-1;bool rose=false,riseStopped=false;
+    // zombie_melee: one hit check per "fire" notetrack of the attack anim.
+    static constexpr std::size_t kMaxFires=8;
+    std::array<int,kMaxFires> fireMs{};std::size_t fireCount=0,nextFire=0;
+    int attackEndMs=static_cast<int>(bo1::kAttackEndMilliseconds);
     bool animatedAttack=false;
+    // MW2 maps/_utility setup (gun_remove, disable_pain, ...) after spawn init.
+    bool scriptSetup=false;
 };
 struct ZombieDrop { bo1::Powerup type=bo1::Powerup::None; AiPoint origin{}; int spawned=0; };
 struct ZombieGameState {
@@ -1358,7 +1363,7 @@ struct ZombieGameState {
     int readySince=-1;
     // Test39: the Spec Ops map this game was launched on, for GAME OVER relaunch.
     std::string launchedMap; ULONGLONG relaunchAt=0; ZombieSettings launchSettings;
-    unsigned rises=0,animatedAttacks=0,riseFailures=0;
+    unsigned rises=0,animatedAttacks=0,riseFailures=0,attacksBrokenOff=0,setupZombies=0;
 } zg;
 int ZombieRandom(int n) {
     zg.random^=zg.random<<13;zg.random^=zg.random>>17;zg.random^=zg.random<<5;
@@ -1384,15 +1389,22 @@ void Announce(const char* text) {Builtin(kBuiltinIPrintLnBold,0,{ScriptArg::Stri
 //    zombie animations read from the owner's own common_zombie.ff. The MW2
 //    XAnimParts headers are restored when the next level loads, before any
 //    actor of that level exists.
-enum class AnimRole : int {Move,Idle,Death,RiseWalk,RiseRun,RiseSprint,Attack1,Attack2,Count};
+enum class AnimRole : int {Move,Idle,Death,
+    RiseWalk,RiseWalk2,RiseRun,RiseSprint,                                   // _zombie_rise_anims
+    Attack1,Attack2,Attack4,Attack6,AttackForward1,AttackForward2,             // _zombie_melee
+    WalkAttack1,WalkAttack2,WalkAttack3,WalkAttack4,                            // _zombie_walk_melee
+    RunAttack1,RunAttack2,RunAttack3,Count};                                    // _zombie_run_melee
 struct AnimSlot { const char* mw2; const char* bo1; AnimRole role; };
-// MW2 animscripts: walk.gsc (walk_cqb_f), run.gsc (run_lowready_f, CQB run,
-// sprints), stop.gsc idles, death.gsc standing deaths. The five flashbang
-// reactions (flashed.gsc; zombies are never flashed) carry the BO1 rise and
-// attack anims so animscripted can reference them in the generic_human tree.
+// MW2 animscripts (animset.gsc, walk.gsc, run.gsc, stop.gsc, death.gsc):
+// walkers play walk_cqb_f, runners run_lowready_f, sprinters (enable_sprint)
+// sprint_loop_distant/sprint1_loop; idles are the casual/exposed alert idles;
+// deaths are death.gsc's standing, running and strong-hit lists.
+// BO1-only anims (rise, melee) need a leaf in the generic_human tree that a
+// zombie never plays itself, so animscripted can name them: flashbang
+// reactions (no flashbangs in the loadout), grenade return/cower anims
+// (grenadeawareness 0) and surprise/bullet reactions (disabled at setup).
 inline constexpr AnimSlot kAnimSlots[]={
     {"walk_cqb_f","ai_zombie_walk_v1",AnimRole::Move},{"walk_forward","ai_zombie_walk_v2",AnimRole::Move},
-    {"walk_lowready_f","ai_zombie_walk_v4",AnimRole::Move},
     {"run_lowready_f","ai_zombie_run_v2",AnimRole::Move},{"run_cqb_f_search_v1","ai_zombie_walk_fast_v1",AnimRole::Move},
     {"heat_run_loop","ai_zombie_run_v3",AnimRole::Move},
     {"sprint_loop_distant","ai_zombie_sprint_v1",AnimRole::Move},{"sprint1_loop","ai_zombie_sprint_v2",AnimRole::Move},
@@ -1407,12 +1419,40 @@ inline constexpr AnimSlot kAnimSlots[]={
     {"exposed_death_groin","ai_zombie_death_v1",AnimRole::Death},{"exposed_death_blowback","ai_zombie_death_v2",AnimRole::Death},
     {"stand_death_face","ai_zombie_death_v1",AnimRole::Death},{"stand_death_headshot_slowfall","ai_zombie_death_v2",AnimRole::Death},
     {"stand_death_tumbleback","ai_zombie_death_v1",AnimRole::Death},{"stand_death_shoulderback","ai_zombie_death_v2",AnimRole::Death},
-    {"stand_death_leg","ai_zombie_death_v1",AnimRole::Death},
+    {"stand_death_leg","ai_zombie_death_v1",AnimRole::Death},{"stand_death_crotch","ai_zombie_death_v2",AnimRole::Death},
+    {"stand_death_guts","ai_zombie_death_v1",AnimRole::Death},{"stand_death_fallside","ai_zombie_death_v2",AnimRole::Death},
+    {"stand_death_head_straight_back","ai_zombie_death_v1",AnimRole::Death},{"stand_death_chest_stunned","ai_zombie_death_v2",AnimRole::Death},
+    {"exposed_death_nerve","ai_zombie_death_v1",AnimRole::Death},{"exposed_death_firing_02","ai_zombie_death_v2",AnimRole::Death},
+    {"exposed_death_firing","ai_zombie_death_v1",AnimRole::Death},{"exposed_death","ai_zombie_death_v2",AnimRole::Death},
+    {"run_death_facedown","ai_zombie_death_v1",AnimRole::Death},{"run_death_roll","ai_zombie_death_v2",AnimRole::Death},
+    {"run_death_fallonback","ai_zombie_death_v1",AnimRole::Death},{"run_death_flop","ai_zombie_death_v2",AnimRole::Death},
+    {"death_shotgun_legs","ai_zombie_death_v1",AnimRole::Death},{"death_stand_sniper_leg","ai_zombie_death_v2",AnimRole::Death},
+    {"death_shotgun_back_v1","ai_zombie_death_v1",AnimRole::Death},{"death_stand_sniper_chest1","ai_zombie_death_v2",AnimRole::Death},
+    {"death_stand_sniper_chest2","ai_zombie_death_v1",AnimRole::Death},{"death_stand_sniper_spin1","ai_zombie_death_v2",AnimRole::Death},
+    {"death_stand_sniper_spin2","ai_zombie_death_v1",AnimRole::Death},{"death_shotgun_spinl","ai_zombie_death_v2",AnimRole::Death},
+    {"death_shotgun_spinr","ai_zombie_death_v1",AnimRole::Death},
     {"exposed_flashbang_v1","ai_zombie_traverse_ground_v1_walk",AnimRole::RiseWalk},
+    {"exposed_idle_twitch","ai_zombie_traverse_ground_v2_walk_alta",AnimRole::RiseWalk2},
     {"exposed_flashbang_v2","ai_zombie_traverse_ground_v1_run",AnimRole::RiseRun},
     {"exposed_flashbang_v3","ai_zombie_traverse_ground_climbout_fast",AnimRole::RiseSprint},
     {"exposed_flashbang_v4","ai_zombie_attack_v1",AnimRole::Attack1},
-    {"exposed_flashbang_v5","ai_zombie_attack_v2",AnimRole::Attack2}};
+    {"exposed_flashbang_v5","ai_zombie_attack_v2",AnimRole::Attack2},
+    {"grenade_return_running_throw_forward","ai_zombie_attack_v4",AnimRole::Attack4},
+    {"grenade_return_standing_throw_forward_1","ai_zombie_attack_v6",AnimRole::Attack6},
+    {"grenade_return_standing_throw_overhand_forward","ai_zombie_attack_forward_v1",AnimRole::AttackForward1},
+    {"exposed_squat_down_grenade_f","ai_zombie_attack_forward_v2",AnimRole::AttackForward2},
+    {"exposed_squat_idle_grenade_f","ai_zombie_walk_attack_v1",AnimRole::WalkAttack1},
+    {"exposed_dive_grenade_b","ai_zombie_walk_attack_v2",AnimRole::WalkAttack2},
+    {"exposed_idle_reacta","ai_zombie_walk_attack_v3",AnimRole::WalkAttack3},
+    {"exposed_idle_reactb","ai_zombie_walk_attack_v4",AnimRole::WalkAttack4},
+    {"exposed_dive_grenade_f","ai_zombie_run_attack_v1",AnimRole::RunAttack1},
+    {"run_react_duck","ai_zombie_run_attack_v2",AnimRole::RunAttack2},
+    {"run_react_flinch","ai_zombie_run_attack_v3",AnimRole::RunAttack3}};
+// level._zombie_melee / _zombie_walk_melee / _zombie_run_melee (_zombiemode.gsc).
+inline constexpr AnimRole kMeleeAnims[]={AnimRole::Attack2,AnimRole::Attack4,AnimRole::Attack6,AnimRole::Attack1,AnimRole::AttackForward1,AnimRole::AttackForward2};
+inline constexpr AnimRole kWalkMeleeAnims[]={AnimRole::WalkAttack1,AnimRole::WalkAttack2,AnimRole::WalkAttack3,AnimRole::WalkAttack4};
+inline constexpr AnimRole kRunMeleeAnims[]={AnimRole::RunAttack1,AnimRole::RunAttack2,AnimRole::RunAttack3};
+inline constexpr int kFirstSpecialRole=static_cast<int>(AnimRole::RiseWalk);
 inline constexpr int kAnimRoleCount=static_cast<int>(AnimRole::Count);
 using FindAssetEntryFn=std::uintptr_t(*)(int,const char*);
 using SlGetStringFn=unsigned(*)(const char*,unsigned,unsigned);
@@ -1433,6 +1473,11 @@ struct LevelPrep {
     std::vector<std::pair<std::uintptr_t,std::uint8_t>> guards;
     std::unordered_map<std::uintptr_t,TreeAnims> trees;
     unsigned slotsWanted=0;
+    // Compiled maps/_utility setup functions of the level being played
+    // (Scr_GetFunctionHandle is only valid while the level's scripts link).
+    bool threads=false;
+    std::array<int,static_cast<std::size_t>(SetupFunction::Count)> setup{};
+    unsigned setupCalls=0,setupFailures=0;
 } prep;
 bool WriteProtected(std::uintptr_t at,const void* bytes,std::size_t size) {
     DWORD old=0;
@@ -1442,6 +1487,17 @@ bool WriteProtected(std::uintptr_t at,const void* bytes,std::size_t size) {
     return true;
 }
 const bo1xanim::Anim* RoleAnim(AnimRole role) {return prep.roleAnim[static_cast<std::size_t>(role)];}
+// Runs one maps/_utility setup function on a zombie (see kSetupFunctions).
+bool RunSetupFunction(unsigned entnum,SetupFunction f,std::initializer_list<ScriptArg> args={}) {
+    const auto n=static_cast<std::size_t>(f);
+    if(!prep.threads || !prep.setup[n] || args.size()!=static_cast<std::size_t>(kSetupFunctions[n].params)) return false;
+    auto& p=*reinterpret_cast<volatile NativeScriptParameters*>(aiProfile.base+kScriptParametersRva);
+    const auto r=CallScriptThread(p,scriptNatives,reinterpret_cast<ScriptExecEntThread>(aiProfile.base+kScrExecEntThreadNumRva),
+        reinterpret_cast<ScriptFreeThread>(aiProfile.base+kScrFreeThreadRva),entnum,prep.setup[n],args);
+    ++prep.setupCalls;
+    if(r!=ScriptCallResult::Ok && ++prep.setupFailures<=24) Log("ZOMBIE_SETUP entity=%u function=%s result=%s",entnum,kSetupFunctions[n].function,ScriptCallText(r));
+    return r==ScriptCallResult::Ok;
+}
 // BO1 sound notetracks ("sndnt#alias") name BO1 aliases MW2 does not have.
 bo1xanim::Anim ForMw2(const bo1xanim::Anim& source) {
     bo1xanim::Anim a=source;
@@ -1464,6 +1520,7 @@ void RestoreLevelPrep(const char* reason) {
         Log("LEVEL_PREP restored=1 reason=%s anims=%llu map=%s",reason,static_cast<unsigned long long>(prep.applied.size()),prep.map.c_str());
     prep.applied.clear();prep.images.clear();prep.trees.clear();
     prep.roleParts.fill(0);prep.roleAnim.fill(nullptr);prep.guards.clear();prep.prepared=false;prep.map.clear();
+    prep.setup.fill(0);
 }
 unsigned ApplySpecOpsGuards() {
     const auto base=aiProfile.base;
@@ -1528,10 +1585,26 @@ unsigned ApplyAnimSwaps() {
         const auto r=static_cast<std::size_t>(slot.role);
         if(!prep.roleParts[r]) {prep.roleParts[r]=parts;prep.roleAnim[r]=source;}
     }
-    Log("BO1_ANIM swap=%u/%u images=%llu strings=%llu rise=%d/%d/%d attack=%d/%d",applied,prep.slotsWanted,
-        static_cast<unsigned long long>(prep.images.size()),static_cast<unsigned long long>(interned.size()),
-        prep.roleParts[3]!=0,prep.roleParts[4]!=0,prep.roleParts[5]!=0,prep.roleParts[6]!=0,prep.roleParts[7]!=0);
+    int special=0;
+    for(int k=kFirstSpecialRole;k<kAnimRoleCount;++k) if(prep.roleParts[static_cast<std::size_t>(k)]) ++special;
+    Log("BO1_ANIM swap=%u/%u images=%llu strings=%llu special=%d/%d",applied,prep.slotsWanted,
+        static_cast<unsigned long long>(prep.images.size()),static_cast<unsigned long long>(interned.size()),special,kAnimRoleCount-kFirstSpecialRole);
     return applied;
+}
+unsigned CaptureSetupFunctions() {
+    const auto handleOf=reinterpret_cast<GetFunctionHandleFn>(aiProfile.base+kScrGetFunctionHandleRva);
+    std::uintptr_t program=0;std::uint32_t size=0;
+    if(!Value(aiProfile.base+kScrProgramBufferRva,program) || !Value(aiProfile.base+kScrProgramSizeRva,size) || !program || !size) return 0;
+    unsigned found=0;
+    for(std::size_t n=0;n<kSetupFunctions.size();++n) {
+        const int handle=handleOf(kSetupFunctions[n].file,kSetupFunctions[n].function);
+        std::uint8_t op=0xff;
+        // A compiled function starts with an opcode the VM dispatch accepts.
+        if(handle>0 && static_cast<std::uint32_t>(handle)<size && Value(program+static_cast<std::uint32_t>(handle),op) && op<=0x8b) {
+            prep.setup[n]=handle;++found;
+        } else Log("ZOMBIE_SETUP function=%s::%s present=0",kSetupFunctions[n].file,kSetupFunctions[n].function);
+    }
+    return found;
 }
 void PrepareLevelScripts() {
     char map[96]{};bool launch=false;
@@ -1540,7 +1613,9 @@ void PrepareLevelScripts() {
         RestoreLevelPrep("NEXT_LOAD");
         const bool named=ReadCurrentMapName(map,sizeof(map));
         launch=named && zg.startWanted && !zg.pendingMap.empty() && zg.pendingMap==map;
-        Log("LEVEL_SCRIPTS_LOADED map=%s zombies_launch=%d",named?map:"?",launch);
+        const unsigned setup=prep.threads?CaptureSetupFunctions():0u;
+        Log("LEVEL_SCRIPTS_LOADED map=%s zombies_launch=%d setup_functions=%u/%llu",named?map:"?",launch,setup,
+            static_cast<unsigned long long>(kSetupFunctions.size()));
         if(!launch || !prep.bindings) return;
     }
     // The animation load started at boot; wait for it without holding the
@@ -1598,8 +1673,10 @@ std::optional<std::uint32_t> AnimValue(const AiEntity& e,AnimRole role) {
         }
         const int index=reinterpret_cast<AnimTreeIndexFn>(base+kAnimTreeIndexRva)(anims);
         if(index>=0 && index<0x10000 && reinterpret_cast<AnimTreeByIndexFn>(base+kAnimTreeByIndexRva)(index)==anims) {t.tree=index;t.valid=true;}
-        Log("BO1_ANIM tree=0x%llx script_tree=%d size=%u rise=%d/%d/%d attack=%d/%d",static_cast<unsigned long long>(anims),t.tree,size,
-            t.index[3],t.index[4],t.index[5],t.index[6],t.index[7]);
+        int leaves=0;
+        for(int k=kFirstSpecialRole;k<kAnimRoleCount;++k) if(t.index[static_cast<std::size_t>(k)]>=0) ++leaves;
+        Log("BO1_ANIM tree=0x%llx script_tree=%d size=%u special_leaves=%d/%d",static_cast<unsigned long long>(anims),t.tree,size,
+            leaves,kAnimRoleCount-kFirstSpecialRole);
     }
     if(!t.valid || t.index[r]<0) return std::nullopt;
     return (static_cast<std::uint32_t>(t.tree)<<16)|static_cast<std::uint32_t>(t.index[r]);
@@ -1608,20 +1685,39 @@ int AnimMilliseconds(AnimRole role,int fallback) {
     const auto* a=RoleAnim(role);
     return a && a->lengthSeconds()>0.f?static_cast<int>(a->lengthSeconds()*1000.f):fallback;
 }
-// do_zombie_rise: the anim starts 45 units under the spawn spot, facing the
-// player; hidden for the first moment like BO1's hide_pop.
+// do_zombie_rise: walkers pick rise version 1 or 2 at random (runners and
+// sprinters always 1); the anim starts under the spawn spot (45 or 14 units),
+// facing the player, hidden for the first 0.5 s like BO1's hide_pop.
 void StartRise(ZombieActor& z,const AiEntity& e,const AiPoint& player,int time) {
     if(z.dog) return;
-    const auto role=z.speed==bo1::MoveSpeed::Walk?AnimRole::RiseWalk:z.speed==bo1::MoveSpeed::Run?AnimRole::RiseRun:AnimRole::RiseSprint;
-    const auto value=AnimValue(e,role);
+    int version=1;
+    if(z.speed==bo1::MoveSpeed::Walk && ZombieRandom(2)) version=2;
+    auto role=z.speed==bo1::MoveSpeed::Walk?(version==2?AnimRole::RiseWalk2:AnimRole::RiseWalk):
+        z.speed==bo1::MoveSpeed::Run?AnimRole::RiseRun:AnimRole::RiseSprint;
+    auto value=AnimValue(e,role);
+    if(!value && version==2) {version=1;role=AnimRole::RiseWalk;value=AnimValue(e,role);}
     if(!value) return;
     const auto ref=ScriptEntityRef(e.number);
-    AiPoint origin=e.origin;origin[2]-=45.f;
+    AiPoint origin=e.origin;origin[2]-=bo1::RiseDepth(version);
     const float yaw=std::atan2(player[1]-e.origin[1],player[0]-e.origin[0])*57.29578f;
     Builtin(kBuiltinHide,ref,{});
     const auto r=Builtin(kBuiltinAnimScripted,ref,{ScriptArg::String("zombie_rise"),ScriptArg::Vector(origin),ScriptArg::Vector({0.f,yaw,0.f}),ScriptArg::Anim(*value)});
     if(r!=ScriptCallResult::Ok) {Builtin(kBuiltinShow,ref,{});++zg.riseFailures;return;}
-    z.risingUntil=time+AnimMilliseconds(role,3000)+150;z.showAt=time+350;z.rose=true;++zg.rises;
+    z.risingUntil=time+AnimMilliseconds(role,3000)+150;z.showAt=time+bo1::kRiseShowMilliseconds;z.rose=true;++zg.rises;
+}
+// zombie_spawn_init equivalents that MW2 keeps in script variables: no
+// weapon, no pain, arrivals, exits, long deaths, surprise, bullet or danger
+// reactions, no battle chatter; sprinters use the sprint animset.
+void RunZombieSetup(ZombieActor& z,const AiEntity& e) {
+    z.scriptSetup=true;
+    if(z.dog || !prep.threads) return;
+    unsigned ok=0;
+    for(const auto f:{SetupFunction::GunRemove,SetupFunction::DisableArrivals,SetupFunction::DisableExits,SetupFunction::DisablePain,
+        SetupFunction::DisableLongDeath,SetupFunction::DisableSurprise,SetupFunction::DisableWhizby,SetupFunction::DisableDangerReact})
+        if(RunSetupFunction(e.number,f)) ++ok;
+    if(RunSetupFunction(e.number,SetupFunction::BattleChatterOff,{ScriptArg::Int(0)})) ++ok;
+    if(z.speed==bo1::MoveSpeed::Sprint && RunSetupFunction(e.number,SetupFunction::EnableSprint)) ++ok;
+    if(ok) ++zg.setupZombies;
 }
 int ZombieMultiplier(int time) {return time<zg.doublePointsUntil?2:1;}
 void AwardPoints(int points,int time) {
@@ -1795,6 +1891,7 @@ void ConfigureZombie(const AiEntity& e,int health,bool dog,bo1::MoveSpeed speed)
     SetField<float>(e.actor+kActorGrenadeAwareness,0.f);
     SetField<int>(e.actor+kActorDropWeapon,0);
     SetField<std::uint8_t>(e.actor+kActorAllowPain,0);       // a.disablepain
+    SetField<std::uint8_t>(e.actor+kActorAllowDeath,1);      // dies inside animscripted (rise, attacks)
     SetField<int>(e.actor+kActorIgnoreSuppression,1);
     SetField<std::uint8_t>(e.actor+kActorNoDodgeMove,1);
     SetField<float>(e.actor+kActorPathEnemyLookahead,0.f);
@@ -1860,27 +1957,43 @@ bool SpawnZombie(const bo1::SpawnRequest& request,const Snapshot& s,const AiScop
 }
 float YawDegrees(const AiPoint& from,const AiPoint& to) {return std::atan2(to[1]-from[1],to[0]-from[0])*57.29578f;}
 float AngleDelta(float a,float b) {float d=std::fmod(a-b,360.f);if(d>180.f)d-=360.f;if(d<-180.f)d+=360.f;return d;}
-// zombie_melee.gsc: admission by the BO1 rule, damage at the "fire" point of
-// the attack, continuation while the target stays in reach.
+// zombie_melee.gsc MeleeCombat: admission by the BO1 rule, a random attack
+// from _zombie_melee plus the walk or run set, one hit check per "fire"
+// notetrack, broken off when the target leaves melee range (the engine ends
+// the melee animscript then), and a new swing while it stays in reach.
+void EndAttack(ZombieActor& z,const AiEntity& e) {
+    z.attacking=false;
+    // A looping run attack never ends by itself; stopanimscripted is a no-op
+    // when the scripted anim has already finished.
+    if(z.animatedAttack) Builtin(kBuiltinStopAnimScripted,ScriptEntityRef(e.number),{});
+    z.animatedAttack=false;
+}
+void MeleeHit(ZombieActor& z,const AiEntity& e,const Snapshot& s,const AiPoint& player,int playerHealth,float distance,int time) {
+    if(playerHealth>0 && distance<=bo1::kAttackHitRangeSquared) {
+        AiPoint dir{player[0]-e.origin[0],player[1]-e.origin[1],0.f};
+        const float length=std::sqrt(dir[0]*dir[0]+dir[1]*dir[1]);
+        if(length>0.f) {dir[0]/=length;dir[1]/=length;}
+        AiPoint hit=player;hit[2]+=48.f;
+        RecordNativeOperation("ZOMBIE_MELEE_BEGIN",e.number);
+        reinterpret_cast<DamageFn>(aiProfile.damage)(s.entity,e.address,e.address,dir.data(),hit.data(),
+            bo1::kZombieMeleeDamage,0,kModMelee,-1,kHitTorsoUpper,0,0);
+        RecordNativeOperation("ZOMBIE_MELEE_END",e.number);
+        ++zg.meleeHits;
+    } else {z.lastMiss=time;++zg.meleeMisses;}
+}
 void ServiceMelee(ZombieActor& z,const AiEntity& e,const Snapshot& s,const AiPoint& player,int playerHealth,int time) {
     if(z.dog)return;   // MW2 dogs attack with their own native animscripts
     const float distance=PointDistanceSquared(e.origin,player);
     if(z.attacking) {
-        if(!z.fired && time-z.attackStart>=z.attackFireMs) {
-            z.fired=true;
-            if(playerHealth>0 && distance<=bo1::kAttackHitRangeSquared) {
-                AiPoint dir{player[0]-e.origin[0],player[1]-e.origin[1],0.f};
-                const float length=std::sqrt(dir[0]*dir[0]+dir[1]*dir[1]);
-                if(length>0.f) {dir[0]/=length;dir[1]/=length;}
-                AiPoint hit=player;hit[2]+=48.f;
-                RecordNativeOperation("ZOMBIE_MELEE_BEGIN",e.number);
-                reinterpret_cast<DamageFn>(aiProfile.damage)(s.entity,e.address,e.address,dir.data(),hit.data(),
-                    bo1::kZombieMeleeDamage,0,kModMelee,-1,kHitTorsoUpper,0,0);
-                RecordNativeOperation("ZOMBIE_MELEE_END",e.number);
-                ++zg.meleeHits;
-            } else {z.lastMiss=time;++zg.meleeMisses;}
+        const int elapsed=time-z.attackStart;
+        const auto epoch=ai.checkpointEpoch.load();
+        while(z.nextFire<z.fireCount && elapsed>=z.fireMs[z.nextFire]) {
+            ++z.nextFire;
+            MeleeHit(z,e,s,player,playerHealth,distance,time);
+            if(epoch!=ai.checkpointEpoch)return;
         }
-        if(time-z.attackStart>=z.attackEndMs)z.attacking=false;
+        if(elapsed>=z.attackEndMs) EndAttack(z,e);
+        else if(playerHealth<=0 || bo1::BreakOffAttack(elapsed,distance)) {++zg.attacksBrokenOff;EndAttack(z,e);}
         return;
     }
     if(playerHealth<=0 || distance>bo1::kLongChargeRangeSquared)return;
@@ -1894,24 +2007,36 @@ void ServiceMelee(ZombieActor& z,const AiEntity& e,const Snapshot& s,const AiPoi
     auto clear=WorldTrace(from,to);
     if(!(clear.valid && !clear.startSolid && clear.fraction>=1.f)) {from[2]+=42.f;to[2]+=42.f;clear=WorldTrace(from,to);}
     inputs.pathClear=clear.valid && !clear.startSolid && clear.fraction>=1.f;
-    if(bo1::CanMeleePlayer(inputs,bo1::MeleeCheck::Normal)==bo1::MeleeDecision::Allowed) {
-        z.attacking=true;z.fired=false;z.attackStart=time;
-        z.attackFireMs=static_cast<int>(bo1::kAttackFireMilliseconds);z.attackEndMs=static_cast<int>(bo1::kAttackEndMilliseconds);z.animatedAttack=false;
-        // zombie_melee: AnimScripted the BO1 attack facing the target; the hit
-        // lands at the anim's "fire" notetrack. Without the imported anims,
-        // OrientMode("face angle", yaw) as the BO1 attack loop does.
-        const auto role=ZombieRandom(2)?AnimRole::Attack1:AnimRole::Attack2;
-        const auto value=AnimValue(e,role);
-        const float yaw=YawDegrees(e.origin,player);
-        if(value && Builtin(kBuiltinAnimScripted,ScriptEntityRef(e.number),{ScriptArg::String("zombie_attack"),ScriptArg::Vector(e.origin),
-            ScriptArg::Vector({0.f,yaw,0.f}),ScriptArg::Anim(*value)})==ScriptCallResult::Ok) {
+    if(bo1::CanMeleePlayer(inputs,bo1::MeleeCheck::Normal)!=bo1::MeleeDecision::Allowed) return;
+    z.attacking=true;z.attackStart=time;z.nextFire=0;z.animatedAttack=false;
+    z.fireMs[0]=static_cast<int>(bo1::kAttackFireMilliseconds);z.fireCount=1;z.attackEndMs=static_cast<int>(bo1::kAttackEndMilliseconds);
+    const float yaw=YawDegrees(e.origin,player);
+    // pick_zombie_melee_anim: _zombie_melee plus _zombie_walk_melee for
+    // walkers or _zombie_run_melee for runners and sprinters.
+    constexpr std::size_t kChoices=std::size(kMeleeAnims)+std::size(kWalkMeleeAnims);
+    std::array<AnimRole,kChoices> choices{};std::array<std::uint32_t,kChoices> values{};std::size_t count=0;
+    auto offer=[&](AnimRole role){if(const auto v=AnimValue(e,role)) {choices[count]=role;values[count]=*v;++count;}};
+    for(const auto r:kMeleeAnims) offer(r);
+    if(z.speed==bo1::MoveSpeed::Walk) {for(const auto r:kWalkMeleeAnims) offer(r);}
+    else for(const auto r:kRunMeleeAnims) offer(r);
+    if(count) {
+        const auto pick=static_cast<std::size_t>(ZombieRandom(static_cast<int>(count)));
+        const auto role=choices[pick];
+        if(Builtin(kBuiltinAnimScripted,ScriptEntityRef(e.number),{ScriptArg::String("zombie_attack"),ScriptArg::Vector(e.origin),
+            ScriptArg::Vector({0.f,yaw,0.f}),ScriptArg::Anim(values[pick])})==ScriptCallResult::Ok) {
             const auto* a=RoleAnim(role);
-            const float fire=a?a->notetrack("fire"):-1.f;
             z.attackEndMs=AnimMilliseconds(role,z.attackEndMs);
-            if(fire>0.f && fire<1.f)z.attackFireMs=static_cast<int>(fire*static_cast<float>(z.attackEndMs));
+            if(a) {
+                const auto fires=bo1::AttackFireTimes(a->notify,z.attackEndMs,z.fireMs.data(),z.fireMs.size());
+                if(fires) z.fireCount=fires;
+            }
             z.animatedAttack=true;++zg.animatedAttacks;
-        } else Builtin(kBuiltinOrientMode,ScriptEntityRef(e.number),{ScriptArg::String("face angle"),ScriptArg::Float(yaw)});
+            return;
+        }
     }
+    // Without the imported anims: OrientMode("face angle", yaw) as the BO1
+    // attack loop does, with the adapter fire/end times.
+    Builtin(kBuiltinOrientMode,ScriptEntityRef(e.number),{ScriptArg::String("face angle"),ScriptArg::Float(yaw)});
 }
 void GrabPowerup(const ZombieDrop& drop,int time) {
     Log("ZOMBIE_POWERUP_GRAB type=%s age_ms=%d",bo1::PowerupText(drop.type),time-drop.spawned);
@@ -1968,18 +2093,23 @@ void ServiceZombieActors(const Snapshot& s,const AiScope& scope,const AiPoint& p
             ++n;continue;
         }
         z.lastOrigin=e.origin;
+        // Campaign spawn functions run in the VM after the native spawn and may
+        // set health/goal fields; apply the BO1 setup once more before any hit,
+        // then the script-side setup once the actor's animscripts initialized.
+        if(!z.reconfigured && time>=z.reconfigureAt) {
+            z.reconfigured=true;
+            if(!z.damaged)ConfigureZombie(e,z.health,z.dog,z.speed);
+            RunZombieSetup(z,e);
+            if(epoch!=ai.checkpointEpoch)return;
+        }
         // do_zombie_rise: no pursuit, attack or failsafe while climbing out.
         if(z.showAt>=0 && time>=z.showAt) {z.showAt=-1;Builtin(kBuiltinShow,ScriptEntityRef(e.number),{});}
         if(time<z.risingUntil) {
             z.failsafeAt=time+static_cast<int>(bo1::kFailsafeIntervalMilliseconds);z.failsafeOrigin=e.origin;
             ++n;continue;
         }
-        // Campaign spawn functions run in the VM after the native spawn and may
-        // set health/goal fields; apply the BO1 setup once more before any hit.
-        if(!z.reconfigured && time>=z.reconfigureAt) {
-            z.reconfigured=true;
-            if(!z.damaged)ConfigureZombie(e,z.health,z.dog,z.speed);
-        }
+        // The rise anim has ended; make sure the actor left scripted mode.
+        if(z.rose && !z.riseStopped) {z.riseStopped=true;Builtin(kBuiltinStopAnimScripted,ScriptEntityRef(e.number),{});}
         // zombie_follow_enemy: SetGoalPos(favoriteenemy.origin) on BO1's cadence.
         const float distance=PointDistanceSquared(e.origin,player);
         if(time>=z.nextRepath) {
@@ -2046,7 +2176,7 @@ void BeginZombies(const Snapshot& s,const AiScope& scope,int time) {
     zg.firstRound=zg.settings.startingRound;zg.previousSpawner=-1;zg.dogFailures=0;zg.announcedRound=0;zg.gameOverRound=0;
     zg.client=scope.client;std::snprintf(zg.map,sizeof(zg.map),"%s",s.map);
     zg.launchedMap=!zg.pendingMap.empty() && zg.pendingMap==s.map?zg.pendingMap:std::string();zg.relaunchAt=0;
-    zg.rises=zg.animatedAttacks=zg.riseFailures=0;
+    zg.rises=zg.animatedAttacks=zg.riseFailures=zg.attacksBrokenOff=zg.setupZombies=0;
     zg.controller.setPlanner([](int round,bool) -> std::optional<bo1::RoundPlan> {
         // dog_round_tracker listens from the first "between_round_over".
         if(!zg.settings.hellhounds || round==zg.firstRound)return std::nullopt;
@@ -2488,8 +2618,22 @@ void InitializeAiEngine(std::uintptr_t base,std::size_t size,std::uintptr_t text
         if(prep.bindings)scriptNatives.addAnim=reinterpret_cast<decltype(scriptNatives.addAnim)>(base+kScrAddAnimRva);
         Log("LEVEL_PREP bindings=%d anim_builtins=%u/%llu",prep.bindings,anims,static_cast<unsigned long long>(kAnimBuiltins.size()));
         if(prep.bindings)bo1assets::StartLoad();
+        // Scr_ExecEntThreadNum / Scr_FreeThread exactly as animscripted uses
+        // them: program-buffer relative handle, VM_Execute, then the return
+        // value popped (inparamcount decremented) before the id is returned.
+        prep.threads=prep.bindings
+            && bytesAt(kScrExecEntThreadNumRva,kScrExecEntThreadNumPrologue) && bytesAt(kScrExecEntThreadRva,kScrExecEntThreadPrologue)
+            && Jump(base+kScrExecEntThreadRva,12)==base+kScrExecEntThreadNumRva && bytesAt(kScrFreeThreadRva,kScrFreeThreadPrologue)
+            && Call(base+kAnimScriptedExecCallRva,0)==base+kScrExecEntThreadRva && Call(base+kAnimScriptedFreeCallRva,0)==base+kScrFreeThreadRva
+            && Rip(base+0x22270a,0,3,7)==base+kScrProgramBufferRva && Call(base+0x22274a,0)==base+0x224700
+            && Rip(base+0x22278b,0,2,6)==base+kScriptParametersRva+8;
+        Log("ZOMBIE_SETUP thread_calls=%d functions=%llu",prep.threads,static_cast<unsigned long long>(kSetupFunctions.size()));
     }
     InstallExpandedCapacity(base,aiProfile.resolved);
+    // Installed after the capacity arena is placed (unchanged layout), before
+    // any level loads, so every level's setup functions are known (zombies
+    // started on "This level" use them too).
+    if(prep.bindings && IsProcessorFeaturePresent(PF_COMPARE_EXCHANGE128)) InstallLevelScriptHook();
     Log("AI_PROFILE resolved=%d callback_slot_rva=0x%llx spawn_rva=0x%llx delete_rva=0x%llx pool_slot_rva=0x%llx clock_rva=0x%llx",
         aiProfile.resolved,static_cast<unsigned long long>(aiProfile.thinkSlot-base),static_cast<unsigned long long>(spawn-base),
         static_cast<unsigned long long>(remove-base),static_cast<unsigned long long>(aiProfile.poolSlot-base),static_cast<unsigned long long>(aiProfile.timeSlot-base));
@@ -2669,10 +2813,12 @@ void LogZombieGame() {
     std::lock_guard<std::recursive_mutex> lock(aiMutex);
     const auto& c=zg.controller.status();
     const auto assets=bo1assets::GetStatus();
-    Log("ZOMBIE_PREP prepared=%d map=%s anims=%llu/%llu so_guards=%llu bo1_assets=%s found=%u/%u zone=%s rises=%u rise_failures=%u animated_attacks=%u relaunch_pending=%d",
+    unsigned setupHandles=0;for(const auto h:prep.setup) if(h>0) ++setupHandles;
+    Log("ZOMBIE_PREP prepared=%d map=%s anims=%llu/%llu so_guards=%llu bo1_assets=%s found=%u/%u zone=%s rises=%u rise_failures=%u animated_attacks=%u attacks_broken_off=%u setup_threads=%d setup_functions=%u/%llu setup_zombies=%u setup_calls=%u setup_failures=%u relaunch_pending=%d",
         prep.prepared,prep.map.c_str(),static_cast<unsigned long long>(prep.applied.size()),static_cast<unsigned long long>(std::size(kAnimSlots)),
         static_cast<unsigned long long>(prep.guards.size()),bo1assets::StateText(assets.state),assets.found,assets.wanted,
-        assets.zone.empty()?"NONE":assets.zone.c_str(),zg.rises,zg.riseFailures,zg.animatedAttacks,zg.relaunchAt!=0);
+        assets.zone.empty()?"NONE":assets.zone.c_str(),zg.rises,zg.riseFailures,zg.animatedAttacks,zg.attacksBrokenOff,prep.threads,setupHandles,
+        static_cast<unsigned long long>(kSetupFunctions.size()),zg.setupZombies,prep.setupCalls,prep.setupFailures,zg.relaunchAt!=0);
     Log("ZOMBIE_STATE available=%d running=%d pending=%d map=%s round=%d phase=%s alive=%d queued=%d killed=%d dogs=%d points=%d total=%d kills=%u headshots=%u hits=%u melee_hits=%u melee_misses=%u drops=%llu double_points_ms=%d insta_kill_ms=%d campaign_removed=%u weapon=%s dog_spawners=%llu next_dog_round=%d",
         zombieBindingsReady,zg.running,zg.startWanted,zg.running?zg.map:zg.pendingMap.c_str(),c.round,bo1::PhaseText(c.phase),c.alive,c.queued,c.killed,c.dogs,
         zg.ledger.score,zg.ledger.total,zg.kills,zg.headshots,zg.hits,zg.meleeHits,zg.meleeMisses,static_cast<unsigned long long>(zg.drops.size()),

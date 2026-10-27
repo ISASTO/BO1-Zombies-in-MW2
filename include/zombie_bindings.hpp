@@ -115,4 +115,30 @@ inline constexpr BuiltinBinding kBuiltinStopAnimScripted{"stopanimscripted",0x18
 inline constexpr BuiltinBinding kBuiltinHide{"hide",0x192860};
 inline constexpr BuiltinBinding kBuiltinShow{"show",0x192830};
 inline constexpr std::array<BuiltinBinding,4> kAnimBuiltins={kBuiltinAnimScripted,kBuiltinStopAnimScripted,kBuiltinHide,kBuiltinShow};
+
+// ---- Test39: running MW2's own actor-setup script functions on zombies ----
+// Scr_ExecEntThreadNum(entnum, classnum 0, handle, paramcount) runs a compiled
+// script function as a thread on an entity and returns the thread id, which
+// Scr_FreeThread releases. animscripted itself calls them (0x183365 calls
+// Scr_ExecEntThread 0x19ae00, which tail-jumps here; 0x18336d frees).
+inline constexpr std::uintptr_t kScrExecEntThreadNumRva=0x2226f0,kScrExecEntThreadRva=0x19ae00,kScrFreeThreadRva=0x222830;
+inline constexpr std::array<std::uint8_t,15> kScrExecEntThreadNumPrologue={
+    0x48,0x89,0x5c,0x24,0x08,0x48,0x89,0x6c,0x24,0x10,0x48,0x89,0x74,0x24,0x18};
+inline constexpr std::array<std::uint8_t,12> kScrExecEntThreadPrologue={0x0f,0xb7,0x49,0x7e,0x45,0x8b,0xc8,0x44,0x8b,0xc2,0x33,0xd2};
+inline constexpr std::array<std::uint8_t,4> kScrFreeThreadPrologue={0x0f,0xb7,0xc9,0xe9};
+inline constexpr std::uintptr_t kAnimScriptedExecCallRva=0x183365,kAnimScriptedFreeCallRva=0x18336d;
+// actor.allowdeath: without it an actor inside animscripted (rising,
+// attacking) cannot drop below 1 health (BO1 zombie_spawn_init sets it).
+inline constexpr std::size_t kActorAllowDeath=0x165;
+// maps/_utility functions BO1's zombie_spawn_init equivalents map to. Each
+// takes no argument except set_battlechatter(false).
+enum class SetupFunction : int {
+    GunRemove,DisableArrivals,DisableExits,DisablePain,DisableLongDeath,DisableSurprise,
+    DisableWhizby,DisableDangerReact,BattleChatterOff,EnableSprint,Count};
+struct ScriptFunctionBinding { const char* file; const char* function; int params; };
+inline constexpr std::array<ScriptFunctionBinding,static_cast<std::size_t>(SetupFunction::Count)> kSetupFunctions={{
+    {"maps/_utility","gun_remove",0},{"maps/_utility","disable_arrivals",0},{"maps/_utility","disable_exits",0},
+    {"maps/_utility","disable_pain",0},{"maps/_utility","disable_long_death",0},{"maps/_utility","disable_surprise",0},
+    {"maps/_utility","disable_bulletwhizbyreaction",0},{"maps/_utility","disable_danger_react",0},
+    {"maps/_utility","set_battlechatter",1},{"maps/_utility","enable_sprint",0}}};
 } // namespace mod
