@@ -2,6 +2,7 @@
 #include "vtable_patch.hpp"
 #include "script_vm.hpp"
 #include "bo1_models.hpp"
+#include "hang_watch.hpp"
 #include <array>
 #include <cwchar>
 #include <memory>
@@ -23,6 +24,7 @@ void Initialize() {
         mod::InitializeLog();
         mod::LogScriptVm(false);
         mod::InstallCrashHandler();
+        mod::hangwatch::Start();
         mod::InitializeEngine();
     }
     wchar_t path[MAX_PATH]{};
@@ -128,6 +130,7 @@ HRESULT STDMETHODCALLTYPE OnEndScene(IDirect3DDevice9* self) {
     auto original = reinterpret_cast<EndSceneFn>(hooks->slots[3].original);
     if (!r) return original(self);
     ++r->overlay.endScenes;
+    hangwatch::RenderFrame();
     if (r->overlay.endScenes == 1) Log("HOOK EndScene reached device=%p thread=%lu", self, GetCurrentThreadId());
     if (BackbufferBound(self)) {
         r->overlay.frame();

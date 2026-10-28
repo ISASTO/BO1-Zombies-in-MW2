@@ -19,6 +19,7 @@
 #include "bo1_zombie_rules.hpp"
 #include "bo1_assets.hpp"
 #include "bo1_models.hpp"
+#include "hang_watch.hpp"
 #include <memory>
 #include <optional>
 #include <algorithm>
@@ -410,6 +411,7 @@ void HoldAppearance(AiAppearance& appearance);
 void ReleaseAppearance(AiAppearance& appearance);
 void ClockHook() {
     originalClock();++nativeCallbacks;
+    hangwatch::ServerFrame();
     DWORD expected=0;nativeThread.compare_exchange_strong(expected,GetCurrentThreadId());
     try {Service();} catch(...) {
         std::lock_guard<std::recursive_mutex> lock(aiMutex);
@@ -2330,6 +2332,7 @@ void ResetZombieGame(const char* reason,bool deleteActors) {
     // A pending start (e.g. a map launched from the menu) survives loads; only
     // a running game ends here. RequestZombieStop cancels a pending start.
     zg.stopWanted=false;
+    hangwatch::SetArmed(false);
     if(!zg.running)return;
     const bool wasRunning=zg.running;
     if(wasRunning) {
@@ -2385,6 +2388,7 @@ void BeginZombies(const Snapshot& s,const AiScope& scope,int time) {
         static_cast<unsigned long long>(ai.enemies.size()));
 }
 void ServiceZombies(const Snapshot& s,const AiScope& scope,int time) {
+    hangwatch::SetArmed(zg.running);
     zg.lastTime=time;
     zg.dogSpawners=!ai.dogPoints.empty();
     if(zg.stopWanted) {ResetZombieGame("MENU_END",true);return;}

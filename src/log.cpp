@@ -85,35 +85,43 @@ BOOL PreserveCurrentLog(const wchar_t* destination) {
     }
     FlushFileBuffers(copy);CloseHandle(copy);CloseHandle(source);SetLastError(error);return error?FALSE:TRUE;
 }
-LONG WINAPI CrashFilter(EXCEPTION_POINTERS* info) {
-    if (InterlockedCompareExchange(&crashing, 1, 0) != 0) return EXCEPTION_CONTINUE_SEARCH;
+// Shared by the crash filter and the Test41 hang watchdog: preserve the log,
+// write <kind>-<time>.txt with the engine error, VM state and native event
+// ring, and <kind>-<time>.dmp. For a hang `info` is null and `hung` is the
+// stalled thread's context (captured while it was suspended).
+void WriteDiagnostics(const wchar_t* kind,EXCEPTION_POINTERS* info,const CONTEXT* hung,DWORD hungThread,const char* extra) {
     if (logFile != INVALID_HANDLE_VALUE) FlushFileBuffers(logFile);
     SYSTEMTIME time{}; GetLocalTime(&time);
     wchar_t path[32768]{};
     // A later game launch overwrites latest.log. Preserve the log belonging to
     // this exception while its handle is still open, without taking logMutex.
-    std::swprintf(path,32768,L"%ls\\crash-%04u%02u%02u-%02u%02u%02u.log",directory,
+    std::swprintf(path,32768,L"%ls\\%ls-%04u%02u%02u-%02u%02u%02u.log",directory,kind,
         time.wYear,time.wMonth,time.wDay,time.wHour,time.wMinute,time.wSecond);
     const BOOL logCopied=logPath[0]?PreserveCurrentLog(path):FALSE;
     const DWORD logCopyError=logCopied?0:GetLastError();
-    std::swprintf(path, 32768, L"%ls\\crash-%04u%02u%02u-%02u%02u%02u.txt", directory,
+    std::swprintf(path, 32768, L"%ls\\%ls-%04u%02u%02u-%02u%02u%02u.txt", directory, kind,
         time.wYear, time.wMonth, time.wDay, time.wHour, time.wMinute, time.wSecond);
     HANDLE report = CreateFileW(path, GENERIC_WRITE, FILE_SHARE_READ, nullptr, CREATE_ALWAYS, 0, nullptr);
     char message[2048]{};
-    const auto address = reinterpret_cast<std::uintptr_t>(info->ExceptionRecord->ExceptionAddress);
+    const CONTEXT* registers=info?info->ContextRecord:hung;
+    const auto address = info?reinterpret_cast<std::uintptr_t>(info->ExceptionRecord->ExceptionAddress):(hung?hung->Rip:0);
     const auto base = reinterpret_cast<std::uintptr_t>(GetModuleHandleW(nullptr));
-    int size = std::snprintf(message, sizeof(message),
+    int size = info?std::snprintf(message, sizeof(message),
         "BO1MW2 %s\r\nexception=0x%08lx address=0x%llx engine_base=0x%llx engine_relative=0x%llx\r\n"
         "thread=%lu rip=0x%llx rsp=0x%llx\r\n",
         kVersion, info->ExceptionRecord->ExceptionCode, static_cast<unsigned long long>(address),
         static_cast<unsigned long long>(base), static_cast<unsigned long long>(address - base),
         GetCurrentThreadId(), static_cast<unsigned long long>(info->ContextRecord->Rip),
-        static_cast<unsigned long long>(info->ContextRecord->Rsp));
+        static_cast<unsigned long long>(info->ContextRecord->Rsp))
+        :std::snprintf(message,sizeof(message),"BO1MW2 %s\r\nhang thread=%lu rip=0x%llx rsp=0x%llx engine_base=0x%llx engine_relative=0x%llx\r\n",
+        kVersion,hungThread,static_cast<unsigned long long>(address),static_cast<unsigned long long>(hung?hung->Rsp:0),
+        static_cast<unsigned long long>(base),static_cast<unsigned long long>(address>=base?address-base:0));
     if (size > 0) RawWrite(report, message, static_cast<DWORD>(size),true);
     size=std::snprintf(message,sizeof(message),"crash_log=%s error=%lu\r\n",logCopied?"preserved":"failed",logCopyError);
     if(size>0)RawWrite(report,message,static_cast<DWORD>(size));
+    if(extra)RawWrite(report,extra,static_cast<DWORD>(std::strlen(extra)));
     HMODULE faultModule = nullptr;
-    if (GetModuleHandleExW(GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS | GET_MODULE_HANDLE_EX_FLAG_UNCHANGED_REFCOUNT,
+    if (address && GetModuleHandleExW(GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS | GET_MODULE_HANDLE_EX_FLAG_UNCHANGED_REFCOUNT,
                           reinterpret_cast<LPCWSTR>(address), &faultModule)) {
         wchar_t moduleName[32768]{};
         GetModuleFileNameW(faultModule, moduleName, 32768);
@@ -226,22 +234,47 @@ LONG WINAPI CrashFilter(EXCEPTION_POINTERS* info) {
                && places && places<=0x400)
                 memory.Add(records,places*12ull+0x40);
         }
-        const auto* context=info->ContextRecord;
+        const CONTEXT empty{};
+        const auto* context=registers?registers:&empty;
         for(const auto value:{context->Rax,context->Rbx,context->Rcx,context->Rdx,context->Rsi,context->Rdi,context->Rbp,
                               context->R8,context->R9,context->R10,context->R11,context->R12,context->R13,context->R14,context->R15}) {
             if(value>=base+0x3bc000 && value<base+0x4000000)memory.Add((value&~0xffull)-0x100,0x300);
         }
         MINIDUMP_CALLBACK_INFORMATION callbacks{IncludeNativeVmMemory,&memory};
         BOOL ok = MiniDumpWriteDump(GetCurrentProcess(), GetCurrentProcessId(), dump, type,
-                                   &exception, nullptr, &callbacks);
+                                   info?&exception:nullptr, nullptr, &callbacks);
         size = std::snprintf(message, sizeof(message), "minidump=%s error=%lu\r\n", ok ? "written" : "failed", ok ? 0 : GetLastError());
         if (size > 0) RawWrite(report, message, static_cast<DWORD>(size),true);
         CloseHandle(dump);
     }
     if (report != INVALID_HANDLE_VALUE) CloseHandle(report);
+}
+LONG WINAPI CrashFilter(EXCEPTION_POINTERS* info) {
+    if (InterlockedCompareExchange(&crashing, 1, 0) != 0) return EXCEPTION_CONTINUE_SEARCH;
+    WriteDiagnostics(L"crash",info,nullptr,0,nullptr);
     if (previousFilter) return previousFilter(info);
     return EXCEPTION_CONTINUE_SEARCH;
 }
+}
+void WriteHangDiagnostics(const CONTEXT* context,DWORD thread,const char* extra) {
+    // A crash being written takes precedence; never two reports at once.
+    if(InterlockedCompareExchange(&crashing,1,0)!=0)return;
+    WriteDiagnostics(L"hang",nullptr,context,thread,extra);
+    InterlockedExchange(&crashing,0);
+}
+void LogUrgent(const char* format,...) {
+    // The watchdog's log: never blocks behind a stalled thread holding logMutex.
+    char body[4096]{};
+    va_list args; va_start(args, format);
+    std::vsnprintf(body, sizeof(body), format, args);
+    va_end(args);
+    SYSTEMTIME time{}; GetLocalTime(&time);
+    char line[4300]{};
+    std::snprintf(line, sizeof(line), "%02u:%02u:%02u.%03u [t%lu] %s\r\n",
+        time.wHour, time.wMinute, time.wSecond, time.wMilliseconds, GetCurrentThreadId(), body);
+    std::unique_lock<std::mutex> lock(logMutex,std::defer_lock);
+    for(int i=0;i<50 && !lock.try_lock();++i)Sleep(10);
+    RawWrite(logFile, line, static_cast<DWORD>(std::strlen(line)),true);
 }
 const wchar_t* LogDirectory() { return directory; }
 void RecordNativeOperation(const char* operation,unsigned entity,int actorCount) {

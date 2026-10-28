@@ -20,6 +20,9 @@ void Log(const char* format, ...);
 void InstallCrashHandler();
 void RecordNativeOperation(const char* operation,unsigned entity=0,int actorCount=-1);
 const wchar_t* LogDirectory();
+// Test41 hang watchdog: a hang-<time>.txt/.dmp report like a crash report.
+void WriteHangDiagnostics(const CONTEXT* context,DWORD thread,const char* extra);
+void LogUrgent(const char* format,...);
 // Test32 hardware write watch on static console command entries.
 void ArmStaticCommandWatch();
 void LogStaticWatchHits();

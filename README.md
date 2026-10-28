@@ -1,7 +1,23 @@
 # BO1 Zombies in MW2
 
 Incremental mod framework for **retail Modern Warfare 2 (2009), single player**.
-Current build: **0.1.39-zombies-test40**.
+Current build: **0.1.40-zombies-test41**.
+
+**Test41 fixes the first Test40 run.**
+
+- **The freeze.** It came from three BO1 attack animations that carry the
+  root-motion flag without root-motion data. MW2's sampler read the missing
+  data when a zombie first swung. A new exact-native probe runs the retail
+  sampler on every converted animation.
+- **The models.** The BO1 model zone now loads before the level zone, so the
+  models exist when the level scripts precache them.
+- **Rooftop spawns.** A zombie the engine finds no path for is respawned, and
+  that spawn point is dropped.
+- **Freeze diagnostics.** A freeze now writes its own report: a hang
+  watchdog plus a record-only fault recorder.
+
+See [Test41](docs/zombies-test41.md) and the
+[Test41 test instructions](docs/test41-testing-protocol.md).
 
 **Test40 imports the BO1 zombie models.** Zombies now wear Kino der Toten's
 zombie: the two honor-guard bodies and four zombie heads, picked at random as
@@ -79,9 +95,11 @@ bridge, 72 MiB GPU/CPU skinning buffers, guarded animated-record storage and
 16-bit handles remain active. Rendering and actor regressions are rerun.
 Windows missions and stable 256-actor retail gameplay require owner testing.
 
-Install the complete Test40 package (run its Uninstall.cmd first to remove
-Test39). Follow the [Test40 instructions](docs/test40-testing-protocol.md):
-the BO1 zombie models on Spec Ops maps, with screenshots. The
+Install the complete Test41 package (run its Uninstall.cmd first to remove
+Test40). Follow the [Test41 instructions](docs/test41-testing-protocol.md):
+Favela with zombies attacking for a few minutes, then Arcadia and Gulag
+showers, with screenshots. The [Test40 instructions](docs/test40-testing-protocol.md)
+describe the models in more detail. The
 [Test39 instructions](docs/test39-testing-protocol.md) still cover the BO1
 rise, attacks and deaths and the GAME OVER reload. The
 [Test38 instructions](docs/test38-testing-protocol.md) still cover the
