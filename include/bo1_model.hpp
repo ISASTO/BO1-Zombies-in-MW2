@@ -87,7 +87,7 @@ struct Model {
     std::string name;                    // empty when the zone aliased it
     std::uint8_t numBones=0,numRootBones=0,numsurfs=0,lodRampType=0;
     std::vector<std::string> bones;
-    std::vector<std::uint8_t> parentList,quats,trans /*12 per non-root bone*/,partClassification,baseMat,boneInfo /*T5, 44 each*/;
+    std::vector<std::uint8_t> parentList,quats,trans /*vec3 per non-root bone, packed*/,partClassification,baseMat,boneInfo /*T5, 44 each*/;
     std::vector<Surface> surfs;
     std::vector<MaterialRef> materials;
     std::vector<CollSurf> collSurfs;
@@ -194,7 +194,14 @@ inline bool ParseModel(const std::uint8_t* raw,std::size_t size,std::size_t at,c
     }
     if(nc) {
         m.parentList=r.take(nc);m.quats=r.take(8*nc);
-        for(std::size_t n=0;n<nc;++n) {const auto t=r.take(16);m.trans.insert(m.trans.end(),t.begin(),t.begin()+std::min<std::size_t>(12,t.size()));}
+        // T5 allocates 16 bytes per bone for the translations but stores them
+        // packed, 12 bytes (vec3) per bone, followed by 4*nc zero bytes. Test40
+        // read 16-byte records and scrambled every bone after the first (the
+        // folded, stretched zombies in the Test42 screenshot).
+        const auto t=r.take(16*nc);
+        if(t.size()!=16*nc) return Fail(error,"truncated skeleton");
+        if(std::any_of(t.begin()+12*nc,t.end(),[](std::uint8_t v){return v!=0;})) return Fail(error,"unexpected bone translation layout");
+        m.trans.assign(t.begin(),t.begin()+12*nc);
     }
     m.partClassification=r.take(nb);m.baseMat=r.take(32*nb);
     if(!r.ok()) return Fail(error,"truncated skeleton");
@@ -292,6 +299,49 @@ inline bool ParseModel(const std::uint8_t* raw,std::size_t size,std::size_t at,c
     m.end=r.pos();
     return true;
 }
+
+// The skeleton's own consistency check: composing every bone's local
+// rotation and translation from its parent (parentList holds the distance
+// back to the parent, as in MW2) must land on the model-space rest pose that
+// baseMat stores (quat xyzw, trans xyz, transWeight). Returns the largest
+// distance in units; MW2's own defaultactor and the corrected BO1 models give
+// 0.0, Test40's misread translations gave 54.8.
+inline float SkeletonError(const Model& m) {
+    using Quat=std::array<float,4>;using Vec=std::array<float,3>;
+    const std::size_t nb=m.numBones,nr=m.numRootBones,nc=nb-nr;
+    if(!nb || m.baseMat.size()!=32*nb || m.parentList.size()!=nc || m.quats.size()!=8*nc || m.trans.size()!=12*nc) return 1e9f;
+    auto mul=[](const Quat& a,const Quat& b)->Quat {
+        return {a[3]*b[0]+a[0]*b[3]+a[1]*b[2]-a[2]*b[1],a[3]*b[1]-a[0]*b[2]+a[1]*b[3]+a[2]*b[0],
+                a[3]*b[2]+a[0]*b[1]-a[1]*b[0]+a[2]*b[3],a[3]*b[3]-a[0]*b[0]-a[1]*b[1]-a[2]*b[2]};
+    };
+    auto normal=[](Quat q)->Quat {const float l=std::sqrt(q[0]*q[0]+q[1]*q[1]+q[2]*q[2]+q[3]*q[3]);if(l>0)for(auto& v:q)v/=l;return q;};
+    auto rotate=[&](const Quat& q,const Vec& v)->Vec {
+        const auto r=mul(mul(q,{v[0],v[1],v[2],0.f}),Quat{-q[0],-q[1],-q[2],q[3]});return {r[0],r[1],r[2]};
+    };
+    auto base=[&](std::size_t i,Quat& q,Vec& tr) {
+        for(std::size_t k=0;k<4;++k) q[k]=Get<float>(m.baseMat.data()+32*i+4*k);
+        for(std::size_t k=0;k<3;++k) tr[k]=Get<float>(m.baseMat.data()+32*i+16+4*k);
+        q=normal(q);
+    };
+    std::vector<Quat> wq(nb);std::vector<Vec> wt(nb);
+    for(std::size_t i=0;i<nr;++i) base(i,wq[i],wt[i]);
+    float worst=0.f;
+    for(std::size_t i=nr;i<nb;++i) {
+        const std::size_t c=i-nr,back=m.parentList[c];
+        if(!back || back>i) return 1e9f;
+        const std::size_t parent=i-back;
+        Quat local;for(std::size_t k=0;k<4;++k) local[k]=Get<std::int16_t>(m.quats.data()+8*c+2*k)/32767.f;
+        Vec offset;for(std::size_t k=0;k<3;++k) offset[k]=Get<float>(m.trans.data()+12*c+4*k);
+        wq[i]=normal(mul(wq[parent],local));
+        const auto moved=rotate(wq[parent],offset);
+        for(std::size_t k=0;k<3;++k) wt[i][k]=wt[parent][k]+moved[k];
+        Quat bq;Vec bt;base(i,bq,bt);
+        const float d=std::sqrt((wt[i][0]-bt[0])*(wt[i][0]-bt[0])+(wt[i][1]-bt[1])*(wt[i][1]-bt[1])+(wt[i][2]-bt[2])*(wt[i][2]-bt[2]));
+        if(!(d<=worst)) worst=d;
+    }
+    return worst;
+}
+inline constexpr float kSkeletonTolerance=0.05f;
 
 // ------------------------------------------------- the Kino honorguard zombie
 inline constexpr const char* kHead1Material="mc/mtl_c_ger_zombie_head1";
@@ -403,6 +453,9 @@ inline std::optional<Character> CarveCharacter(const std::uint8_t* raw,std::size
     if(!body2) return fail("zombie body (c_ger_honorguard_body2) not found");
     c.heads[0]=*head1;for(std::size_t n=0;n<3;++n) c.heads[n+1]=*otherHeads[n];
     c.body1=*body1;c.body2=*body2;
+    // Never ship a skeleton that does not reproduce its own rest pose.
+    for(const auto* m:{&c.body1,&c.body2,&c.heads[0],&c.heads[1],&c.heads[2],&c.heads[3]})
+        if(!(SkeletonError(*m)<=kSkeletonTolerance)) return fail("zombie skeleton does not match its base pose");
     c.headColor=detail::TextureBySuffix(head1->materials[0],"_c");
     c.headNormal=detail::TextureBySuffix(head1->materials[0],"_n");
     c.headSpec=detail::TextureBySuffix(head1->materials[0],"_s");

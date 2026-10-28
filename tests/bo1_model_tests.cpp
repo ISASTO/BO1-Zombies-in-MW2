@@ -157,6 +157,25 @@ static void TestZone() {
     Check(!BuildZone(spec,z),"misaligned rigid bone refused");
 }
 
+// A three-bone chain: root at (0,0,10), a child 5 units along x rotated 90
+// degrees about z, and a grandchild 2 units along its parent's x (world +y).
+static void TestSkeleton() {
+    Model m;m.numBones=3;m.numRootBones=1;m.bones={"tag_origin","j_a","j_b"};
+    m.parentList={1,1};
+    auto quat=[&](std::int16_t x,std::int16_t y,std::int16_t z,std::int16_t w){for(auto v:{x,y,z,w}){m.quats.push_back(static_cast<std::uint8_t>(v));m.quats.push_back(static_cast<std::uint8_t>(static_cast<std::uint16_t>(v)>>8));}};
+    auto vec=[](std::vector<std::uint8_t>& out,std::initializer_list<float> v){for(float f:v){std::uint8_t b[4];std::memcpy(b,&f,4);out.insert(out.end(),b,b+4);}};
+    const std::int16_t h=23170;   // 32767*sqrt(1/2)
+    quat(0,0,h,h);quat(0,0,0,32767);
+    vec(m.trans,{5.f,0.f,0.f});vec(m.trans,{2.f,0.f,0.f});
+    const float s=0.70710677f;
+    vec(m.baseMat,{0,0,0,1, 0,0,10, 2});vec(m.baseMat,{0,0,s,s, 5,0,10, 2});vec(m.baseMat,{0,0,s,s, 5,2,10, 2});
+    Check(SkeletonError(m)<0.01f,"consistent chain reproduces its base pose");
+    auto broken=m;broken.trans[3]^=0x01;   // 5.0f -> 20.0f
+    Check(SkeletonError(broken)>0.5f,"a moved bone is caught");
+    auto bad=m;bad.parentList[1]=3;
+    Check(SkeletonError(bad)>1e8f,"a parent past the root is refused");
+}
+
 static void TestCharacter() {
     const char* path=std::getenv("BO1_THEATER_DEC");
     if(!path) {std::puts("SKIP real zombie_theater carve (set BO1_THEATER_DEC)");return;}
@@ -169,6 +188,15 @@ static void TestCharacter() {
     Check(!!c,error.c_str());
     if(!c) return;
     Check(c->body1.numBones==73 && c->body2.numBones==73 && c->body1.bones==c->body2.bones && c->heads[0].numBones==28,"bodies and heads");
+    // Test43: packed vec3 bone translations; every skeleton lands on its base pose.
+    for(const auto* m:{&c->body1,&c->body2,&c->heads[0],&c->heads[1],&c->heads[2],&c->heads[3]})
+        Check(SkeletonError(*m)<0.01f,"real skeleton reproduces its base pose");
+    {
+        const auto knee=static_cast<std::size_t>(std::find(c->body1.bones.begin(),c->body1.bones.end(),"j_knee_le")-c->body1.bones.begin());
+        const auto hip=static_cast<std::size_t>(std::find(c->body1.bones.begin(),c->body1.bones.end(),"j_hip_le")-c->body1.bones.begin());
+        const float kneeX=Get<float>(c->body1.trans.data()+12*(knee-1)),hipZ=Get<float>(c->body1.trans.data()+12*(hip-1)+8);
+        Check(std::fabs(kneeX-17.51f)<0.01f && std::fabs(hipZ-4.87f)<0.01f,"thigh 17.51 and hip 4.87 units, as MW2's defaultactor");
+    }
     Check(c->headSpec=="c_ger_zombie_head1_s" && c->bodyNormal=="char_ger_honorguard_body1_n","texture names");
     int skin=0;for(std::size_t n=0;n<c->body1.numsurfs;++n)skin+=c->skinOf(c->body1,n)==Skin::HeadSkin;
     Check(skin==4,"body hands/neck use the head skin");
@@ -218,7 +246,7 @@ static void TestPipeline() {
 }
 
 int main() {
-    TestIwi();TestSpecGloss();TestZlib();TestZip();TestZone();TestCharacter();TestPipeline();
+    TestIwi();TestSpecGloss();TestZlib();TestZip();TestZone();TestSkeleton();TestCharacter();TestPipeline();
     if(failures) {std::printf("%d failure(s)\n",failures);return 1;}
     std::puts("bo1_model_tests: all passed");
     return 0;

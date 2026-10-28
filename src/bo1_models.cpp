@@ -15,7 +15,7 @@
 namespace mod::bo1models {
 namespace {
 // Bump when the generated zone changes so cached files are rebuilt.
-constexpr const char* kBuilderVersion="bo1mw2-models-1";
+constexpr const char* kBuilderVersion="bo1mw2-models-2";   // Test43: packed bone translations
 std::mutex mutex;
 std::condition_variable changed;
 Status status;
