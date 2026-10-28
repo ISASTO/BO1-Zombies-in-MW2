@@ -136,6 +136,17 @@ class ModelImportTests(unittest.TestCase):
         written=re.search(r'cacheDir\+L"\\\\([a-z0-9_]+)\.ff"',self.source)[1]
         self.assertTrue(zone.endswith('cache\\'+written),(zone,written))
 
+    def test_model_zone_loads_before_the_level_zone(self):
+        # Test41: assets are only found once their zone has loaded; the level
+        # scripts precache the models before a zone queued after the level's.
+        ai=(ROOT/'src'/'ai.cpp').read_text()
+        self.assertIn('XZoneInfo zones[2]={{bo1models::kZoneName,info[0].allocFlags,0},info[0]};',ai)
+
+    def test_delta_flag_requires_a_delta_part(self):
+        xanim=(ROOT/'include'/'bo1_xanim.hpp').read_text()
+        self.assertIn('return a.delta && (a.trans.present || a.quat.present);',xanim)
+        self.assertIn('(HasDelta(a)?mw2::kFlagDelta:0)',xanim)
+
     def test_level_zone_flags_and_helmet_note(self):
         self.assertIn('kLevelZoneAllocFlags=4',self.bindings)
         self.assertIn('"swap taghelmet to tagleft"',self.bindings)

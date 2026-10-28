@@ -114,5 +114,23 @@ int main() {
     Check(!BreakOffAttack(100,500.f*500.f),"a swing is never cancelled in its first 250 ms");
     Check(BreakOffAttack(300,97.f*97.f) && !BreakOffAttack(300,95.f*95.f),"break off beyond melee distance + 32");
     Check(RiseDepth(1)==45.f && RiseDepth(2)==14.f && kRiseShowMilliseconds==500,"do_zombie_rise offsets and hide_pop");
+    // Test41: unreachable spawn points (Favela rooftops).
+    {
+        ReachInputs in;in.distanceSquared=600.f*600.f;in.noPathMs=3000;in.otherZombieHasPath=true;
+        Check(JudgeReach(in)==Reach::RecycleAndBlacklist,"no path while another zombie paths: blacklist the point");
+        in.pointKnownGood=true;
+        Check(JudgeReach(in)==Reach::Wait,"a point that pathed before is never blacklisted");
+        in.noPathMs=12000;
+        Check(JudgeReach(in)==Reach::Recycle,"a zombie without a path for 12 s is recycled");
+        in.pointKnownGood=false;in.otherZombieHasPath=false;in.noPathMs=11999;
+        Check(JudgeReach(in)==Reach::Wait,"alone, no blacklisting: the player may be unreachable for a moment");
+        in.hasPath=true;in.noPathMs=20000;
+        Check(JudgeReach(in)==Reach::Ok,"a path is fine");
+        in.hasPath=false;in.distanceSquared=100.f*100.f;
+        Check(JudgeReach(in)==Reach::Ok,"next to the player needs no path");
+        in.distanceSquared=600.f*600.f;in.attacking=true;
+        Check(JudgeReach(in)==Reach::Ok,"attacking zombies are left alone");
+        Check(MayBlacklist(0,4) && MayBlacklist(2,4) && !MayBlacklist(3,4) && !MayBlacklist(0,1),"at most three quarters blacklisted");
+    }
     std::cout<<"BO1 zombie rules fixtures passed\n";
 }

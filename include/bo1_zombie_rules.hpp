@@ -115,6 +115,31 @@ inline constexpr int kRiseShowMilliseconds=500;
 inline constexpr std::int64_t kFailsafeIntervalMilliseconds=30000;
 inline constexpr float kFailsafeMinimumMoveSquared=24.f*24.f;
 
+// ---- Test41: spawn points the player cannot be reached from.
+// BO1 only spawns from zones connected to the player's; MW2 Spec Ops maps
+// have enemy spawners on rooftops and ledges with no path down (Favela). The
+// engine leaves such a zombie without a path (path_t point count 0) while
+// its goal is the player. With another zombie pathing to the player at the
+// same time the point is proven unreachable: recycle the zombie and stop
+// using the point. Alone, a zombie that never gets a path is recycled after
+// longer (the player may be momentarily unreachable) without blacklisting.
+inline constexpr float kReachCheckRangeSquared=128.f*128.f;
+inline constexpr int kUnreachableBlacklistMs=3000,kUnreachableRecycleMs=12000;
+enum class Reach {Ok,Wait,RecycleAndBlacklist,Recycle};
+struct ReachInputs {
+    bool hasPath=false,attacking=false,otherZombieHasPath=false,pointKnownGood=false;
+    float distanceSquared=0.f;
+    int noPathMs=0;                       // since the rise ended without a path
+};
+inline Reach JudgeReach(const ReachInputs& in) {
+    if(in.hasPath || in.attacking || in.distanceSquared<=kReachCheckRangeSquared) return Reach::Ok;
+    if(in.noPathMs>=kUnreachableBlacklistMs && in.otherZombieHasPath && !in.pointKnownGood) return Reach::RecycleAndBlacklist;
+    if(in.noPathMs>=kUnreachableRecycleMs) return Reach::Recycle;
+    return Reach::Wait;
+}
+// Never blacklist more than three quarters of a map's spawn points.
+inline bool MayBlacklist(std::size_t blacklisted,std::size_t points) {return points>=2 && (blacklisted+1)*4<=points*3;}
+
 // ---- Powerups: maps/_zombiemode_powerups.gsc
 enum class Powerup { None, Nuke, InstaKill, DoublePoints, MaxAmmo, Carpenter, FireSale };
 inline const char* PowerupText(Powerup p) {

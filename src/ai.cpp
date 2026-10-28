@@ -1343,6 +1343,9 @@ struct ZombieActor {
     bool scriptSetup=false;
     // Test40: wearing a BO1 body and head.
     bool dressed=false;
+    // Test41: the spawn point it rose at and whether the engine found it a
+    // path to the player (path_t point count > 0) on the last service.
+    unsigned spawnPoint=0;int noPathSince=-1;bool pathing=false;
 };
 struct ZombieDrop { bo1::Powerup type=bo1::Powerup::None; AiPoint origin{}; int spawned=0; };
 struct ZombieGameState {
@@ -1367,6 +1370,9 @@ struct ZombieGameState {
     // Test39: the Spec Ops map this game was launched on, for GAME OVER relaunch.
     std::string launchedMap; ULONGLONG relaunchAt=0; ZombieSettings launchSettings;
     unsigned rises=0,animatedAttacks=0,riseFailures=0,attacksBrokenOff=0,setupZombies=0;
+    // Test41: spawn points proven unreachable (no path while others path) and
+    // points a zombie has pathed from.
+    std::vector<unsigned> badPoints,goodPoints;unsigned unreachableRecycled=0;std::string reachMap;
 } zg;
 int ZombieRandom(int n) {
     zg.random^=zg.random<<13;zg.random^=zg.random>>17;zg.random^=zg.random<<5;
@@ -1643,7 +1649,10 @@ void PrepareLevelScripts() {
     const auto anims=ApplyAnimSwaps();
     models.helmetSwap=prep.threads?CaptureHelmetSwap():0;
     const auto precached=PrecacheModels();
-    if(models.appended) bo1models::GuardLoaded();   // the zone loaded without an error
+    if(models.appended) {
+        bo1models::GuardLoaded();                    // the zone loaded without an error
+        if(!models.precached) bo1models::GuardUnused();   // nothing will wear the models on this level
+    }
     prep.prepared=true;
     Log("LEVEL_PREP map=%s so_guards=%u/%llu anims=%u bo1_models=%u zone_loaded=%d",map,guards,static_cast<unsigned long long>(kSpecOpsEndFunctions.size()),anims,
         precached,models.appended);
@@ -1679,7 +1688,11 @@ struct XZoneInfo {const char* name;int allocFlags;int freeFlags;};
 using LoadXAssetsFn=void(*)(XZoneInfo*,unsigned,int);
 using ModelIndexFn=int(*)(const char*);
 // The level zone of a zombies launch loads together with the generated BO1
-// model fastfile (same allocation flags, so the next level frees both).
+// model fastfile (same allocation flags, so the next level frees both). The
+// database thread loads a batch in order and the server only waits for the
+// assets it asks for (the level's clipmap, scripts...), so the model zone
+// goes FIRST: in Test40 it came after the level zone and was still loading
+// when the level scripts precached the models (present=0).
 void LevelZoneLoadHook(XZoneInfo* info,unsigned count,int sync) {
     const auto load=reinterpret_cast<LoadXAssetsFn>(aiProfile.base+kDbLoadXAssetsRva);
     bool add=false;std::string zone;
@@ -1703,7 +1716,7 @@ void LevelZoneLoadHook(XZoneInfo* info,unsigned count,int sync) {
         }
     } catch(...) {add=false;}
     if(!add) {load(info,count,sync);return;}
-    XZoneInfo zones[2]={info[0],{bo1models::kZoneName,info[0].allocFlags,0}};
+    XZoneInfo zones[2]={{bo1models::kZoneName,info[0].allocFlags,0},info[0]};
     {std::lock_guard<std::recursive_mutex> lock(aiMutex);models.appended=true;models.zoneFor=zone;}
     load(zones,2,sync);
 }
@@ -2042,9 +2055,11 @@ void ConfigureZombie(const AiEntity& e,int health,bool dog,bo1::MoveSpeed speed)
 // level.enemy_spawns: campaign enemy spawn locations; maps without enemy
 // spawners (e.g. the museum) fall back to every human spawner.
 const std::vector<AiEntity>& ZombieSpawnPoints() {return ai.enemyPoints.empty()?ai.allPoints:ai.enemyPoints;}
+bool Listed(const std::vector<unsigned>& points,unsigned number) {return std::find(points.begin(),points.end(),number)!=points.end();}
 std::vector<AiEntity> SpawnPointBand(const AiPoint& player,float nearest,float farthest) {
     std::vector<AiEntity> band;
     for(const auto& p:ZombieSpawnPoints()) {
+        if(Listed(zg.badPoints,p.number)) continue;
         const float d=PointDistanceSquared(p.origin,player);
         if(d>=nearest*nearest && d<=farthest*farthest)band.push_back(p);
     }
@@ -2062,7 +2077,11 @@ bool SpawnZombie(const bo1::SpawnRequest& request,const Snapshot& s,const AiScop
     // level.enemy_spawns: campaign enemy spawn locations near the player.
     auto band=SpawnPointBand(player,request.dogs?400.f:400.f,request.dogs?800.f:2500.f);
     if(band.size()<2)band=SpawnPointBand(player,256.f,4000.f);
-    if(band.empty()) {band=ZombieSpawnPoints();if(band.size()>8)band.resize(8);}
+    if(band.empty()) {
+        for(const auto& p:ZombieSpawnPoints()) if(!Listed(zg.badPoints,p.number)) band.push_back(p);
+        if(band.empty()) band=ZombieSpawnPoints();
+        if(band.size()>8)band.resize(8);
+    }
     const int count=static_cast<int>(band.size());
     const int draw=ZombieRandom(count);
     int previous=-1;
@@ -2082,7 +2101,7 @@ bool SpawnZombie(const bo1::SpawnRequest& request,const Snapshot& s,const AiScop
     if(!e.valid)return false;
     const auto speed=request.dogs?bo1::MoveSpeed::Sprint:bo1::RunSpeed(bo1::ZombieMoveSpeed(request.round),ZombieRng());
     ConfigureZombie(e,request.health,request.dogs,speed);
-    ZombieActor z;z.identity=created;z.ticket=request.ticket;z.dog=request.dogs;z.speed=speed;z.spawned=time;
+    ZombieActor z;z.identity=created;z.ticket=request.ticket;z.dog=request.dogs;z.speed=speed;z.spawned=time;z.spawnPoint=point.number;
     z.health=request.health;z.reconfigureAt=time+300;
     z.nextRepath=time;z.failsafeAt=time+static_cast<int>(bo1::kFailsafeIntervalMilliseconds);z.failsafeOrigin=e.origin;
     zg.zombies.push_back(z);
@@ -2213,6 +2232,8 @@ void ServicePowerups(const AiPoint& player,int time) {
 void ServiceZombieActors(const Snapshot& s,const AiScope& scope,const AiPoint& player,int playerHealth,int time) {
     const auto epoch=ai.checkpointEpoch.load();
     const auto& c=zg.controller.status();
+    int pathingZombies=0;
+    for(const auto& z:zg.zombies) if(z.pathing) ++pathingZombies;
     for(std::size_t n=0;n<zg.zombies.size();) {
         auto& z=zg.zombies[n];
         const auto raw=ReadAiAllocation(z.identity,ReadAi);
@@ -2265,6 +2286,31 @@ void ServiceZombieActors(const Snapshot& s,const AiScope& scope,const AiPoint& p
         }
         ServiceMelee(z,e,s,player,playerHealth,time);
         if(epoch!=ai.checkpointEpoch)return;
+        // Test41: a zombie the engine finds no path for (rooftop spawners).
+        if(!z.dog) {
+            std::int8_t points=0;
+            const bool hasPath=Value(e.actor+kActorPath+kPathPointCount,points) && points>0;
+            const bool before=z.pathing;z.pathing=hasPath;
+            if(hasPath) {z.noPathSince=-1;if(!Listed(zg.goodPoints,z.spawnPoint))zg.goodPoints.push_back(z.spawnPoint);}
+            else if(z.noPathSince<0) z.noPathSince=time;
+            bo1::ReachInputs reach;reach.hasPath=hasPath;reach.attacking=z.attacking;reach.distanceSquared=distance;
+            reach.noPathMs=z.noPathSince<0?0:time-z.noPathSince;reach.otherZombieHasPath=pathingZombies-(before?1:0)>0;
+            reach.pointKnownGood=Listed(zg.goodPoints,z.spawnPoint);
+            const auto verdict=bo1::JudgeReach(reach);
+            if(verdict==bo1::Reach::Recycle || verdict==bo1::Reach::RecycleAndBlacklist) {
+                bool listed=false;
+                if(verdict==bo1::Reach::RecycleAndBlacklist && bo1::MayBlacklist(zg.badPoints.size(),ZombieSpawnPoints().size())) {
+                    zg.badPoints.push_back(z.spawnPoint);listed=true;
+                }
+                Log("ZOMBIE_UNREACHABLE entity=%u point=%u no_path_ms=%d distance=%.0f others_pathing=%d blacklisted=%d bad_points=%llu",
+                    e.number,z.spawnPoint,reach.noPathMs,std::sqrt(distance),reach.otherZombieHasPath,listed,static_cast<unsigned long long>(zg.badPoints.size()));
+                ++zg.unreachableRecycled;
+                zg.controller.retire(z.ticket,bo1::Retirement::Recycle);
+                DeleteActor(e);
+                if(epoch!=ai.checkpointEpoch)return;
+                zg.zombies.erase(zg.zombies.begin()+static_cast<std::ptrdiff_t>(n));continue;
+            }
+        }
         // round_spawn_failsafe: no progress for 30 s and not attacking -> respawn.
         if(time>=z.failsafeAt) {
             if(!z.attacking && PointDistanceSquared(e.origin,z.failsafeOrigin)<bo1::kFailsafeMinimumMoveSquared
@@ -2315,6 +2361,10 @@ void BeginZombies(const Snapshot& s,const AiScope& scope,int time) {
     zg.client=scope.client;std::snprintf(zg.map,sizeof(zg.map),"%s",s.map);
     zg.launchedMap=!zg.pendingMap.empty() && zg.pendingMap==s.map?zg.pendingMap:std::string();zg.relaunchAt=0;
     zg.rises=zg.animatedAttacks=zg.riseFailures=zg.attacksBrokenOff=zg.setupZombies=0;
+    // Spawner entity numbers repeat when the same map loads again (GAME OVER
+    // relaunch), so what was learned about its spawn points is kept.
+    if(zg.reachMap!=s.map) {zg.badPoints.clear();zg.goodPoints.clear();zg.reachMap=s.map;}
+    zg.unreachableRecycled=0;
     zg.controller.setPlanner([](int round,bool) -> std::optional<bo1::RoundPlan> {
         // dog_round_tracker listens from the first "between_round_over".
         if(!zg.settings.hellhounds || round==zg.firstRound)return std::nullopt;
@@ -2983,6 +3033,9 @@ void LogZombieGame() {
         static_cast<unsigned long long>(prep.guards.size()),bo1assets::StateText(assets.state),assets.found,assets.wanted,
         assets.zone.empty()?"NONE":assets.zone.c_str(),zg.rises,zg.riseFailures,zg.animatedAttacks,zg.attacksBrokenOff,prep.threads,setupHandles,
         static_cast<unsigned long long>(kSetupFunctions.size()),zg.setupZombies,prep.setupCalls,prep.setupFailures,zg.relaunchAt!=0);
+    Log("ZOMBIE_REACH unreachable_recycled=%u bad_points=%llu good_points=%llu spawn_points=%llu",zg.unreachableRecycled,
+        static_cast<unsigned long long>(zg.badPoints.size()),static_cast<unsigned long long>(zg.goodPoints.size()),
+        static_cast<unsigned long long>(ZombieSpawnPoints().size()));
     const auto modelStatus=bo1models::GetStatus();
     Log("ZOMBIE_MODELS state=%s skipped=%s cached=%d zone_loaded=%d level_zone=%s precached=%d bodies=%llu heads=%llu dressed=%u dress_failures=%u helmet_swaps=%u textures=%u fallbacks=%u file=%s",
         bo1models::StateText(modelStatus.state),modelStatus.skipped?modelStatus.skipReason.c_str():"-",modelStatus.cached,models.appended,models.zoneFor.empty()?"-":models.zoneFor.c_str(),models.precached,

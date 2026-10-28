@@ -20,6 +20,10 @@ inline constexpr std::size_t kActorGoalPosition=0x1498,kActorGoalRadius=0x14a4,k
 inline constexpr std::size_t kActorGoalNode=0x14b0,kActorGoalVolume=0x14b8,kActorGoalEntity=0x14c0;
 inline constexpr std::size_t kActorGoalEntityInterval=0x14c8;
 inline constexpr std::size_t kActorPathEnemyLookahead=0x14cc,kActorPathEnemyFightDist=0x14d0,kActorMeleeAttackDist=0x14d4;
+// Test41: the actor's current path (path_t at actor+0xfa4). Its point count is
+// the signed byte at +0x380 that Path_Exists (0x144d30) tests; the pathgoalpos
+// getter (0x13ac40) answers only when Actor_HasPath (0x127bb0) sees it > 0.
+inline constexpr std::size_t kActorPath=0xfa4,kPathPointCount=0x380;
 inline constexpr std::size_t kActorFixedNode=0x14dd,kActorDropWeapon=0x14ec;
 inline constexpr std::size_t kActorDesiredAngle=0x100;
 inline constexpr std::size_t kActorAllowPain=0x164,kActorIgnoreSuppression=0xd28,kActorNoDodgeMove=0x13e0;

@@ -226,6 +226,11 @@ void GuardBegin(const std::string& level) {
     else Log("BO1_MODELS guard=MARKER_WRITE_FAILED");
 }
 void GuardLoaded() {loadPending=false;}
+void GuardUnused() {
+    std::lock_guard<std::mutex> lock(mutex);
+    if(markerOwned && !markerPath.empty()) DeleteFileW(markerPath.c_str());
+    markerOwned=false;
+}
 bool GuardConfirm() {
     std::lock_guard<std::mutex> lock(mutex);
     if(confirmed) return false;

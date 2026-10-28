@@ -210,6 +210,18 @@ def verify(path,include=Path('include')):
     # DB_LoadXAssets queues each zone: name copied (64 chars), allocFlags kept, 16-byte XZoneInfo stride.
     if get(0xf0f6c,6)!=bytes.fromhex('41 b8 40 00 00 00') or get(0xf0f7f,2)!=bytes.fromhex('8b 07') or get(0xf0f91,4)!=bytes.fromhex('48 83 c7 10'):
         raise ValueError('DB_LoadXAssets queue layout differs')
+    # Test41: an actor's path point count, as Path_Exists and the pathgoalpos getter read it.
+    if get(0x144d30,11)!=bytes.fromhex('80 b9 80 03 00 00 00 0f 9f c0 c3') or get(0x127bb0,8)!=bytes.fromhex('48 81 c1 a4 0f 00 00 e9'):
+        raise ValueError('Path_Exists / Actor_HasPath differ')
+    if get(0x127bb7,1)!=b'\xe9' or 0x127bb7+5+struct.unpack('<i',get(0x127bb8,4))[0]!=0x144d30 or call_target(0x13ac49)!=0x127bb0:
+        raise ValueError('pathgoalpos getter chain differs')
+    if value('kActorPath')!=0xfa4 or value('kPathPointCount')!=0x380:raise ValueError('Actor path constants differ')
+    if not any(struct.unpack('<Q',get(at+32,8))[0]-IMAGE_BASE==0x13ac40 for at,_ in pairs('pathgoalpos')):
+        raise ValueError('pathgoalpos field getter differs')
+    # Test41: the database thread loads the queued names in list order (0x44-byte
+    # records from 0xb69450, one after another), so the model zone is put first.
+    if get(0xf19b5,14)!=bytes.fromhex('48 83 c5 44 49 83 c7 44 49 83 ec 01 0f 85') or rip(0xf17e7,3,7)!=0xb69450:
+        raise ValueError('Database thread queue order differs')
     # The database thread opens <exe dir>\zone\<language>\<name>.ff (names starting mp_ use zone\dlc).
     for rva,text_ in ((0x332468,'%s.ff'),(0x35a1c8,'zone\\%s\\'),(0x357060,'%s\\%s%s')):
         if cstring(rva)!=text_:raise ValueError(f'Zone path literal at {rva:#x} differs')

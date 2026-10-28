@@ -37,6 +37,7 @@ inline constexpr unsigned long long kGuardConfirmMs=45000;
 bool GuardAllowsLoad(std::string& reason);
 void GuardBegin(const std::string& level);
 void GuardLoaded();
+void GuardUnused();                      // the level loaded but precached no model: clear the marker
 bool GuardConfirm();                     // true when this call cleared the marker
 void GuardProcessExit();                 // DLL_PROCESS_DETACH: takes no locks
 // DB_LoadXAssets zone name for the fastfile: zone\<language>\ is prepended by
