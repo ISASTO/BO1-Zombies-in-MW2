@@ -1,7 +1,20 @@
 # BO1 Zombies in MW2
 
 Incremental mod framework for **retail Modern Warfare 2 (2009), single player**.
-Current build: **0.1.40-zombies-test41**.
+Current build: **0.1.41-zombies-test42**.
+
+**Test42 fixes the freeze.** Test41's hang reports caught the game stuck
+releasing `"zombie_rise"`/`"zombie_attack"`, script strings that had already
+been freed.
+
+MW2's `animscripted` releases its own arguments in the middle of the call
+and keeps using the notify name. Script literals survive that; the mod's
+strings did not. The mod now pins every string it passes to a builtin or
+script thread, as a compiled script does.
+
+The crash guard now skips the models for one run only. See
+[Test42](docs/zombies-test42.md) and the
+[Test42 test instructions](docs/test42-testing-protocol.md).
 
 **Test41 fixes the first Test40 run.**
 
@@ -95,8 +108,9 @@ bridge, 72 MiB GPU/CPU skinning buffers, guarded animated-record storage and
 16-bit handles remain active. Rendering and actor regressions are rerun.
 Windows missions and stable 256-actor retail gameplay require owner testing.
 
-Install the complete Test41 package (run its Uninstall.cmd first to remove
-Test40). Follow the [Test41 instructions](docs/test41-testing-protocol.md):
+Install the complete Test42 package (run its Uninstall.cmd first to remove
+Test41). Follow the [Test42 instructions](docs/test42-testing-protocol.md);
+the [Test41 instructions](docs/test41-testing-protocol.md) cover the same maps:
 Favela with zombies attacking for a few minutes, then Arcadia and Gulag
 showers, with screenshots. The [Test40 instructions](docs/test40-testing-protocol.md)
 describe the models in more detail. The

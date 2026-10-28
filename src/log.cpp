@@ -176,7 +176,7 @@ void WriteDiagnostics(const wchar_t* kind,EXCEPTION_POINTERS* info,const CONTEXT
             static_cast<unsigned long long>(n),static_cast<unsigned long long>(tick),thread,operation,entity,actors);
         if(size>0)RawWrite(report,message,static_cast<DWORD>(size<2048?size:2047));
     }
-    std::swprintf(path, 32768, L"%ls\\crash-%04u%02u%02u-%02u%02u%02u.dmp", directory,
+    std::swprintf(path, 32768, L"%ls\\%ls-%04u%02u%02u-%02u%02u%02u.dmp", directory, kind,
         time.wYear, time.wMonth, time.wDay, time.wHour, time.wMinute, time.wSecond);
     HANDLE dump = CreateFileW(path, GENERIC_WRITE, FILE_SHARE_READ, nullptr, CREATE_ALWAYS, 0, nullptr);
     if (dump != INVALID_HANDLE_VALUE) {

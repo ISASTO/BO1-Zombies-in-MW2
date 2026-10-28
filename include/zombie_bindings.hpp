@@ -105,6 +105,9 @@ inline constexpr std::size_t kAssetEntryHeader=0x8;
 inline constexpr std::uintptr_t kSlGetStringRva=0x21b2d0;
 inline constexpr std::array<std::uint8_t,10> kSlGetStringPrologue={0x45,0x8b,0xc8,0x48,0xc7,0xc0,0xff,0xff,0xff,0xff};
 inline constexpr unsigned kSlGetStringType=4;
+// Scr_AddString (0x222300) interns with SL_GetString(str, 0) at 0x21a670, which
+// passes type 7: strings the DLL pins for builtins use exactly that call.
+inline constexpr unsigned kScrAddStringType=7;
 // Scr_AddAnim(value): VAR_ANIMATION (13) push used by animscripted's anim argument.
 inline constexpr std::uintptr_t kScrAddAnimRva=0x222070;
 inline constexpr std::array<std::uint8_t,9> kScrAddAnimPrologue={0x40,0x53,0x48,0x83,0xec,0x20,0x48,0x8b,0xd9};

@@ -142,6 +142,21 @@ class ModelImportTests(unittest.TestCase):
         ai=(ROOT/'src'/'ai.cpp').read_text()
         self.assertIn('XZoneInfo zones[2]={{bo1models::kZoneName,info[0].allocFlags,0},info[0]};',ai)
 
+    def test_builtin_and_thread_strings_are_pinned(self):
+        # Test42: animscripted releases its own parameters (IncInParam) before
+        # it pushes the borrowed notify name again; strings we pass must be
+        # kept alive like script literals.
+        ai=(ROOT/'src'/'ai.cpp').read_text()
+        builtin=ai[ai.index('ScriptCallResult Builtin('):]
+        self.assertLess(builtin.index('PinScriptStrings(args);'),builtin.index('CallScriptBuiltin('))
+        setup=ai[ai.index('bool RunSetupFunction('):]
+        self.assertLess(setup.index('PinScriptStrings(args);'),setup.index('CallScriptThread('))
+        dress=ai[ai.index('void DressZombie('):]
+        self.assertLess(dress.index('PinScriptStrings({ScriptArg::String(kHelmetSwapNote)});'),dress.index('CallScriptThread('))
+        self.assertEqual(ai.count('CallScriptThread('),2)
+        self.assertEqual(ai.count('CallScriptBuiltin('),1)
+        self.assertIn('kScrAddStringType=7',self.bindings)
+
     def test_delta_flag_requires_a_delta_part(self):
         xanim=(ROOT/'include'/'bo1_xanim.hpp').read_text()
         self.assertIn('return a.delta && (a.trans.present || a.quat.present);',xanim)

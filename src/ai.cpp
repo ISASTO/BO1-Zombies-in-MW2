@@ -1383,8 +1383,36 @@ int ZombieRandom(int n) {
 const bo1::RandomInt& ZombieRng() {static const bo1::RandomInt rng=[](int n){return ZombieRandom(n);};return rng;}
 bool ZombieWorkWanted() {return zg.running || zg.startWanted || zg.stopWanted;}
 void ZombieEvent(const char* text,int time) {zg.event=text;zg.eventTime=time;}
+// Test42: every script string handed to a builtin or thread is pinned for
+// the level, the way a compiled script keeps its string literals alive. A
+// builtin that pushes any value first releases its own parameters
+// (IncInParam 0x221ff0 clears the out-params) and may keep using an id it
+// borrowed from them: animscripted reads its notify name, then pushes the
+// arguments of animscripts\scripted::init, then pushes that id again. With
+// only our parameter's reference, "zombie_rise"/"zombie_attack" were freed
+// there; the next release of the stale id spun forever in
+// SL_RemoveRefToString (Test40/41 freezes, hang dumps: refcount 0 entry).
+std::unordered_map<std::string,unsigned> pinnedStrings;
+std::string pinnedLevel;
+unsigned pinnedTotal=0;
+void PinScriptStrings(std::initializer_list<ScriptArg> args) {
+    using SlGet=unsigned(*)(const char*,unsigned,unsigned);
+    for(const auto& a:args) {
+        if(a.kind!=ScriptArg::Kind::String || !a.text || pinnedStrings.count(a.text)) continue;
+        // SL_GetString(text, user 0, type 7): the call Scr_AddString makes.
+        const unsigned id=reinterpret_cast<SlGet>(aiProfile.base+kSlGetStringRva)(a.text,0,kScrAddStringType);
+        pinnedStrings.emplace(a.text,id);++pinnedTotal;
+    }
+}
+// Level scripts reload the string table's users; pin again on the next level
+// (an extra reference per level and string, never released, is harmless).
+void ResetPinnedStrings(const char* level) {
+    if(pinnedLevel==level) return;
+    pinnedLevel=level;pinnedStrings.clear();
+}
 ScriptCallResult Builtin(const BuiltinBinding& b,unsigned entref,std::initializer_list<ScriptArg> args,ScriptReturn* out=nullptr) {
     if(!zombieBindingsReady)return ScriptCallResult::Invalid;
+    PinScriptStrings(args);
     auto& p=*reinterpret_cast<volatile NativeScriptParameters*>(aiProfile.base+kScriptParametersRva);
     const auto r=CallScriptBuiltin(p,scriptNatives,reinterpret_cast<ScriptBuiltin>(aiProfile.base+b.rva),entref,args,out);
     if(r!=ScriptCallResult::Ok)Log("ZOMBIE_BUILTIN name=%s result=%s",b.name,ScriptCallText(r));
@@ -1514,6 +1542,7 @@ bool RunSetupFunction(unsigned entnum,SetupFunction f,std::initializer_list<Scri
     const auto n=static_cast<std::size_t>(f);
     if(!prep.threads || !prep.setup[n] || args.size()!=static_cast<std::size_t>(kSetupFunctions[n].params)) return false;
     auto& p=*reinterpret_cast<volatile NativeScriptParameters*>(aiProfile.base+kScriptParametersRva);
+    PinScriptStrings(args);
     const auto r=CallScriptThread(p,scriptNatives,reinterpret_cast<ScriptExecEntThread>(aiProfile.base+kScrExecEntThreadNumRva),
         reinterpret_cast<ScriptFreeThread>(aiProfile.base+kScrFreeThreadRva),entnum,prep.setup[n],args);
     ++prep.setupCalls;
@@ -1647,6 +1676,7 @@ void PrepareLevelScripts() {
     bo1assets::WaitReady(15000);
     std::lock_guard<std::recursive_mutex> lock(aiMutex);
     prep.map=map;
+    ResetPinnedStrings(map);
     const auto guards=SpecOpsMapIndex(map)>=0?ApplySpecOpsGuards():0u;
     const auto anims=ApplyAnimSwaps();
     models.helmetSwap=prep.threads?CaptureHelmetSwap():0;
@@ -1703,6 +1733,7 @@ void LevelZoneLoadHook(XZoneInfo* info,unsigned count,int sync) {
         {
             std::lock_guard<std::recursive_mutex> lock(aiMutex);
             models.appended=false;models.precached=false;models.bodies.clear();models.heads.clear();models.zoneFor.clear();models.firstDressed=0;
+            pinnedStrings.clear();pinnedLevel.clear();   // every level load: pin again before use
             if(count==1 && info && info[0].name) zone=info[0].name;
             wanted=!zone.empty() && info[0].allocFlags==kLevelZoneAllocFlags && zg.startWanted && !zg.pendingMap.empty()
                 && LevelZoneOf(zg.pendingMap)==zone;
@@ -1785,6 +1816,7 @@ void DressZombie(ZombieActor& z,const AiEntity& e) {
     const auto ref=ScriptEntityRef(e.number);
     if(models.helmetSwap && prep.threads) {
         auto& p=*reinterpret_cast<volatile NativeScriptParameters*>(aiProfile.base+kScriptParametersRva);
+        PinScriptStrings({ScriptArg::String(kHelmetSwapNote)});
         const auto r=CallScriptThread(p,scriptNatives,reinterpret_cast<ScriptExecEntThread>(aiProfile.base+kScrExecEntThreadNumRva),
             reinterpret_cast<ScriptFreeThread>(aiProfile.base+kScrFreeThreadRva),e.number,models.helmetSwap,{ScriptArg::String(kHelmetSwapNote)});
         if(r==ScriptCallResult::Ok) ++models.helmetSwaps;
@@ -3037,6 +3069,7 @@ void LogZombieGame() {
         static_cast<unsigned long long>(prep.guards.size()),bo1assets::StateText(assets.state),assets.found,assets.wanted,
         assets.zone.empty()?"NONE":assets.zone.c_str(),zg.rises,zg.riseFailures,zg.animatedAttacks,zg.attacksBrokenOff,prep.threads,setupHandles,
         static_cast<unsigned long long>(kSetupFunctions.size()),zg.setupZombies,prep.setupCalls,prep.setupFailures,zg.relaunchAt!=0);
+    Log("ZOMBIE_STRINGS pinned_level=%llu pinned_total=%u",static_cast<unsigned long long>(pinnedStrings.size()),pinnedTotal);
     Log("ZOMBIE_REACH unreachable_recycled=%u bad_points=%llu good_points=%llu spawn_points=%llu",zg.unreachableRecycled,
         static_cast<unsigned long long>(zg.badPoints.size()),static_cast<unsigned long long>(zg.goodPoints.size()),
         static_cast<unsigned long long>(ZombieSpawnPoints().size()));

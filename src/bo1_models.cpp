@@ -184,8 +184,12 @@ void StartBuild() {
         started=true;status.state=State::Building;
         markerPath=bo1assets::GameDirectory()+L"bo1mw2\\cache\\bo1_zombie_models.loading";
         staleMarker=GetFileAttributesW(markerPath.c_str())!=INVALID_FILE_ATTRIBUTES;
+        // Test42: skip the models for this run only. A freeze that had
+        // nothing to do with them (Test41) must not disable them for good;
+        // a real model crash still alternates instead of looping.
+        if(staleMarker) DeleteFileW(markerPath.c_str());
     }
-    if(staleMarker) Log("BO1_MODELS guard=STALE_MARKER models_skipped=1 marker=%s (an earlier run ended while the models were new; delete the file to try them again)",
+    if(staleMarker) Log("BO1_MODELS guard=STALE_MARKER models_skipped=1 this_run_only=1 marker=%s (an earlier run ended while the models were new)",
         bo1assets::Utf8(markerPath).c_str());
     std::thread([]{
         try {Build();}

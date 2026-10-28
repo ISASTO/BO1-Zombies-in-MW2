@@ -30,7 +30,7 @@ Status GetStatus();
 // a level load until zombies wearing the models have been in play for
 // kGuardConfirmMs (or MW2 exits normally). A marker left by an earlier run
 // means that run ended abnormally while the models were new: they are then
-// skipped (zombies keep MW2 models) until the marker is deleted. A load in
+// skipped (zombies keep MW2 models) for that one run (Test42). A load in
 // this run that never reached the level scripts (an error dialog) skips them
 // for the rest of the run.
 inline constexpr unsigned long long kGuardConfirmMs=45000;

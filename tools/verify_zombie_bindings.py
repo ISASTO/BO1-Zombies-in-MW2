@@ -210,6 +210,19 @@ def verify(path,include=Path('include')):
     # DB_LoadXAssets queues each zone: name copied (64 chars), allocFlags kept, 16-byte XZoneInfo stride.
     if get(0xf0f6c,6)!=bytes.fromhex('41 b8 40 00 00 00') or get(0xf0f7f,2)!=bytes.fromhex('8b 07') or get(0xf0f91,4)!=bytes.fromhex('48 83 c7 10'):
         raise ValueError('DB_LoadXAssets queue layout differs')
+    # Test42: the Test40/41 freeze. IncInParam (0x221ff0) releases the out-params
+    # whenever anything is pushed; animscripted takes its notify name with
+    # Scr_GetConstString(0), pushes the scripted::init arguments, then pushes that
+    # id again with Scr_AddConstString. A string only the caller's parameter kept
+    # alive is freed in between, so the DLL pins its strings like script literals
+    # with the same SL_GetString call Scr_AddString makes (type 7).
+    if get(0x221ff4,7)!=bytes.fromhex('83 3d c1 24 6d 01 00') or call_target(0x22200a)!=0x21dc30:
+        raise ValueError('IncInParam out-param release differs')
+    if call_target(0x222309)!=0x221ff0 or call_target(0x222321)!=0x21a670 or get(0x21a68f,6)!=bytes.fromhex('41 b9 07 00 00 00'):
+        raise ValueError('Scr_AddString interning differs')
+    if value('kScrAddStringType')!=7:raise ValueError('Pinned string type differs')
+    if call_target(0x183257)!=0x222c40 or get(0x18334a,7)!=bytes.fromhex('8b 8c 24 e0 00 00 00') or call_target(0x183351)!=0x222170:
+        raise ValueError('animscripted notify-name reuse differs')
     # Test41: an actor's path point count, as Path_Exists and the pathgoalpos getter read it.
     if get(0x144d30,11)!=bytes.fromhex('80 b9 80 03 00 00 00 0f 9f c0 c3') or get(0x127bb0,8)!=bytes.fromhex('48 81 c1 a4 0f 00 00 e9'):
         raise ValueError('Path_Exists / Actor_HasPath differ')
