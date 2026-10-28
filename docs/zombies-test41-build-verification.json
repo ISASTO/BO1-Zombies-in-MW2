@@ -1,0 +1,122 @@
+{
+ "version": "0.1.40-zombies-test41",
+ "base_commit": "01e58e9",
+ "executable_sha256": "fb7e8a987c371dea7b666091b0b9e2011c0cd9cd277b191ad453d11d557dd777",
+ "dll_sha256": "410f2b5a7432d03af292a1c8a852395a242878d4b0dae9feb847f66ba8b6a774",
+ "dll_bytes": 12864175,
+ "compiler": "xPack MinGW-w64 GCC 13.2.0 (posix threads, UCRT), RelWithDebInfo, static GCC/C++ runtime",
+ "pe_checks": {
+  "amd64_pe32_plus": true,
+  "exact_ten_exports": true,
+  "aslr_nx": true,
+  "no_gcc_runtime_dlls": true
+ },
+ "exports": [
+  "D3DPERF_BeginEvent",
+  "D3DPERF_EndEvent",
+  "D3DPERF_GetStatus",
+  "D3DPERF_QueryRepeatFrame",
+  "D3DPERF_SetMarker",
+  "D3DPERF_SetOptions",
+  "D3DPERF_SetRegion",
+  "DebugSetMute",
+  "Direct3DCreate9",
+  "Direct3DCreate9Ex"
+ ],
+ "imports": [
+  "advapi32.dll",
+  "bcrypt.dll",
+  "dbghelp.dll",
+  "gdi32.dll",
+  "kernel32.dll",
+  "user32.dll",
+  "winmm.dll",
+  "api-ms-win-crt-*-l1-1-0.dll (11 UCRT API sets)"
+ ],
+ "imports_added_since_test40": [],
+ "early_dllmain_native_edits_unchanged": true,
+ "third_party": {
+  "miniz": "tinfl inflate only, MIT, third_party/miniz (VERSION records the upstream commit); also inflates .iwd entries for the model textures"
+ },
+ "native_cxx_tests": {
+  "passed": 23,
+  "failed": 0,
+  "updated": [
+   "bo1_xanim_tests (delta flag without root-motion data)",
+   "bo1_zombie_rules_tests (reachability)"
+  ]
+ },
+ "python_tests": {
+  "passed": 52,
+  "failed": 0,
+  "locally_gated": [
+   "test_mw2_slot_anims_exist_when_local_zone_is_available (passed with the owner's common.ff)",
+   "test_helmet_note_exists_in_local_mw2_scripts (passed with the owner's extracted MW2 scripts)"
+  ]
+ },
+ "native_suites_and_audits_passed": [
+  "runtime",
+  "resources",
+  "iterator",
+  "animation",
+  "history",
+  "awareness",
+  "threat",
+  "crowd",
+  "fracture",
+  "glass_state",
+  "tables",
+  "layout",
+  "lifecycle",
+  "audit",
+  "consumers",
+  "script_vm",
+  "sweep",
+  "script_call",
+  "level_prep",
+  "bindings",
+  "script_parameters",
+  "capacity",
+  "fire_mode",
+  "owned_strings",
+  "model_zone",
+  "model_zone_kino",
+  "anim_delta"
+ ],
+ "native_suites_and_audits_failed": [],
+ "model_zone_local_kino": {
+  "models": 6,
+  "surfaces": 52,
+  "materials": 3,
+  "images": 8,
+  "vertices": 20774,
+  "triangles": 27972,
+  "rigid_lists": 16,
+  "collision_trees": 16,
+  "references_resolved": 53,
+  "script_strings": 96,
+  "fastfile_bytes": 1047406,
+  "block_sizes": [
+   6064,
+   0,
+   0,
+   197648,
+   0,
+   0,
+   668864,
+   172304
+  ]
+ },
+ "anim_delta": {
+  "synthetic_failures": 0,
+  "bo1_anims": 27,
+  "bo1_failures": 0,
+  "before_fix": "ai_zombie_attack_v1/v4/v6 faulted in the retail sampler (delta flag, null deltaPart)"
+ },
+ "installer_fixture": "pwsh 7.5.3 on Linux: Test40 installed, Test41 refuses to overwrite, Test41 Uninstall removes Test40 and the model cache/marker, Test41 installed (Black Ops and Kino der Toten found, stale guard marker removed), CollectLogs includes the model manifest, Test41 uninstalled keeping logs/backups/bo1_path.txt",
+ "bo1_inputs": {
+  "zombie_theater.ff_sha256": "970db88bb5ae9aa1d3875cdbd55d43212f22ee55096ce251f596d4a38a776786",
+  "models_carved": "6/6 (c_ger_honorguard_body1/2, c_ger_zombie_head1-4)",
+  "note": "owner's files, read at run time on the owner's PC, never shipped; Test40 in-game log: textures=8 fallbacks=0 from the real .iwd archives"
+ }
+}
