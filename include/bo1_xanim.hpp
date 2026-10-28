@@ -288,6 +288,9 @@ template<class T> inline T Get(const std::uint8_t* at) {T v{};std::memcpy(&v,at,
 inline std::uint64_t Address(const void* p) {return static_cast<std::uint64_t>(reinterpret_cast<std::uintptr_t>(p));}
 inline std::uint64_t VectorAddress(const std::vector<std::uint8_t>& v) {return v.empty()?0:Address(v.data());}
 
+// The MW2 delta flag: set only when there is root motion to sample.
+inline bool HasDelta(const Anim& a) {return a.delta && (a.trans.present || a.quat.present);}
+
 // Build the MW2 XAnimParts image for `a`. `intern` returns the MW2 script
 // string for a name (0 refuses). `nameField` is the asset name pointer to
 // keep (the MW2 asset's own name so database lookups stay unchanged).
@@ -345,7 +348,12 @@ inline bool Build(const Anim& a,const std::function<std::uint16_t(const std::str
     Put<std::uint16_t>(h.data()+mw2::kRandomDataByteCount,a.randomDataByteCount);
     Put<std::uint16_t>(h.data()+mw2::kRandomDataIntCount,a.randomDataIntCount);
     Put<std::uint16_t>(h.data()+mw2::kNumFrames,a.numframes);
-    h[mw2::kFlags]=static_cast<std::uint8_t>((a.loop?mw2::kFlagLoop:0)|(a.delta?mw2::kFlagDelta:0));
+    // Some BO1 anims (e.g. ai_zombie_attack_v1/v4/v6) carry the delta flag
+    // with no delta part at all. BO1 tests the pointer; MW2's root-motion
+    // sampler (XAnimCalcRelDeltaParts 0x29b200) tests only the flag and then
+    // reads deltaPart, so such an anim is written as a plain (non-delta) one:
+    // the same "no root motion" BO1 plays (Test41 freeze/crash on attacks).
+    h[mw2::kFlags]=static_cast<std::uint8_t>((a.loop?mw2::kFlagLoop:0)|(HasDelta(a)?mw2::kFlagDelta:0));
     for(std::size_t n=0;n<kPartTypeCount;++n)h[mw2::kBoneCount+n]=a.boneCount[n];
     h[mw2::kNotifyCount]=static_cast<std::uint8_t>(a.notify.size());
     h[mw2::kAssetType]=a.assetType;h[mw2::kIsDefault]=0;
@@ -374,6 +382,8 @@ inline bool ImageMatches(const Image& image,const Anim& a) {
     if(h[mw2::kNotifyCount]!=a.notify.size() || h[mw2::kBoneCount+9]!=a.boneCount[9]) return false;
     if(Get<std::uint64_t>(h+mw2::kNames)!=(image.names.empty()?0:Address(image.names.data()))) return false;
     if(Get<std::uint64_t>(h+mw2::kNotify)!=VectorAddress(image.notify)) return false;
+    // The engine reads deltaPart whenever the delta flag is set.
+    if((h[mw2::kFlags]&mw2::kFlagDelta) && !Get<std::uint64_t>(h+mw2::kDeltaPart)) return false;
     return Get<std::uint32_t>(h+mw2::kRandomDataShortCount)==a.randomDataShort.size()/2;
 }
 

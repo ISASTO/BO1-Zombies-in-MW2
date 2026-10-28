@@ -103,6 +103,19 @@ int main() {
     Check(ImageMatches(image,a),"image self-check");
     Check(!Build(a,[](const std::string&){return std::uint16_t{0};},0,image),"refused when a name cannot be interned");
 
+    // Test41: the delta flag without any delta part (BO1 ai_zombie_attack_v1/v4/v6).
+    // MW2's sampler reads deltaPart whenever the flag is set, so the image is
+    // written without root motion instead of with a null deltaPart.
+    {
+        Anim noDelta=a;noDelta.trans=DeltaTrans{};noDelta.quat=DeltaQuat{};
+        Image img;
+        Check(noDelta.delta && !HasDelta(noDelta) && HasDelta(a),"delta flag needs a delta part");
+        Check(Build(noDelta,intern,0,img) && img.header[0x14]==mw2::kFlagLoop && Get<std::uint64_t>(img.header.data()+0x80)==0,"flagged anim without parts written as non-delta");
+        Check(ImageMatches(img,noDelta),"non-delta self-check");
+        img.header[0x14]|=mw2::kFlagDelta;
+        Check(!ImageMatches(img,noDelta),"self-check refuses delta flag with null deltaPart");
+    }
+
     if(const char* path=std::getenv("BO1_ZONE_DEC")) {
         std::ifstream f(path,std::ios::binary);std::vector<std::uint8_t> raw((std::istreambuf_iterator<char>(f)),{});
         auto z=ParseZoneStrings(raw.data(),raw.size());
@@ -110,7 +123,10 @@ int main() {
             "ai_zombie_traverse_ground_v1_walk","ai_zombie_traverse_ground_climbout_fast","ai_zombie_death_v1","ai_zombie_idle_v1"};
         std::size_t rej=0;auto real=z?CarveAnims(raw.data(),raw.size(),*z,want,&rej):std::vector<Anim>{};
         Check(real.size()==want.size() && rej==0,"real zone: all wanted anims carved");
-        for(const auto& r:real) {Image img;Check(Build(r,intern,0,img) && ImageMatches(img,r),r.name.c_str());}
+        for(const auto& r:real) {
+            Image img;Check(Build(r,intern,0,img) && ImageMatches(img,r),r.name.c_str());
+            if(r.name=="ai_zombie_attack_v1") Check(r.delta && !HasDelta(r) && !(img.header[0x14]&mw2::kFlagDelta),"attack_v1 has no root motion");
+        }
         std::printf("real zone: %zu anims\n",real.size());
     }
     std::printf("%s (%d failures)\n",failures?"FAILED":"bo1_xanim_tests passed",failures);

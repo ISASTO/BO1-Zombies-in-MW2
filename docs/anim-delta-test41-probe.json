@@ -1,0 +1,115 @@
+{
+  "synthetic": {
+    "probe": "exact-native root motion (XAnimGetRelDelta 0x29cbb0)",
+    "source": "synthetic",
+    "anims": [
+      {
+        "name": "synthetic_flag_without_parts",
+        "frames": 54,
+        "bo1_delta_flag": 1,
+        "root_motion": 0,
+        "wide_indices": 0,
+        "samples": 651,
+        "non_finite": 0,
+        "fault": "none",
+        "yaw_sin_cos": [
+          0.0,
+          1.0
+        ],
+        "trans": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "max_step": 0.0
+      },
+      {
+        "name": "synthetic_trans",
+        "frames": 94,
+        "bo1_delta_flag": 1,
+        "root_motion": 1,
+        "wide_indices": 0,
+        "samples": 1131,
+        "non_finite": 0,
+        "fault": "none",
+        "yaw_sin_cos": [
+          0.0,
+          1.0
+        ],
+        "trans": [
+          63000.0,
+          63000.0,
+          31500.0
+        ],
+        "max_step": 1038.46
+      },
+      {
+        "name": "synthetic_trans_yaw",
+        "frames": 70,
+        "bo1_delta_flag": 1,
+        "root_motion": 1,
+        "wide_indices": 0,
+        "samples": 843,
+        "non_finite": 0,
+        "fault": "none",
+        "yaw_sin_cos": [
+          0.1221,
+          0.9976
+        ],
+        "trans": [
+          63000.0,
+          63000.0,
+          31500.0
+        ],
+        "max_step": 1012.5
+      },
+      {
+        "name": "synthetic_small_trans",
+        "frames": 215,
+        "bo1_delta_flag": 1,
+        "root_motion": 1,
+        "wide_indices": 0,
+        "samples": 2583,
+        "non_finite": 0,
+        "fault": "none",
+        "yaw_sin_cos": [
+          0.1221,
+          0.9976
+        ],
+        "trans": [
+          210.0,
+          210.0,
+          105.0
+        ],
+        "max_step": 3.38
+      },
+      {
+        "name": "synthetic_wide_indices",
+        "frames": 303,
+        "bo1_delta_flag": 1,
+        "root_motion": 1,
+        "wide_indices": 1,
+        "samples": 3639,
+        "non_finite": 0,
+        "fault": "none",
+        "yaw_sin_cos": [
+          0.1221,
+          0.9976
+        ],
+        "trans": [
+          63000.0,
+          63000.0,
+          31500.0
+        ],
+        "max_step": 1020.35
+      }
+    ],
+    "failures": 0
+  },
+  "executable_sha256": "fb7e8a987c371dea7b666091b0b9e2011c0cd9cd277b191ad453d11d557dd777",
+  "routines": [
+    "0x29b200",
+    "0x29cbb0",
+    "0x2a4ac0"
+  ]
+}
