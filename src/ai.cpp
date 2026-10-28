@@ -1491,6 +1491,7 @@ struct ModelPrep {
     std::vector<std::string> bodies,heads;   // precached, in BO1 alias order
     int helmetSwap=0;               // animscripts\shared::HandleNoteTrack
     unsigned dressed=0,dressFailures=0,helmetSwaps=0;
+    unsigned long long firstDressed=0;   // GetTickCount64 of this level's first dressed zombie (crash guard)
 } models;
 bool WriteProtected(std::uintptr_t at,const void* bytes,std::size_t size) {
     DWORD old=0;
@@ -1642,6 +1643,7 @@ void PrepareLevelScripts() {
     const auto anims=ApplyAnimSwaps();
     models.helmetSwap=prep.threads?CaptureHelmetSwap():0;
     const auto precached=PrecacheModels();
+    if(models.appended) bo1models::GuardLoaded();   // the zone loaded without an error
     prep.prepared=true;
     Log("LEVEL_PREP map=%s so_guards=%u/%llu anims=%u bo1_models=%u zone_loaded=%d",map,guards,static_cast<unsigned long long>(kSpecOpsEndFunctions.size()),anims,
         precached,models.appended);
@@ -1685,15 +1687,19 @@ void LevelZoneLoadHook(XZoneInfo* info,unsigned count,int sync) {
         bool wanted=false;
         {
             std::lock_guard<std::recursive_mutex> lock(aiMutex);
-            models.appended=false;models.precached=false;models.bodies.clear();models.heads.clear();models.zoneFor.clear();
+            models.appended=false;models.precached=false;models.bodies.clear();models.heads.clear();models.zoneFor.clear();models.firstDressed=0;
             if(count==1 && info && info[0].name) zone=info[0].name;
             wanted=!zone.empty() && info[0].allocFlags==kLevelZoneAllocFlags && zg.startWanted && !zg.pendingMap.empty()
                 && LevelZoneOf(zg.pendingMap)==zone;
         }
         if(wanted) {
             add=bo1models::WaitReady(30000);
+            std::string skip;
+            if(add && !bo1models::GuardAllowsLoad(skip)) add=false;
+            if(add) bo1models::GuardBegin(zone);
             const auto st=bo1models::GetStatus();
-            Log("BO1_MODELS level_zone=%s append=%d state=%s cached=%d detail=%s",zone.c_str(),add,bo1models::StateText(st.state),st.cached,st.detail.c_str());
+            Log("BO1_MODELS level_zone=%s append=%d state=%s cached=%d skipped=%s detail=%s",zone.c_str(),add,bo1models::StateText(st.state),st.cached,
+                skip.empty()?"-":skip.c_str(),st.detail.c_str());
         }
     } catch(...) {add=false;}
     if(!add) {load(info,count,sync);return;}
@@ -1778,6 +1784,7 @@ void DressZombie(ZombieActor& z,const AiEntity& e) {
         return;
     }
     ++models.dressed;
+    if(!models.firstDressed) models.firstDressed=GetTickCount64();
 }
 // %anim value (script animtree index << 16 | index in the tree) for one of the
 // replaced flashbang slots, in the tree this actor animates with.
@@ -2920,7 +2927,13 @@ void TickZombieRelaunch() {
     std::string map;ZombieSettings settings;
     {
         std::unique_lock<std::recursive_mutex> lock(aiMutex,std::try_to_lock);
-        if(!lock.owns_lock() || !zg.relaunchAt || GetTickCount64()<zg.relaunchAt || zg.running || zg.startWanted)return;
+        if(!lock.owns_lock())return;
+        // Crash guard: zombies have worn the BO1 models in play long enough.
+        if(models.appended && models.firstDressed && GetTickCount64()-models.firstDressed>=bo1models::kGuardConfirmMs) {
+            models.firstDressed=0;
+            if(bo1models::GuardConfirm()) Log("BO1_MODELS confirmed=1 level_zone=%s dressed=%u",models.zoneFor.c_str(),models.dressed);
+        }
+        if(!zg.relaunchAt || GetTickCount64()<zg.relaunchAt || zg.running || zg.startWanted)return;
         map=zg.launchedMap;settings=zg.launchSettings;zg.relaunchAt=0;
     }
     if(!map.empty())Log("ZOMBIE_RELAUNCH map=%s accepted=%d",map.c_str(),LaunchZombieMap(map.c_str(),settings));
@@ -2949,8 +2962,14 @@ ZombieGameStatus GetZombieGameStatus() {
     s.bo1AnimsFound=static_cast<int>(assets.found);s.bo1AnimsWanted=static_cast<int>(assets.wanted);
     s.animSlotsApplied=static_cast<int>(prep.applied.size());s.animSlotsWanted=static_cast<int>(std::size(kAnimSlots));
     s.specOpsGuards=static_cast<int>(prep.guards.size());s.levelPrepared=prep.prepared;
-    std::snprintf(s.bo1Models,sizeof(s.bo1Models),"%s",bo1models::StateText(bo1models::GetStatus().state));
-    s.modelsPrecached=models.precached?static_cast<int>(models.bodies.size()+models.heads.size()):0;s.zombiesDressed=models.dressed;
+    const auto modelStatus=bo1models::GetStatus();
+    std::snprintf(s.bo1Models,sizeof(s.bo1Models),"%s",modelStatus.skipped?"SKIPPED":bo1models::StateText(modelStatus.state));
+    s.modelsPrecached=0;
+    if(models.precached) {   // distinct models (the body list repeats body2 for BO1's weighting)
+        std::vector<std::string> all(models.bodies);all.insert(all.end(),models.heads.begin(),models.heads.end());
+        std::sort(all.begin(),all.end());s.modelsPrecached=static_cast<int>(std::unique(all.begin(),all.end())-all.begin());
+    }
+    s.zombiesDressed=models.dressed;
     if(zg.relaunchAt) {const auto now64=GetTickCount64();s.restartInMs=now64>=zg.relaunchAt?0:static_cast<int>(zg.relaunchAt-now64);}
     cached=s;return s;
 }
@@ -2965,8 +2984,8 @@ void LogZombieGame() {
         assets.zone.empty()?"NONE":assets.zone.c_str(),zg.rises,zg.riseFailures,zg.animatedAttacks,zg.attacksBrokenOff,prep.threads,setupHandles,
         static_cast<unsigned long long>(kSetupFunctions.size()),zg.setupZombies,prep.setupCalls,prep.setupFailures,zg.relaunchAt!=0);
     const auto modelStatus=bo1models::GetStatus();
-    Log("ZOMBIE_MODELS state=%s cached=%d zone_loaded=%d level_zone=%s precached=%d bodies=%llu heads=%llu dressed=%u dress_failures=%u helmet_swaps=%u textures=%u fallbacks=%u file=%s",
-        bo1models::StateText(modelStatus.state),modelStatus.cached,models.appended,models.zoneFor.empty()?"-":models.zoneFor.c_str(),models.precached,
+    Log("ZOMBIE_MODELS state=%s skipped=%s cached=%d zone_loaded=%d level_zone=%s precached=%d bodies=%llu heads=%llu dressed=%u dress_failures=%u helmet_swaps=%u textures=%u fallbacks=%u file=%s",
+        bo1models::StateText(modelStatus.state),modelStatus.skipped?modelStatus.skipReason.c_str():"-",modelStatus.cached,models.appended,models.zoneFor.empty()?"-":models.zoneFor.c_str(),models.precached,
         static_cast<unsigned long long>(models.bodies.size()),static_cast<unsigned long long>(models.heads.size()),models.dressed,models.dressFailures,
         models.helmetSwaps,modelStatus.textures,modelStatus.fallbacks,modelStatus.file.empty()?"-":modelStatus.file.c_str());
     Log("ZOMBIE_STATE available=%d running=%d pending=%d map=%s round=%d phase=%s alive=%d queued=%d killed=%d dogs=%d points=%d total=%d kills=%u headshots=%u hits=%u melee_hits=%u melee_misses=%u drops=%llu double_points_ms=%d insta_kill_ms=%d campaign_removed=%u weapon=%s dog_spawners=%llu next_dog_round=%d",

@@ -16,7 +16,7 @@ try {
         $source = Join-Path (Split-Path $PSScriptRoot -Parent) $relative
     }
     if (-not (Test-Path -LiteralPath $source)) { throw 'd3d9.dll was not found. Extract the full test ZIP first.' }
-    $version = if ($Build -eq 'startup') { '0.1.1-startup-test2' } else { '0.1.38-zombies-test39' }
+    $version = if ($Build -eq 'startup') { '0.1.1-startup-test2' } else { '0.1.39-zombies-test40' }
     $payloadPath = Join-Path $PSScriptRoot 'payload.json'
     if (Test-Path -LiteralPath $payloadPath) {
         $payload = Get-Content -LiteralPath $payloadPath -Raw | ConvertFrom-Json
@@ -31,7 +31,7 @@ try {
     New-Item -ItemType Directory -Force -Path $logs | Out-Null
     $players = Join-Path $root 'players'
     if ($Build -eq 'menu' -and (Test-Path -LiteralPath $players -PathType Container)) {
-        $saveBackup = Join-Path $root ('bo1mw2\backups\before-test39-' + [DateTime]::UtcNow.ToString('yyyyMMdd-HHmmss-fff'))
+        $saveBackup = Join-Path $root ('bo1mw2\backups\before-test40-' +[DateTime]::UtcNow.ToString('yyyyMMdd-HHmmss-fff'))
         New-Item -ItemType Directory -Path $saveBackup | Out-Null
         Copy-Item -LiteralPath $players -Destination $saveBackup -Recurse
         Write-Host "Local player/save backup: $saveBackup"
@@ -68,8 +68,9 @@ try {
         }
     }
     if ($Build -eq 'menu') {
-        # Test39: BO1 zombie animations are read at run time from the owner's own
-        # Black Ops install (zone\Common\common_zombie.ff); nothing is copied.
+        # Test39/40: BO1 zombie animations and models are read at run time from the
+        # owner's own Black Ops install (zone\Common\common_zombie.ff, and
+        # zone\Common\zombie_theater.ff with main\*.iwd); nothing is copied here.
         $candidates = New-Object System.Collections.Generic.List[string]
         $parent = Split-Path $root -Parent
         # Plain string paths: Join-Path throws for a drive letter that does not exist.
@@ -112,6 +113,14 @@ try {
         if ($bo1) {
             [IO.File]::WriteAllText($pointer, $bo1)
             Write-Host "Black Ops found: $bo1 (zombie animations are read from it while MW2 runs)"
+            if (Test-Path -LiteralPath ($bo1 + '\zone\Common\zombie_theater.ff') -PathType Leaf) {
+                Write-Host 'Kino der Toten found: BO1 zombie models are built from it the first time MW2 starts.'
+                # A fresh install retries models that the crash guard held back.
+                $marker = Join-Path $root 'bo1mw2\cache\bo1_zombie_models.loading'
+                if (Test-Path -LiteralPath $marker) { Remove-Item -LiteralPath $marker }
+            } else {
+                Write-Host 'zone\Common\zombie_theater.ff (Kino der Toten) is missing: zombies keep MW2 soldier models.'
+            }
         } else {
             if (Test-Path -LiteralPath $pointer) { Remove-Item -LiteralPath $pointer }
             Write-Host 'Black Ops was not found. Zombies will use MW2 animations; run Install.cmd again to retry.'

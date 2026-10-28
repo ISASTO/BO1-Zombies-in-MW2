@@ -4,6 +4,7 @@
 #include "runtime.hpp"
 #include <windows.h>
 #include <algorithm>
+#include <atomic>
 #include <chrono>
 #include <condition_variable>
 #include <cstdio>
@@ -19,6 +20,11 @@ std::mutex mutex;
 std::condition_variable changed;
 Status status;
 bool started=false;
+// Crash guard (see bo1_models.hpp). markerPath is written once in StartBuild,
+// before the game can load a level; the atomics are read at process exit.
+std::wstring markerPath;
+std::atomic<bool> markerOwned{false},loadPending{false};
+bool staleMarker=false,unfinished=false,confirmed=false;     // under mutex
 
 struct File {
     HANDLE handle=INVALID_HANDLE_VALUE;
@@ -176,7 +182,11 @@ void StartBuild() {
         std::lock_guard<std::mutex> lock(mutex);
         if(started) return;
         started=true;status.state=State::Building;
+        markerPath=bo1assets::GameDirectory()+L"bo1mw2\\cache\\bo1_zombie_models.loading";
+        staleMarker=GetFileAttributesW(markerPath.c_str())!=INVALID_FILE_ATTRIBUTES;
     }
+    if(staleMarker) Log("BO1_MODELS guard=STALE_MARKER models_skipped=1 marker=%s (an earlier run ended while the models were new; delete the file to try them again)",
+        bo1assets::Utf8(markerPath).c_str());
     std::thread([]{
         try {Build();}
         catch(...) {
@@ -190,5 +200,43 @@ bool WaitReady(unsigned milliseconds) {
     changed.wait_for(lock,std::chrono::milliseconds(milliseconds),[]{return status.state!=State::Building;});
     return status.state==State::Ready;
 }
-Status GetStatus() {std::lock_guard<std::mutex> lock(mutex);return status;}
+Status GetStatus() {
+    std::lock_guard<std::mutex> lock(mutex);
+    auto s=status;
+    if(!confirmed && staleMarker) {s.skipped=true;s.skipReason="marker from an earlier run";}
+    else if(!confirmed && unfinished) {s.skipped=true;s.skipReason="earlier load did not finish";}
+    return s;
+}
+bool GuardAllowsLoad(std::string& reason) {
+    std::lock_guard<std::mutex> lock(mutex);
+    if(confirmed) return true;
+    if(staleMarker) {reason="STALE_MARKER";return false;}
+    if(loadPending) {reason="EARLIER_LOAD_UNFINISHED";unfinished=true;return false;}
+    return true;
+}
+void GuardBegin(const std::string& level) {
+    std::lock_guard<std::mutex> lock(mutex);
+    if(confirmed || markerPath.empty()) return;
+    loadPending=true;
+    if(markerOwned) return;
+    const auto text="bo1mw2 model guard: "+level+"\r\n";
+    CreateDirectoryW((bo1assets::GameDirectory()+L"bo1mw2").c_str(),nullptr);
+    CreateDirectoryW((bo1assets::GameDirectory()+L"bo1mw2\\cache").c_str(),nullptr);
+    if(WriteAll(markerPath,text.data(),text.size())) markerOwned=true;
+    else Log("BO1_MODELS guard=MARKER_WRITE_FAILED");
+}
+void GuardLoaded() {loadPending=false;}
+bool GuardConfirm() {
+    std::lock_guard<std::mutex> lock(mutex);
+    if(confirmed) return false;
+    confirmed=true;
+    if(markerOwned && !markerPath.empty()) DeleteFileW(markerPath.c_str());
+    markerOwned=false;
+    return true;
+}
+void GuardProcessExit() {
+    // A normal exit is not a crash; an unfinished load (error dialog) keeps
+    // its marker so the next run skips the models.
+    if(markerOwned.load() && !loadPending.load() && !markerPath.empty()) DeleteFileW(markerPath.c_str());
+}
 } // namespace mod::bo1models

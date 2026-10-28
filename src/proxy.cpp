@@ -1,6 +1,7 @@
 #include "runtime.hpp"
 #include "vtable_patch.hpp"
 #include "script_vm.hpp"
+#include "bo1_models.hpp"
 #include <array>
 #include <cwchar>
 #include <memory>
@@ -290,6 +291,8 @@ BOOL WINAPI DllMain(HINSTANCE module, DWORD reason, LPVOID) {
         // Static import: runs before iw4sp.exe initializes script variables,
         // the memory tree or checkpoint slots. Kernel32-only, fails closed.
         mod::InstallScriptVmExpansion();
+    } else if (reason == DLL_PROCESS_DETACH) {
+        mod::bo1models::GuardProcessExit();
     }
     return TRUE;
 }

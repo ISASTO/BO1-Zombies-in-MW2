@@ -15,5 +15,14 @@ try {
     }
     Remove-Item -LiteralPath $dll
     Remove-Item -LiteralPath $receipt
+    # Test40: the zombie models generated from the Black Ops install.
+    $cache = Join-Path $root 'bo1mw2\cache'
+    if (Test-Path -LiteralPath $cache -PathType Container) {
+        foreach ($name in @('bo1_zombie_models.ff','bo1_zombie_models.txt','bo1_zombie_models.loading','bo1_zombie_models.ff.tmp','bo1_zombie_models.txt.tmp')) {
+            $file = Join-Path $cache $name
+            if (Test-Path -LiteralPath $file -PathType Leaf) { Remove-Item -LiteralPath $file }
+        }
+        if (-not (Get-ChildItem -LiteralPath $cache -Force)) { Remove-Item -LiteralPath $cache }
+    }
     Write-Host 'Mod removed. Logs were kept; original game files were unchanged.'
 } catch { Write-Host $_.Exception.Message -ForegroundColor Red; exit 1 }

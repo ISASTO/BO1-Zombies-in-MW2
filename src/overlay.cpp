@@ -596,7 +596,8 @@ void Overlay::frame() {
                     else { std::snprintf(value,sizeof(value),"%s%s%d out",zombie.doublePointsMs>0?"x2 ":"",zombie.instaKillMs>0?"INSTA ":"",zombie.dropCount); status=value; }
                 }
                 else if(n==10) {
-                    if(zombie.levelPrepared) std::snprintf(value,sizeof(value),"A%d/%d M%d SO%d",zombie.animSlotsApplied,zombie.animSlotsWanted,zombie.modelsPrecached,zombie.specOpsGuards);
+                    if(zombie.levelPrepared && zombie.modelsPrecached) std::snprintf(value,sizeof(value),"A%d/%d M%d SO%d",zombie.animSlotsApplied,zombie.animSlotsWanted,zombie.modelsPrecached,zombie.specOpsGuards);
+                    else if(zombie.levelPrepared) std::snprintf(value,sizeof(value),"A%d/%d M-%.8s SO%d",zombie.animSlotsApplied,zombie.animSlotsWanted,zombie.bo1Models,zombie.specOpsGuards);
                     else std::snprintf(value,sizeof(value),"%.8s %d/%d M %.8s",zombie.bo1Assets,zombie.bo1AnimsFound,zombie.bo1AnimsWanted,zombie.bo1Models);
                     status=value;
                 }
