@@ -173,4 +173,30 @@ inline constexpr std::array<BuiltinBinding,3> kModelBuiltins={kBuiltinSetModel,k
 // self.hatModel, so death/pain helmetPop() never looks for it afterwards.
 inline constexpr ScriptFunctionRef kHelmetSwapFunction{"animscripts/shared","handlenotetrack"};
 inline constexpr const char* kHelmetSwapNote="swap taghelmet to tagleft";
+
+// ---- Test43: BO1 zombie sounds ----
+// The generated sound fastfile loads with the level zone like the models.
+// A sound plays the way the "playsound" method plays it with one argument
+// (0x195d80): G_SoundAliasIndex(name) (0x1a0750, a 256-slot ring of sound
+// alias configstrings, never an error) then G_AddEvent(ent, EV_SOUND_ALIAS 3,
+// index) (0x19e570); the client plays the alias on the entity.
+inline constexpr int kAssetTypeSound=11;
+inline constexpr std::uintptr_t kGSoundAliasIndexRva=0x1a0750,kGAddEventRva=0x19e570;
+inline constexpr std::array<std::uint8_t,10> kGSoundAliasIndexPrologue={0x40,0x56,0x48,0x83,0xec,0x20,0x80,0x39,0x00,0x48};
+inline constexpr std::array<std::uint8_t,15> kGAddEventPrologue={0x40,0x53,0x48,0x83,0xec,0x20,0x41,0x8b,0xc0,0x44,0x8b,0xd2,0x4c,0x8b,0x81};
+inline constexpr int kEventSoundAlias=3;
+// The "playsound" method is a 16-byte thunk: mov edx, 3 (EV_SOUND_ALIAS);
+// jmp 0x195d80. Its first 5 bytes are redirected so MW2's own animscripts
+// play BO1 sounds for zombies: footsteps ("step_run_<surface>" ->
+// "fly_step_zombie_<surface>") and no soldier pain/death voices.
+inline constexpr std::uintptr_t kPlaySoundMethodRva=0x192160,kPlaySoundImplRva=0x195d80;
+inline constexpr std::array<std::uint8_t,16> kPlaySoundMethodBytes={0xba,0x03,0x00,0x00,0x00,0xe9,0x16,0x3c,0x00,0x00,0xcc,0xcc,0xcc,0xcc,0xcc,0xcc};
+inline constexpr std::array<std::uint8_t,15> kPlaySoundImplPrologue={0x48,0x89,0x5c,0x24,0x18,0x48,0x89,0x6c,0x24,0x20,0x56,0x57,0x41,0x56,0x48};
+inline constexpr BuiltinBinding kBuiltinPlaySound{"playsound",0x192160};
+inline constexpr std::array<BuiltinBinding,1> kSoundBuiltins={kBuiltinPlaySound};
+// Scr_GetString(index) (0x223440: Scr_GetConstString then SL_ConvertToString)
+// and Scr_GetNumParam (0x223180: the VM's outparamcount).
+inline constexpr std::uintptr_t kScrGetStringRva=0x223440,kScrGetNumParamRva=0x223180;
+inline constexpr std::array<std::uint8_t,15> kScrGetStringPrologue={0x48,0x83,0xec,0x28,0xe8,0xf7,0xf7,0xff,0xff,0x8b,0xc8,0x48,0x83,0xc4,0x28};
+inline constexpr std::array<std::uint8_t,7> kScrGetNumParamBytes={0x8b,0x05,0x36,0x13,0x6d,0x01,0xc3};
 } // namespace mod

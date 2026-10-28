@@ -2,6 +2,7 @@
 #include "vtable_patch.hpp"
 #include "script_vm.hpp"
 #include "bo1_models.hpp"
+#include "bo1_sounds.hpp"
 #include "hang_watch.hpp"
 #include <array>
 #include <cwchar>
@@ -296,6 +297,7 @@ BOOL WINAPI DllMain(HINSTANCE module, DWORD reason, LPVOID) {
         mod::InstallScriptVmExpansion();
     } else if (reason == DLL_PROCESS_DETACH) {
         mod::bo1models::GuardProcessExit();
+        mod::bo1sounds::GuardProcessExit();
     }
     return TRUE;
 }

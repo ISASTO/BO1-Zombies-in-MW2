@@ -1,0 +1,175 @@
+{
+ "version": "0.1.42-zombies-test43",
+ "base_commit": "9235b93",
+ "executable_sha256": "fb7e8a987c371dea7b666091b0b9e2011c0cd9cd277b191ad453d11d557dd777",
+ "dll_sha256": "9cb345cf15b6553578b1aad0d18587262004484acf05e8187d4f1c5415a6d962",
+ "dll_bytes": 16426818,
+ "compiler": "xPack MinGW-w64 GCC 13.2.0 (posix threads, UCRT), RelWithDebInfo, static GCC/C++ runtime",
+ "pe_checks": {
+  "amd64_pe32_plus": true,
+  "exact_ten_exports": true,
+  "aslr_nx": true,
+  "no_gcc_runtime_dlls": true
+ },
+ "exports": [
+  "D3DPERF_BeginEvent",
+  "D3DPERF_EndEvent",
+  "D3DPERF_GetStatus",
+  "D3DPERF_QueryRepeatFrame",
+  "D3DPERF_SetMarker",
+  "D3DPERF_SetOptions",
+  "D3DPERF_SetRegion",
+  "DebugSetMute",
+  "Direct3DCreate9",
+  "Direct3DCreate9Ex"
+ ],
+ "imports": [
+  "advapi32.dll",
+  "bcrypt.dll",
+  "dbghelp.dll",
+  "gdi32.dll",
+  "kernel32.dll",
+  "user32.dll",
+  "winmm.dll",
+  "api-ms-win-crt-*-l1-1-0.dll (11 UCRT API sets)"
+ ],
+ "imports_added_since_test42": [],
+ "early_dllmain_native_edits_unchanged": true,
+ "third_party": {
+  "miniz": "tinfl inflate only, MIT, third_party/miniz (VERSION records the upstream commit)",
+  "wmadec": "C++ port of FFmpeg n7.1 WMA v2 decoder (wmadec.c, wma.c, wma_common.c and tables), LGPL 2.1 or later, third_party/wmadec; licence text and notice ship in the package docs"
+ },
+ "native_cxx_tests": {
+  "passed": 24,
+  "failed": 0,
+  "new": [
+   "bo1_sound_tests (bit reader/VLC, IMDCT vs definition, WMA fixture, MS-ADPCM, synthetic T5 bank, streamed file, zone writer, downmix; real banks when BO1_COMMON_DEC/BO1_THEATER_DEC are set)"
+  ],
+  "changed": [
+   "bo1_model_tests (packed vec3 translations, skeleton check against baseMat)"
+  ]
+ },
+ "python_tests": {
+  "passed": 59,
+  "failed": 0,
+  "locally_gated_passed": [
+   "test_mw2_slot_anims_exist_when_local_zone_is_available (owner's common.ff)",
+   "test_helmet_note_exists_in_local_mw2_scripts (owner's extracted MW2 scripts)"
+  ]
+ },
+ "native_suites_and_audits_passed": [
+  "runtime",
+  "resources",
+  "iterator",
+  "animation",
+  "history",
+  "awareness",
+  "threat",
+  "crowd",
+  "fracture",
+  "glass_state",
+  "tables",
+  "layout",
+  "lifecycle",
+  "audit",
+  "consumers",
+  "script_vm",
+  "sweep",
+  "script_call",
+  "level_prep",
+  "bindings",
+  "script_parameters",
+  "capacity",
+  "fire_mode",
+  "owned_strings",
+  "model_zone",
+  "model_zone_kino",
+  "anim_delta",
+  "sound_zone",
+  "sound_zone_bo1"
+ ],
+ "native_suites_and_audits_failed": [],
+ "model_zone_local_kino": {
+  "models": 6,
+  "surfaces": 52,
+  "materials": 3,
+  "images": 8,
+  "vertices": 20774,
+  "triangles": 27972,
+  "rigid_lists": 16,
+  "collision_trees": 16,
+  "references_resolved": 53,
+  "script_strings": 96,
+  "fastfile_bytes": 1047406,
+  "block_sizes": [
+   6064,
+   0,
+   0,
+   197648,
+   0,
+   0,
+   668864,
+   172304
+  ]
+ },
+ "skeleton_fix": {
+  "before": "worst bone 54.8 units from baseMat (translations read 16 bytes per bone)",
+  "after": "6/6 Kino models within 0.05 units of baseMat (packed 12-byte vec3)",
+  "model_builder_version": "bo1mw2-models-2 (cache rebuilt on first start)"
+ },
+ "sound_zone_synthetic": {
+  "alias_lists": 2,
+  "aliases": 5,
+  "loaded_sounds": 3,
+  "pcm_bytes": 47230,
+  "speaker_maps": 5,
+  "references_resolved": 7,
+  "fastfile_bytes": 50940,
+  "block_sizes": [
+   42592,
+   0,
+   0,
+   6640,
+   0,
+   0,
+   0,
+   0
+  ]
+ },
+ "sound_zone_local_bo1": {
+  "alias_lists": 50,
+  "aliases": 238,
+  "loaded_sounds": 142,
+  "pcm_bytes": 19648512,
+  "speaker_maps": 238,
+  "references_resolved": 334,
+  "fastfile_bytes": 19828469,
+  "block_sizes": [
+   1855584,
+   0,
+   0,
+   132544,
+   0,
+   0,
+   0,
+   0
+  ],
+  "decode_failures": 0,
+  "skipped_aliases": 7,
+  "missing_lists": 7,
+  "streamed_missing": 5,
+  "audio_seconds": 194.1
+ },
+ "sound_zone_note": "built from the owner's common_zombie.ff and zombie_theater.ff without .iwd archives here, so the 5 streamed music lists are missing (S47 in the menu row; S52 with the music)",
+ "decoder_checks": {
+  "xwma_common_zombie": "1,443/1,443 within 1 LSB of FFmpeg 6.1, identical sample counts",
+  "ms_adpcm_common_zombie": "69/69 bit-exact",
+  "sanitizers": "all 1,513 + 326 loaded sounds of both banks decode under ASan/UBSan"
+ },
+ "installer_fixture": "pwsh 7.5.3 on Linux: Test42 installed, Test43 refuses to overwrite, Test43 Uninstall removes Test42 and the model cache/marker, Test43 installed (Black Ops and Kino der Toten found, stale model and sound guard markers removed, save backup before-test43-*), CollectLogs includes the model and sound manifests, Test43 uninstalled removing the caches and keeping logs/backups/bo1_path.txt",
+ "bo1_inputs": {
+  "common_zombie.ff_sha256": "f812069ef2ff446b97051e75d6a5ee49687a8085218b8f79dc2d8237e543117e",
+  "zombie_theater.ff_sha256": "970db88bb5ae9aa1d3875cdbd55d43212f22ee55096ce251f596d4a38a776786",
+  "note": "owner's files, read at run time on the owner's PC, never shipped"
+ }
+}

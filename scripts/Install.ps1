@@ -16,7 +16,7 @@ try {
         $source = Join-Path (Split-Path $PSScriptRoot -Parent) $relative
     }
     if (-not (Test-Path -LiteralPath $source)) { throw 'd3d9.dll was not found. Extract the full test ZIP first.' }
-    $version = if ($Build -eq 'startup') { '0.1.1-startup-test2' } else { '0.1.41-zombies-test42' }
+    $version = if ($Build -eq 'startup') { '0.1.1-startup-test2' } else { '0.1.42-zombies-test43' }
     $payloadPath = Join-Path $PSScriptRoot 'payload.json'
     if (Test-Path -LiteralPath $payloadPath) {
         $payload = Get-Content -LiteralPath $payloadPath -Raw | ConvertFrom-Json
@@ -31,7 +31,7 @@ try {
     New-Item -ItemType Directory -Force -Path $logs | Out-Null
     $players = Join-Path $root 'players'
     if ($Build -eq 'menu' -and (Test-Path -LiteralPath $players -PathType Container)) {
-        $saveBackup = Join-Path $root ('bo1mw2\backups\before-test42-' +[DateTime]::UtcNow.ToString('yyyyMMdd-HHmmss-fff'))
+        $saveBackup = Join-Path $root ('bo1mw2\backups\before-test43-' +[DateTime]::UtcNow.ToString('yyyyMMdd-HHmmss-fff'))
         New-Item -ItemType Directory -Path $saveBackup | Out-Null
         Copy-Item -LiteralPath $players -Destination $saveBackup -Recurse
         Write-Host "Local player/save backup: $saveBackup"
@@ -113,6 +113,10 @@ try {
         if ($bo1) {
             [IO.File]::WriteAllText($pointer, $bo1)
             Write-Host "Black Ops found: $bo1 (zombie animations are read from it while MW2 runs)"
+            Write-Host 'BO1 zombie sounds are built from common_zombie.ff the first time MW2 starts.'
+            # A fresh install retries sounds that the crash guard held back.
+            $soundMarker = Join-Path $root 'bo1mw2\cache\bo1_zombie_sounds.loading'
+            if (Test-Path -LiteralPath $soundMarker) { Remove-Item -LiteralPath $soundMarker }
             if (Test-Path -LiteralPath ($bo1 + '\zone\Common\zombie_theater.ff') -PathType Leaf) {
                 Write-Host 'Kino der Toten found: BO1 zombie models are built from it the first time MW2 starts.'
                 # A fresh install retries models that the crash guard held back.

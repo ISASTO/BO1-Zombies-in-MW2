@@ -170,7 +170,7 @@ const char* Row(Page page, int n) {
     static constexpr const char* diag[] = {"Status HUD", "Write State to Log"};
     static constexpr const char* rules[] = {"Preview round", "Total zombies", "Zombie health", "Simultaneous cap", "Spawn interval", "Between rounds"};
     static constexpr const char* view[] = {"Base FOV", "Save for next launch", "Restore default / clear saved", "Live base FOV", "Saved base FOV"};
-    static constexpr const char* game[] = {"Start / End zombies", "Spec Ops map", "Starting round", "Hellhounds", "Campaign allies", "Round", "Points", "Zombies left", "Kills / headshots", "Powerups", "BO1 anims / models", "Zombies info to log"};
+    static constexpr const char* game[] = {"Start / End zombies", "Spec Ops map", "Starting round", "Hellhounds", "Campaign allies", "Round", "Points", "Zombies left", "Kills / headshots", "Powerups", "BO1 anims / models / sounds", "Zombies info to log"};
     static constexpr const char* controller[] = {"Start / End rehearsal", "Starting round", "Auto-clear simulated actors", "Pause spawn queue", "Simulate one kill", "Clear simulated alive", "Current round", "Simulated alive", "Unspawned queue", "Phase / timer", "Zombie health", "Controller info to log"};
     switch (page) {
         case Page::Home: return MenuText<Page::Home>(home,n); case Page::Player: return MenuText<Page::Player>(player,n);
@@ -596,9 +596,12 @@ void Overlay::frame() {
                     else { std::snprintf(value,sizeof(value),"%s%s%d out",zombie.doublePointsMs>0?"x2 ":"",zombie.instaKillMs>0?"INSTA ":"",zombie.dropCount); status=value; }
                 }
                 else if(n==10) {
-                    if(zombie.levelPrepared && zombie.modelsPrecached) std::snprintf(value,sizeof(value),"A%d/%d M%d SO%d",zombie.animSlotsApplied,zombie.animSlotsWanted,zombie.modelsPrecached,zombie.specOpsGuards);
-                    else if(zombie.levelPrepared) std::snprintf(value,sizeof(value),"A%d/%d M-%.8s SO%d",zombie.animSlotsApplied,zombie.animSlotsWanted,zombie.bo1Models,zombie.specOpsGuards);
-                    else std::snprintf(value,sizeof(value),"%.8s %d/%d M %.8s",zombie.bo1Assets,zombie.bo1AnimsFound,zombie.bo1AnimsWanted,zombie.bo1Models);
+                    char sound[16];
+                    if(zombie.soundLists) std::snprintf(sound,sizeof(sound),"S%d",zombie.soundLists);
+                    else std::snprintf(sound,sizeof(sound),"S-%.8s",zombie.bo1Sounds);
+                    if(zombie.levelPrepared && zombie.modelsPrecached) std::snprintf(value,sizeof(value),"A%d/%d M%d %s SO%d",zombie.animSlotsApplied,zombie.animSlotsWanted,zombie.modelsPrecached,sound,zombie.specOpsGuards);
+                    else if(zombie.levelPrepared) std::snprintf(value,sizeof(value),"A%d/%d M-%.8s %s SO%d",zombie.animSlotsApplied,zombie.animSlotsWanted,zombie.bo1Models,sound,zombie.specOpsGuards);
+                    else std::snprintf(value,sizeof(value),"%.8s %d/%d M %.8s S %.8s",zombie.bo1Assets,zombie.bo1AnimsFound,zombie.bo1AnimsWanted,zombie.bo1Models,zombie.bo1Sounds);
                     status=value;
                 }
                 else status="ENTER";
@@ -731,7 +734,7 @@ void Overlay::frame() {
                 "Alive now + still to spawn this round (24 at once).",
                 "Headshot kills give the 50 point bonus.",
                 "Kaboom, insta-kill, double points, max ammo.",
-                "BO1 anims (A) and models (M) from your Black Ops install.",
+                "BO1 anims (A), models (M), sounds (S) from your Black Ops install.",
                 "Logs round, points, powerups and native results."
             };
             footer=MenuText<Page::ZombieGame>(hints,menu.selected);

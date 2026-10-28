@@ -267,6 +267,39 @@ def verify(path,include=Path('include')):
     report['bo1_models']={'level_zone_call':hex(zone_call),'db_load_xassets':hex(value('kDbLoadXAssetsRva')),
         'g_model_index':hex(value('kGModelIndexRva')),'model_builtins':model_builtins,'dobj_bone_limit':0xc0,
         'helmet_swap':re.search(r'kHelmetSwapFunction\{"([^"]+)","([^"]+)"\}',text).groups()}
+    # ---- Test43: BO1 zombie sounds ----
+    names=[cstring(struct.unpack('<Q',get(value('kAssetNamesRva')+8*t,8))[0]-IMAGE_BASE) for t in (11,12,13)]
+    if names!=['sound','sndcurve','loaded_sound'] or value('kAssetTypeSound')!=11:raise ValueError(f'Sound asset types differ: {names}')
+    if get(value('kGSoundAliasIndexRva'),10)!=bytes_of('kGSoundAliasIndexPrologue') or get(value('kGAddEventRva'),15)!=bytes_of('kGAddEventPrologue'):
+        raise ValueError('G_SoundAliasIndex / G_AddEvent prologue differs')
+    # G_SoundAliasIndex: a 256-slot ring of sound alias configstrings at 0xab7 (no "not precached" error).
+    if get(0x1a07b3,6)!=bytes.fromhex('81 c1 b7 0a 00 00') or get(0x1a0837,6)!=bytes.fromhex('81 c1 b7 0a 00 00') \
+       or get(0x1a0794,5)!=bytes.fromhex('bd 00 02 00 00') or get(0x1a0799,6)!=bytes.fromhex('41 be 00 01 00 00'):
+        raise ValueError('Sound alias configstring ring differs')
+    # G_AddEvent stamps the event time on the entity (+0x104).
+    if get(0x19e59b,6)!=bytes.fromhex('89 83 04 01 00 00'):raise ValueError('G_AddEvent entity event time differs')
+    # The playsound method: a thunk (mov edx, 3; jmp impl) whose one-argument
+    # path reads the alias, indexes it and adds EV_SOUND_ALIAS on the entity.
+    thunk=value('kPlaySoundMethodRva');impl=value('kPlaySoundImplRva')
+    if get(thunk,16)!=bytes_of('kPlaySoundMethodBytes') or jump_target(thunk+5)!=impl or value('kEventSoundAlias')!=3:
+        raise ValueError('playsound thunk differs')
+    if thunk&15:raise ValueError('playsound thunk not 16-byte aligned')
+    if get(impl,15)!=bytes_of('kPlaySoundImplPrologue'):raise ValueError('playsound implementation prologue differs')
+    if call_target(0x195da1)!=value('kScrGetStringRva') or call_target(0x195dd2)!=value('kGSoundAliasIndexRva') \
+       or call_target(0x195de6)!=value('kScrGetNumParamRva') or call_target(0x195f88)!=value('kGAddEventRva'):
+        raise ValueError('playsound calls differ')
+    if get(0x195deb,6)!=bytes.fromhex('83 e8 01 0f 84 8c') or get(0x195f80,8)!=bytes.fromhex('44 8b c7 8b d5 48 8b cb'):
+        raise ValueError('playsound one-argument path differs')
+    if get(value('kScrGetStringRva'),15)!=bytes_of('kScrGetStringPrologue') or call_target(0x223444)!=0x222c40 or jump_target(0x22344f)!=0x21a370:
+        raise ValueError('Scr_GetString differs')
+    if get(value('kScrGetNumParamRva'),7)!=bytes_of('kScrGetNumParamBytes'):raise ValueError('Scr_GetNumParam differs')
+    # Method entity references: entity number in the low 16 bits, class 0 = g_entities (stride 0x2a0).
+    if get(0x18fa30,14)!=bytes.fromhex('48 83 ec 28 8b c1 c1 e8 10 66 85 c0 75 19') or get(0x18fa48,7)!=bytes.fromhex('48 69 c0 a0 02 00 00'):
+        raise ValueError('Method entity reference decoding differs')
+    report['bo1_sounds']={'asset_types':{'sound':11,'sndcurve':12,'loaded_sound':13},'g_sound_alias_index':hex(value('kGSoundAliasIndexRva')),
+        'g_add_event':hex(value('kGAddEventRva')),'playsound_thunk':hex(thunk),'playsound_impl':hex(impl),
+        'scr_get_string':hex(value('kScrGetStringRva')),'scr_get_num_param':hex(value('kScrGetNumParamRva')),
+        'alias_configstrings':'0xab7 + (0..255)'}
     report.update({'goal_entity':'setgoalentity replica: 0x1244b0 clear, 0x15b190 handle, node/volume zero',
         'command_buffer':'Cbuf_AddText(0,"set specialops 1; ...; devmap <so_map>\\n") (critical section 0x24)',
         'damage_args':'G_Damage(targ,inflictor,attacker,dir,point,damage,dflags,mod,weapon,hitloc,...)',

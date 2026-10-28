@@ -67,6 +67,9 @@ struct ZombieGameStatus {
     char bo1Models[16]{};        // READY, BUILDING, MISSING, FAILED
     int modelsPrecached=0;       // BO1 bodies + heads usable on this level
     unsigned zombiesDressed=0;
+    // Test43: BO1 sounds generated from the Black Ops install.
+    char bo1Sounds[16]{};        // READY, BUILDING, MISSING, FAILED, SKIPPED
+    int soundLists=0;            // BO1 alias lists usable on this level
     int restartInMs=-1;          // GAME OVER relaunch countdown, -1 when none
 };
 } // namespace mod

@@ -1,6 +1,7 @@
 #include "bo1_models.hpp"
 #include "bo1_assets.hpp"
 #include "bo1_model_build.hpp"
+#include "bo1_cache_io.hpp"
 #include "runtime.hpp"
 #include <windows.h>
 #include <algorithm>
@@ -26,95 +27,19 @@ std::wstring markerPath;
 std::atomic<bool> markerOwned{false},loadPending{false};
 bool staleMarker=false,unfinished=false,confirmed=false;     // under mutex
 
-struct File {
-    HANDLE handle=INVALID_HANDLE_VALUE;
-    ~File(){if(handle!=INVALID_HANDLE_VALUE)CloseHandle(handle);}
-};
-bool Stat(const std::wstring& path,std::uint64_t& size,std::uint64_t& time) {
-    WIN32_FILE_ATTRIBUTE_DATA a{};
-    if(!GetFileAttributesExW(path.c_str(),GetFileExInfoStandard,&a) || (a.dwFileAttributes&FILE_ATTRIBUTE_DIRECTORY)) return false;
-    size=(static_cast<std::uint64_t>(a.nFileSizeHigh)<<32)|a.nFileSizeLow;
-    time=(static_cast<std::uint64_t>(a.ftLastWriteTime.dwHighDateTime)<<32)|a.ftLastWriteTime.dwLowDateTime;
-    return true;
-}
-bool ReadSmall(const std::wstring& path,std::string& out) {
-    File f;f.handle=CreateFileW(path.c_str(),GENERIC_READ,FILE_SHARE_READ,nullptr,OPEN_EXISTING,0,nullptr);
-    if(f.handle==INVALID_HANDLE_VALUE) return false;
-    LARGE_INTEGER size{};
-    if(!GetFileSizeEx(f.handle,&size) || size.QuadPart>1<<20) return false;
-    out.assign(static_cast<std::size_t>(size.QuadPart),'\0');
-    DWORD read=0;
-    return !size.QuadPart || (::ReadFile(f.handle,out.data(),static_cast<DWORD>(out.size()),&read,nullptr) && read==out.size());
-}
-bool WriteAll(const std::wstring& path,const void* data,std::size_t size) {
-    File f;f.handle=CreateFileW(path.c_str(),GENERIC_WRITE,0,nullptr,CREATE_ALWAYS,FILE_ATTRIBUTE_NORMAL,nullptr);
-    if(f.handle==INVALID_HANDLE_VALUE) return false;
-    const auto* p=static_cast<const std::uint8_t*>(data);
-    while(size) {
-        DWORD wrote=0;const auto chunk=static_cast<DWORD>(std::min<std::size_t>(size,1u<<24));
-        if(!::WriteFile(f.handle,p,chunk,&wrote,nullptr) || !wrote) return false;
-        p+=wrote;size-=wrote;
-    }
-    return FlushFileBuffers(f.handle)!=0;
-}
-// Write to a temporary name, then replace: a crash never leaves half a zone.
-bool Replace(const std::wstring& path,const void* data,std::size_t size) {
-    const auto temporary=path+L".tmp";
-    if(!WriteAll(temporary,data,size)) {DeleteFileW(temporary.c_str());return false;}
-    if(!MoveFileExW(temporary.c_str(),path.c_str(),MOVEFILE_REPLACE_EXISTING|MOVEFILE_WRITE_THROUGH)) {DeleteFileW(temporary.c_str());return false;}
-    return true;
-}
-std::vector<std::wstring> Iwds(const std::wstring& folder) {
-    std::vector<std::wstring> out;
-    WIN32_FIND_DATAW d{};
-    HANDLE find=FindFirstFileW((folder+L"\\main\\*.iwd").c_str(),&d);
-    if(find==INVALID_HANDLE_VALUE) return out;
-    do {if(!(d.dwFileAttributes&FILE_ATTRIBUTE_DIRECTORY)) out.push_back(folder+L"\\main\\"+d.cFileName);} while(FindNextFileW(find,&d));
-    FindClose(find);
-    std::sort(out.begin(),out.end(),[](const std::wstring& a,const std::wstring& b){return _wcsicmp(a.c_str(),b.c_str())<0;});
-    return out;
-}
+using bo1cache::File;
+using bo1cache::Stat;
+using bo1cache::ReadSmall;
+using bo1cache::WriteAll;
+using bo1cache::Replace;
+using bo1cache::Iwds;
+using bo1cache::FastFileHeaderOk;
+using bo1cache::OpenArchive;
+using bo1cache::Open;
 std::string Manifest(const std::wstring& theater,const std::vector<std::wstring>& iwds) {
-    std::string m=std::string(kBuilderVersion)+"\n";
-    auto line=[&](const std::wstring& path) {
-        std::uint64_t size=0,time=0;Stat(path,size,time);
-        char buffer[96];std::snprintf(buffer,sizeof(buffer)," %llu %llu\n",static_cast<unsigned long long>(size),static_cast<unsigned long long>(time));
-        m+=bo1assets::Utf8(path)+buffer;
-    };
-    line(theater);for(const auto& i:iwds) line(i);
-    return m;
-}
-bool FastFileHeaderOk(const std::wstring& path) {
-    std::string head;
-    File f;f.handle=CreateFileW(path.c_str(),GENERIC_READ,FILE_SHARE_READ,nullptr,OPEN_EXISTING,0,nullptr);
-    if(f.handle==INVALID_HANDLE_VALUE) return false;
-    std::uint8_t h[24]{};DWORD read=0;
-    if(!::ReadFile(f.handle,h,sizeof(h),&read,nullptr) || read!=sizeof(h)) return false;
-    return !std::memcmp(h,"IWffu100",8) && bo1model::Get<std::uint32_t>(h+8)==bo1model::mw2::kVersion && h[21]==0x78;
-}
-// An open .iwd for the pipeline's reads (offset reads on a synchronous handle).
-struct OpenArchive {
-    std::unique_ptr<File> file;
-    bo1model::Archive archive;
-};
-bool Open(const std::wstring& path,OpenArchive& out) {
-    out.file=std::make_unique<File>();
-    out.file->handle=CreateFileW(path.c_str(),GENERIC_READ,FILE_SHARE_READ,nullptr,OPEN_EXISTING,FILE_FLAG_RANDOM_ACCESS,nullptr);
-    LARGE_INTEGER size{};
-    if(out.file->handle==INVALID_HANDLE_VALUE || !GetFileSizeEx(out.file->handle,&size)) return false;
-    const HANDLE h=out.file->handle;
-    out.archive.name=bo1assets::Utf8(path);out.archive.size=static_cast<std::uint64_t>(size.QuadPart);
-    out.archive.read=[h](std::uint64_t at,void* buffer,std::size_t n) {
-        auto* p=static_cast<std::uint8_t*>(buffer);
-        while(n) {
-            OVERLAPPED o{};o.Offset=static_cast<DWORD>(at);o.OffsetHigh=static_cast<DWORD>(at>>32);
-            DWORD got=0;const auto chunk=static_cast<DWORD>(std::min<std::size_t>(n,1u<<24));
-            if(!::ReadFile(h,p,chunk,&got,&o) || !got) return false;
-            p+=got;n-=got;at+=got;
-        }
-        return true;
-    };
-    return true;
+    std::vector<std::wstring> sources{theater};
+    sources.insert(sources.end(),iwds.begin(),iwds.end());
+    return bo1cache::Manifest(kBuilderVersion,sources);
 }
 void Build() {
     const auto begin=std::chrono::steady_clock::now();

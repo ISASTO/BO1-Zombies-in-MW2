@@ -21,12 +21,12 @@ class ZombieBindingTableTests(unittest.TestCase):
 
     def test_builtin_list_matches_declarations(self):
         declared=self.builtins()
-        names=self.listed('kZombieBuiltins')+self.listed('kAnimBuiltins')+self.listed('kModelBuiltins')
+        names=self.listed('kZombieBuiltins')+self.listed('kAnimBuiltins')+self.listed('kModelBuiltins')+self.listed('kSoundBuiltins')
         self.assertEqual(len(names),len(declared))
         self.assertEqual(len(set(names)),len(names))
         self.assertEqual(len(set(declared.values())),len(declared),'two builtins share one routine')
         for required in ('giveweapon','takeallweapons','switchtoweapon','givemaxammo','iprintlnbold','orientmode','animscripted','hide','show',
-                         'setmodel','attach','detachall'):
+                         'setmodel','attach','detachall','playsound'):
             self.assertIn(required,declared)
 
     def test_probe_gate_covers_the_value_pushes(self):
@@ -140,7 +140,11 @@ class ModelImportTests(unittest.TestCase):
         # Test41: assets are only found once their zone has loaded; the level
         # scripts precache the models before a zone queued after the level's.
         ai=(ROOT/'src'/'ai.cpp').read_text()
-        self.assertIn('XZoneInfo zones[2]={{bo1models::kZoneName,info[0].allocFlags,0},info[0]};',ai)
+        hook=ai[ai.index('void LevelZoneLoadHook('):ai.index('bool InstallLevelZoneHook(')]
+        order=[hook.index('if(addModels) zones[n++]={bo1models::kZoneName,info[0].allocFlags,0};'),
+               hook.index('if(addSounds) zones[n++]={bo1sounds::kZoneName,info[0].allocFlags,0};'),
+               hook.index('zones[n++]=info[0];'),hook.index('load(zones,n,sync);')]
+        self.assertEqual(order,sorted(order))
 
     def test_builtin_and_thread_strings_are_pinned(self):
         # Test42: animscripted releases its own parameters (IncInParam) before
@@ -175,3 +179,72 @@ class ModelImportTests(unittest.TestCase):
         self.assertRegex(shared,r'(?i)\nHandleNoteTrack\(\s*note')
         case=shared[shared.index('case "swap taghelmet to tagleft":'):]
         self.assertIn('self.hatModel = undefined;',case[:400])
+
+
+class BO1SoundTests(unittest.TestCase):
+    """Test43: the generated sound zone and how the game plays it."""
+    def setUp(self):
+        self.sounds=(ROOT/'include'/'bo1_sounds.hpp').read_text()
+        self.build=(ROOT/'include'/'bo1_sound_build.hpp').read_text()
+        self.source=(ROOT/'src'/'bo1_sounds.cpp').read_text()
+        self.ai=(ROOT/'src'/'ai.cpp').read_text()
+
+    def aliases(self):
+        block=self.sounds[self.sounds.index('namespace alias {'):self.sounds.index('} // namespace alias')]
+        return dict(re.findall(r'const char\* (k\w+)="([^"]+)"',block))
+
+    def body(self,signature,end='\n}\n'):
+        start=self.ai.index(signature)
+        return self.ai[start:self.ai.index(end,start)]
+
+    def test_runtime_aliases_are_built(self):
+        built=re.findall(r'\{"([a-z0-9_]+)",mw2::kChannel\w+(,true)?\}',self.build)
+        exact={name for name,prefix in built if not prefix};prefixes=[name for name,prefix in built if prefix]
+        for key,name in self.aliases().items():
+            if key=='kStepPrefix':
+                self.assertIn(name,prefixes);continue
+            self.assertTrue(name in exact or any(name.startswith(p) for p in prefixes),f'{name} is played but never built')
+        runtime=re.search(r'kRuntimeAliases=\{([^}]+)\}',self.sounds)[1]
+        listed=[n.strip().replace('alias::','') for n in runtime.split(',') if n.strip()]
+        self.assertEqual(len(listed),int(re.search(r'array<const char\*,(\d+)> kRuntimeAliases',self.sounds)[1]))
+        self.assertEqual(sorted(listed),sorted(k for k in self.aliases() if k!='kStepPrefix'))
+
+    def test_zone_name_reaches_the_cached_file(self):
+        zone=re.search(r'kZoneName="([^"]+)"',self.sounds)[1].replace('\\\\','\\')
+        self.assertTrue(zone.startswith('..\\..\\bo1mw2\\'),zone)
+        self.assertLess(len(zone),64)
+        written=re.search(r'cacheDir\+L"\\\\([a-z0-9_]+)\.ff"',self.source)[1]
+        self.assertTrue(zone.endswith('cache\\'+written),(zone,written))
+
+    def test_played_aliases_are_known_constants(self):
+        names=set(self.aliases())
+        calls=[a for a in re.findall(r'PlayZombieSound\([^;]*?,([^;]*?)\)',self.ai) if not a.strip().startswith('const char*')]
+        self.assertGreater(len(calls),15)
+        for arg in calls:
+            for key in re.findall(r'bo1sounds::alias::(k\w+)',arg): self.assertIn(key,names)
+            if 'bo1sounds::alias::' not in arg: self.assertIn(arg.strip(),('alias','play'),arg)
+
+    def test_a_sound_needs_its_alias_and_an_active_level(self):
+        play=self.body('bool PlayZombieSound(')
+        self.assertLess(play.index('SoundAvailable(alias)'),play.index('kGSoundAliasIndexRva'))
+        self.assertLess(play.index('sounds.active'),play.index('kGAddEventRva'))
+        self.assertIn('kEventSoundAlias',play)
+
+    def test_playsound_hook_owns_nothing_across_script_errors(self):
+        # Scr_GetString raises script errors with longjmp: no destructors may be live.
+        for signature in ('void PlaySoundHook(','bool ZombieSoundOverride('):
+            body=self.body(signature)
+            for owner in ('std::string','lock_guard','unique_lock','std::vector','std::unique_ptr'):
+                self.assertNotIn(owner,body,f'{signature} {owner}')
+        hook=self.body('void PlaySoundHook(')
+        self.assertLess(hook.index('kScrGetNumParamRva'),hook.index('kScrGetStringRva'))
+        self.assertIn('reinterpret_cast<ImplFn>(base+kPlaySoundImplRva)(entref,kEventSoundAlias);',hook)
+
+    def test_only_zombies_lose_soldier_voices(self):
+        override=self.body('bool ZombieSoundOverride(')
+        self.assertIn('"step_run_"',override)
+        self.assertIn('"generic_"',override)
+        hook=self.body('void PlaySoundHook(')
+        self.assertIn('sounds.zombieUntil[number]',hook)
+        self.assertIn('if(!z.dog) sounds.zombieUntil[',self.ai)
+

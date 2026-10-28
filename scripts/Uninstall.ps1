@@ -18,7 +18,9 @@ try {
     # Test40: the zombie models generated from the Black Ops install.
     $cache = Join-Path $root 'bo1mw2\cache'
     if (Test-Path -LiteralPath $cache -PathType Container) {
-        foreach ($name in @('bo1_zombie_models.ff','bo1_zombie_models.txt','bo1_zombie_models.loading','bo1_zombie_models.ff.tmp','bo1_zombie_models.txt.tmp')) {
+        # Test43: and the zombie sounds.
+        foreach ($name in @('bo1_zombie_models.ff','bo1_zombie_models.txt','bo1_zombie_models.loading','bo1_zombie_models.ff.tmp','bo1_zombie_models.txt.tmp',
+                            'bo1_zombie_sounds.ff','bo1_zombie_sounds.txt','bo1_zombie_sounds.loading','bo1_zombie_sounds.ff.tmp','bo1_zombie_sounds.txt.tmp')) {
             $file = Join-Path $cache $name
             if (Test-Path -LiteralPath $file -PathType Leaf) { Remove-Item -LiteralPath $file }
         }

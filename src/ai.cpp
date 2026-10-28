@@ -19,7 +19,11 @@
 #include "bo1_zombie_rules.hpp"
 #include "bo1_assets.hpp"
 #include "bo1_models.hpp"
+#include "bo1_sounds.hpp"
 #include "hang_watch.hpp"
+#include <atomic>
+#include <set>
+#include <string_view>
 #include <memory>
 #include <optional>
 #include <algorithm>
@@ -1348,6 +1352,9 @@ struct ZombieActor {
     // Test41: the spawn point it rose at and whether the engine found it a
     // path to the player (path_t point count > 0) on the last service.
     unsigned spawnPoint=0;int noPathSince=-1;bool pathing=false;
+    // Test43: BO1 vocals (zombie_moan's 1-4 s cadence, one moan at a time)
+    // and the behind-the-player warning.
+    int nextVocal=0,talkingUntil=0,nextBehind=0;
 };
 struct ZombieDrop { bo1::Powerup type=bo1::Powerup::None; AiPoint origin{}; int spawned=0; };
 struct ZombieGameState {
@@ -1375,6 +1382,8 @@ struct ZombieGameState {
     // Test41: spawn points proven unreachable (no path while others path) and
     // points a zombie has pathed from.
     std::vector<unsigned> badPoints,goodPoints;unsigned unreachableRecycled=0;std::string reachMap;
+    // Test43: the player entity this game's 2D sounds play on.
+    std::uintptr_t playerEntity=0;
 } zg;
 int ZombieRandom(int n) {
     zg.random^=zg.random<<13;zg.random^=zg.random>>17;zg.random^=zg.random<<5;
@@ -1529,6 +1538,99 @@ struct ModelPrep {
     unsigned dressed=0,dressFailures=0,helmetSwaps=0;
     unsigned long long firstDressed=0;   // GetTickCount64 of this level's first dressed zombie (crash guard)
 } models;
+// ---- Test43: BO1 zombie sounds ----
+struct SoundPrep {
+    bool bindings=false,hookInstalled=false;
+    bool appended=false;            // the generated zone is part of this level's load
+    std::string zoneFor;
+    std::set<std::string,std::less<>> available;   // alias lists present after the load (server thread)
+    std::atomic<bool> active{false};               // zone loaded and aliases checked on this level
+    unsigned played=0,steps=0,voicesSuppressed=0,failures=0,music=0;
+    unsigned long long firstPlayed=0;   // GetTickCount64 of this level's first sound (crash guard)
+    // Level time until which an entity number is a BO1 zombie (not a dog) for
+    // the playsound hook; refreshed every service, so it lapses with the zombie.
+    std::array<std::atomic<int>,kAiEntityCapacity> zombieUntil{};
+} sounds;
+using SoundIndexFn=int(*)(const char*);
+using AddEventFn=void(*)(std::uintptr_t,int,int);
+using NumParamFn=int(*)();
+using GetStringFn=const char*(*)(unsigned);
+bool SoundAvailable(std::string_view alias) {return sounds.available.find(alias)!=sounds.available.end();}
+// What "self playsound(alias)" does with one argument: the alias configstring
+// (G_SoundAliasIndex) and an EV_SOUND_ALIAS event on the entity, which the
+// client plays on that entity. Server thread only; never for a missing alias.
+bool PlayZombieSound(std::uintptr_t entity,const char* alias) {
+    if(!sounds.active.load(std::memory_order_relaxed) || !entity || !SoundAvailable(alias)) return false;
+    const int index=reinterpret_cast<SoundIndexFn>(aiProfile.base+kGSoundAliasIndexRva)(alias);
+    if(index<=0) {++sounds.failures;return false;}
+    reinterpret_cast<AddEventFn>(aiProfile.base+kGAddEventRva)(entity,kEventSoundAlias,index);
+    ++sounds.played;
+    if(!sounds.firstPlayed) sounds.firstPlayed=GetTickCount64();
+    return true;
+}
+// MW2's animscripts on a BO1 zombie: footsteps become BO1 zombie steps on
+// the same surface, soldier voices (pain, death, flashbang) are dropped; the
+// zombie's own vocals come from the service below. One-argument calls only.
+bool ZombieSoundOverride(unsigned number,const char* alias) {
+    const auto entity=aiProfile.fixedPool+static_cast<std::uintptr_t>(number)*kAiEntityStride;
+    if(!std::strncmp(alias,"step_run_",9)) {
+        char name[64];
+        std::snprintf(name,sizeof(name),"%s%s",bo1sounds::alias::kStepPrefix,alias+9);
+        const char* play=SoundAvailable(name)?name:bo1sounds::alias::kStepDefault;
+        if(PlayZombieSound(entity,play)) {++sounds.steps;return true;}
+        return false;
+    }
+    if(!std::strncmp(alias,"generic_",8)) {++sounds.voicesSuppressed;return true;}
+    return false;
+}
+// Replaces the "playsound" method thunk (mov edx, 3; jmp 0x195d80). Nothing
+// here may own a destructor: Scr_GetString raises script errors with longjmp.
+void PlaySoundHook(unsigned entref) {
+    using ImplFn=void(*)(unsigned,int);
+    const auto base=aiProfile.base;
+    if(sounds.active.load(std::memory_order_relaxed) && !(entref>>16)) {
+        const unsigned number=entref&0xffffu;
+        int now=0;
+        if(number<static_cast<unsigned>(kAiEntityCapacity) && Value(aiProfile.timeSlot,now)
+           && now<sounds.zombieUntil[number].load(std::memory_order_relaxed)
+           && reinterpret_cast<NumParamFn>(base+kScrGetNumParamRva)()==1) {
+            const char* alias=reinterpret_cast<GetStringFn>(base+kScrGetStringRva)(0);
+            if(alias && ZombieSoundOverride(number,alias)) return;
+        }
+    }
+    reinterpret_cast<ImplFn>(base+kPlaySoundImplRva)(entref,kEventSoundAlias);
+}
+bool InstallPlaySoundHook() {
+    if(sounds.hookInstalled) return true;
+    if(!sounds.bindings) return false;
+    const auto at=aiProfile.base+kPlaySoundMethodRva;
+    auto* relay=Relay(at,reinterpret_cast<std::uintptr_t>(&PlaySoundHook));
+    std::array<std::uint8_t,5> code{};
+    if(!relay || !RelativeCall(at,reinterpret_cast<std::uintptr_t>(relay),code)) {Log("BO1_SOUNDS hook=RELAY_UNAVAILABLE");return false;}
+    code[0]=0xe9;
+    CodeEdit edit;edit.at=at;
+    if((at&15) || !ReadAi(edit.at,edit.before.data(),16)) return false;
+    edit.after=edit.before;std::memcpy(edit.after.data(),code.data(),code.size());
+    sounds.hookInstalled=ExchangeCode(edit,true);
+    Log("BO1_SOUNDS playsound_hook_installed=%d",sounds.hookInstalled);
+    return sounds.hookInstalled;
+}
+// The alias lists of the generated zone that this level actually holds.
+unsigned CheckSounds() {
+    sounds.available.clear();
+    if(!sounds.appended) return 0;
+    const auto find=reinterpret_cast<FindAssetEntryFn>(aiProfile.base+kDbFindXAssetEntryRva);
+    auto check=[&](const std::string& name) {
+        const auto entry=find(kAssetTypeSound,name.c_str());
+        std::uintptr_t header=0,namePtr=0;int count=0;char text[64]{};
+        if(!entry || name.size()>=sizeof(text) || !Value(entry+kAssetEntryHeader,header) || !header || !Value(header,namePtr) || !namePtr
+           || !ReadAi(namePtr,text,name.size()+1) || name!=text || !Value(header+0x10,count) || count<=0) return;
+        sounds.available.insert(name);
+    };
+    for(const auto* name:bo1sounds::kRuntimeAliases) check(name);
+    for(const auto* surface:bo1sounds::kSurfaces) check(std::string(bo1sounds::alias::kStepPrefix)+surface);
+    return static_cast<unsigned>(sounds.available.size());
+}
 bool WriteProtected(std::uintptr_t at,const void* bytes,std::size_t size) {
     DWORD old=0;
     if(!VirtualProtect(reinterpret_cast<void*>(at),size,PAGE_READWRITE,&old)) return false;
@@ -1685,9 +1787,20 @@ void PrepareLevelScripts() {
         bo1models::GuardLoaded();                    // the zone loaded without an error
         if(!models.precached) bo1models::GuardUnused();   // nothing will wear the models on this level
     }
+    const auto soundLists=CheckSounds();
+    if(sounds.appended) {
+        bo1sounds::GuardLoaded();
+        if(!soundLists) bo1sounds::GuardUnused();
+        unsigned steps=0;for(const auto& n:sounds.available) if(n.rfind(bo1sounds::alias::kStepPrefix,0)==0) ++steps;
+        Log("BO1_SOUNDS level=%s available=%u of=%llu steps=%u music=%d/5 playsound_hook=%d",map,soundLists,
+            static_cast<unsigned long long>(bo1sounds::kRuntimeAliases.size()+bo1sounds::kSurfaces.size()),steps,
+            static_cast<int>(SoundAvailable(bo1sounds::alias::kRoundStart))+SoundAvailable(bo1sounds::alias::kRoundOver)+SoundAvailable(bo1sounds::alias::kDogRoundStart)
+            +SoundAvailable(bo1sounds::alias::kDogRoundOver)+SoundAvailable(bo1sounds::alias::kGameOver),sounds.hookInstalled);
+    }
+    sounds.active=sounds.appended && soundLists>0;
     prep.prepared=true;
-    Log("LEVEL_PREP map=%s so_guards=%u/%llu anims=%u bo1_models=%u zone_loaded=%d",map,guards,static_cast<unsigned long long>(kSpecOpsEndFunctions.size()),anims,
-        precached,models.appended);
+    Log("LEVEL_PREP map=%s so_guards=%u/%llu anims=%u bo1_models=%u zone_loaded=%d bo1_sounds=%u sound_zone_loaded=%d",map,guards,
+        static_cast<unsigned long long>(kSpecOpsEndFunctions.size()),anims,precached,models.appended,soundLists,sounds.appended);
 }
 void LevelScriptsLoadedHook() {
     try {PrepareLevelScripts();}
@@ -1727,31 +1840,50 @@ using ModelIndexFn=int(*)(const char*);
 // when the level scripts precached the models (present=0).
 void LevelZoneLoadHook(XZoneInfo* info,unsigned count,int sync) {
     const auto load=reinterpret_cast<LoadXAssetsFn>(aiProfile.base+kDbLoadXAssetsRva);
-    bool add=false;std::string zone;
+    bool addModels=false,addSounds=false;std::string zone;
     try {
         bool wanted=false;
         {
             std::lock_guard<std::recursive_mutex> lock(aiMutex);
             models.appended=false;models.precached=false;models.bodies.clear();models.heads.clear();models.zoneFor.clear();models.firstDressed=0;
+            sounds.active=false;sounds.appended=false;sounds.zoneFor.clear();sounds.available.clear();sounds.firstPlayed=0;
             pinnedStrings.clear();pinnedLevel.clear();   // every level load: pin again before use
             if(count==1 && info && info[0].name) zone=info[0].name;
             wanted=!zone.empty() && info[0].allocFlags==kLevelZoneAllocFlags && zg.startWanted && !zg.pendingMap.empty()
                 && LevelZoneOf(zg.pendingMap)==zone;
         }
         if(wanted) {
-            add=bo1models::WaitReady(30000);
+            addModels=bo1models::WaitReady(30000);
             std::string skip;
-            if(add && !bo1models::GuardAllowsLoad(skip)) add=false;
-            if(add) bo1models::GuardBegin(zone);
+            if(addModels && !bo1models::GuardAllowsLoad(skip)) addModels=false;
+            if(addModels) bo1models::GuardBegin(zone);
             const auto st=bo1models::GetStatus();
-            Log("BO1_MODELS level_zone=%s append=%d state=%s cached=%d skipped=%s detail=%s",zone.c_str(),add,bo1models::StateText(st.state),st.cached,
+            Log("BO1_MODELS level_zone=%s append=%d state=%s cached=%d skipped=%s detail=%s",zone.c_str(),addModels,bo1models::StateText(st.state),st.cached,
                 skip.empty()?"-":skip.c_str(),st.detail.c_str());
+            if(sounds.bindings) {
+                addSounds=bo1sounds::WaitReady(30000);
+                std::string soundSkip;
+                if(addSounds && !bo1sounds::GuardAllowsLoad(soundSkip)) addSounds=false;
+                if(addSounds) bo1sounds::GuardBegin(zone);
+                const auto ss=bo1sounds::GetStatus();
+                Log("BO1_SOUNDS level_zone=%s append=%d state=%s cached=%d skipped=%s detail=%s",zone.c_str(),addSounds,bo1sounds::StateText(ss.state),ss.cached,
+                    soundSkip.empty()?"-":soundSkip.c_str(),ss.detail.c_str());
+            }
         }
-    } catch(...) {add=false;}
-    if(!add) {load(info,count,sync);return;}
-    XZoneInfo zones[2]={{bo1models::kZoneName,info[0].allocFlags,0},info[0]};
-    {std::lock_guard<std::recursive_mutex> lock(aiMutex);models.appended=true;models.zoneFor=zone;}
-    load(zones,2,sync);
+    } catch(...) {addModels=addSounds=false;}
+    if(!addModels && !addSounds) {load(info,count,sync);return;}
+    // Generated zones first (see above), then the level zone; same flags so
+    // the next level frees them all.
+    XZoneInfo zones[3]{};unsigned n=0;
+    if(addModels) zones[n++]={bo1models::kZoneName,info[0].allocFlags,0};
+    if(addSounds) zones[n++]={bo1sounds::kZoneName,info[0].allocFlags,0};
+    zones[n++]=info[0];
+    {
+        std::lock_guard<std::recursive_mutex> lock(aiMutex);
+        models.appended=addModels;if(addModels)models.zoneFor=zone;
+        sounds.appended=addSounds;if(addSounds)sounds.zoneFor=zone;
+    }
+    load(zones,n,sync);
 }
 bool InstallLevelZoneHook() {
     if(models.hookInstalled) return true;
@@ -1888,6 +2020,7 @@ void StartRise(ZombieActor& z,const AiEntity& e,const AiPoint& player,int time) 
     const auto r=Builtin(kBuiltinAnimScripted,ref,{ScriptArg::String("zombie_rise"),ScriptArg::Vector(origin),ScriptArg::Vector({0.f,yaw,0.f}),ScriptArg::Anim(*value)});
     if(r!=ScriptCallResult::Ok) {Builtin(kBuiltinShow,ref,{});++zg.riseFailures;return;}
     z.risingUntil=time+AnimMilliseconds(role,3000)+150;z.showAt=time+bo1::kRiseShowMilliseconds;z.rose=true;++zg.rises;
+    PlayZombieSound(e.address,bo1sounds::alias::kRise);   // the dirt of do_zombie_rise
 }
 // zombie_spawn_init equivalents that MW2 keeps in script variables: no
 // weapon, no pain, arrivals, exits, long deaths, surprise, bullet or danger
@@ -1936,7 +2069,7 @@ ZombieActor* FindZombie(std::uintptr_t entity) {
     for(auto& z:zg.zombies)if(z.identity.address==entity)return &z;
     return nullptr;
 }
-void QueueDrop(bo1::Powerup type,const AiPoint& at,int time) {
+void QueueDrop(bo1::Powerup type,const AiPoint& at,int time,std::uintptr_t source=0) {
     // zombie_death_points: ground trace below the zombie, powerup 40 units up.
     AiPoint start=at,end=at;start[2]+=5.f;end[2]-=300.f;
     const auto ground=WorldTrace(start,end);
@@ -1945,6 +2078,7 @@ void QueueDrop(bo1::Powerup type,const AiPoint& at,int time) {
     origin[2]+=bo1::kPowerupHeight;
     if(zg.drops.size()>=8)zg.drops.erase(zg.drops.begin());
     zg.drops.push_back({type,origin,time});
+    PlayZombieSound(source?source:zg.playerEntity,bo1sounds::alias::kPowerupSpawn);
     Log("ZOMBIE_POWERUP_DROP type=%s origin=%.1f,%.1f,%.1f drops_this_round=%d score_to_drop=%d",
         bo1::PowerupText(type),origin[0],origin[1],origin[2],zg.powerups.dropsThisRound(),zg.powerups.scoreToDrop());
 }
@@ -1980,7 +2114,7 @@ bool ZombieDamage(std::uintptr_t target,std::uintptr_t inflictor,std::uintptr_t 
         ++zg.kills;if(part==bo1::BodyPart::Head || part==bo1::BodyPart::Helmet)++zg.headshots;
         AiPoint origin{};
         if(ReadAi(target+kAiOrigin,origin.data(),sizeof(origin)) && FinitePoint(origin))
-            if(const auto drop=zg.powerups.zombieDied(ZombieRng()))QueueDrop(*drop,origin,level);
+            if(const auto drop=zg.powerups.zombieDied(ZombieRng()))QueueDrop(*drop,origin,level,target);
     }
     return result;
 }
@@ -2137,6 +2271,12 @@ bool SpawnZombie(const bo1::SpawnRequest& request,const Snapshot& s,const AiScop
     ConfigureZombie(e,request.health,request.dogs,speed);
     ZombieActor z;z.identity=created;z.ticket=request.ticket;z.dog=request.dogs;z.speed=speed;z.spawned=time;z.spawnPoint=point.number;
     z.health=request.health;z.reconfigureAt=time+300;
+    z.nextVocal=time+1000+ZombieRandom(3001);z.nextBehind=time+1000;
+    if(!z.dog) sounds.zombieUntil[e.number&(kAiEntityCapacity-1)].store(time+3000,std::memory_order_relaxed);
+    else {   // dog_spawn_fx: the lightning bolt, then the hound
+        PlayZombieSound(e.address,bo1sounds::alias::kDogBolt);
+        PlayZombieSound(e.address,bo1sounds::alias::kDogSpawn);
+    }
     z.nextRepath=time;z.failsafeAt=time+static_cast<int>(bo1::kFailsafeIntervalMilliseconds);z.failsafeOrigin=e.origin;
     zg.zombies.push_back(z);
     DressZombie(zg.zombies.back(),e);
@@ -2165,12 +2305,13 @@ void MeleeHit(ZombieActor& z,const AiEntity& e,const Snapshot& s,const AiPoint& 
         const float length=std::sqrt(dir[0]*dir[0]+dir[1]*dir[1]);
         if(length>0.f) {dir[0]/=length;dir[1]/=length;}
         AiPoint hit=player;hit[2]+=48.f;
+        PlayZombieSound(e.address,bo1sounds::alias::kSwing);
         RecordNativeOperation("ZOMBIE_MELEE_BEGIN",e.number);
         reinterpret_cast<DamageFn>(aiProfile.damage)(s.entity,e.address,e.address,dir.data(),hit.data(),
             bo1::kZombieMeleeDamage,0,kModMelee,-1,kHitTorsoUpper,0,0);
         RecordNativeOperation("ZOMBIE_MELEE_END",e.number);
         ++zg.meleeHits;
-    } else {z.lastMiss=time;++zg.meleeMisses;}
+    } else {z.lastMiss=time;++zg.meleeMisses;PlayZombieSound(e.address,bo1sounds::alias::kSwing);}
 }
 void ServiceMelee(ZombieActor& z,const AiEntity& e,const Snapshot& s,const AiPoint& player,int playerHealth,int time) {
     if(z.dog)return;   // MW2 dogs attack with their own native animscripts
@@ -2200,6 +2341,8 @@ void ServiceMelee(ZombieActor& z,const AiEntity& e,const Snapshot& s,const AiPoi
     inputs.pathClear=clear.valid && !clear.startSolid && clear.fraction>=1.f;
     if(bo1::CanMeleePlayer(inputs,bo1::MeleeCheck::Normal)!=bo1::MeleeDecision::Allowed) return;
     z.attacking=true;z.attackStart=time;z.nextFire=0;z.animatedAttack=false;
+    // zombie_melee: do_zombies_playvocals("attack") as the swing starts.
+    if(PlayZombieSound(e.address,bo1sounds::alias::kAttack)) z.talkingUntil=time+bo1sounds::kAttackMs;
     z.fireMs[0]=static_cast<int>(bo1::kAttackFireMilliseconds);z.fireCount=1;z.attackEndMs=static_cast<int>(bo1::kAttackEndMilliseconds);
     const float yaw=YawDegrees(e.origin,player);
     // pick_zombie_melee_anim: _zombie_melee plus _zombie_walk_melee for
@@ -2233,6 +2376,13 @@ void GrabPowerup(const ZombieDrop& drop,int time) {
     Log("ZOMBIE_POWERUP_GRAB type=%s age_ms=%d",bo1::PowerupText(drop.type),time-drop.spawned);
     ZombieEvent(bo1::PowerupText(drop.type),time);
     Announce(bo1::PowerupText(drop.type));
+    PlayZombieSound(zg.playerEntity,bo1sounds::alias::kPowerupGrab);
+    switch(drop.type) {
+        case bo1::Powerup::MaxAmmo: PlayZombieSound(zg.playerEntity,bo1sounds::alias::kMaxAmmo); break;
+        case bo1::Powerup::InstaKill: PlayZombieSound(zg.playerEntity,bo1sounds::alias::kInstaKill); break;
+        case bo1::Powerup::Nuke: PlayZombieSound(zg.playerEntity,bo1sounds::alias::kNukeFlash); break;
+        default: break;
+    }
     switch(drop.type) {
         case bo1::Powerup::DoublePoints: zg.doublePointsUntil=time+static_cast<int>(bo1::kPowerupDurationMilliseconds); break;
         case bo1::Powerup::InstaKill: zg.instaKillUntil=time+static_cast<int>(bo1::kPowerupDurationMilliseconds); break;
@@ -2263,16 +2413,50 @@ void ServicePowerups(const AiPoint& player,int time) {
         ++it;
     }
 }
+// Test43: BO1 zombie_moan (an ambient or sprint moan every 1-4 s, never two
+// at once), zombie_behind_vox (a zombie close behind the player) and the
+// hellhound's ambient/close vocals.
+void ServiceZombieVoice(ZombieActor& z,const AiEntity& e,const AiPoint& player,float playerYaw,bool playerYawValid,int time) {
+    if(z.dog) {
+        if(time>=z.nextVocal) {
+            z.nextVocal=time+2000+ZombieRandom(3001);
+            const bool close=PointDistanceSquared(e.origin,player)<600.f*600.f;
+            PlayZombieSound(e.address,close?bo1sounds::alias::kDogClose:bo1sounds::alias::kDogAmbient);
+        }
+        return;
+    }
+    if(time>=z.nextVocal) {
+        z.nextVocal=time+1000+ZombieRandom(3001);
+        if(time>=z.talkingUntil && !z.attacking) {
+            const bool fast=z.speed!=bo1::MoveSpeed::Walk;
+            if(PlayZombieSound(e.address,fast?bo1sounds::alias::kSprint:bo1sounds::alias::kAmbience))
+                z.talkingUntil=time+(fast?bo1sounds::kSprintMs:bo1sounds::kAmbienceMs);
+        }
+    }
+    if(time>=z.nextBehind && playerYawValid) {
+        z.nextBehind=time+1000;
+        const float dz=e.origin[2]-player[2];
+        if(!z.attacking && PointDistanceSquared(e.origin,player)<150.f*150.f && std::fabs(dz)<50.f
+           && std::fabs(AngleDelta(YawDegrees(player,e.origin),playerYaw))>95.f
+           && PlayZombieSound(e.address,bo1sounds::alias::kBehind)) {z.nextBehind=time+4000;z.talkingUntil=time+bo1sounds::kAmbienceMs;}
+    }
+}
 void ServiceZombieActors(const Snapshot& s,const AiScope& scope,const AiPoint& player,int playerHealth,int time) {
     const auto epoch=ai.checkpointEpoch.load();
     const auto& c=zg.controller.status();
     int pathingZombies=0;
     for(const auto& z:zg.zombies) if(z.pathing) ++pathingZombies;
+    AiPoint playerAngles{};
+    const bool playerYawValid=ReadAi(s.entity+kEntityAngles,playerAngles.data(),sizeof(playerAngles)) && FinitePoint(playerAngles);
     for(std::size_t n=0;n<zg.zombies.size();) {
         auto& z=zg.zombies[n];
         const auto raw=ReadAiAllocation(z.identity,ReadAi);
         const auto e=Entity(z.identity,scope.pool,false);
         if(!SameAiAllocation(z.identity,raw) || raw.type!=kActorType || !e.valid || e.type!=kActorType || e.health<=0) {
+            // The dying actor is still there: its BO1 death vocal (MW2's own
+            // soldier death voice is dropped by the playsound hook).
+            if(SameAiAllocation(z.identity,raw) && e.valid && e.type==kActorType && e.health<=0)
+                PlayZombieSound(e.address,z.dog?bo1sounds::alias::kDogExplode:bo1sounds::alias::kDeath);
             if(z.dog) {zg.lastDogOrigin=z.lastOrigin;zg.lastDogKnown=true;}
             zg.controller.retire(z.ticket,bo1::Retirement::Killed);
             zg.zombies.erase(zg.zombies.begin()+static_cast<std::ptrdiff_t>(n));continue;
@@ -2281,6 +2465,7 @@ void ServiceZombieActors(const Snapshot& s,const AiScope& scope,const AiPoint& p
         if(!z.identity.matches(e)) {z.identity=AiIdentity::capture(e);Log("ZOMBIE_BIND refreshed entity=%u",e.number);}
         if(z.nukeAt>=0 && time>=z.nukeAt) {
             z.nukeAt=-1;
+            PlayZombieSound(e.address,bo1sounds::alias::kNuked);
             reinterpret_cast<DamageFn>(aiProfile.damage)(e.address,0,0,nullptr,e.origin.data(),e.health+666,0,kModUnknown,-1,0,0,0);
             if(epoch!=ai.checkpointEpoch)return;
             ++n;continue;
@@ -2297,10 +2482,12 @@ void ServiceZombieActors(const Snapshot& s,const AiScope& scope,const AiPoint& p
         }
         // do_zombie_rise: no pursuit, attack or failsafe while climbing out.
         if(z.showAt>=0 && time>=z.showAt) {z.showAt=-1;Builtin(kBuiltinShow,ScriptEntityRef(e.number),{});}
+        if(!z.dog) sounds.zombieUntil[e.number&(kAiEntityCapacity-1)].store(time+3000,std::memory_order_relaxed);
         if(time<z.risingUntil) {
             z.failsafeAt=time+static_cast<int>(bo1::kFailsafeIntervalMilliseconds);z.failsafeOrigin=e.origin;
             ++n;continue;
         }
+        ServiceZombieVoice(z,e,player,playerAngles[1],playerYawValid,time);
         // The rise anim has ended; make sure the actor left scripted mode.
         if(z.rose && !z.riseStopped) {z.riseStopped=true;Builtin(kBuiltinStopAnimScripted,ScriptEntityRef(e.number),{});}
         // zombie_follow_enemy: SetGoalPos(favoriteenemy.origin) on BO1's cadence.
@@ -2372,6 +2559,8 @@ void ResetZombieGame(const char* reason,bool deleteActors) {
         Log("ZOMBIE_END reason=%s round=%d points=%d total=%d kills=%u headshots=%u hits=%u melee_hits=%u melee_misses=%u campaign_removed=%u",
             reason,zg.gameOverRound,zg.ledger.score,zg.ledger.total,zg.kills,zg.headshots,zg.hits,zg.meleeHits,zg.meleeMisses,zg.campaignRemoved);
     }
+    if(wasRunning && !std::strcmp(reason,"PLAYER_DIED") && PlayZombieSound(zg.playerEntity,bo1sounds::alias::kGameOver)) ++sounds.music;
+    for(auto& until:sounds.zombieUntil) until.store(0,std::memory_order_relaxed);
     zg.controller.stop(bo1::StopReason::Manual);
     zg.running=false;zg.drops.clear();
     if(deleteActors && !zg.zombies.empty())CleanupOwned("ZOMBIES_END",false,true);
@@ -2440,6 +2629,7 @@ void ServiceZombies(const Snapshot& s,const AiScope& scope,int time) {
     ai.pauseWanted=true;
     AiPoint player{};int playerHealth=0;
     if(!ReadAi(s.entity+kAiOrigin,player.data(),sizeof(player)) || !FinitePoint(player) || !Value(s.entity+kAiHealth,playerHealth))return;
+    zg.playerEntity=s.entity;
     if(!zg.loadout && time>=zg.loadoutAt) {
         zg.loadout=ApplyLoadout();
         if(!zg.loadout && ++zg.loadoutTries<20)zg.loadoutAt=time+250;
@@ -2455,11 +2645,19 @@ void ServiceZombies(const Snapshot& s,const AiScope& scope,int time) {
         zg.announcedRound=c.round;zg.powerups.roundStart();zg.dogFailures=0;
         char text[48];std::snprintf(text,sizeof(text),c.dogs?"ROUND %d - HELLHOUNDS":"ROUND %d",c.round);
         Announce(text);ZombieEvent(text,time);AwardGrenades();
+        // round_think: the round (or dog round) start music.
+        if(c.dogs) {
+            if(PlayZombieSound(s.entity,bo1sounds::alias::kDogRoundStart)) ++sounds.music;
+            PlayZombieSound(s.entity,bo1sounds::alias::kDogRoundStinger);
+        } else if(PlayZombieSound(s.entity,bo1sounds::alias::kRoundStart)) ++sounds.music;
         Log("ZOMBIE_ROUND round=%d total=%d health=%d interval=%.3f dogs=%d move_speed=%d points=%d",
             c.round,c.total,c.health,c.interval,c.dogs,bo1::ZombieMoveSpeed(c.round),zg.ledger.score);
     }
     if(oldPhase!=c.phase || oldRound!=c.round)Log("ZOMBIE_PHASE round=%d phase=%s alive=%d queued=%d killed=%d wait_ms=%lld",
         c.round,bo1::PhaseText(c.phase),c.alive,c.queued,c.killed,static_cast<long long>(c.waitMilliseconds));
+    // end_of_round: the round over (or dog round over) music.
+    if(c.phase==bo1::RoundPhase::Between && oldPhase!=bo1::RoundPhase::Between && oldRound==c.round
+       && PlayZombieSound(s.entity,c.dogs?bo1sounds::alias::kDogRoundOver:bo1sounds::alias::kRoundOver)) ++sounds.music;
     if(request) {
         const bool created=SpawnZombie(*request,s,scope,time);
         zg.controller.confirm(request->ticket,created,time);
@@ -2863,6 +3061,21 @@ void InitializeAiEngine(std::uintptr_t base,std::size_t size,std::uintptr_t text
             && ReadAi(static_cast<std::uintptr_t>(xmodelName),xmodel,7) && !std::strcmp(xmodel,"xmodel");
         Log("BO1_MODELS bindings=%d model_builtins=%u/%llu",models.bindings,modelBuiltins,static_cast<unsigned long long>(kModelBuiltins.size()));
         if(models.bindings)bo1models::StartBuild();
+        // Test43: the sound zone (loaded by the same level-zone redirect),
+        // G_SoundAliasIndex and G_AddEvent exactly as the playsound method
+        // calls them, the playsound thunk and the script parameter readers.
+        std::uint64_t soundName=0;char soundText[8]{};
+        sounds.bindings=models.bindings
+            && bytesAt(kGSoundAliasIndexRva,kGSoundAliasIndexPrologue) && bytesAt(kGAddEventRva,kGAddEventPrologue)
+            && bytesAt(kPlaySoundMethodRva,kPlaySoundMethodBytes) && Jump(base+kPlaySoundMethodRva,5)==base+kPlaySoundImplRva
+            && bytesAt(kPlaySoundImplRva,kPlaySoundImplPrologue) && MethodEntry(kBuiltinPlaySound.name,base+kBuiltinPlaySound.rva)
+            && Call(base+0x195da1,0)==base+kScrGetStringRva && Call(base+0x195dd2,0)==base+kGSoundAliasIndexRva
+            && Call(base+0x195de6,0)==base+kScrGetNumParamRva && Call(base+0x195f88,0)==base+kGAddEventRva
+            && bytesAt(kScrGetStringRva,kScrGetStringPrologue) && bytesAt(kScrGetNumParamRva,kScrGetNumParamBytes)
+            && Value(base+kAssetNamesRva+8*kAssetTypeSound,soundName) && soundName>base && soundName<base+aiProfile.size
+            && ReadAi(static_cast<std::uintptr_t>(soundName),soundText,6) && !std::strcmp(soundText,"sound");
+        Log("BO1_SOUNDS bindings=%d",sounds.bindings);
+        if(sounds.bindings)bo1sounds::StartBuild();
     }
     InstallExpandedCapacity(base,aiProfile.resolved);
     // Installed after the capacity arena is placed (unchanged layout), before
@@ -2870,6 +3083,7 @@ void InitializeAiEngine(std::uintptr_t base,std::size_t size,std::uintptr_t text
     // started on "This level" use them too).
     if(prep.bindings && IsProcessorFeaturePresent(PF_COMPARE_EXCHANGE128)) InstallLevelScriptHook();
     if(models.bindings && IsProcessorFeaturePresent(PF_COMPARE_EXCHANGE128)) InstallLevelZoneHook();
+    if(sounds.bindings && models.hookInstalled && IsProcessorFeaturePresent(PF_COMPARE_EXCHANGE128)) InstallPlaySoundHook();
     Log("AI_PROFILE resolved=%d callback_slot_rva=0x%llx spawn_rva=0x%llx delete_rva=0x%llx pool_slot_rva=0x%llx clock_rva=0x%llx",
         aiProfile.resolved,static_cast<unsigned long long>(aiProfile.thinkSlot-base),static_cast<unsigned long long>(spawn-base),
         static_cast<unsigned long long>(remove-base),static_cast<unsigned long long>(aiProfile.poolSlot-base),static_cast<unsigned long long>(aiProfile.timeSlot-base));
@@ -3019,6 +3233,11 @@ void TickZombieRelaunch() {
             models.firstDressed=0;
             if(bo1models::GuardConfirm()) Log("BO1_MODELS confirmed=1 level_zone=%s dressed=%u",models.zoneFor.c_str(),models.dressed);
         }
+        // ... and the BO1 sounds have been playing long enough.
+        if(sounds.appended && sounds.firstPlayed && GetTickCount64()-sounds.firstPlayed>=bo1sounds::kGuardConfirmMs) {
+            sounds.firstPlayed=0;
+            if(bo1sounds::GuardConfirm()) Log("BO1_SOUNDS confirmed=1 level_zone=%s played=%u",sounds.zoneFor.c_str(),sounds.played);
+        }
         if(!zg.relaunchAt || GetTickCount64()<zg.relaunchAt || zg.running || zg.startWanted)return;
         map=zg.launchedMap;settings=zg.launchSettings;zg.relaunchAt=0;
     }
@@ -3056,6 +3275,9 @@ ZombieGameStatus GetZombieGameStatus() {
         std::sort(all.begin(),all.end());s.modelsPrecached=static_cast<int>(std::unique(all.begin(),all.end())-all.begin());
     }
     s.zombiesDressed=models.dressed;
+    const auto soundStatus=bo1sounds::GetStatus();
+    std::snprintf(s.bo1Sounds,sizeof(s.bo1Sounds),"%s",soundStatus.skipped?"SKIPPED":bo1sounds::StateText(soundStatus.state));
+    s.soundLists=sounds.active?static_cast<int>(sounds.available.size()):0;
     if(zg.relaunchAt) {const auto now64=GetTickCount64();s.restartInMs=now64>=zg.relaunchAt?0:static_cast<int>(zg.relaunchAt-now64);}
     cached=s;return s;
 }
@@ -3078,6 +3300,11 @@ void LogZombieGame() {
         bo1models::StateText(modelStatus.state),modelStatus.skipped?modelStatus.skipReason.c_str():"-",modelStatus.cached,models.appended,models.zoneFor.empty()?"-":models.zoneFor.c_str(),models.precached,
         static_cast<unsigned long long>(models.bodies.size()),static_cast<unsigned long long>(models.heads.size()),models.dressed,models.dressFailures,
         models.helmetSwaps,modelStatus.textures,modelStatus.fallbacks,modelStatus.file.empty()?"-":modelStatus.file.c_str());
+    const auto soundStatus=bo1sounds::GetStatus();
+    Log("ZOMBIE_SOUNDS state=%s skipped=%s cached=%d zone_loaded=%d level_zone=%s active=%d available=%llu played=%u steps=%u voices_suppressed=%u music=%u failures=%u playsound_hook=%d file=%s",
+        bo1sounds::StateText(soundStatus.state),soundStatus.skipped?soundStatus.skipReason.c_str():"-",soundStatus.cached,sounds.appended,
+        sounds.zoneFor.empty()?"-":sounds.zoneFor.c_str(),sounds.active.load(),static_cast<unsigned long long>(sounds.available.size()),sounds.played,
+        sounds.steps,sounds.voicesSuppressed,sounds.music,sounds.failures,sounds.hookInstalled,soundStatus.file.empty()?"-":soundStatus.file.c_str());
     Log("ZOMBIE_STATE available=%d running=%d pending=%d map=%s round=%d phase=%s alive=%d queued=%d killed=%d dogs=%d points=%d total=%d kills=%u headshots=%u hits=%u melee_hits=%u melee_misses=%u drops=%llu double_points_ms=%d insta_kill_ms=%d campaign_removed=%u weapon=%s dog_spawners=%llu next_dog_round=%d",
         zombieBindingsReady,zg.running,zg.startWanted,zg.running?zg.map:zg.pendingMap.c_str(),c.round,bo1::PhaseText(c.phase),c.alive,c.queued,c.killed,c.dogs,
         zg.ledger.score,zg.ledger.total,zg.kills,zg.headshots,zg.hits,zg.meleeHits,zg.meleeMisses,static_cast<unsigned long long>(zg.drops.size()),

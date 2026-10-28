@@ -1,7 +1,33 @@
 # BO1 Zombies in MW2
 
 Incremental mod framework for **retail Modern Warfare 2 (2009), single player**.
-Current build: **0.1.41-zombies-test42**.
+Current build: **0.1.42-zombies-test43**.
+
+**Test43 fixes the mangled zombie models and adds BO1's zombie sounds.**
+
+- **The models.** Black Ops stores bone offsets packed, 12 bytes per bone, in a
+  block sized for 16. The importer read them 16 bytes apart, which folded and
+  stretched the limbs. They are now read packed, and every converted model
+  must chain back to its own rest pose before it is used.
+- **The sounds.** The sounds are built from the owner's Black Ops install
+  into a cached MW2 sound fastfile:
+  - Black Ops' sound bank in `common_zombie.ff`;
+  - the round music from Kino and the `.iwd` archives.
+
+  The xWMA sounds are decoded by a port of FFmpeg's WMA decoder
+  (`third_party/wmadec`, LGPL). Zombies, hellhounds, powerups and rounds play
+  them through MW2's own sound system:
+  - zombies: moans, sprint moans, attack vocals, swing whooshes, the "behind
+    you" moan, death vocals, rising dirt and per-surface zombie footsteps;
+  - hellhounds: lightning, growls and explosions;
+  - powerups: drop, grab and stingers;
+  - rounds: round start, round over, dog round and game over music.
+
+  MW2's soldier pain/death voices are dropped for zombies. The generated file
+  loads through the retail MW2 loader code in a new exact-native probe.
+
+See [Test43](docs/zombies-test43.md) and the
+[Test43 test instructions](docs/test43-testing-protocol.md).
 
 **Test42 fixes the freeze.** Test41's hang reports caught the game stuck
 releasing `"zombie_rise"`/`"zombie_attack"`, script strings that had already
@@ -108,9 +134,10 @@ bridge, 72 MiB GPU/CPU skinning buffers, guarded animated-record storage and
 16-bit handles remain active. Rendering and actor regressions are rerun.
 Windows missions and stable 256-actor retail gameplay require owner testing.
 
-Install the complete Test42 package (run its Uninstall.cmd first to remove
-Test41). Follow the [Test42 instructions](docs/test42-testing-protocol.md);
-the [Test41 instructions](docs/test41-testing-protocol.md) cover the same maps:
+Install the complete Test43 package (run its Uninstall.cmd first to remove
+Test42). Follow the [Test43 instructions](docs/test43-testing-protocol.md);
+the [Test42](docs/test42-testing-protocol.md) and
+[Test41 instructions](docs/test41-testing-protocol.md) cover the same maps:
 Favela with zombies attacking for a few minutes, then Arcadia and Gulag
 showers, with screenshots. The [Test40 instructions](docs/test40-testing-protocol.md)
 describe the models in more detail. The
@@ -483,3 +510,14 @@ animation fixture before connecting live round population. Broader campaign-
 map/reset coverage and asset import remain separate checks.
 AI and asset injection need separate compatibility and behavior tests; shared
 engine ancestry does not imply compatible binary layouts or actor behavior.
+
+## Third-party code
+
+`d3d9.dll` compiles in two third-party libraries:
+
+- **miniz** (`third_party/miniz`, tinfl inflate only, MIT) inflates Black Ops
+  fastfiles and `.iwd` entries.
+- **wmadec** (`third_party/wmadec`) is a C++ port of FFmpeg's WMA v2 decoder,
+  LGPL 2.1 or later (`third_party/wmadec/COPYING.LGPLv2.1`). It decodes Black
+  Ops' xWMA sounds on the owner's machine. The rest of the project is MIT.
+  Every test package carries `docs/THIRD-PARTY-NOTICES.txt` and the LGPL text.
