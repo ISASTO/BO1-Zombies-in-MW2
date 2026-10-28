@@ -1,7 +1,31 @@
 # BO1 Zombies in MW2
 
 Incremental mod framework for **retail Modern Warfare 2 (2009), single player**.
-Current build: **0.1.42-zombies-test43**.
+Current build: **0.1.43-zombies-test44**.
+
+**Test44 fixes what the first Test43 run showed:**
+
+- **Favela and Terminal crashed while loading.** The error was "Exceeded
+  limit of 1350 'loaded_sound' assets": the BO1 sounds pushed MW2's sound
+  pool over its fixed size. The pool is now enlarged to 4096 from `DllMain`,
+  before `DB_Init` links the pools. Every table entry and routine is checked
+  first. A new exact-native probe runs the retail `DB_Init`, allocator and
+  free routine on it.
+- **Nobody reached the player in Gulag showers.** Zombies spawned in other
+  wings of the prison. The mod now reads MW2's navigation graph: the path
+  nodes and the currently connected links, so closed doors count. It spawns
+  zombies only where a walking route leads to the player, chosen by walking
+  distance. This also keeps them off Favela's roofs.
+- **A "Missing tag [j_helmet]" error ended Gulag.** Zombies are no longer made
+  from drone, riot shield or civilian templates.
+- **Zombies swung from several metres away.** A swing now starts only within
+  64 units (BO1's `meleeAttackDist`) and about the same height.
+- **Zombies briefly ran like MW2 soldiers.** Turn anims are disabled. The
+  stairs, sideways-walk and second CQB run anims now play BO1 zombie anims
+  (76 slots). The two run attacks moved off MW2's running bullet reactions.
+
+See [Test44](docs/zombies-test44.md) and the
+[Test44 test instructions](docs/test44-testing-protocol.md).
 
 **Test43 fixes the mangled zombie models and adds BO1's zombie sounds.**
 
@@ -134,9 +158,11 @@ bridge, 72 MiB GPU/CPU skinning buffers, guarded animated-record storage and
 16-bit handles remain active. Rendering and actor regressions are rerun.
 Windows missions and stable 256-actor retail gameplay require owner testing.
 
-Install the complete Test43 package (run its Uninstall.cmd first to remove
-Test42). Follow the [Test43 instructions](docs/test43-testing-protocol.md);
-the [Test42](docs/test42-testing-protocol.md) and
+Install the complete Test44 package (run its Uninstall.cmd first to remove
+Test43). Follow the [Test44 instructions](docs/test44-testing-protocol.md):
+Favela, Terminal, Gulag showers and Contingency. The
+[Test43 instructions](docs/test43-testing-protocol.md) describe the sounds in
+more detail; the [Test42](docs/test42-testing-protocol.md) and
 [Test41 instructions](docs/test41-testing-protocol.md) cover the same maps:
 Favela with zombies attacking for a few minutes, then Arcadia and Gulag
 showers, with screenshots. The [Test40 instructions](docs/test40-testing-protocol.md)

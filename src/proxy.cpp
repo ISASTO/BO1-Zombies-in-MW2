@@ -1,6 +1,7 @@
 #include "runtime.hpp"
 #include "vtable_patch.hpp"
 #include "script_vm.hpp"
+#include "asset_pools.hpp"
 #include "bo1_models.hpp"
 #include "bo1_sounds.hpp"
 #include "hang_watch.hpp"
@@ -24,6 +25,7 @@ void Initialize() {
     if (targetHost) {
         mod::InitializeLog();
         mod::LogScriptVm(false);
+        mod::assetpools::LogStatus();
         mod::InstallCrashHandler();
         mod::hangwatch::Start();
         mod::InitializeEngine();
@@ -295,6 +297,8 @@ BOOL WINAPI DllMain(HINSTANCE module, DWORD reason, LPVOID) {
         // Static import: runs before iw4sp.exe initializes script variables,
         // the memory tree or checkpoint slots. Kernel32-only, fails closed.
         mod::InstallScriptVmExpansion();
+        // Test44: before DB_Init links the asset pools (loaded_sound 1350 -> 4096).
+        mod::assetpools::Expand();
     } else if (reason == DLL_PROCESS_DETACH) {
         mod::bo1models::GuardProcessExit();
         mod::bo1sounds::GuardProcessExit();

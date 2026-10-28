@@ -21,6 +21,8 @@
 #include "bo1_models.hpp"
 #include "bo1_sounds.hpp"
 #include "hang_watch.hpp"
+#include "nav_graph.hpp"
+#include "asset_pools.hpp"
 #include <atomic>
 #include <set>
 #include <string_view>
@@ -1494,8 +1496,21 @@ inline constexpr AnimSlot kAnimSlots[]={
     {"exposed_idle_reacta","ai_zombie_walk_attack_v3",AnimRole::WalkAttack3},
     {"exposed_idle_reactb","ai_zombie_walk_attack_v4",AnimRole::WalkAttack4},
     {"exposed_dive_grenade_f","ai_zombie_run_attack_v1",AnimRole::RunAttack1},
-    {"run_react_duck","ai_zombie_run_attack_v2",AnimRole::RunAttack2},
-    {"run_react_flinch","ai_zombie_run_attack_v3",AnimRole::RunAttack3}};
+    // Test44: not the running bullet reactions (run_react_duck/flinch) any
+    // more, which MW2's run script can still play, but the backward run and
+    // gun blends (run.gsc RunNGun: only with an enemy to shoot at; zombies
+    // have no gun and ignore everyone).
+    {"run_n_gun_l_120","ai_zombie_run_attack_v2",AnimRole::RunAttack2},
+    {"run_n_gun_r_120","ai_zombie_run_attack_v3",AnimRole::RunAttack3},
+    // Test44: the rest of the zombie's locomotion (animset.gsc, run.gsc,
+    // cqb.gsc): the second CQB search run, stairs up/down for the walk and run
+    // sets, and the sideways/backward walks MW2 blends in while a turning
+    // actor's facing lags its motion. Turn anims are disabled (setup).
+    {"run_cqb_f_search_v2","ai_zombie_walk_fast_v1",AnimRole::Move},
+    {"traverse_stair_run","ai_zombie_walk_v1",AnimRole::Move},{"traverse_stair_run_down_01","ai_zombie_walk_v2",AnimRole::Move},
+    {"traverse_stair_run_01","ai_zombie_run_v2",AnimRole::Move},{"traverse_stair_run_down","ai_zombie_run_v3",AnimRole::Move},
+    {"walk_left","ai_zombie_walk_v1",AnimRole::Move},{"walk_right","ai_zombie_walk_v1",AnimRole::Move},
+    {"walk_backward","ai_zombie_walk_v2",AnimRole::Move}};
 // level._zombie_melee / _zombie_walk_melee / _zombie_run_melee (_zombiemode.gsc).
 inline constexpr AnimRole kMeleeAnims[]={AnimRole::Attack2,AnimRole::Attack4,AnimRole::Attack6,AnimRole::Attack1,AnimRole::AttackForward1,AnimRole::AttackForward2};
 inline constexpr AnimRole kWalkMeleeAnims[]={AnimRole::WalkAttack1,AnimRole::WalkAttack2,AnimRole::WalkAttack3,AnimRole::WalkAttack4};
@@ -1798,6 +1813,9 @@ void PrepareLevelScripts() {
             +SoundAvailable(bo1sounds::alias::kDogRoundOver)+SoundAvailable(bo1sounds::alias::kGameOver),sounds.hookInstalled);
     }
     sounds.active=sounds.appended && soundLists>0;
+    // Test44: how full the (enlarged) loaded_sound pool is with this level.
+    Log("ASSET_POOLS level=%s loaded_sound_in_use=%d capacity=%d expanded=%d",map,assetpools::LoadedSoundsInUse(),
+        assetpools::GetStatus().applied?assetpools::GetStatus().loadedSoundCapacity:kLoadedSoundStockCount,assetpools::GetStatus().applied);
     prep.prepared=true;
     Log("LEVEL_PREP map=%s so_guards=%u/%llu anims=%u bo1_models=%u zone_loaded=%d bo1_sounds=%u sound_zone_loaded=%d",map,guards,
         static_cast<unsigned long long>(kSpecOpsEndFunctions.size()),anims,precached,models.appended,soundLists,sounds.appended);
@@ -2030,7 +2048,8 @@ void RunZombieSetup(ZombieActor& z,const AiEntity& e) {
     if(z.dog || !prep.threads) return;
     unsigned ok=0;
     for(const auto f:{SetupFunction::GunRemove,SetupFunction::DisableArrivals,SetupFunction::DisableExits,SetupFunction::DisablePain,
-        SetupFunction::DisableLongDeath,SetupFunction::DisableSurprise,SetupFunction::DisableWhizby,SetupFunction::DisableDangerReact})
+        SetupFunction::DisableLongDeath,SetupFunction::DisableSurprise,SetupFunction::DisableWhizby,SetupFunction::DisableDangerReact,
+        SetupFunction::DisableTurnAnims})
         if(RunSetupFunction(e.number,f)) ++ok;
     if(RunSetupFunction(e.number,SetupFunction::BattleChatterOff,{ScriptArg::Int(0)})) ++ok;
     if(z.speed==bo1::MoveSpeed::Sprint && RunSetupFunction(e.number,SetupFunction::EnableSprint)) ++ok;
@@ -2233,22 +2252,199 @@ std::vector<AiEntity> SpawnPointBand(const AiPoint& player,float nearest,float f
     }
     return band;
 }
+// ---- Test44: spawn points a zombie can walk from ----
+// MW2's navigation graph (include/nav_graph.hpp) read from the level: the
+// walking distance from every node to the player's node, over connected
+// links only (closed doors excluded). A spawn point counts when its anchor
+// (the nearest node beside it, in clear view) has a walking distance; points
+// are then chosen by that distance instead of the straight line, so zombies
+// no longer rise in other wings of a building (Gulag showers) or on roofs.
+struct NavState {
+    std::string map;std::uintptr_t client=0;
+    nav::Graph graph;bool valid=false;
+    std::vector<float> toPlayer;int playerNode=-1;AiPoint playerAt{};
+    std::unordered_map<unsigned,int> anchors;   // spawn point entity number -> node, -1 none
+    int builtAt=-1000000,playerCheckedAt=-1000000,loggedAt=-1000000;
+    unsigned builds=0,readFailures=0,byPath=0,byLine=0,lastReachable=0,lastPoints=0;
+    std::size_t lastNodes=0,lastLinks=0;
+    std::vector<std::uint8_t> raw,linkBlob;
+} navState;
+bool NavTraceClear(const AiPoint& a,const AiPoint& b,float lift) {
+    AiPoint from=a,to=b;from[2]+=lift;to[2]+=lift;
+    const auto t=WorldTrace(from,to);
+    return t.valid && !t.startSolid && !t.allSolid && t.fraction>=1.f;
+}
+bool ReadNavGraph(nav::Graph& out) {
+    std::uint32_t count=0,capacity=0;std::uintptr_t nodes=0;
+    if(!Value(aiProfile.base+kPathNodeCountRva,count) || !Value(aiProfile.base+kPathNodeCapacityRva,capacity)
+       || !Value(aiProfile.base+kPathNodesRva,nodes) || !nodes || !count || count>capacity || capacity>nav::kMaxNodes) return false;
+    auto& raw=navState.raw;raw.resize(static_cast<std::size_t>(count)*nav::kNodeBytes);
+    if(!ReadAi(nodes,raw.data(),raw.size())) return false;
+    // The links of a level are one zone allocation: read their span at once
+    // when it is compact, else node by node.
+    std::uint64_t low=~0ull,high=0;
+    for(std::size_t n=0;n<count;++n) {
+        const auto* q=raw.data()+n*nav::kNodeBytes;
+        const auto total=nav::Field<std::uint16_t>(q,nav::kNodeTotalLinks);const auto at=nav::Field<std::uint64_t>(q,nav::kNodeLinks);
+        if(!at || !total || total>nav::kMaxLinksPerNode) continue;
+        low=std::min(low,at);high=std::max(high,at+static_cast<std::uint64_t>(total)*nav::kLinkBytes);
+    }
+    auto& blob=navState.linkBlob;blob.clear();
+    const bool compact=high>low && high-low<=(16ull<<20);
+    if(compact) {blob.resize(static_cast<std::size_t>(high-low));if(!ReadAi(static_cast<std::uintptr_t>(low),blob.data(),blob.size())) blob.clear();}
+    std::vector<std::uint8_t> single;
+    return nav::Decode(raw.data(),count,[&](std::size_t,std::uint64_t at,std::uint16_t total) -> const std::uint8_t* {
+        const auto bytes=static_cast<std::size_t>(total)*nav::kLinkBytes;
+        if(!blob.empty() && at>=low && at+bytes<=high) return blob.data()+(at-low);
+        single.resize(bytes);
+        return ReadAi(static_cast<std::uintptr_t>(at),single.data(),bytes)?single.data():nullptr;
+    },out);
+}
+// The anchor node of a point: the nearest usable node beside it with a clear
+// line (one of the 4 nearest), else none.
+int NavAnchor(const AiPoint& at,float horizontal,float vertical) {
+    const auto nearby=nav::NearestNodes(navState.graph,at,horizontal,vertical,4);
+    for(const int n:nearby) if(NavTraceClear(at,navState.graph.nodes[static_cast<std::size_t>(n)].origin,24.f)) return n;
+    return -1;
+}
+void ResetNav() {navState=NavState{};}
+void ServiceNav(const Snapshot& s,const AiScope& scope,const AiPoint& player,int time) {
+    if(navState.map!=s.map || navState.client!=scope.client) {ResetNav();navState.map=s.map;navState.client=scope.client;}
+    bool fieldStale=false;
+    // Doors open and close (connectpaths/disconnectpaths): read the links again every 5 s.
+    if(time-navState.builtAt>=5000 || time<navState.builtAt) {
+        navState.builtAt=time;
+        LARGE_INTEGER a{},b{},f{};QueryPerformanceCounter(&a);
+        nav::Graph g;
+        if(ReadNavGraph(g) && g.usableNodes) {
+            const bool moreNodes=g.usableNodes!=navState.graph.usableNodes;
+            navState.graph=std::move(g);navState.valid=true;++navState.builds;fieldStale=true;
+            // Anchors stay while their node is usable; points without one are
+            // looked at again (traces) only when the usable nodes changed.
+            for(auto it=navState.anchors.begin();it!=navState.anchors.end();)
+                it=(it->second<0 && moreNodes) || (it->second>=0 && (static_cast<std::size_t>(it->second)>=navState.graph.nodes.size()
+                    || !navState.graph.nodes[static_cast<std::size_t>(it->second)].usable))?navState.anchors.erase(it):std::next(it);
+        } else if(++navState.readFailures<=8) Log("ZOMBIE_NAV read_failed=%u map=%s",navState.readFailures,s.map);
+        QueryPerformanceCounter(&b);QueryPerformanceFrequency(&f);
+        if(navState.valid && (navState.builds==1 || navState.graph.nodes.size()!=navState.lastNodes || navState.graph.connectedLinks!=navState.lastLinks)) {
+            navState.lastNodes=navState.graph.nodes.size();navState.lastLinks=navState.graph.connectedLinks;
+            Log("ZOMBIE_NAV build=%u nodes=%llu usable=%llu links=%llu disconnected=%llu read_us=%.0f",navState.builds,
+                static_cast<unsigned long long>(navState.graph.nodes.size()),static_cast<unsigned long long>(navState.graph.usableNodes),
+                static_cast<unsigned long long>(navState.graph.connectedLinks),static_cast<unsigned long long>(navState.graph.disconnectedLinks),
+                static_cast<double>(b.QuadPart-a.QuadPart)*1e6/static_cast<double>(f.QuadPart));
+        }
+    }
+    if(!navState.valid) return;
+    // The player's node: again every 0.5 s or after a 48-unit move.
+    if(time-navState.playerCheckedAt>=500 || PointDistanceSquared(player,navState.playerAt)>48.f*48.f || fieldStale) {
+        navState.playerCheckedAt=time;navState.playerAt=player;
+        int node=NavAnchor(player,160.f,80.f);
+        if(node<0) {const auto nearby=nav::NearestNodes(navState.graph,player,96.f,72.f,1);if(!nearby.empty()) node=nearby.front();}
+        if(node>=0 && (node!=navState.playerNode || fieldStale)) {
+            navState.playerNode=node;navState.toPlayer=nav::DistancesTo(navState.graph,node);
+            unsigned reachable=0,points=0;
+            for(const auto& p:ZombieSpawnPoints()) {
+                ++points;
+                auto found=navState.anchors.find(p.number);
+                if(found==navState.anchors.end()) found=navState.anchors.emplace(p.number,NavAnchor(p.origin,256.f,96.f)).first;
+                if(std::isfinite(nav::PathDistance(navState.graph,navState.toPlayer,found->second,p.origin))) ++reachable;
+            }
+            if(reachable!=navState.lastReachable || points!=navState.lastPoints || time-navState.loggedAt>=30000) {
+                navState.lastReachable=reachable;navState.lastPoints=points;navState.loggedAt=time;
+                Log("ZOMBIE_NAV player_node=%d reachable_points=%u/%u",node,reachable,points);
+            }
+        }
+    }
+}
+// Spawn points by walking distance to the player: [nearest, farthest], each
+// also at least `minimumLine` away in a straight line.
+std::vector<std::pair<AiEntity,float>> NavBand(const AiPoint& player,float nearest,float farthest,float minimumLine) {
+    std::vector<std::pair<AiEntity,float>> band;
+    if(!navState.valid || navState.playerNode<0 || navState.toPlayer.size()!=navState.graph.nodes.size()) return band;
+    for(const auto& p:ZombieSpawnPoints()) {
+        if(Listed(zg.badPoints,p.number)) continue;
+        auto found=navState.anchors.find(p.number);
+        if(found==navState.anchors.end()) found=navState.anchors.emplace(p.number,NavAnchor(p.origin,256.f,96.f)).first;
+        const float d=nav::PathDistance(navState.graph,navState.toPlayer,found->second,p.origin);
+        if(std::isfinite(d) && d>=nearest && d<=farthest && PointDistanceSquared(p.origin,player)>=minimumLine*minimumLine) band.push_back({p,d});
+    }
+    return band;
+}
+// When a level has too few reachable spawners (Gulag showers: nearly all of
+// them in other wings), zombies rise at walkable path nodes in the band too,
+// as BO1 zombies rise out of any floor. Node points are numbered from
+// kNodePointBase (entity numbers stay below 2048), at most `limit` of them,
+// drawn at random.
+constexpr std::uint16_t kNodePointBase=0x8000;
+std::vector<std::pair<AiEntity,float>> NavNodeBand(const AiPoint& player,float nearest,float farthest,float minimumLine,std::size_t limit) {
+    std::vector<std::pair<AiEntity,float>> band;
+    if(!navState.valid || navState.playerNode<0 || navState.toPlayer.size()!=navState.graph.nodes.size()) return band;
+    for(std::size_t n=0;n<navState.graph.nodes.size() && n<nav::kMaxNodes;++n) {
+        const auto& node=navState.graph.nodes[n];
+        const float d=navState.toPlayer[n];
+        if(!nav::StandNode(node) || !std::isfinite(d) || d<nearest || d>farthest || PointDistanceSquared(node.origin,player)<minimumLine*minimumLine) continue;
+        const unsigned number=kNodePointBase+static_cast<unsigned>(n);
+        if(Listed(zg.badPoints,number)) continue;
+        AiEntity p;p.valid=true;p.number=static_cast<std::uint16_t>(number);p.origin=node.origin;p.classname="path_node";
+        band.push_back({p,d});
+    }
+    for(std::size_t k=0;k<band.size() && k<limit;++k)
+        std::swap(band[k],band[k+static_cast<std::size_t>(ZombieRandom(static_cast<int>(band.size()-k)))]);
+    if(band.size()>limit) band.resize(limit);
+    return band;
+}
+// Templates zombies are made from: human enemies, not the scripted drones
+// some levels place (Gulag's "drone" spawners carry a hat model their
+// complete-body model has no helmet bone for: helmetPop's GetTagOrigin
+// ended the level with "Missing tag [j_helmet]"), riot shields or civilians.
+bool ZombieTemplate(const AiEntity& e) {
+    std::string name=e.classname;
+    std::transform(name.begin(),name.end(),name.begin(),[](unsigned char c){return static_cast<char>(std::tolower(c));});
+    for(const char* word:{"drone","riotshield","riot_shield","civilian","juggernaut","hostage"}) if(name.find(word)!=std::string::npos) return false;
+    return true;
+}
 bool SpawnZombie(const bo1::SpawnRequest& request,const Snapshot& s,const AiScope& scope,int time) {
     AiPoint player{};
     if(!ReadAi(s.entity+kAiOrigin,player.data(),sizeof(player)) || !FinitePoint(player))return false;
-    const auto& templates=request.dogs?ai.dogPoints:ai.enemies.empty()?ai.friends:ai.enemies;
+    const auto& source=request.dogs?ai.dogPoints:ai.enemies.empty()?ai.friends:ai.enemies;
+    std::vector<AiEntity> templates;
+    for(const auto& t:source) if(request.dogs || ZombieTemplate(t)) templates.push_back(t);
+    if(templates.empty()) templates=source;
     if(templates.empty() || ZombieSpawnPoints().empty()) {
         static int lastLog=-100000;
         if(time-lastLog>5000) {lastLog=time;Log("ZOMBIE_SPAWN refused=%s dogs=%d",templates.empty()?"NO_TEMPLATE":"NO_SPAWN_POINT",request.dogs);}
         return false;
     }
-    // level.enemy_spawns: campaign enemy spawn locations near the player.
-    auto band=SpawnPointBand(player,request.dogs?400.f:400.f,request.dogs?800.f:2500.f);
-    if(band.size()<2)band=SpawnPointBand(player,256.f,4000.f);
-    if(band.empty()) {
-        for(const auto& p:ZombieSpawnPoints()) if(!Listed(zg.badPoints,p.number)) band.push_back(p);
-        if(band.empty()) band=ZombieSpawnPoints();
-        if(band.size()>8)band.resize(8);
+    // level.enemy_spawns: campaign enemy spawn locations nearby the player,
+    // by walking distance when the level's navigation graph is known.
+    std::vector<AiEntity> band;std::vector<float> paths;
+    {
+        auto nearby=NavBand(player,request.dogs?300.f:350.f,request.dogs?1200.f:2500.f,request.dogs?200.f:250.f);
+        if(nearby.size()<3) {
+            const auto nodes=NavNodeBand(player,request.dogs?300.f:400.f,request.dogs?1200.f:1800.f,request.dogs?200.f:300.f,16);
+            nearby.insert(nearby.end(),nodes.begin(),nodes.end());
+        }
+        if(nearby.size()<2) {
+            const auto wide=NavBand(player,200.f,4500.f,200.f);
+            for(const auto& c:wide) if(std::none_of(nearby.begin(),nearby.end(),[&](const auto& x){return x.first.number==c.first.number;})) nearby.push_back(c);
+        }
+        if(nearby.empty()) {
+            nearby=NavBand(player,0.f,nav::kUnreachable,0.f);
+            std::sort(nearby.begin(),nearby.end(),[](const auto& a,const auto& b){return a.second<b.second;});
+            if(nearby.size()>8) nearby.resize(8);
+        }
+        for(const auto& [p,d]:nearby) {band.push_back(p);paths.push_back(d);}
+    }
+    if(!band.empty()) ++navState.byPath;
+    else {
+        ++navState.byLine;
+        band=SpawnPointBand(player,request.dogs?400.f:400.f,request.dogs?800.f:2500.f);
+        if(band.size()<2)band=SpawnPointBand(player,256.f,4000.f);
+        if(band.empty()) {
+            for(const auto& p:ZombieSpawnPoints()) if(!Listed(zg.badPoints,p.number)) band.push_back(p);
+            if(band.empty()) band=ZombieSpawnPoints();
+            if(band.size()>8)band.resize(8);
+        }
     }
     const int count=static_cast<int>(band.size());
     const int draw=ZombieRandom(count);
@@ -2257,8 +2453,9 @@ bool SpawnZombie(const bo1::SpawnRequest& request,const Snapshot& s,const AiScop
     const auto pick=bo1::ChooseSpawner(count,previous,draw,ZombieRandom(count));
     if(!pick)return false;
     const auto point=band[*pick];
-    const auto& source=templates[static_cast<std::size_t>(ZombieRandom(static_cast<int>(templates.size())))];
-    AiRequest spawn;spawn.operation=AiOperation::SpawnEnemy;spawn.source=AiIdentity::capture(source);
+    const float pathDistance=static_cast<std::size_t>(*pick)<paths.size()?paths[static_cast<std::size_t>(*pick)]:-1.f;
+    const auto& chosen=templates[static_cast<std::size_t>(ZombieRandom(static_cast<int>(templates.size())))];
+    AiRequest spawn;spawn.operation=AiOperation::SpawnEnemy;spawn.source=AiIdentity::capture(chosen);
     AiIdentity created;
     SpawnOptions options;options.center=&point.origin;options.zombie=true;options.dog=request.dogs;
     options.bypassPause=true;options.setEnemy=request.dogs;options.created=&created;
@@ -2281,9 +2478,9 @@ bool SpawnZombie(const bo1::SpawnRequest& request,const Snapshot& s,const AiScop
     zg.zombies.push_back(z);
     DressZombie(zg.zombies.back(),e);
     StartRise(zg.zombies.back(),e,player,time);
-    Log("ZOMBIE_SPAWN entity=%u round=%d health=%d speed=%s dog=%d point=%u distance=%.0f template=%s rise=%d alive=%d queued=%d",
+    Log("ZOMBIE_SPAWN entity=%u round=%d health=%d speed=%s dog=%d point=%u distance=%.0f path=%.0f template=%s rise=%d alive=%d queued=%d",
         e.number,request.round,request.health,bo1::MoveSpeedText(speed),request.dogs,point.number,
-        std::sqrt(PointDistanceSquared(point.origin,player)),source.classname.c_str(),zg.zombies.back().rose,zg.controller.status().alive+1,zg.controller.status().queued-1);
+        std::sqrt(PointDistanceSquared(point.origin,player)),pathDistance,chosen.classname.c_str(),zg.zombies.back().rose,zg.controller.status().alive+1,zg.controller.status().queued-1);
     return true;
 }
 float YawDegrees(const AiPoint& from,const AiPoint& to) {return std::atan2(to[1]-from[1],to[0]-from[0])*57.29578f;}
@@ -2328,7 +2525,10 @@ void ServiceMelee(ZombieActor& z,const AiEntity& e,const Snapshot& s,const AiPoi
         else if(playerHealth<=0 || bo1::BreakOffAttack(elapsed,distance)) {++zg.attacksBrokenOff;EndAttack(z,e);}
         return;
     }
-    if(playerHealth<=0 || distance>bo1::kLongChargeRangeSquared)return;
+    // Test44: a swing starts only in melee reach (64 units, about the same
+    // floor). BO1's 200-unit charge range let the engine run the zombie in
+    // first; MW2 has no charge, so Test43 zombies swung at the air from 3-4 m.
+    if(playerHealth<=0 || distance>bo1::kMeleeRangeSquared || std::fabs(e.origin[2]-player[2])>bo1::kMeleeHeightTolerance)return;
     AiPoint angles{};
     if(!ReadAi(e.address+kEntityAngles,angles.data(),sizeof(angles)) || !FinitePoint(angles))return;
     bo1::MeleeInputs inputs;inputs.sentient=true;inputs.alive=true;
@@ -2630,6 +2830,7 @@ void ServiceZombies(const Snapshot& s,const AiScope& scope,int time) {
     AiPoint player{};int playerHealth=0;
     if(!ReadAi(s.entity+kAiOrigin,player.data(),sizeof(player)) || !FinitePoint(player) || !Value(s.entity+kAiHealth,playerHealth))return;
     zg.playerEntity=s.entity;
+    ServiceNav(s,scope,player,time);
     if(!zg.loadout && time>=zg.loadoutAt) {
         zg.loadout=ApplyLoadout();
         if(!zg.loadout && ++zg.loadoutTries<20)zg.loadoutAt=time+250;
@@ -3292,9 +3493,10 @@ void LogZombieGame() {
         assets.zone.empty()?"NONE":assets.zone.c_str(),zg.rises,zg.riseFailures,zg.animatedAttacks,zg.attacksBrokenOff,prep.threads,setupHandles,
         static_cast<unsigned long long>(kSetupFunctions.size()),zg.setupZombies,prep.setupCalls,prep.setupFailures,zg.relaunchAt!=0);
     Log("ZOMBIE_STRINGS pinned_level=%llu pinned_total=%u",static_cast<unsigned long long>(pinnedStrings.size()),pinnedTotal);
-    Log("ZOMBIE_REACH unreachable_recycled=%u bad_points=%llu good_points=%llu spawn_points=%llu",zg.unreachableRecycled,
+    Log("ZOMBIE_REACH unreachable_recycled=%u bad_points=%llu good_points=%llu spawn_points=%llu nav=%d nav_builds=%u player_node=%d reachable_points=%u by_path=%u by_line=%u",zg.unreachableRecycled,
         static_cast<unsigned long long>(zg.badPoints.size()),static_cast<unsigned long long>(zg.goodPoints.size()),
-        static_cast<unsigned long long>(ZombieSpawnPoints().size()));
+        static_cast<unsigned long long>(ZombieSpawnPoints().size()),navState.valid,navState.builds,navState.playerNode,navState.lastReachable,
+        navState.byPath,navState.byLine);
     const auto modelStatus=bo1models::GetStatus();
     Log("ZOMBIE_MODELS state=%s skipped=%s cached=%d zone_loaded=%d level_zone=%s precached=%d bodies=%llu heads=%llu dressed=%u dress_failures=%u helmet_swaps=%u textures=%u fallbacks=%u file=%s",
         bo1models::StateText(modelStatus.state),modelStatus.skipped?modelStatus.skipReason.c_str():"-",modelStatus.cached,models.appended,models.zoneFor.empty()?"-":models.zoneFor.c_str(),models.precached,

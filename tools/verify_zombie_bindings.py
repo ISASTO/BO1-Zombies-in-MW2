@@ -24,7 +24,7 @@ def verify(path,include=Path('include')):
     def value(name):
         m=re.search(r'\b'+name+r'\s*=\s*(0x[0-9a-fA-F]+|[0-9.]+f?)',text)
         if not m:raise ValueError(f'{name} missing from zombie_bindings.hpp')
-        v=m[1].rstrip('f')
+        v=m[1] if m[1].lower().startswith('0x') else m[1].rstrip('f')
         return float(v) if '.' in v else int(v,0)
     def get(rva,n):return pe.get_data(rva,n)
     def call_target(at):
@@ -300,6 +300,73 @@ def verify(path,include=Path('include')):
         'g_add_event':hex(value('kGAddEventRva')),'playsound_thunk':hex(thunk),'playsound_impl':hex(impl),
         'scr_get_string':hex(value('kScrGetStringRva')),'scr_get_num_param':hex(value('kScrGetNumParamRva')),
         'alias_configstrings':'0xab7 + (0..255)'}
+    # ---- Test44: the loaded_sound pool (src/asset_pools.cpp) ----
+    def q(rva):return struct.unpack('<Q',get(rva,8))[0]
+    def d(rva):return struct.unpack('<i',get(rva,4))[0]
+    t=value('kAssetTypeLoadedSound')
+    if cstring(q(value('kAssetNamesRva')+8*t)-IMAGE_BASE)!='loaded_sound':raise ValueError('Asset type 13 is not loaded_sound')
+    if d(value('kPoolSizeRva')+4*t)!=value('kLoadedSoundStockCount'):raise ValueError('loaded_sound pool size differs')
+    if q(value('kXAssetPoolRva')+8*t)-IMAGE_BASE!=value('kLoadedSoundPoolRva'):raise ValueError('loaded_sound pool pointer differs')
+    for table,routine,constant in (('kPoolInitTableRva','kLoadedSoundPoolInitRva','kLoadedSoundPoolInitBytes'),
+                                   ('kPoolAllocTableRva','kPoolAllocRva','kPoolAllocBytes'),('kPoolFreeTableRva','kPoolFreeRva','kPoolFreeBytes')):
+        if q(value(table)+8*t)-IMAGE_BASE!=value(routine) or get(value(routine),len(bytes_of(constant)))!=bytes_of(constant):
+            raise ValueError(f'loaded_sound {table} differs')
+    if value('kLoadedSoundEntryBytes')!=0x40 or bytes_of('kLoadedSoundPoolInitBytes')[39:43]!=bytes.fromhex('48 c1 e0 06'):
+        raise ValueError('loaded_sound entry size differs')
+    # DB_Init: flag store, then for 43 types init[type](pool[type], size[type]); its one caller.
+    db_init=value('kDbInitRva')
+    if get(db_init+0x16,2)!=b'\xc6\x05' or rip(db_init+0x16,2,7)!=value('kDbInitDoneRva') or get(db_init+0x1c,1)!=b'\x01':
+        raise ValueError('DB_Init flag store differs')
+    if rip(0xeff2d,3,7)!=value('kPoolSizeRva') or get(0xeff40,8)!=bytes.fromhex('48 8b 8c 2b')+struct.pack('<I',value('kXAssetPoolRva')) \
+       or get(0xeff4d,2)!=bytes.fromhex('8b 17') or get(0xeff4f,7)!=bytes.fromhex('ff 94 2b')+struct.pack('<I',value('kPoolInitTableRva')) \
+       or get(0xeff3b,3)!=bytes.fromhex('8d 73 2b'):
+        raise ValueError('DB_Init pool loop differs')
+    if call_target(value('kDbInitCallRva'))!=db_init:raise ValueError('DB_Init caller differs')
+    # The limit error reads g_poolSize and g_assetNames by type.
+    if get(0xeeed9,8)!=bytes.fromhex('4d 8b 84 ce')+struct.pack('<I',value('kAssetNamesRva')) or get(0xeeee1,8)!=bytes.fromhex('41 8b 94 8e')+struct.pack('<I',value('kPoolSizeRva')):
+        raise ValueError('Asset limit error differs')
+    # Nothing but its table slot points into the stock loaded_sound pool.
+    lo=value('kLoadedSoundPoolRva');hi=lo+8+value('kLoadedSoundStockCount')*0x40
+    slots=[slot for target,where in pointer_slots.items() if lo<=target<hi for slot in where]
+    if slots!=[value('kXAssetPoolRva')+8*t]:raise ValueError(f'Other pointers into the loaded_sound pool: {[hex(x) for x in slots]}')
+    text_section=next(s_ for s_ in pe.sections if s_.Name.rstrip(b'\0')==b'.text')
+    code=text_section.get_data();base=text_section.VirtualAddress;refs=[]
+    for i in range(len(code)-12):
+        if (code[i+1]&0xc7)==5 or (code[i+2]&0xc7)==5:
+            for k in (1,2):
+                if (code[i+k]&0xc7)!=5:continue
+                disp=struct.unpack_from('<i',code,i+k+1)[0]
+                for length in range(k+5,k+10):
+                    if lo<=base+i+length+disp<hi:refs.append(base+i)
+    if refs:raise ValueError(f'Code addresses the loaded_sound pool directly: {[hex(x) for x in sorted(set(refs))[:8]]}')
+    report['asset_pools']={'loaded_sound':{'type':t,'stock':value('kLoadedSoundStockCount'),'expanded':value('kLoadedSoundExpandedCount'),
+        'entry_bytes':0x40,'pool':hex(lo),'init':hex(value('kLoadedSoundPoolInitRva')),'alloc':hex(value('kPoolAllocRva')),'free':hex(value('kPoolFreeRva'))},
+        'db_init':hex(db_init),'db_init_caller':hex(value('kDbInitCallRva')),'tables':{'pool':hex(value('kXAssetPoolRva')),
+        'size':hex(value('kPoolSizeRva')),'init':hex(value('kPoolInitTableRva'))},'other_references':0}
+    # ---- Test44: the navigation graph (include/nav_graph.hpp) ----
+    index=value('kPathNodeIndexRva')
+    if get(index,18)!=bytes_of('kPathNodeIndexBytes') or rip(index+10,3,7)!=value('kPathNodesRva'):raise ValueError('Path_ConvertIndexToNode differs')
+    if rip(0x1a5745,2,6)!=value('kPathNodeCountRva') or get(0x1a574b,6)!=bytes.fromhex('81 f9 00 20 00 00') \
+       or get(0x1a5763,7)!=bytes.fromhex('48 69 f1 a8 00 00 00') or rip(0x1a5771,3,7)!=value('kPathNodesRva') \
+       or rip(0x1a5778,2,6)!=value('kPathNodeCapacityRva') or rip(0x1a577e,2,6)!=value('kPathNodeCountRva'):
+        raise ValueError('Path_LoadNode differs')
+    if rip(0x1aa8dd,2,6)!=value('kPathNodeCountRva'):raise ValueError('getallnodes count differs')
+    if get(0x1a5b57,4)!=bytes.fromhex('48 83 c2 14') or get(0x1a5b68,6)!=bytes.fromhex('66 41 83 78 6c 00'):
+        raise ValueError('Path_NodesInRadius origin/link count differs')
+    if get(0x140030,4)!=bytes.fromhex('48 8b 4f 40') or get(0x140042,4)!=bytes.fromhex('0f b7 49 04') or get(0x1400bd,6)!=bytes.fromhex('f3 41 0f 10 04 06') \
+       or get(0x1401c7,4)!=bytes.fromhex('0f bf 47 6c') or get(0x1401cd,4)!=bytes.fromhex('49 83 c6 0c'):
+        raise ValueError('A* link walk differs')
+    if get(0x14636c,4)!=bytes.fromhex('0f b7 50 38') or get(0x146384,4)!=bytes.fromhex('48 8b 48 40') or get(0x146390,4)!=bytes.fromhex('0f b7 41 04') \
+       or get(0x1463a7,4)!=bytes.fromhex('80 79 06 00') or get(0x14639c,4)!=bytes.fromhex('48 83 c1 0c'):
+        raise ValueError('Path link check differs')
+    nav=(include/'nav_graph.hpp').read_text()
+    for name,want in (('kNodeBytes',0xa8),('kNodeOrigin',0x14),('kNodeTotalLinks',0x38),('kNodeLinks',0x40),('kNodeLinkCount',0x6c),
+                      ('kLinkBytes',0xc),('kLinkDistance',0),('kLinkNode',4),('kLinkDisconnect',6),('kMaxNodes',0x2000)):
+        m=re.search(r'\b'+name+r'=(0x[0-9a-fA-F]+|[0-9]+)',nav)
+        if not m or int(m[1],0)!=want:raise ValueError(f'nav_graph.hpp {name} differs')
+    report['nav_graph']={'nodes':hex(value('kPathNodesRva')),'count':hex(value('kPathNodeCountRva')),'capacity':hex(value('kPathNodeCapacityRva')),
+        'node_bytes':0xa8,'origin':0x14,'total_links':0x38,'links':0x40,'active_links':0x6c,'link_bytes':0xc,'link_node':4,'link_distance':0,
+        'link_disconnect':6,'max_nodes':0x2000}
     report.update({'goal_entity':'setgoalentity replica: 0x1244b0 clear, 0x15b190 handle, node/volume zero',
         'command_buffer':'Cbuf_AddText(0,"set specialops 1; ...; devmap <so_map>\\n") (critical section 0x24)',
         'damage_args':'G_Damage(targ,inflictor,attacker,dir,point,damage,dflags,mod,weapon,hitloc,...)',

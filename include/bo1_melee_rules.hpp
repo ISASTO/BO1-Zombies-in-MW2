@@ -11,6 +11,9 @@ namespace mod::bo1 {
 inline constexpr float kMeleeRangeSquared=64.f*64.f;
 inline constexpr float kChargeRangeSquared=200.f*200.f;
 inline constexpr float kLongChargeRangeSquared=512.f*512.f;
+// Adapter: MW2 has no melee charge, so a swing starts only within melee
+// range and about the same height (a ledge or stairs above stops it).
+inline constexpr float kMeleeHeightTolerance=48.f;
 enum class MeleeCheck { Normal, AlreadyStarted, AnyRange, LongRange };
 enum class MeleeDecision { Allowed, TargetInvalid, TargetDead, Disabled, Facing,
     EnemyDistanceGuard, Shielded, BlockedPath, NeedsPathAdapter, OutOfRange,

@@ -141,13 +141,16 @@ inline constexpr std::size_t kActorAllowDeath=0x165;
 // takes no argument except set_battlechatter(false).
 enum class SetupFunction : int {
     GunRemove,DisableArrivals,DisableExits,DisablePain,DisableLongDeath,DisableSurprise,
-    DisableWhizby,DisableDangerReact,BattleChatterOff,EnableSprint,Count};
+    DisableWhizby,DisableDangerReact,BattleChatterOff,EnableSprint,DisableTurnAnims,Count};
 struct ScriptFunctionBinding { const char* file; const char* function; int params; };
 inline constexpr std::array<ScriptFunctionBinding,static_cast<std::size_t>(SetupFunction::Count)> kSetupFunctions={{
     {"maps/_utility","gun_remove",0},{"maps/_utility","disable_arrivals",0},{"maps/_utility","disable_exits",0},
     {"maps/_utility","disable_pain",0},{"maps/_utility","disable_long_death",0},{"maps/_utility","disable_surprise",0},
     {"maps/_utility","disable_bulletwhizbyreaction",0},{"maps/_utility","disable_danger_react",0},
-    {"maps/_utility","set_battlechatter",1},{"maps/_utility","enable_sprint",0}}};
+    {"maps/_utility","set_battlechatter",1},{"maps/_utility","enable_sprint",0},
+    // Test44: self.noTurnAnims, so move.gsc's pathChange never plays MW2's
+    // soldier run_turn_* anims when a zombie's path bends.
+    {"maps/_utility","disable_turnanims",0}}};
 
 // ---- Test40: BO1 zombie character models ----
 // Com_LoadLevelFastFiles (0xf09b0) ends with DB_LoadXAssets({level zone,
@@ -199,4 +202,41 @@ inline constexpr std::array<BuiltinBinding,1> kSoundBuiltins={kBuiltinPlaySound}
 inline constexpr std::uintptr_t kScrGetStringRva=0x223440,kScrGetNumParamRva=0x223180;
 inline constexpr std::array<std::uint8_t,15> kScrGetStringPrologue={0x48,0x83,0xec,0x28,0xe8,0xf7,0xf7,0xff,0xff,0x8b,0xc8,0x48,0x83,0xc4,0x28};
 inline constexpr std::array<std::uint8_t,7> kScrGetNumParamBytes={0x8b,0x05,0x36,0x13,0x6d,0x01,0xc3};
+
+// ---- Test44: a larger loaded_sound asset pool ----
+// Favela and Terminal stopped with "Exceeded limit of 1350 'loaded_sound'
+// assets" once the BO1 sounds joined the level. The asset pools are static
+// free lists named by two .data tables: DB_XAssetPool[type] (0x3bfe00, the
+// pool: free head + entries) and g_poolSize[type] (0x3bf930). DB_Init
+// (0xeff10, called once from 0x1fce6f) sets 0xb69438 and links every pool
+// with its type's init routine (table 0x3bf9e0; loaded_sound 0xeec00 links
+// count entries of 0x40 bytes after the 8-byte head). Allocation (0xeee20)
+// pops the head; freeing (0xee6c0) pushes it. Nothing else addresses the
+// loaded_sound pool, so from DllMain, before DB_Init, the two table entries
+// may name a larger, zeroed pool.
+inline constexpr std::uintptr_t kPoolSizeRva=0x3bf930,kXAssetPoolRva=0x3bfe00;   // names: kAssetNamesRva (0x3bf360)
+inline constexpr std::uintptr_t kPoolInitTableRva=0x3bf9e0,kPoolAllocTableRva=0x3bfb40,kPoolFreeTableRva=0x3bfca0;
+inline constexpr std::uintptr_t kDbInitRva=0xeff10,kDbInitCallRva=0x1fce6f,kDbInitDoneRva=0xb69438;
+inline constexpr int kAssetTypeLoadedSound=13,kLoadedSoundStockCount=1350,kLoadedSoundExpandedCount=4096;
+inline constexpr std::uintptr_t kLoadedSoundPoolRva=0x983740,kLoadedSoundPoolInitRva=0xeec00,kPoolAllocRva=0xeee20,kPoolFreeRva=0xee6c0;
+inline constexpr std::size_t kLoadedSoundEntryBytes=0x40;
+inline constexpr std::array<std::uint8_t,76> kLoadedSoundPoolInitBytes={
+    0x4c,0x63,0xd2,0x4c,0x8d,0x41,0x08,0x49,0xff,0xca,0x4c,0x89,0x01,0x4d,0x85,0xd2,0x7e,0x2c,0xba,0x01,0x00,0x00,0x00,0x4d,
+    0x8b,0xca,0x66,0x0f,0x1f,0x44,0x00,0x00,0x48,0x63,0xc2,0x4d,0x8d,0x40,0x40,0x48,0xc1,0xe0,0x06,0xff,0xc2,0x48,0x83,0xc0,
+    0x08,0x48,0x03,0xc1,0x49,0x89,0x40,0xc0,0x49,0x83,0xe9,0x01,0x75,0xe2,0x49,0xc1,0xe2,0x06,0x49,0xc7,0x44,0x0a,0x08,0x00,
+    0x00,0x00,0x00,0xc3};
+inline constexpr std::array<std::uint8_t,15> kPoolAllocBytes={0x48,0x8b,0x01,0x48,0x85,0xc0,0x74,0x07,0x48,0x8b,0x10,0x48,0x89,0x11,0xc3};
+inline constexpr std::array<std::uint8_t,10> kPoolFreeBytes={0x48,0x8b,0x01,0x48,0x89,0x11,0x48,0x89,0x02,0xc3};
+
+// ---- Test44: the AI navigation graph (include/nav_graph.hpp) ----
+// Path_ConvertIndexToNode (0x1a6320): nodes + index * 0xa8, the node array
+// pointer at 0xcf7090 (game_map_sp path data: node capacity at 0xcf7088).
+// Path_LoadNode (0x1a5730) counts loaded nodes in 0xf56484 (limit 0x2000);
+// getallnodes (0x1aa8d0) iterates that count. Path_NodesInRadius (0x1a5940)
+// reads the origin at +0x14 and skips nodes whose wLinkCount (+0x6c) is 0;
+// the A* (e.g. 0x13fef0) walks links[0 .. wLinkCount) of 0xc bytes from
+// +0x40, target node u16 at +4, cost float at +0; the link check (0x146330)
+// reads totalLinkCount (+0x38) and disconnectCount (+6).
+inline constexpr std::uintptr_t kPathNodeIndexRva=0x1a6320,kPathNodesRva=0xcf7090,kPathNodeCapacityRva=0xcf7088,kPathNodeCountRva=0xf56484;
+inline constexpr std::array<std::uint8_t,18> kPathNodeIndexBytes={0x48,0x63,0xc1,0x48,0x69,0xc0,0xa8,0x00,0x00,0x00,0x48,0x03,0x05,0x5f,0x0d,0xb5,0x00,0xc3};
 } // namespace mod

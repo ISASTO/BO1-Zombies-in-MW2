@@ -248,3 +248,80 @@ class BO1SoundTests(unittest.TestCase):
         self.assertIn('sounds.zombieUntil[number]',hook)
         self.assertIn('if(!z.dog) sounds.zombieUntil[',self.ai)
 
+
+
+class Test44Tests(unittest.TestCase):
+    """Test44: the loaded_sound pool, walkable spawn points, melee reach and anims."""
+    def setUp(self):
+        self.ai=(ROOT/'src'/'ai.cpp').read_text()
+        self.bindings=(ROOT/'include'/'zombie_bindings.hpp').read_text()
+
+    def body(self,signature,end='\n}\n'):
+        start=self.ai.index(signature)
+        return self.ai[start:self.ai.index(end,start)]
+
+    def test_pool_is_enlarged_in_dllmain_before_the_game_runs(self):
+        proxy=(ROOT/'src'/'proxy.cpp').read_text()
+        attach=proxy[proxy.index('if (reason == DLL_PROCESS_ATTACH)'):proxy.index('} else if (reason == DLL_PROCESS_DETACH)')]
+        self.assertIn('mod::assetpools::Expand();',attach)
+        source=(ROOT/'src'/'asset_pools.cpp').read_text()
+        expand=source[source.index('bool Expand()'):source.index('const Status& GetStatus()')]
+        # Every check runs before the first write.
+        self.assertLess(expand.index('Refusal(host)'),expand.index('VirtualAlloc'))
+        self.assertLess(expand.index('VirtualAlloc'),expand.index('std::memcpy'))
+        refusal=source[source.index('const char* Refusal('):source.index('bool Expand()')]
+        for check in ('POOL_SIZE_DIFFERS','POOL_POINTER_DIFFERS','POOL_INIT_DIFFERS','POOL_ALLOC_DIFFERS','POOL_FREE_DIFFERS',
+                      'DB_INIT_DIFFERS','DB_INIT_CALL_DIFFERS','POOLS_ALREADY_LINKED','ASSET_NAME_DIFFERS'):
+            self.assertIn(check,refusal)
+        self.assertEqual(int(re.search(r'kLoadedSoundExpandedCount=(\d+)',self.bindings)[1]),4096)
+
+    def test_spawns_prefer_walkable_points(self):
+        spawn=self.body('bool SpawnZombie(')
+        self.assertLess(spawn.index('NavBand('),spawn.index('SpawnPointBand('))
+        self.assertIn('ZombieTemplate(t)',spawn)
+        # Too few reachable spawners: walkable stand nodes join the band.
+        self.assertLess(spawn.index('NavNodeBand('),spawn.index('SpawnPointBand('))
+        self.assertIn('nav::StandNode(node)',self.body('std::vector<std::pair<AiEntity,float>> NavNodeBand('))
+        service=self.body('void ServiceZombies(const Snapshot& s,const AiScope& scope,int time) {')
+        self.assertLess(service.index('ServiceNav('),service.index('SpawnZombie('))
+        nav=self.body('void ServiceNav(')
+        self.assertIn('>=5000',nav)                  # links re-read: doors open and close
+        self.assertIn('nav::DistancesTo(',nav)
+
+    def test_drones_never_become_zombies(self):
+        template=self.body('bool ZombieTemplate(')
+        for word in ('drone','riotshield','civilian'):
+            self.assertIn('"'+word+'"',template)
+
+    def test_a_swing_starts_only_in_reach(self):
+        melee=self.body('void ServiceMelee(')
+        admission=melee.index('distance>bo1::kMeleeRangeSquared')
+        self.assertLess(admission,melee.index('CanMeleePlayer('))
+        self.assertIn('kMeleeHeightTolerance',melee[admission-200:admission+200])
+        self.assertNotIn('kLongChargeRangeSquared',melee)
+
+    def test_zombies_skip_turn_anims(self):
+        self.assertIn('{"maps/_utility","disable_turnanims",0}',self.bindings)
+        self.assertIn('SetupFunction::DisableTurnAnims',self.body('void RunZombieSetup('))
+
+    def test_mw2_scripts_never_play_the_bo1_only_leaves_when_available(self):
+        # Optional local check against the owner's extracted MW2 animscripts.
+        import os
+        path=os.environ.get('MW2_SCRIPTS')
+        if not path:self.skipTest('MW2_SCRIPTS not set (local extracted animscripts)')
+        scripts=Path(path)/'animscripts'
+        utility=(Path(path)/'maps'/'_utility.gsc').read_text(errors='replace')
+        self.assertIn('self.noTurnAnims = true;',utility[utility.index('\ndisable_turnAnims()'):][:200])
+        move=(scripts/'move.gsc').read_text(errors='replace')
+        self.assertIn('isdefined( self.noTurnAnims )',move)
+        slots=re.findall(r'\{"([a-z0-9_]+)","(ai_zombie_[a-z0-9_]+)",AnimRole::(\w+)\}',self.ai)
+        special=[mw2 for mw2,_,role in slots if role not in ('Move','Idle','Death')]
+        # The scripts a zombie runs while it walks, idles, reacts or dies.
+        for name in ('move.gsc','run.gsc','walk.gsc','stop.gsc','pain.gsc','death.gsc','cqb.gsc'):
+            text=(scripts/name).read_text(errors='replace').lower()
+            for leaf in special:
+                self.assertNotIn('%'+leaf,text,f'{name} plays {leaf}')
+        reactions=(scripts/'reactions.gsc').read_text(errors='replace').lower()
+        for leaf in ('run_react_duck','run_react_flinch'):
+            self.assertNotIn(leaf,special)
+            self.assertIn('%'+leaf,reactions)

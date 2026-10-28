@@ -1,0 +1,192 @@
+{
+ "version": "0.1.43-zombies-test44",
+ "base_commit": "0e65628",
+ "executable_sha256": "fb7e8a987c371dea7b666091b0b9e2011c0cd9cd277b191ad453d11d557dd777",
+ "dll_sha256": "136dc3a8c0807629294c851cec4a7d2f3b8c4c9fb44a5c9aa2cd16c99004cbcc",
+ "dll_bytes": 17199394,
+ "compiler": "xPack MinGW-w64 GCC 13.2.0 (posix threads, UCRT), RelWithDebInfo, static GCC/C++ runtime",
+ "pe_checks": {
+  "amd64_pe32_plus": true,
+  "exact_ten_exports": true,
+  "aslr_nx": true,
+  "no_gcc_runtime_dlls": true
+ },
+ "exports": [
+  "D3DPERF_BeginEvent",
+  "D3DPERF_EndEvent",
+  "D3DPERF_GetStatus",
+  "D3DPERF_QueryRepeatFrame",
+  "D3DPERF_SetMarker",
+  "D3DPERF_SetOptions",
+  "D3DPERF_SetRegion",
+  "DebugSetMute",
+  "Direct3DCreate9",
+  "Direct3DCreate9Ex"
+ ],
+ "imports": [
+  "advapi32.dll",
+  "bcrypt.dll",
+  "dbghelp.dll",
+  "gdi32.dll",
+  "kernel32.dll",
+  "user32.dll",
+  "winmm.dll",
+  "api-ms-win-crt-*-l1-1-0.dll (11 UCRT API sets)"
+ ],
+ "imports_added_since_test43": [],
+ "early_dllmain_native_edits_unchanged": true,
+ "third_party": {
+  "miniz": "tinfl inflate only, MIT, third_party/miniz (VERSION records the upstream commit)",
+  "wmadec": "C++ port of FFmpeg n7.1 WMA v2 decoder (wmadec.c, wma.c, wma_common.c and tables), LGPL 2.1 or later, third_party/wmadec; licence text and notice ship in the package docs"
+ },
+ "native_cxx_tests": {
+  "passed": 25,
+  "failed": 0,
+  "new": [
+   "nav_graph_tests (raw node/link decoding, active links only, one-way drops, closed doors, anchors, walking distances, stand nodes, bounds)"
+  ]
+ },
+ "python_tests": {
+  "passed": 65,
+  "failed": 0,
+  "new": "Test44Tests (6): pool expansion order and checks, walkable spawn order, drone exclusion, melee reach, turn anims, BO1-only leaves never played by the locomotion/pain/death scripts (local)",
+  "locally_gated_passed": [
+   "test_mw2_slot_anims_exist_when_local_zone_is_available (owner's common.ff; all 76 slot anims)",
+   "test_helmet_note_exists_in_local_mw2_scripts (owner's extracted MW2 scripts)",
+   "test_mw2_scripts_never_play_the_bo1_only_leaves_when_available (owner's extracted MW2 scripts)"
+  ]
+ },
+ "native_suites_and_audits_passed": [
+  "runtime",
+  "resources",
+  "iterator",
+  "animation",
+  "history",
+  "awareness",
+  "threat",
+  "crowd",
+  "fracture",
+  "glass_state",
+  "tables",
+  "layout",
+  "lifecycle",
+  "audit",
+  "consumers",
+  "script_vm",
+  "sweep",
+  "script_call",
+  "level_prep",
+  "bindings",
+  "script_parameters",
+  "capacity",
+  "fire_mode",
+  "owned_strings",
+  "model_zone",
+  "model_zone_kino",
+  "anim_delta",
+  "sound_zone",
+  "sound_zone_bo1",
+  "asset_pool"
+ ],
+ "native_suites_and_audits_failed": [],
+ "asset_pool_probe": {
+  "stock": 1350,
+  "expanded": 4096,
+  "linked": 4096,
+  "allocated": 4096,
+  "exhausted_after": 4096,
+  "freed": 4096
+ },
+ "asset_pool_note": "retail DB_Init (0xeff10) links the enlarged pool; retail allocator hands out 4096 distinct entries then null; retail free takes all back; 28 other free-list pools linked in place; verifier: no code or data addresses the stock pool except its table slot",
+ "bindings_test44": {
+  "asset_pools": {
+   "loaded_sound": {
+    "type": 13,
+    "stock": 1350,
+    "expanded": 4096,
+    "entry_bytes": 64,
+    "pool": "0x983740",
+    "init": "0xeec00",
+    "alloc": "0xeee20",
+    "free": "0xee6c0"
+   },
+   "db_init": "0xeff10",
+   "db_init_caller": "0x1fce6f",
+   "tables": {
+    "pool": "0x3bfe00",
+    "size": "0x3bf930",
+    "init": "0x3bf9e0"
+   },
+   "other_references": 0
+  },
+  "nav_graph": {
+   "nodes": "0xcf7090",
+   "count": "0xf56484",
+   "capacity": "0xcf7088",
+   "node_bytes": 168,
+   "origin": 20,
+   "total_links": 56,
+   "links": 64,
+   "active_links": 108,
+   "link_bytes": 12,
+   "link_node": 4,
+   "link_distance": 0,
+   "link_disconnect": 6,
+   "max_nodes": 8192
+  }
+ },
+ "model_zone_local_kino": {
+  "models": 6,
+  "surfaces": 52,
+  "materials": 3,
+  "images": 8,
+  "vertices": 20774,
+  "triangles": 27972,
+  "rigid_lists": 16,
+  "collision_trees": 16,
+  "references_resolved": 53,
+  "script_strings": 96,
+  "fastfile_bytes": 1047406,
+  "block_sizes": [
+   6064,
+   0,
+   0,
+   197648,
+   0,
+   0,
+   668864,
+   172304
+  ]
+ },
+ "sound_zone_local_bo1": {
+  "alias_lists": 50,
+  "aliases": 238,
+  "loaded_sounds": 142,
+  "pcm_bytes": 19648512,
+  "speaker_maps": 238,
+  "references_resolved": 334,
+  "fastfile_bytes": 19828469,
+  "block_sizes": [
+   1855584,
+   0,
+   0,
+   132544,
+   0,
+   0,
+   0,
+   0
+  ],
+  "decode_failures": 0,
+  "skipped_aliases": 7,
+  "missing_lists": 7,
+  "streamed_missing": 5,
+  "audio_seconds": 194.1
+ },
+ "anim_slots": 76,
+ "installer_fixture": "pwsh 7.5.3 on Linux: Test43 installed, Test44 refuses to overwrite, Test44 Uninstall removes Test43 with its model and sound caches and both guard markers (the Favela crash state), Test44 installed (Black Ops and Kino found, stale model and sound markers removed, save backup before-test44-*), CollectLogs includes both manifests, Test44 uninstalled keeping logs/backups/bo1_path.txt",
+ "bo1_inputs": {
+  "common_zombie.ff_sha256": "f812069ef2ff446b97051e75d6a5ee49687a8085218b8f79dc2d8237e543117e",
+  "zombie_theater.ff_sha256": "970db88bb5ae9aa1d3875cdbd55d43212f22ee55096ce251f596d4a38a776786",
+  "note": "owner's files, read at run time on the owner's PC, never shipped"
+ }
+}
