@@ -197,17 +197,53 @@ void Report(unsigned long long stalled) {
         LogUrgent("HANG_DIALOG raised=1");
     }
 }
+// Test45: the main thread waits inside the graphics driver, called through
+// this DLL's Direct3D proxy (a device reset after alt-tab, a slow present).
+// Test44's two "hangs" were this: the game went on afterwards.
+bool DriverWait(DWORD id,std::uint64_t& rip) {
+    rip=0;
+    if(!id) return false;
+    HANDLE thread=OpenThread(THREAD_SUSPEND_RESUME|THREAD_GET_CONTEXT|THREAD_QUERY_INFORMATION,FALSE,id);
+    if(!thread) return false;
+    std::array<std::uint64_t,64> stack{};bool read=false;
+    if(SuspendThread(thread)!=static_cast<DWORD>(-1)) {
+        CONTEXT context{};context.ContextFlags=CONTEXT_CONTROL|CONTEXT_INTEGER;
+        if(GetThreadContext(thread,&context)) {rip=context.Rip;read=CheckedReadMemory(context.Rsp,stack.data(),sizeof(stack));}
+        ResumeThread(thread);
+    }
+    CloseHandle(thread);
+    if(!read || !rip || Ours(rip)) return false;
+    unsigned ours=0;
+    for(const auto v:stack) {
+        if(!Ours(v)) continue;
+        if(v>=dllBase && v<dllEnd) return true;      // our d3d9 proxy among the first frames of the game
+        if(++ours>=4) break;
+    }
+    return false;
+}
 DWORD WINAPI Watch(void*) {
     std::uint64_t lastServer=0,lastRender=0;
     ULONGLONG progress=GetTickCount64();
-    unsigned reports=0;bool reported=false;
+    unsigned reports=0,driverWaits=0;bool reported=false,driverNoted=false;
     for(;;) {
         Sleep(250);
         PrintFaults(true);
         const auto s=serverFrames.load(std::memory_order_relaxed),r=renderFrames.load(std::memory_order_relaxed);
         const auto now=GetTickCount64();
-        if(s!=lastServer || r!=lastRender) {lastServer=s;lastRender=r;progress=now;reported=false;continue;}
+        if(s!=lastServer || r!=lastRender) {
+            if(driverNoted) Log("HANG_DRIVER_WAIT ended stalled_ms=%llu",static_cast<unsigned long long>(now-progress));
+            lastServer=s;lastRender=r;progress=now;reported=false;driverNoted=false;continue;
+        }
         if(!armed.load() || reported || reports>=kMaxReports || now-progress<kHangMilliseconds || !ForegroundIsOurs()) continue;
+        std::uint64_t rip=0;
+        if(now-progress<kDriverWaitMilliseconds && DriverWait(mainThread.load(),rip)) {
+            if(!driverNoted && driverWaits<16) {
+                ++driverWaits;driverNoted=true;
+                Log("HANG_DRIVER_WAIT stalled_ms=%llu at=%s (inside the graphics driver through the Direct3D proxy; reported only after %llu ms)",
+                    static_cast<unsigned long long>(now-progress),Where(rip).c_str(),static_cast<unsigned long long>(kDriverWaitMilliseconds));
+            }
+            continue;
+        }
         reported=true;++reports;
         Report(now-progress);
     }

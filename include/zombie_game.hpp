@@ -12,7 +12,9 @@ struct ZombieSettings {
     int startingRound=1;
     bool hellhounds=false;      // BO1 dog rounds, when the map has a dog spawner
     bool removeAllies=true;     // campaign allies are deleted like campaign enemies
-    bool autoRestart=true;      // after GAME OVER the Spec Ops map is loaded again
+    // After GAME OVER: false (Test45 default, as BO1) returns to the main
+    // menu; true loads the Spec Ops map again for a new game.
+    bool autoRestart=false;
 };
 // Test39: zombies are played on the Spec Ops maps, which are campaign
 // locations cut down to a small play area (the zone file is so_<mission>).
@@ -40,7 +42,10 @@ inline bool SafeMapName(const char* name) {
     for(const char* c=name;*c;++c) if(!((*c>='a' && *c<='z') || (*c>='0' && *c<='9') || *c=='_')) return false;
     return true;
 }
-struct ZombieDropView { bo1::Powerup type=bo1::Powerup::None; AiPoint origin{}; bool visible=true; };
+// Test45: GAME OVER shows for this long before the main menu; the zombies
+// game ends once no level has been running for kLeftLevelMilliseconds.
+inline constexpr unsigned long long kGameOverMenuMilliseconds=8000,kLeftLevelMilliseconds=1500;
+struct ZombieDropView { bo1::Powerup type=bo1::Powerup::None; AiPoint origin{}; bool visible=true; bool model=false; };
 struct ZombieGameStatus {
     bool available=false,running=false,pending=false;
     char pendingMap[33]{};
@@ -71,5 +76,8 @@ struct ZombieGameStatus {
     char bo1Sounds[16]{};        // READY, BUILDING, MISSING, FAILED, SKIPPED
     int soundLists=0;            // BO1 alias lists usable on this level
     int restartInMs=-1;          // GAME OVER relaunch countdown, -1 when none
+    int menuInMs=-1;             // Test45: GAME OVER -> main menu countdown, -1 when none
+    // Test45: BO1 HUD and world models on this level.
+    int powerupModels=0,gibModels=0;
 };
 } // namespace mod

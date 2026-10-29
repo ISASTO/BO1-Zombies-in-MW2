@@ -1,7 +1,32 @@
 # BO1 Zombies in MW2
 
 Incremental mod framework for **retail Modern Warfare 2 (2009), single player**.
-Current build: **0.1.43-zombies-test44**.
+Current build: **0.1.44-zombies-test45**.
+
+**Test45 does what the Test44 run asked for:**
+
+- **No soldier sounds.** Every sound MW2's animscripts play on a zombie is
+  dropped, including the gear rattle of each running step. The exceptions:
+  footsteps become BO1 zombie steps, and a body falling keeps its thud.
+- **No mission music.** On a zombies level the `musicplay` builtin returns at
+  once; the map's own ambience keeps playing.
+- **Zombie ambience.** Kino's underscore plays as a quiet bed, with Kino's
+  wind, groans, whispers and clangs now and then.
+- **The announcer.** BO1's announcer names every powerup and dog round. It is
+  read from the owner's localized Kino zone and archives.
+- **BO1's HUD.** The round is shown as BO1's chalk marks (a red figure above
+  round ten). BO1's Double Points and Insta-Kill icons appear while those
+  powerups are active.
+- **BO1's powerup models.** The ammo can, x2, bomb and skull float and turn
+  where powerups drop.
+- **Dismemberment.** BO1's rules and Kino's dismemberment models: heads pop,
+  and arms and legs come off and fly.
+- **Zombies info in the log** after every round and at the end of a game.
+- **The end of a game.** GAME OVER returns to the main menu. Quitting a
+  zombies level ends zombies mode.
+
+See [Test45](docs/zombies-test45.md) and the
+[Test45 test instructions](docs/test45-testing-protocol.md).
 
 **Test44 fixes what the first Test43 run showed:**
 
@@ -158,9 +183,11 @@ bridge, 72 MiB GPU/CPU skinning buffers, guarded animated-record storage and
 16-bit handles remain active. Rendering and actor regressions are rerun.
 Windows missions and stable 256-actor retail gameplay require owner testing.
 
-Install the complete Test44 package (run its Uninstall.cmd first to remove
-Test43). Follow the [Test44 instructions](docs/test44-testing-protocol.md):
-Favela, Terminal, Gulag showers and Contingency. The
+Install the complete Test45 package (run its Uninstall.cmd first to remove
+Test44). Follow the [Test45 instructions](docs/test45-testing-protocol.md):
+Favela for a few rounds, the end of a game, and a later round. The
+[Test44 instructions](docs/test44-testing-protocol.md) cover Terminal, Gulag
+showers and Contingency. The
 [Test43 instructions](docs/test43-testing-protocol.md) describe the sounds in
 more detail; the [Test42](docs/test42-testing-protocol.md) and
 [Test41 instructions](docs/test41-testing-protocol.md) cover the same maps:

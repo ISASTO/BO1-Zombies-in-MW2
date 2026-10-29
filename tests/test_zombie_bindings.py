@@ -21,12 +21,13 @@ class ZombieBindingTableTests(unittest.TestCase):
 
     def test_builtin_list_matches_declarations(self):
         declared=self.builtins()
-        names=self.listed('kZombieBuiltins')+self.listed('kAnimBuiltins')+self.listed('kModelBuiltins')+self.listed('kSoundBuiltins')
+        names=self.listed('kZombieBuiltins')+self.listed('kAnimBuiltins')+self.listed('kModelBuiltins')+self.listed('kSoundBuiltins')+self.listed('kWorldBuiltins')
         self.assertEqual(len(names),len(declared))
         self.assertEqual(len(set(names)),len(names))
         self.assertEqual(len(set(declared.values())),len(declared),'two builtins share one routine')
         for required in ('giveweapon','takeallweapons','switchtoweapon','givemaxammo','iprintlnbold','orientmode','animscripted','hide','show',
-                         'setmodel','attach','detachall','playsound'):
+                         'setmodel','attach','detachall','playsound','musicplay','musicstop','spawn','delete','rotateto','movegravity',
+                         'gettagorigin','stopsounds'):
             self.assertIn(required,declared)
 
     def test_probe_gate_covers_the_value_pushes(self):
@@ -191,7 +192,11 @@ class BO1SoundTests(unittest.TestCase):
 
     def aliases(self):
         block=self.sounds[self.sounds.index('namespace alias {'):self.sounds.index('} // namespace alias')]
-        return dict(re.findall(r'const char\* (k\w+)="([^"]+)"',block))
+        found=dict(re.findall(r'const char\* (k\w+)="([^"]+)"',block))
+        # Test45: arrays of aliases (the ambience one-shots) as kName[i].
+        for name,items in re.findall(r'std::array<const char\*,\d+> (k\w+)=\{([^}]+)\}',block):
+            for i,item in enumerate(re.findall(r'"([^"]+)"',items)):found[f'{name}[{i}]']=item
+        return found
 
     def body(self,signature,end='\n}\n'):
         start=self.ai.index(signature)
@@ -200,6 +205,8 @@ class BO1SoundTests(unittest.TestCase):
     def test_runtime_aliases_are_built(self):
         built=re.findall(r'\{"([a-z0-9_]+)",mw2::kChannel\w+(,true)?\}',self.build)
         exact={name for name,prefix in built if not prefix};prefixes=[name for name,prefix in built if prefix]
+        # Test45: lists written under another MW2 name ({"bo1 name",channel,false,"mw2 name",...}).
+        exact|=set(re.findall(r'\{"[a-z0-9_]+",mw2::kChannel\w+,false,"([a-z0-9_]+)"',self.build))
         for key,name in self.aliases().items():
             if key=='kStepPrefix':
                 self.assertIn(name,prefixes);continue
@@ -222,7 +229,7 @@ class BO1SoundTests(unittest.TestCase):
         self.assertGreater(len(calls),15)
         for arg in calls:
             for key in re.findall(r'bo1sounds::alias::(k\w+)',arg): self.assertIn(key,names)
-            if 'bo1sounds::alias::' not in arg: self.assertIn(arg.strip(),('alias','play'),arg)
+            if 'bo1sounds::alias::' not in arg: self.assertTrue(arg.strip() in ('alias','play') or arg.strip().startswith('present['),arg)
 
     def test_a_sound_needs_its_alias_and_an_active_level(self):
         play=self.body('bool PlayZombieSound(')
@@ -242,8 +249,9 @@ class BO1SoundTests(unittest.TestCase):
 
     def test_only_zombies_lose_soldier_voices(self):
         override=self.body('bool ZombieSoundOverride(')
-        self.assertIn('"step_run_"',override)
-        self.assertIn('"generic_"',override)
+        self.assertIn('ClassifySoldierSound(alias)',override)
+        classify=self.sounds[self.sounds.index('inline SoldierSound ClassifySoldierSound('):]
+        for literal in ('"step_run_"','"generic_"','"gear_rattle"','"bodyfall_"'):self.assertIn(literal,classify)
         hook=self.body('void PlaySoundHook(')
         self.assertIn('sounds.zombieUntil[number]',hook)
         self.assertIn('if(!z.dog) sounds.zombieUntil[',self.ai)
@@ -325,3 +333,83 @@ class Test44Tests(unittest.TestCase):
         for leaf in ('run_react_duck','run_react_flinch'):
             self.assertNotIn(leaf,special)
             self.assertIn('%'+leaf,reactions)
+
+
+class Test45Tests(unittest.TestCase):
+    """Test45: no soldier sounds or mission music, ambience and announcer,
+    powerup models, BO1 HUD, dismemberment, auto logs and the end of a game."""
+    def setUp(self):
+        self.ai=(ROOT/'src'/'ai.cpp').read_text()
+        self.bindings=(ROOT/'include'/'zombie_bindings.hpp').read_text()
+        self.build=(ROOT/'include'/'bo1_sound_build.hpp').read_text()
+
+    def body(self,signature,end='\n}\n'):
+        start=self.ai.index(signature)
+        return self.ai[start:self.ai.index(end,start)]
+
+    def test_mission_music_is_blocked_only_on_zombies_levels(self):
+        prepare=self.body('void PrepareLevelScripts() {')
+        self.assertLess(prepare.index('if(!launch || !prep.bindings) return;'),prepare.index('SetMusicBlock(true)'))
+        self.assertIn('SetMusicBlock(false);',self.body('void RestoreLevelPrep('))
+        block=self.body('bool SetMusicBlock(')
+        self.assertIn('observed!=kMusicPlayPrologue',block)
+        self.assertIn('ExchangeCode(musicEdit,block)',block)
+        self.assertIn('kBuiltinMusicStop',self.body('void BeginZombies('))
+        # The map's ambience (ambientplay) is a different builtin and stays.
+        self.assertNotIn('ambientplay',self.bindings)
+
+    def test_every_soldier_sound_on_a_zombie_is_dropped_or_replaced(self):
+        override=self.body('bool ZombieSoundOverride(')
+        self.assertIn('case bo1sounds::SoldierSound::Keep: return false;',override)
+        self.assertEqual(override.count('return false'),1)
+
+    def test_ambience_and_announcer_are_built_and_played(self):
+        self.assertIn('"bo1_zombie_ambience_bed",true',self.build)
+        spec=self.build[self.build.index('inline bool BuildSoundSpec('):]
+        self.assertIn('detail::AddBank(announcer,localized.raw,kAnnouncerLists',spec)
+        grab=self.body('void GrabPowerup(')
+        for key in ('kAnnMaxAmmo','kAnnInstaKill','kAnnNuke','kAnnDoublePoints'):self.assertIn(key,grab)
+        service=self.body('void ServiceZombies(const Snapshot& s,const AiScope& scope,int time) {')
+        self.assertIn('ServiceAmbience(time);',service)
+        self.assertIn('kAnnDogStart',service)
+
+    def test_zombies_info_is_logged_after_rounds_and_at_the_end(self):
+        service=self.body('void ServiceZombies(const Snapshot& s,const AiScope& scope,int time) {')
+        self.assertIn('ZOMBIE_AUTO_LOG reason=ROUND_',service)
+        self.assertIn('LogZombieGame();',service)
+        reset=self.body('void ResetZombieGame(const char* reason,bool deleteActors) {')
+        self.assertLess(reset.index('LogZombieGame();'),reset.index('zg.running=false;'))
+
+    def test_game_over_returns_to_the_main_menu_and_leaving_ends_zombies(self):
+        game=(ROOT/'include'/'zombie_game.hpp').read_text()
+        self.assertIn('bool autoRestart=false;',game)
+        tick=self.body('void TickZombieRelaunch(const Snapshot& s) {')
+        self.assertIn('LevelState::NoLevel',tick)
+        self.assertIn('ResetZombieGame("LEFT_LEVEL",false)',tick)
+        self.assertIn('kDisconnectCommand',tick)
+        self.assertIn('kDisconnectCommand="disconnect\\n"',self.bindings)
+        reset=self.body('void ResetZombieGame(const char* reason,bool deleteActors) {')
+        self.assertIn('zg.menuAt=GetTickCount64()+kGameOverMenuMilliseconds',reset)
+        # Builtins only while the level is still there.
+        self.assertIn('if(levelAlive) {StopPlayerSounds();RemoveDropModels();}',reset)
+
+    def test_world_models_are_made_by_the_service_only(self):
+        # QueueDrop and the damage hook run inside G_Damage: no spawn, delete or setmodel there.
+        for signature in ('void QueueDrop(','bool ZombieDamage(','void QueueGib('):
+            body=self.body(signature)
+            for call in ('SpawnScriptModel(','DeleteWorldModel(','Builtin('):self.assertNotIn(call,body,f'{signature} {call}')
+        self.assertIn('drop.wantModel=true;',self.body('void QueueDrop('))
+        self.assertIn('SpawnDropModel(drop,time)',self.body('void ServiceDropModel('))
+        self.assertIn('ServiceGibs(time);',self.body('void ServiceZombies(const Snapshot& s,const AiScope& scope,int time) {'))
+
+    def test_head_gib_never_detaches_a_missing_model(self):
+        apply=self.body('bool ApplyGib(')
+        self.assertNotIn('kBuiltinDetach,',apply)
+        self.assertIn('kBuiltinDetachAll',apply)
+        # Tags are read before the body changes.
+        self.assertLess(apply.index('kBuiltinGetTagOrigin'),apply.index('kBuiltinSetModel'))
+
+    def test_spawn_diff_leaves_room_for_the_game(self):
+        spawn=self.body('WorldModel SpawnScriptModel(')
+        self.assertIn('used+96>',spawn)
+        self.assertIn('found!=1',spawn)

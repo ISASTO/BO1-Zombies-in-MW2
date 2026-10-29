@@ -10,6 +10,7 @@
 #include "native_animation.hpp"
 #include <windows.h>
 #include <d3d9.h>
+#include <array>
 #include <atomic>
 #include <deque>
 #include <mutex>
@@ -141,7 +142,10 @@ void RequestZombieStop();
 void SetZombieHellhounds(bool enabled);
 bool LaunchZombieMap(const char* map,const ZombieSettings& settings);
 // Test39: relaunches the Spec Ops map after GAME OVER (called every frame).
-void TickZombieRelaunch();
+void TickZombieRelaunch(const Snapshot& s);
+// Test45: the overlay draws the BO1 round chalk marks (set by the render thread).
+void SetBo1HudReady(bool ready);
+bool Bo1HudReady();
 bool ReadCurrentMapName(char* out,std::size_t size);
 ZombieGameStatus GetZombieGameStatus();
 void LogZombieGame();
@@ -169,6 +173,13 @@ struct Overlay {
     bool fontAttempted = false;
     IDirect3DTexture9* hitTexture=nullptr;
     bool hitAttempted=false;
+    // Test45: the BO1 HUD images (bo1hud::kImages order) and a large digit
+    // atlas for rounds above ten.
+    std::array<IDirect3DTexture9*,7> hudTextures{};
+    bool hudAttempted=false;ULONGLONG hudRetryAt=0;
+    IDirect3DTexture9* digits=nullptr;
+    bool digitsAttempted=false;
+    int hudRound=0;ULONGLONG hudRoundAt=0;
     unsigned presents = 0;
     unsigned endScenes = 0;
     unsigned drawnSincePresent = 0;

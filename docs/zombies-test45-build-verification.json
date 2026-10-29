@@ -1,0 +1,197 @@
+{
+ "version": "0.1.44-zombies-test45",
+ "base_commit": "6ad6edd",
+ "executable_sha256": "fb7e8a987c371dea7b666091b0b9e2011c0cd9cd277b191ad453d11d557dd777",
+ "dll_sha256": "367d48938c2be95178ca1658fab309e4c98683d077bd33c32c5bffbb45449832",
+ "dll_bytes": 19317640,
+ "compiler": "xPack MinGW-w64 GCC 13.2.0 (posix threads, UCRT), RelWithDebInfo, static GCC/C++ runtime",
+ "pe_checks": {
+  "amd64_pe32_plus": true,
+  "exact_ten_exports": true,
+  "aslr_nx": true,
+  "no_gcc_runtime_dlls": true
+ },
+ "exports": [
+  "D3DPERF_BeginEvent",
+  "D3DPERF_EndEvent",
+  "D3DPERF_GetStatus",
+  "D3DPERF_QueryRepeatFrame",
+  "D3DPERF_SetMarker",
+  "D3DPERF_SetOptions",
+  "D3DPERF_SetRegion",
+  "DebugSetMute",
+  "Direct3DCreate9",
+  "Direct3DCreate9Ex"
+ ],
+ "imports": [
+  "advapi32.dll",
+  "bcrypt.dll",
+  "dbghelp.dll",
+  "gdi32.dll",
+  "kernel32.dll",
+  "user32.dll",
+  "winmm.dll",
+  "api-ms-win-crt-*-l1-1-0.dll (11 UCRT API sets)"
+ ],
+ "imports_added_since_test44": [],
+ "early_dllmain_native_edits_unchanged": true,
+ "third_party": {
+  "miniz": "tinfl inflate only, MIT, third_party/miniz (VERSION records the upstream commit)",
+  "wmadec": "C++ port of FFmpeg n7.1 WMA v2 decoder (wmadec.c, wma.c, wma_common.c and tables), LGPL 2.1 or later, third_party/wmadec; licence text and notice ship in the package docs"
+ },
+ "native_cxx_tests": {
+  "passed": 26,
+  "failed": 0,
+  "new": [
+   "test45_tests (soldier-sound classes, every BO1 gib rule, the IWI decoder for luminance-alpha/DXT1/DXT5 and the HUD pack, the ambience bed copy, surface removal and used bones; with the owner zones: the dismemberment and powerup carves and the announcer bank paths)"
+  ],
+  "updated": [
+   "bo1_model_tests (the pipeline now carries the 9 dismemberment models and 4 pieces)"
+  ]
+ },
+ "python_tests": {
+  "passed": 73,
+  "failed": 0,
+  "new": "Test45Tests (8): music block only on zombies levels, every soldier sound dropped or replaced, ambience and announcer built and played, auto logs, GAME OVER to the main menu and leaving ends zombies, world models only from the service, head gibs never detach a missing model, spawn diff headroom",
+  "locally_gated_passed": [
+   "test_mw2_slot_anims_exist_when_local_zone_is_available (owner's common.ff; all 76 slot anims)",
+   "test_helmet_note_exists_in_local_mw2_scripts (owner's extracted MW2 scripts)",
+   "test_mw2_scripts_never_play_the_bo1_only_leaves_when_available (owner's extracted MW2 scripts)"
+  ]
+ },
+ "native_suites_and_audits_passed": [
+  "runtime",
+  "resources",
+  "iterator",
+  "animation",
+  "history",
+  "awareness",
+  "threat",
+  "crowd",
+  "fracture",
+  "glass_state",
+  "tables",
+  "layout",
+  "lifecycle",
+  "audit",
+  "consumers",
+  "script_vm",
+  "sweep",
+  "script_call",
+  "level_prep",
+  "bindings",
+  "script_parameters",
+  "capacity",
+  "fire_mode",
+  "owned_strings",
+  "model_zone",
+  "model_zone_kino",
+  "anim_delta",
+  "sound_zone",
+  "sound_zone_bo1",
+  "asset_pool"
+ ],
+ "native_suites_and_audits_failed": [],
+ "bindings_test45": {
+  "musicplay": "0x192ef0",
+  "musicplay_server_command": "mu_play %s %i (0x344848)",
+  "stopsounds_event": 5,
+  "entity_pool": "0xd9e070",
+  "spawn_class_field": "0x13c",
+  "classname_field": "0x13e",
+  "disconnect": "command buffer"
+ },
+ "world_builtins": {
+  "musicplay": "0x192ef0",
+  "musicstop": "0x192fa0",
+  "spawn": "0x187370",
+  "delete": "0x189240",
+  "rotateto": "0x196cb0",
+  "rotatevelocity": "0x1971c0",
+  "movegravity": "0x196950",
+  "gettagorigin": "0x18d080",
+  "gettagangles": "0x18d150",
+  "detach": "0x1876c0",
+  "stopsounds": "0x185cd0"
+ },
+ "model_zone_local_kino": {
+  "models": 6,
+  "surfaces": 52,
+  "materials": 3,
+  "images": 8,
+  "vertices": 20774,
+  "triangles": 27972,
+  "rigid_lists": 16,
+  "collision_trees": 16,
+  "references_resolved": 53,
+  "script_strings": 96,
+  "fastfile_bytes": 1047406,
+  "block_sizes": [
+   6064,
+   0,
+   0,
+   197648,
+   0,
+   0,
+   668864,
+   172304
+  ]
+ },
+ "model_zone_local_zombie_zone": {
+  "models": 23,
+  "surfaces": 181,
+  "materials": 6,
+  "images": 16,
+  "vertices": 59583,
+  "triangles": 73412,
+  "rigid_lists": 62,
+  "collision_trees": 62,
+  "references_resolved": 183,
+  "script_strings": 100,
+  "fastfile_bytes": 2925038,
+  "block_sizes": [
+   6080,
+   0,
+   0,
+   526592,
+   0,
+   0,
+   1910752,
+   445792
+  ]
+ },
+ "model_zone_note": "the whole generated zombie zone (character, 9 dismemberment models, 4 thrown pieces, 4 powerups from common_zombie) through the retail DB_LoadXFile and every XModel/Material/GfxImage loader",
+ "sound_zone_local_bo1": {
+  "alias_lists": 56,
+  "aliases": 268,
+  "loaded_sounds": 172,
+  "pcm_bytes": 34374656,
+  "speaker_maps": 268,
+  "references_resolved": 364,
+  "fastfile_bytes": 34577993,
+  "block_sizes": [
+   1855584,
+   0,
+   0,
+   148528,
+   0,
+   0,
+   0,
+   0
+  ],
+  "decode_failures": 0,
+  "skipped_aliases": 9,
+  "missing_lists": 9,
+  "streamed_missing": 7,
+  "audio_seconds": 298.2
+ },
+ "sound_zone_note": "ambience one-shots and gib sounds included; streamed files (round music, ambience bed, announcer) live in archives not copied here",
+ "anim_slots": 76,
+ "installer_fixture": "pwsh 7.5.3 on Linux: Test44 installed with its caches and both guard markers; Test45 refuses to overwrite; Test45 Uninstall removes Test44 with every cache file (models, sounds, sounds info, HUD pack, markers); Test45 installed (Black Ops found, save backup before-test45-*); CollectLogs includes both manifests and the sounds info; Test45 uninstalled keeping logs/backups/bo1_path.txt",
+ "bo1_inputs": {
+  "common_zombie.ff_sha256": "f812069ef2ff446b97051e75d6a5ee49687a8085218b8f79dc2d8237e543117e",
+  "zombie_theater.ff_sha256": "970db88bb5ae9aa1d3875cdbd55d43212f22ee55096ce251f596d4a38a776786",
+  "en_zombie_theater.ff_sha256": "d26cbc49349ff971ca12cb8cace8cc147bd64564974ece106d6ce08ae4e75756",
+  "note": "owner's files, read at run time on the owner's PC, never shipped"
+ }
+}

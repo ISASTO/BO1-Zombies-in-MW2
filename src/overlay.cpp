@@ -1,6 +1,8 @@
 #include "runtime.hpp"
 #include "checked_memory.hpp"
 #include "zombie_bindings.hpp"
+#include "bo1_hud.hpp"
+#include "bo1_models.hpp"
 #include <algorithm>
 #include <cmath>
 #include <cstdio>
@@ -144,6 +146,117 @@ void DrawHitmarker(IDirect3DDevice9* device,IDirect3DTexture9* texture,float cen
     device->SetTexture(0,texture);
     device->DrawPrimitiveUP(D3DPT_TRIANGLELIST,2,vertices.data(),sizeof(Vertex));
 }
+void DrawTexture(IDirect3DDevice9* device,IDirect3DTexture9* texture,float x,float y,float w,float h,D3DCOLOR color,
+                 float u0=0.f,float v0=0.f,float u1=1.f,float v1=1.f) {
+    if(!texture) return;
+    x-=.5f;y-=.5f;
+    const Vertex a{x,y,0,1,color,u0,v0},b{x+w,y,0,1,color,u1,v0},c{x,y+h,0,1,color,u0,v1},d{x+w,y+h,0,1,color,u1,v1};
+    const std::array<Vertex,6> vertices{a,b,c,c,b,d};
+    device->SetTexture(0,texture);
+    device->SetTextureStageState(0,D3DTSS_COLOROP,D3DTOP_MODULATE);device->SetTextureStageState(0,D3DTSS_COLORARG1,D3DTA_TEXTURE);
+    device->SetTextureStageState(0,D3DTSS_COLORARG2,D3DTA_DIFFUSE);device->SetTextureStageState(0,D3DTSS_ALPHAOP,D3DTOP_MODULATE);
+    device->SetTextureStageState(0,D3DTSS_ALPHAARG1,D3DTA_TEXTURE);device->SetTextureStageState(0,D3DTSS_ALPHAARG2,D3DTA_DIFFUSE);
+    device->DrawPrimitiveUP(D3DPT_TRIANGLELIST,2,vertices.data(),sizeof(Vertex));
+}
+// Test45: the BO1 HUD images from bo1mw2\cache\bo1_hud.bin (written by the
+// model build from the Black Ops archives), as 32-bit textures.
+void LoadHud(Overlay& overlay,ULONGLONG now) {
+    if(overlay.hudAttempted || now<overlay.hudRetryAt) return;
+    const auto st=bo1models::GetStatus();
+    if(st.state==bo1models::State::Building || st.state==bo1models::State::Idle) {overlay.hudRetryAt=now+2000;return;}
+    overlay.hudAttempted=true;
+    std::vector<std::uint8_t> bytes;
+    {
+        HANDLE f=CreateFileW(bo1models::HudPackPath().c_str(),GENERIC_READ,FILE_SHARE_READ,nullptr,OPEN_EXISTING,0,nullptr);
+        if(f!=INVALID_HANDLE_VALUE) {
+            LARGE_INTEGER size{};
+            if(GetFileSizeEx(f,&size) && size.QuadPart>0 && size.QuadPart<(64ll<<20)) {
+                bytes.resize(static_cast<std::size_t>(size.QuadPart));DWORD read=0;
+                if(!ReadFile(f,bytes.data(),static_cast<DWORD>(bytes.size()),&read,nullptr) || read!=bytes.size()) bytes.clear();
+            }
+            CloseHandle(f);
+        }
+    }
+    std::map<std::string,std::vector<std::uint8_t>> files;
+    unsigned made=0;
+    if(!bytes.empty() && bo1hud::ReadPack(bytes.data(),bytes.size(),files)) {
+        for(std::size_t k=0;k<bo1hud::kImages.size();++k) {
+            const auto found=files.find(bo1hud::kImages[k]);
+            bo1hud::Bgra image;
+            if(found==files.end() || !bo1hud::DecodeIwi(found->second.data(),found->second.size(),image)) continue;
+            IDirect3DTexture9* t=nullptr;
+            if(FAILED(overlay.device->CreateTexture(image.width,image.height,1,0,D3DFMT_A8R8G8B8,D3DPOOL_MANAGED,&t,nullptr)) || !t) continue;
+            D3DLOCKED_RECT lock{};
+            if(SUCCEEDED(t->LockRect(0,&lock,nullptr,0))) {
+                for(unsigned y=0;y<image.height;++y)
+                    std::memcpy(static_cast<unsigned char*>(lock.pBits)+static_cast<std::size_t>(y)*lock.Pitch,image.pixels.data()+static_cast<std::size_t>(y)*image.width*4,
+                        static_cast<std::size_t>(image.width)*4);
+                t->UnlockRect(0);
+                overlay.hudTextures[k]=t;++made;
+            } else t->Release();
+        }
+    }
+    Log("BO1_HUD images=%u/%llu pack_bytes=%llu",made,static_cast<unsigned long long>(bo1hud::kImages.size()),static_cast<unsigned long long>(bytes.size()));
+    bool chalk=true;for(std::size_t k=0;k<5;++k) chalk=chalk && overlay.hudTextures[k]!=nullptr;
+    SetBo1HudReady(chalk);
+}
+std::atomic<bool> hudReady{false};
+// Round numbers above ten: BO1 draws them as large blood-red figures. A
+// bold serif digit atlas (ten 48x72 cells), rasterized locally.
+constexpr int kDigitCell=48,kDigitHeight=72;
+void BuildDigits(Overlay& overlay) {
+    overlay.digitsAttempted=true;
+    HDC dc=CreateCompatibleDC(nullptr);
+    if(!dc) return;
+    BITMAPINFO info{};
+    info.bmiHeader.biSize=sizeof(BITMAPINFOHEADER);info.bmiHeader.biWidth=512;info.bmiHeader.biHeight=-128;
+    info.bmiHeader.biPlanes=1;info.bmiHeader.biBitCount=32;info.bmiHeader.biCompression=BI_RGB;
+    void* pixels=nullptr;
+    HBITMAP bitmap=CreateDIBSection(dc,&info,DIB_RGB_COLORS,&pixels,nullptr,0);
+    HFONT font=CreateFontW(-68,0,0,0,FW_HEAVY,TRUE,FALSE,FALSE,ANSI_CHARSET,OUT_DEFAULT_PRECIS,CLIP_DEFAULT_PRECIS,ANTIALIASED_QUALITY,
+                           VARIABLE_PITCH|FF_ROMAN,L"Georgia");
+    if(bitmap && font && pixels) {
+        HGDIOBJ oldBitmap=SelectObject(dc,bitmap);HGDIOBJ oldFont=SelectObject(dc,font);
+        std::memset(pixels,0,512*128*4);
+        SetTextColor(dc,RGB(255,255,255));SetBkColor(dc,RGB(0,0,0));SetBkMode(dc,OPAQUE);
+        for(int n=0;n<10;++n) {
+            const wchar_t c=static_cast<wchar_t>(L'0'+n);
+            SIZE extent{};GetTextExtentPoint32W(dc,&c,1,&extent);
+            TextOutW(dc,n*kDigitCell+(kDigitCell-extent.cx)/2,0,&c,1);
+        }
+        GdiFlush();
+        if(SUCCEEDED(overlay.device->CreateTexture(512,128,1,0,D3DFMT_A8R8G8B8,D3DPOOL_MANAGED,&overlay.digits,nullptr)) && overlay.digits) {
+            D3DLOCKED_RECT lock{};
+            if(SUCCEEDED(overlay.digits->LockRect(0,&lock,nullptr,0))) {
+                const auto* source=static_cast<unsigned char*>(pixels);
+                for(unsigned y=0;y<128;++y) {
+                    auto* dest=reinterpret_cast<DWORD*>(static_cast<unsigned char*>(lock.pBits)+y*lock.Pitch);
+                    for(unsigned x=0;x<512;++x) {
+                        const unsigned char* pixel=source+(y*512+x)*4;
+                        const auto alpha=std::max(pixel[0],std::max(pixel[1],pixel[2]));
+                        dest[x]=(static_cast<DWORD>(alpha)<<24)|0x00ffffff;
+                    }
+                }
+                overlay.digits->UnlockRect(0);
+            } else {overlay.digits->Release();overlay.digits=nullptr;}
+        }
+        SelectObject(dc,oldFont);SelectObject(dc,oldBitmap);
+    }
+    if(font) DeleteObject(font);
+    if(bitmap) DeleteObject(bitmap);
+    DeleteDC(dc);
+}
+void DrawNumber(IDirect3DDevice9* device,IDirect3DTexture9* digits,float x,float y,float height,D3DCOLOR color,int value) {
+    char text[16];std::snprintf(text,sizeof(text),"%d",value);
+    const float w=height*static_cast<float>(kDigitCell)/kDigitHeight;
+    for(const char* c=text;*c;++c) {
+        const int n=*c-'0';
+        if(n<0 || n>9) continue;
+        DrawTexture(device,digits,x,y,w,height,color,static_cast<float>(n*kDigitCell)/512.f,0.f,static_cast<float>((n+1)*kDigitCell)/512.f,
+            static_cast<float>(kDigitHeight)/128.f);
+        x+=w*.82f;
+    }
+}
 const char* PageName(Page page) {
     switch (page) {
         case Page::Home: return "MOD FRAMEWORK";
@@ -247,6 +360,8 @@ void Configure(IDirect3DDevice9* device) {
     device->SetSamplerState(0, D3DSAMP_SRGBTEXTURE, FALSE);
 }
 }
+void SetBo1HudReady(bool ready) {hudReady.store(ready,std::memory_order_relaxed);}
+bool Bo1HudReady() {return hudReady.load(std::memory_order_relaxed);}
 void Overlay::queue(Input input) {
     std::lock_guard<std::mutex> lock(inputMutex);
     if (inputQueue.size() >= 64) return;
@@ -285,6 +400,9 @@ void Overlay::invalidate() {
     if(hitTexture){hitTexture->Release();hitTexture=nullptr;}hitAttempted=false;
     if (font) { font->Release(); font = nullptr; }
     fontAttempted = false;
+    for(auto& t:hudTextures) if(t) {t->Release();t=nullptr;}
+    hudAttempted=false;hudRetryAt=0;SetBo1HudReady(false);
+    if(digits){digits->Release();digits=nullptr;}digitsAttempted=false;
 }
 void Overlay::frame() {
     lastRenderThread = GetCurrentThreadId();
@@ -393,7 +511,7 @@ void Overlay::frame() {
     const auto aiStatus=GetAiStatus();
     UpdateZombieRehearsal(s);
     const auto rehearsal=GetZombieRehearsalStatus();
-    TickZombieRelaunch();
+    TickZombieRelaunch(s);
     const auto zombie=GetZombieGameStatus();
     const auto playerPreferences=GetPlayerPreferences();
     const auto extraPreferences=GetExtraPreferences();
@@ -426,10 +544,11 @@ void Overlay::frame() {
             extraPreferences.wanted(ExtraFeature::Hitmarkers),extraPreferences.wanted(ExtraFeature::SemiAutoFullAuto),s.weapon.fireMode,SemiAutoApplied(s.weapon));
     }
     PrepareMpFeedback(*this);
+    if(!hudAttempted) LoadHud(*this,now);   // Test45: ready before a zombies game starts
     const auto hitAlpha=GetHitmarkerAlpha(now);
     static int seenGameOver=0; static ULONGLONG gameOverAt=0;
     if(zombie.gameOverRound!=seenGameOver) { seenGameOver=zombie.gameOverRound; gameOverAt=now; }
-    const bool showGameOver=zombie.gameOverRound>0 && !zombie.running && now-gameOverAt<10000;
+    const bool showGameOver=zombie.gameOverRound>0 && !zombie.running && now-gameOverAt<10000 && s.state!=LevelState::NoLevel;
     if (!menu.visible && !menu.hud && !hitAlpha && !zombie.running && !showGameOver) return;
     IDirect3DStateBlock9* state = nullptr;
     if (FAILED(device->CreateStateBlock(D3DSBT_ALL, &state)) || !state) return;
@@ -465,16 +584,42 @@ void Overlay::frame() {
             text(20,39,kAccent,line,.7f);
         }
     }
-    // BO1-style zombies HUD: round bottom-left, points bottom-right, active
-    // powerups bottom-centre, dropped powerups marked where they lie.
+    // BO1 zombies HUD (Test45: BO1's own images): the round as chalk tally
+    // marks bottom-left (two groups for rounds 6-10, blood-red figures above
+    // ten) that flash white when a round starts (chalk_one_up), points
+    // bottom-right, the Double Points / Insta-Kill icons bottom-centre,
+    // blinking in their last seconds. Powerups lying on the ground are BO1
+    // models; a marker only shows where no model could be placed.
     if(zombie.running || showGameOver) {
         const float W=static_cast<float>(size.Width),H=static_cast<float>(size.Height),u=H/480.f;
         const D3DCOLOR blood=D3DCOLOR_ARGB(235,170,18,12),white=D3DCOLOR_ARGB(240,236,232,220),gold=D3DCOLOR_ARGB(240,236,198,92);
         char hud[96]{};
+        if(!digitsAttempted) BuildDigits(*this);
         if(zombie.running) {
-            std::snprintf(hud,sizeof(hud),"%d",zombie.round.round);
-            Text(*this,18.f*u,H-66.f*u,1.7f*u,blood,hud);
-            Text(*this,20.f*u,H-82.f*u,.6f*u,blood,zombie.round.dogs?"HELLHOUNDS":"ROUND");
+            const int round=zombie.round.round;
+            if(round!=hudRound) {hudRound=round;hudRoundAt=now;}
+            // chalk_one_up: white, then fading to the round colour over 2 s.
+            const float flash=std::clamp(1.f-static_cast<float>(now-hudRoundAt)/2000.f,0.f,1.f);
+            auto mix=[&](int a,int b){return static_cast<int>(a+(b-a)*flash);};
+            const D3DCOLOR chalk=D3DCOLOR_ARGB(245,mix(150,255),mix(12,255),mix(10,255));
+            const float size64=74.f*u,left=14.f*u,bottom=H-size64-12.f*u;
+            bool drawn=false;
+            if(round>=1 && round<=10) {
+                const int first=round<=5?round:5,second=round>5?round-5:0;
+                if(hudTextures[static_cast<std::size_t>(first-1)] && (!second || hudTextures[static_cast<std::size_t>(second-1)])) {
+                    DrawTexture(device,hudTextures[static_cast<std::size_t>(first-1)],left,bottom,size64,size64,chalk);
+                    if(second) DrawTexture(device,hudTextures[static_cast<std::size_t>(second-1)],left+size64*.9f,bottom,size64,size64,chalk);
+                    drawn=true;
+                }
+            } else if(digits) {
+                DrawNumber(device,digits,left,bottom+4.f*u,size64*.95f,chalk,round);
+                drawn=true;
+            }
+            if(!drawn) {
+                std::snprintf(hud,sizeof(hud),"%d",round);
+                Text(*this,18.f*u,H-66.f*u,1.7f*u,blood,hud);
+            }
+            if(zombie.round.dogs) Text(*this,20.f*u,bottom-16.f*u,.6f*u,blood,"HELLHOUNDS");
             std::snprintf(hud,sizeof(hud),"%d",zombie.points);
             const float pw=11.f*1.1f*u*static_cast<float>(std::strlen(hud));
             Rect(device,W-pw-34.f*u,H-58.f*u,pw+22.f*u,34.f*u,D3DCOLOR_ARGB(150,0,0,0));
@@ -483,17 +628,26 @@ void Overlay::frame() {
                 std::snprintf(hud,sizeof(hud),"+%d",zombie.lastPointsDelta);
                 Text(*this,W-pw-23.f*u-60.f*u,H-74.f*u-zombie.pointsDeltaAgeMs*.02f*u,.8f*u,gold,hud);
             }
-            float px=W*.5f-120.f*u;
-            if(zombie.doublePointsMs>0) { std::snprintf(hud,sizeof(hud),"x2 %ds",(zombie.doublePointsMs+999)/1000); Text(*this,px,H-40.f*u,.8f*u,gold,hud); px+=110.f*u; }
-            if(zombie.instaKillMs>0) { std::snprintf(hud,sizeof(hud),"INSTA %ds",(zombie.instaKillMs+999)/1000); Text(*this,px,H-40.f*u,.8f*u,white,hud); }
+            // Active powerups: BO1 icons (or text), blinking in the last 5 s.
+            struct Active {int ms;IDirect3DTexture9* icon;const char* text;D3DCOLOR color;};
+            const Active active[]={{zombie.doublePointsMs,hudTextures[5],"x2",gold},{zombie.instaKillMs,hudTextures[6],"INSTA",white}};
+            int shown=0;for(const auto& a:active) if(a.ms>0) ++shown;
+            const float icon=44.f*u;float px=W*.5f-(static_cast<float>(shown)*icon+static_cast<float>(std::max(0,shown-1))*10.f*u)*.5f;
+            for(const auto& a:active) {
+                if(a.ms<=0) continue;
+                const bool blinkOff=a.ms<5000 && (a.ms/250)%2==0;
+                if(a.icon) DrawTexture(device,a.icon,px,H-icon-16.f*u,icon,icon,D3DCOLOR_ARGB(blinkOff?70:255,255,255,255));
+                else {std::snprintf(hud,sizeof(hud),"%s %ds",a.text,(a.ms+999)/1000);Text(*this,px,H-40.f*u,.8f*u,blinkOff?D3DCOLOR_ARGB(90,255,255,255):a.color,hud);}
+                px+=icon+10.f*u;
+            }
             if(zombie.round.phase==bo1::RoundPhase::Between) {
                 std::snprintf(hud,sizeof(hud),"Next round in %llds",static_cast<long long>((zombie.round.waitMilliseconds+999)/1000));
-                Text(*this,20.f*u,H-110.f*u,.6f*u,white,hud);
+                Text(*this,20.f*u,bottom-36.f*u,.6f*u,white,hud);
             }
             for(int d=0;d<zombie.dropCount;++d) {
                 const auto& drop=zombie.drops[static_cast<std::size_t>(d)];
                 float x=0,y=0,distance=0;
-                if(!drop.visible || !ProjectToScreen(s,drop.origin,W,H,x,y,distance)) continue;
+                if(drop.model || !drop.visible || !ProjectToScreen(s,drop.origin,W,H,x,y,distance)) continue;
                 Rect(device,x-7.f*u,y-7.f*u,14.f*u,14.f*u,D3DCOLOR_ARGB(220,90,230,90));
                 std::snprintf(hud,sizeof(hud),"%s %.0fm",bo1::PowerupText(drop.type),distance*.0254f);
                 Text(*this,x-60.f*u,y-26.f*u,.6f*u,D3DCOLOR_ARGB(240,150,255,150),hud);
@@ -503,6 +657,9 @@ void Overlay::frame() {
             Text(*this,W*.5f-11.f*1.2f*u*static_cast<float>(std::strlen(hud))*.5f,H*.32f,1.2f*u,blood,hud);
             if(zombie.restartInMs>=0) {
                 std::snprintf(hud,sizeof(hud),"New game in %d s  (F4 > Start to cancel)",(zombie.restartInMs+999)/1000);
+                Text(*this,W*.5f-11.f*.7f*u*static_cast<float>(std::strlen(hud))*.5f,H*.32f+40.f*u,.7f*u,D3DCOLOR_ARGB(230,235,225,200),hud);
+            } else if(zombie.menuInMs>=0) {
+                std::snprintf(hud,sizeof(hud),"Main menu in %d s  (F4 > Start for a new game)",(zombie.menuInMs+999)/1000);
                 Text(*this,W*.5f-11.f*.7f*u*static_cast<float>(std::strlen(hud))*.5f,H*.32f+40.f*u,.7f*u,D3DCOLOR_ARGB(230,235,225,200),hud);
             }
         }
@@ -526,7 +683,8 @@ void Overlay::frame() {
         } else if(menu.page==Page::ZombieGame) {
             text(40,121,kMuted,!zombie.available?"Native zombie bindings unavailable; see log":
                 zombie.running?(zombie.levelPrepared?"Running | Spec Ops map | BO1 animations":"Running | BO1 rules on native MW2 actors"):
-                zombie.pending?"Loading the Spec Ops map...":zombie.restartInMs>=0?"GAME OVER | new game soon (Start cancels)":"Ready | Zombies rise at the map's enemy spawns",.7f);
+                zombie.pending?"Loading the Spec Ops map...":zombie.restartInMs>=0?"GAME OVER | new game soon (Start cancels)":
+                zombie.menuInMs>=0?"GAME OVER | main menu soon (Start = new game)":"Ready | Zombies rise at the map's enemy spawns",.7f);
             std::snprintf(line,sizeof(line),"Map: %.24s | Dog spawners: %s",s.map[0]?s.map:"main menu",zombie.dogSpawners?"yes":"none");
             text(40,143,kMuted,line,.7f);
         } else if(menu.page==Page::AI) {
@@ -599,7 +757,8 @@ void Overlay::frame() {
                     char sound[16];
                     if(zombie.soundLists) std::snprintf(sound,sizeof(sound),"S%d",zombie.soundLists);
                     else std::snprintf(sound,sizeof(sound),"S-%.8s",zombie.bo1Sounds);
-                    if(zombie.levelPrepared && zombie.modelsPrecached) std::snprintf(value,sizeof(value),"A%d/%d M%d %s SO%d",zombie.animSlotsApplied,zombie.animSlotsWanted,zombie.modelsPrecached,sound,zombie.specOpsGuards);
+                    if(zombie.levelPrepared && zombie.modelsPrecached) std::snprintf(value,sizeof(value),"A%d/%d M%d P%d G%d %s",zombie.animSlotsApplied,
+                        zombie.animSlotsWanted,zombie.modelsPrecached,zombie.powerupModels,zombie.gibModels,sound);
                     else if(zombie.levelPrepared) std::snprintf(value,sizeof(value),"A%d/%d M-%.8s %s SO%d",zombie.animSlotsApplied,zombie.animSlotsWanted,zombie.bo1Models,sound,zombie.specOpsGuards);
                     else std::snprintf(value,sizeof(value),"%.8s %d/%d M %.8s S %.8s",zombie.bo1Assets,zombie.bo1AnimsFound,zombie.bo1AnimsWanted,zombie.bo1Models,zombie.bo1Sounds);
                     status=value;

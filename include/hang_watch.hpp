@@ -17,6 +17,9 @@
 
 namespace mod::hangwatch {
 inline constexpr unsigned long long kHangMilliseconds=6000;
+// Test45: a wait inside the graphics driver (under the Direct3D proxy) is
+// only reported once it lasts this long.
+inline constexpr unsigned long long kDriverWaitMilliseconds=30000;
 inline constexpr unsigned kMaxReports=2;
 void Start();                  // once the log exists; idempotent
 void ServerFrame();            // every server frame (server clock hook)

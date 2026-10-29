@@ -2,6 +2,7 @@
 #include "bo1_assets.hpp"
 #include "bo1_model_build.hpp"
 #include "bo1_cache_io.hpp"
+#include "bo1_hud.hpp"
 #include "runtime.hpp"
 #include <windows.h>
 #include <algorithm>
@@ -12,11 +13,13 @@
 #include <memory>
 #include <mutex>
 #include <thread>
+#include <map>
+#include <set>
 
 namespace mod::bo1models {
 namespace {
 // Bump when the generated zone changes so cached files are rebuilt.
-constexpr const char* kBuilderVersion="bo1mw2-models-2";   // Test43: packed bone translations
+constexpr const char* kBuilderVersion="bo1mw2-models-3";   // Test45: powerups, dismemberment, HUD images
 std::mutex mutex;
 std::condition_variable changed;
 Status status;
@@ -36,17 +39,22 @@ using bo1cache::Iwds;
 using bo1cache::FastFileHeaderOk;
 using bo1cache::OpenArchive;
 using bo1cache::Open;
-std::string Manifest(const std::wstring& theater,const std::vector<std::wstring>& iwds) {
+std::string Manifest(const std::wstring& theater,const std::wstring& common,const std::vector<std::wstring>& iwds) {
     std::vector<std::wstring> sources{theater};
+    if(!common.empty()) sources.push_back(common);
     sources.insert(sources.end(),iwds.begin(),iwds.end());
     return bo1cache::Manifest(kBuilderVersion,sources);
 }
+} // namespace
+std::wstring HudPackPath() {return bo1assets::GameDirectory()+L"bo1mw2\\cache\\bo1_hud.bin";}
+namespace {
 void Build() {
     const auto begin=std::chrono::steady_clock::now();
     Status result;result.state=State::Failed;
     const auto folder=bo1assets::BlackOpsFolder();
     const auto cacheDir=bo1assets::GameDirectory()+L"bo1mw2\\cache";
     const auto zonePath=cacheDir+L"\\bo1_zombie_models.ff",manifestPath=cacheDir+L"\\bo1_zombie_models.txt";
+    const auto hudPath=HudPackPath();
     result.file=bo1assets::Utf8(zonePath);
     std::string error;
     [&]{
@@ -56,32 +64,49 @@ void Build() {
         if(!Stat(theater,size,time)) {result.state=State::Missing;result.detail="zone\\Common\\zombie_theater.ff not found";return;}
         const auto iwds=Iwds(folder);
         if(iwds.empty()) {result.state=State::Missing;result.detail="no main\\*.iwd archives";return;}
-        const auto manifest=Manifest(theater,iwds);
+        // Test45: the powerup models are in common_zombie.ff (optional).
+        auto common=folder+L"\\zone\\Common\\common_zombie.ff";
+        if(!Stat(common,size,time)) common.clear();
+        const auto manifest=Manifest(theater,common,iwds);
         std::string previous;
-        if(ReadSmall(manifestPath,previous) && previous==manifest && FastFileHeaderOk(zonePath)) {
+        if(ReadSmall(manifestPath,previous) && previous==manifest && FastFileHeaderOk(zonePath) && Stat(hudPath,size,time)) {
             std::uint64_t zoneSize=0,zoneTime=0;Stat(zonePath,zoneSize,zoneTime);
             result.state=State::Ready;result.cached=true;result.bytes=static_cast<std::size_t>(zoneSize);result.detail="cached";return;
         }
-        std::vector<std::uint8_t> raw;
+        std::vector<std::uint8_t> raw,commonRaw;
         if(!bo1assets::ReadFastFile(theater,raw,error)) {result.detail="zombie_theater.ff: "+error;return;}
+        std::string notes;
+        if(!common.empty() && !bo1assets::ReadFastFile(common,commonRaw,error)) {notes+=" | common_zombie.ff: "+error;commonRaw.clear();}
         std::vector<OpenArchive> open(iwds.size());
         std::vector<bo1model::Archive> archives;
         for(std::size_t n=0;n<iwds.size();++n) if(Open(iwds[n],open[n])) archives.push_back(open[n].archive);
         std::vector<std::uint8_t> file;bo1model::BuildReport report;
-        const bool built=bo1model::BuildCharacterFastFile(raw.data(),raw.size(),archives,file,report,&error);
+        const bool built=bo1model::BuildCharacterFastFile(raw.data(),raw.size(),archives,file,report,&error,commonRaw.data(),commonRaw.size());
+        raw.clear();raw.shrink_to_fit();commonRaw.clear();commonRaw.shrink_to_fit();
         result.textures=report.textures;result.fallbacks=static_cast<unsigned>(report.fallbacks.size());
-        std::string notes;
         for(const auto& n:report.notes) notes+=" | "+n;
         for(const auto& f:report.fallbacks) notes+=" | fallback "+f;
+        for(const auto& f:report.extraFallbacks) notes+=" | extra fallback "+f;
         if(!built) {result.detail=error+notes;return;}
+        // Test45: the BO1 HUD images, as stored in the archives.
+        std::set<std::string> hudWanted;
+        for(const auto* n:bo1hud::kImages) hudWanted.insert(std::string("images/")+n+".iwi");
+        std::vector<std::string> hudNotes;
+        const auto hudFiles=bo1model::ReadArchiveFiles(archives,hudWanted,hudNotes);
+        std::map<std::string,std::vector<std::uint8_t>> hud;
+        for(const auto& [path,bytes]:hudFiles) hud.emplace(path.substr(7,path.size()-11),bytes);
+        for(const auto& n:hudNotes) notes+=" | hud "+n;
         CreateDirectoryW((bo1assets::GameDirectory()+L"bo1mw2").c_str(),nullptr);
         CreateDirectoryW(cacheDir.c_str(),nullptr);
         if(!Replace(zonePath,file.data(),file.size())) {result.detail="cannot write "+result.file;return;}
+        const auto pack=bo1hud::WritePack(hud);
+        if(!Replace(hudPath,pack.data(),pack.size())) Log("BO1_MODELS hud_write_failed=1");
         if(!Replace(manifestPath,manifest.data(),manifest.size())) Log("BO1_MODELS manifest_write_failed=1");
         result.state=State::Ready;result.bytes=file.size();
-        char summary[160];
-        std::snprintf(summary,sizeof(summary),"built models=%zu images=%zu image_bytes=%zu strings=%zu",
-            report.models,report.images,report.imageBytes,report.scriptStrings);
+        char summary[256];
+        std::snprintf(summary,sizeof(summary),"built models=%zu images=%zu image_bytes=%zu strings=%zu powerups=%d gibs=%d gib_pieces=%d extra_models=%zu hud_images=%zu/%zu",
+            report.models,report.images,report.imageBytes,report.scriptStrings,report.powerups,report.gibs,report.gibPieces,report.extraModels,
+            hud.size(),bo1hud::kImages.size());
         result.detail=summary+notes;
     }();
     result.seconds=std::chrono::duration<double>(std::chrono::steady_clock::now()-begin).count();

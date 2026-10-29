@@ -53,6 +53,9 @@ static_assert(sizeof(ScriptValue)==16);
 inline constexpr std::uint32_t kScriptUndefined=0,kScriptString=2,kScriptVector=4,kScriptFloat=5,kScriptInteger=6,kScriptAnimation=13;
 struct ScriptReturn {
     bool present=false; ScriptValue value;
+    // Test45: a returned vector (gettagorigin), copied before the value is
+    // released (the VM's vector value is a pointer into its vector store).
+    bool hasVector=false; std::array<float,3> vector{};
     float asFloat() const { float f=0.f; std::memcpy(&f,&value.raw,4); return value.type==kScriptInteger?static_cast<float>(asInt()):f; }
     int asInt() const { int i=0; std::memcpy(&i,&value.raw,4); return i; }
 };
@@ -99,6 +102,10 @@ inline ScriptCallResult CallScriptBuiltin(volatile NativeScriptParameters& p,con
     builtin(entref);
     if(out && p.incoming && p.top) {
         out->present=true; std::memcpy(&out->value,reinterpret_cast<const void*>(p.top),sizeof(ScriptValue));
+        if(out->value.type==kScriptVector && out->value.raw) {
+            std::memcpy(out->vector.data(),reinterpret_cast<const void*>(static_cast<std::uintptr_t>(out->value.raw)),sizeof(out->vector));
+            out->hasVector=true;
+        }
     }
     n.notify(0,0,p.incoming);
     return !p.incoming && !p.outgoing && p.top==top?ScriptCallResult::Ok:ScriptCallResult::Unbalanced;

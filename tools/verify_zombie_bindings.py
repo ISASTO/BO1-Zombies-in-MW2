@@ -367,6 +367,24 @@ def verify(path,include=Path('include')):
     report['nav_graph']={'nodes':hex(value('kPathNodesRva')),'count':hex(value('kPathNodeCountRva')),'capacity':hex(value('kPathNodeCapacityRva')),
         'node_bytes':0xa8,'origin':0x14,'total_links':0x38,'links':0x40,'active_links':0x6c,'link_bytes':0xc,'link_node':4,'link_distance':0,
         'link_disconnect':6,'max_nodes':0x2000}
+    # ---- Test45: mission music, script models (powerups, gib pieces), stopsounds ----
+    music=value('kMusicPlayRva')
+    if music&15 or get(music,16)!=bytes_of('kMusicPlayPrologue'):raise ValueError('musicplay prologue differs')
+    if rip(0x192f73,3,7)!=0x344848 or cstring(0x344848)!='mu_play %s %i' or call_target(0x192f8a)!=0x231670:
+        raise ValueError('musicplay no longer sends mu_play')
+    stop=0x185cd0
+    if get(stop+0x1a,3)!=bytes.fromhex('48 8d 05') or rip(stop+0x1a,3,7)!=value('kEntityPoolRva') \
+       or get(stop+0x3e,10)!=bytes.fromhex('45 33 c0 48 8b cb 41 8d 50 05') or jump_target(stop+0x4d)!=value('kGAddEventRva'):
+        raise ValueError('stopsounds differs')
+    # spawn(classname, origin): G_Spawn, classname (+0x13e), origin, G_CallSpawnEntity, which
+    # stores the spawn class (+0x13c) that movegravity/rotateto accept (script_model...).
+    if get(0x1873bb,7)!=bytes.fromhex('48 8d 88 3e 01 00 00') or call_target(0x1873fa)!=0x19a1e0 \
+       or get(0x19a235,7)!=bytes.fromhex('66 89 85 3c 01 00 00') or get(0x196974,7)!=bytes.fromhex('0f b7 83 3c 01 00 00') \
+       or get(0x196cf9,7)!=bytes.fromhex('0f b7 83 3c 01 00 00'):
+        raise ValueError('script model spawn / mover class check differs')
+    if data.find(b'\0disconnect\0')<0:raise ValueError('disconnect command missing')
+    report['test45']={'musicplay':hex(music),'musicplay_server_command':'mu_play %s %i (0x344848)','stopsounds_event':5,
+        'entity_pool':hex(value('kEntityPoolRva')),'spawn_class_field':'0x13c','classname_field':'0x13e','disconnect':'command buffer'}
     report.update({'goal_entity':'setgoalentity replica: 0x1244b0 clear, 0x15b190 handle, node/volume zero',
         'command_buffer':'Cbuf_AddText(0,"set specialops 1; ...; devmap <so_map>\\n") (critical section 0x24)',
         'damage_args':'G_Damage(targ,inflictor,attacker,dir,point,damage,dflags,mod,weapon,hitloc,...)',

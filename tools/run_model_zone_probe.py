@@ -104,7 +104,7 @@ def check_native(pe):
         raise ValueError('Zone block alignment differs')
 
 
-def run(executable, theater=None, compiler='g++', cc='gcc'):
+def run(executable, theater=None, compiler='g++', cc='gcc', common=None):
     if platform.system() != 'Linux' or platform.machine().lower() not in ('amd64', 'x86_64'):
         raise ValueError('This probe requires Linux/x86-64')
     data = executable.read_bytes()
@@ -125,7 +125,7 @@ def run(executable, theater=None, compiler='g++', cc='gcc'):
         subprocess.run([cc_path, '-c', '-O2', str(root_dir / 'third_party' / 'miniz' / 'miniz_tinfl.c'), '-o', str(root / 'tinfl.o')], check=True)
         subprocess.run([compiler_path, '-std=c++17', '-O2', '-I', str(root_dir / 'include'), str(tools / 'model_zone_probe.cpp'),
                         str(root / 'tinfl.o'), '-o', str(program)], check=True)
-        args = [str(program), str(image)] + ([str(theater)] if theater else [])
+        args = [str(program), str(image)] + ([str(theater)] if theater else []) + ([str(common)] if theater and common else [])
         result = subprocess.run(args, capture_output=True, text=True, timeout=300)
         if result.returncode:
             raise ValueError(f'Native model-zone probe failed ({result.returncode}): {result.stderr.strip()}')
@@ -140,9 +140,10 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('executable', type=Path)
     parser.add_argument('--bo1-theater', type=Path, help='local decompressed zombie_theater zone (optional)')
+    parser.add_argument('--bo1-common', type=Path, help='local decompressed common_zombie zone (optional, Test45 powerups)')
     parser.add_argument('--output', type=Path, required=True)
     args = parser.parse_args()
-    report = run(args.executable, args.bo1_theater)
+    report = run(args.executable, args.bo1_theater, common=args.bo1_common)
     rendered = json.dumps(report, indent=2) + '\n'
     args.output.write_text(rendered)
     print(rendered, end='')

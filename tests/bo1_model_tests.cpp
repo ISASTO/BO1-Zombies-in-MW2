@@ -233,7 +233,11 @@ static void TestPipeline() {
     for(const auto& n:report.notes) std::printf("  note: %s\n",n.c_str());
     Check(built,"pipeline builds");
     Check(report.textures==7 && report.fallbacks.size()==1 && report.fallbacks[0].find("body specular")==0,"pipeline textures and fallback");
-    Check(report.models==6 && report.images==8 && !std::memcmp(ff.data(),"IWffu100",8),"pipeline fastfile");
+    // Test45: the character's 6 models plus its 9 dismemberment models and 4
+    // thrown pieces (no common_zombie zone: no powerups); the gore material's
+    // textures are not in these archives (a dark red fallback image).
+    Check(report.models==6+13 && report.images==9 && !std::memcmp(ff.data(),"IWffu100",8),"pipeline fastfile");
+    Check(report.gibs && report.gibPieces && !report.powerups && report.extraModels==13 && report.extraFallbacks.size()==3,"pipeline dismemberment models");
     std::printf("pipeline: %zu byte fastfile, %zu images (%zu bytes), notes=%zu\n",ff.size(),report.images,report.imageBytes,report.notes.size());
     // Every texture missing except colour maps -> still builds; no colour -> refused.
     const auto colours=MakeZip({{"images/c_ger_zombie_head1_c.iwi",dxt1(16),0},{"images/~-gzombie_eye.iwi",dxt1(16),0},

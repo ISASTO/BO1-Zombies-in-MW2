@@ -97,6 +97,7 @@ struct Model {
     std::int32_t contents=0;
     float radius=0.f;
     std::array<float,3> mins{},maxs{};
+    bool physics=false;                  // Test45: had physics data (not converted)
     bool hasBone(const std::string& bone) const {return std::find(bones.begin(),bones.end(),bone)!=bones.end();}
 };
 
@@ -150,11 +151,18 @@ inline bool ParseMaterial(Reader& r,MaterialRef& out) {
 }
 } // namespace detail
 
+// Test45: models the character carve never needed. allowPhysics: a model
+// with a physics preset or collision maps (the thrown gib pieces) is read up
+// to its physics data, which MW2 does not get (its `end` is then where the
+// physics data starts). unnamedRootBone: a one-bone model whose bone has no
+// name (zombie_skull) gets "tag_origin".
+struct ParseOptions {bool allowPhysics=false;bool unnamedRootBone=false;};
+
 // Parse one T5 XModel whose 252-byte header starts at `at`. Skeleton arrays
 // must be inline; material slots may be inline, null or aliases. `end`
 // receives the first byte after the model (the next asset).
 inline bool ParseModel(const std::uint8_t* raw,std::size_t size,std::size_t at,const std::vector<std::string>& strings,
-                       Model& m,std::string* error=nullptr) {
+                       Model& m,std::string* error=nullptr,const ParseOptions& options={}) {
     using detail::Fail;
     Reader r(raw,size,at);
     const auto h=r.take(t5::kModelBytes);
@@ -185,11 +193,16 @@ inline bool ParseModel(const std::uint8_t* raw,std::size_t size,std::size_t at,c
     const std::size_t nb=m.numBones,nc=static_cast<std::size_t>(m.numBones-m.numRootBones);
     for(int n:{ParentList,Quats,Trans}) if(nc ? !t5::IsInline(p[static_cast<std::size_t>(n)]) : p[static_cast<std::size_t>(n)]!=0)
         return Fail(error,"aliased model arrays");
-    if(physPreset || (numCollmaps && collmaps) || physConstraints) return Fail(error,"physics data is not supported");
+    m.physics=physPreset || (numCollmaps && collmaps) || physConstraints;
+    if(m.physics && !options.allowPhysics) return Fail(error,"physics data is not supported");
     if(t5::IsInline(name)) m.name=r.cstring(256);
     for(std::size_t n=0;n<nb;++n) {
         const auto id=r.get<std::uint16_t>();
-        if(!r.ok() || id>=strings.size() || strings[id].empty()) return Fail(error,"bad bone name");
+        if(!r.ok() || id>=strings.size()) return Fail(error,"bad bone name");
+        if(strings[id].empty()) {
+            if(!options.unnamedRootBone || nb!=1) return Fail(error,"bad bone name");
+            m.bones.push_back("tag_origin");continue;
+        }
         m.bones.push_back(strings[id]);
     }
     if(nc) {

@@ -15,6 +15,8 @@ try {
     $modelManifest = Join-Path $root 'bo1mw2\cache\bo1_zombie_models.txt'
     # Test43: and the sound cache manifest.
     $soundManifest = Join-Path $root 'bo1mw2\cache\bo1_zombie_sounds.txt'
+    # Test45: the ambience bed length the sound build recorded.
+    $soundInfo = Join-Path $root 'bo1mw2\cache\bo1_zombie_sounds.info'
     if ($files.Count -eq 0) { throw 'No logs found. Confirm the DLL is beside iw4sp.exe and run MW2 SP once.' }
     $output = Join-Path $PSScriptRoot ('BO1MW2-test-results-' + (Get-Date -Format 'yyyyMMdd-HHmmss') + '.zip')
     $stage = Join-Path $env:TEMP ('BO1MW2-logs-' + [Guid]::NewGuid().ToString('N'))
@@ -25,6 +27,7 @@ try {
         if (Test-Path -LiteralPath $receipt) { Copy-Item -LiteralPath $receipt -Destination $stage }
         if (Test-Path -LiteralPath $modelManifest) { Copy-Item -LiteralPath $modelManifest -Destination $stage }
         if (Test-Path -LiteralPath $soundManifest) { Copy-Item -LiteralPath $soundManifest -Destination $stage }
+        if (Test-Path -LiteralPath $soundInfo) { Copy-Item -LiteralPath $soundInfo -Destination $stage }
         Compress-Archive -Path (Join-Path $stage '*') -DestinationPath $output
     } finally { Remove-Item -LiteralPath $stage -Recurse -Force }
     Write-Host "Test results: $output"

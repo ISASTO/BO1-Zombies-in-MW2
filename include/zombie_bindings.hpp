@@ -239,4 +239,39 @@ inline constexpr std::array<std::uint8_t,10> kPoolFreeBytes={0x48,0x8b,0x01,0x48
 // reads totalLinkCount (+0x38) and disconnectCount (+6).
 inline constexpr std::uintptr_t kPathNodeIndexRva=0x1a6320,kPathNodesRva=0xcf7090,kPathNodeCapacityRva=0xcf7088,kPathNodeCountRva=0xf56484;
 inline constexpr std::array<std::uint8_t,18> kPathNodeIndexBytes={0x48,0x63,0xc1,0x48,0x69,0xc0,0xa8,0x00,0x00,0x00,0x48,0x03,0x05,0x5f,0x0d,0xb5,0x00,0xc3};
+
+// ---- Test45: mission music, world models (powerups, gib pieces) ----
+// The "musicplay" builtin (0x192ef0, function table entry 0x3c2a78) starts a
+// level's music: Scr_GetNumParam, the alias, then SV_GameSendServerCommand
+// "mu_play %s %i". Its first 16 bytes (aligned) are exchanged for a jump that
+// returns at once while a zombies level is loaded. "musicstop" (0x192fa0)
+// sends "mu_stop" (an optional fade time).
+inline constexpr std::uintptr_t kMusicPlayRva=0x192ef0;
+inline constexpr std::array<std::uint8_t,16> kMusicPlayPrologue={0x48,0x83,0xec,0x28,0x48,0x8b,0x05,0x75,0x96,0xc0,0x00,0x80,0x78,0x10,0x00,0x74};
+inline constexpr BuiltinBinding kBuiltinMusicPlay{"musicplay",0x192ef0};
+inline constexpr BuiltinBinding kBuiltinMusicStop{"musicstop",0x192fa0};
+// spawn("script_model", origin) (function), then the methods a script uses on
+// a script model: setmodel, rotateto(angles, time, accel, decel),
+// rotatevelocity(velocity, time), movegravity(velocity, time), hide/show and
+// delete; gettagorigin/gettagangles(tag) on an actor; detach(model, tag).
+inline constexpr BuiltinBinding kBuiltinSpawn{"spawn",0x187370};
+inline constexpr BuiltinBinding kBuiltinDelete{"delete",0x189240};
+inline constexpr BuiltinBinding kBuiltinRotateTo{"rotateto",0x196cb0};
+inline constexpr BuiltinBinding kBuiltinRotateVelocity{"rotatevelocity",0x1971c0};
+inline constexpr BuiltinBinding kBuiltinMoveGravity{"movegravity",0x196950};
+inline constexpr BuiltinBinding kBuiltinGetTagOrigin{"gettagorigin",0x18d080};
+inline constexpr BuiltinBinding kBuiltinGetTagAngles{"gettagangles",0x18d150};
+inline constexpr BuiltinBinding kBuiltinDetach{"detach",0x1876c0};
+// stopsounds (0x185cd0): G_AddEvent(ent, EV_STOP_SOUNDS 5, 0); the ambience
+// bed and announcer on the player stop when the game ends.
+inline constexpr BuiltinBinding kBuiltinStopSounds{"stopsounds",0x185cd0};
+inline constexpr std::array<BuiltinBinding,11> kWorldBuiltins={kBuiltinMusicPlay,kBuiltinMusicStop,kBuiltinSpawn,kBuiltinDelete,kBuiltinRotateTo,
+    kBuiltinRotateVelocity,kBuiltinMoveGravity,kBuiltinGetTagOrigin,kBuiltinGetTagAngles,kBuiltinDetach,kBuiltinStopSounds};
+// The entity array's in-use bytes (+0xb0 of each 0x2a0-byte gentity at
+// 0xd9e070): a spawned script model is the one entity that became in use
+// during the spawn call. Script return values are object ids, not numbers.
+inline constexpr std::uintptr_t kEntityPoolRva=0xd9e070;
+// Disconnect to the main menu after GAME OVER ("disconnect" through the
+// command buffer, as the in-game menus do).
+inline constexpr const char* kDisconnectCommand="disconnect\n";
 } // namespace mod

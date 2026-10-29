@@ -47,4 +47,6 @@ inline constexpr const char* kZoneName="..\\..\\bo1mw2\\cache\\bo1_zombie_models
 inline constexpr std::array<const char*,4> kBodyAlias={"c_ger_honorguard_body1","c_ger_honorguard_body2",
     "c_ger_honorguard_body2","c_ger_honorguard_body2"};
 inline constexpr std::array<const char*,4> kHeadAlias={"c_ger_zombie_head1","c_ger_zombie_head2","c_ger_zombie_head3","c_ger_zombie_head4"};
+// Test45: the HUD images pack written by the build (include/bo1_hud.hpp).
+std::wstring HudPackPath();
 } // namespace mod::bo1models

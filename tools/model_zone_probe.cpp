@@ -13,6 +13,7 @@
 // guards are checked, and the stream must be consumed exactly.
 #include "script_call.hpp"
 #include "bo1_model.hpp"
+#include "bo1_extra_models.hpp"
 #include "../tests/bo1_model_synthetic.hpp"
 #include <sys/mman.h>
 #include <csetjmp>
@@ -348,6 +349,28 @@ int main(int argc,char** argv) {
             const auto rr=LoadAndVerify(spec,ff);
             Check(rr.models==6,"character coverage");
             emit("kino_character",rr,ff.size(),zr);
+            // 3. Test45: the whole zombie zone: the character, its
+            // dismemberment models and (with a common_zombie zone) the powerups.
+            std::optional<PowerupSet> powerups;
+            std::vector<std::uint8_t> common;
+            if(argc>3) {
+                std::ifstream cin(argv[3],std::ios::binary);common.assign(std::istreambuf_iterator<char>(cin),{});
+                const auto cs=mod::bo1xanim::ParseZoneStrings(common.data(),common.size());
+                Check(!!cs,"common zone strings");
+                powerups=CarvePowerups(common.data(),common.size(),cs->strings,&error);
+                Check(!!powerups,"powerups: "+error);
+            }
+            const auto gibs=CarveGibs(raw.data(),raw.size(),strings->strings,*c,&error);
+            Check(!!gibs && gibs->piecesFound,"dismemberment: "+error);
+            for(const auto& n:ExtraTextures(powerups?&*powerups:nullptr,&*gibs)) tex[n]=synthetic::Dxt1(32,32,seed++);
+            ZoneSpec full;Check(CharacterSpec(*c,tex,full,&error),"spec: "+error);
+            ExtraReport extra;
+            Check(ExtendZoneSpec(full,powerups?&*powerups:nullptr,&*gibs,tex,extra,&error),"extend: "+error);
+            ZoneResult zf;Check(BuildZone(full,zf,&error),"BuildZone: "+error);
+            const auto fff=FastFile(zf);
+            const auto rf=LoadAndVerify(full,fff);
+            Check(rf.models==6+13+(powerups?4u:0u) && extra.pieces,"zombie zone coverage");
+            emit("zombie_zone",rf,fff.size(),zf);
         }
         json+="}";
         std::puts(json.c_str());
