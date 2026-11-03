@@ -385,6 +385,47 @@ def verify(path,include=Path('include')):
     if data.find(b'\0disconnect\0')<0:raise ValueError('disconnect command missing')
     report['test45']={'musicplay':hex(music),'musicplay_server_command':'mu_play %s %i (0x344848)','stopsounds_event':5,
         'entity_pool':hex(value('kEntityPoolRva')),'spawn_class_field':'0x13c','classname_field':'0x13e','disconnect':'command buffer'}
+    # ---- Test46: weapon alignment, Spec Ops HUD/objectives, dialogue, effects, hellhounds ----
+    jump_or_call=lambda at:at+5+struct.unpack('<i',get(at+1,4))[0]
+    # Load_WeaponCompleteDefPtr / Load_WeaponCompleteDef allocate with DB_AllocStreamPos(3): 4-byte alignment.
+    if get(0xe45d7,6)!=bytes.fromhex('b9 03 00 00 00 e8') or jump_or_call(0xe45dc)!=0xf3cf0 or get(0xe4246,5)!=bytes.fromhex('b9 03 00 00 00'):
+        raise ValueError('Weapon definitions are no longer 4-byte aligned')
+    if not re.search(r'kZoneAssetAlignMask\s*=\s*3;',(include/'control_extensions.hpp').read_text()):raise ValueError('kZoneAssetAlignMask differs')
+    hud=value('kHudElemUpdateClientRva')
+    if get(hud,16)!=bytes_of('kHudElemUpdateClientPrologue') or call_target(0x17474f)!=hud or rip(hud+13,3,7)!=value('kHudElemsRva'):
+        raise ValueError('HudElem_UpdateClient differs')
+    objectives={}
+    for m in re.finditer(r'\{"(objective_\w+)",(0x[0-9a-f]+),\{([^}]+)\}\}',text):
+        name,rva=m[1],int(m[2],16);pro=bytes(int(x,16) for x in m[3].split(','))
+        if get(rva,16)!=pro or sum(1 for _,f in pairs(name) if f==rva)!=1:raise ValueError(f'Objective builtin {name} differs')
+        objectives[name]=hex(rva)
+    if len(objectives)!=12:raise ValueError('Objective builtin list incomplete')
+    # DB_FindXAssetEntry: hash % 37000 into u16 db_hashTable, 24-byte entries, next at +0x12.
+    if get(0xef55b,6)!=bytes.fromhex('69 c2 88 90 00 00') or struct.unpack('<I',get(0xef566+4,4))[0]!=value('kAssetHashTableRva') \
+       or struct.unpack('<I',get(0xef576+3,4))[0]!=value('kAssetEntryPoolRva') or get(0xef59d,4)!=bytes.fromhex('0f b7 4b 12'):
+        raise ValueError('Asset hash table layout differs')
+    # playloopsound: alias list lookup then "first alias loops" (head +8, flags +0x50 bit 0).
+    if call_target(0x1921a4)!=0x26ab30 or call_target(0x1921b9)!=0x26ac30 or get(0x26ac30,11)!=bytes.fromhex('48 8b 41 08 0f b6 40 50 24 01 c3'):
+        raise ValueError('playloopsound alias checks differ')
+    # G_EffectIndex: level.initializing, SL_FindString, configstrings 0xcb7+index.
+    fx=value('kGEffectIndexRva')
+    if get(fx,12)!=bytes_of('kGEffectIndexPrologue') or rip(0x19effa,2,6)!=value('kLevelInitializingRva') or call_target(0x19f01f)!=value('kSlFindStringRva') \
+       or get(0x19f030,6)!=bytes.fromhex('8d 8b b7 0c 00 00') or value('kEffectConfigstringBase')!=0xcb7:
+        raise ValueError('G_EffectIndex differs')
+    if get(value('kSlFindStringRva'),12)!=bytes_of('kSlFindStringPrologue') or get(value('kDObjGetBoneIndexRva'),12)!=bytes_of('kDObjGetBoneIndexPrologue'):
+        raise ValueError('Tag check natives differ')
+    # playfxontag: model index (+0x284) and SV_DObjGetBoneIndex checks, ids 1..255.
+    if get(0x18c28e,8)!=bytes.fromhex('66 83 bb 84 02 00 00 00') or call_target(0x18c2a2)!=value('kDObjGetBoneIndexRva') \
+       or get(0x18c27e,9)!=bytes.fromhex('8d 4e ff 81 f9 fe 00 00 00') or value('kEntityModelIndex')!=0x284:
+        raise ValueError('playfxontag checks differ')
+    # allowedstances writes the actor stance mask (+0xe38; crouch 2).
+    if get(0x14d6d0,7)!=bytes.fromhex('83 8b 38 0e 00 00 02') or value('kActorAllowedStances')!=0xe38 or value('kStanceCrouch')!=2:
+        raise ValueError('allowedstances differs')
+    if not any(f==0x14d650 for _,f in pairs('allowedstances')):raise ValueError('allowedstances method differs')
+    report['test46']={'weapon_alignment':'DB_AllocStreamPos(3) (0xe45d7, 0xe4246)','hudelem_update':hex(hud),'objective_builtins':objectives,
+        'asset_hash':{'table':hex(value('kAssetHashTableRva')),'entries':hex(value('kAssetEntryPoolRva')),'buckets':37000,'entry_bytes':24,'next':'0x12'},
+        'effect_index':hex(fx),'effect_configstrings':'0xcb7+1..255','sl_find_string':hex(value('kSlFindStringRva')),
+        'dobj_bone_index':hex(value('kDObjGetBoneIndexRva')),'allowed_stances':'actor+0xe38','loop_alias_flags':'list+8 -> alias+0x50 bit 0'}
     report.update({'goal_entity':'setgoalentity replica: 0x1244b0 clear, 0x15b190 handle, node/volume zero',
         'command_buffer':'Cbuf_AddText(0,"set specialops 1; ...; devmap <so_map>\\n") (critical section 0x24)',
         'damage_args':'G_Damage(targ,inflictor,attacker,dir,point,damage,dflags,mod,weapon,hitloc,...)',

@@ -79,5 +79,7 @@ struct ZombieGameStatus {
     int menuInMs=-1;             // Test45: GAME OVER -> main menu countdown, -1 when none
     // Test45: BO1 HUD and world models on this level.
     int powerupModels=0,gibModels=0;
+    // Test46: BO1 effects registered and BO1 hellhounds ready on this level.
+    int effects=0;bool hounds=false;
 };
 } // namespace mod

@@ -38,7 +38,8 @@ def check_native(pe):
 
 def used_anims(root):
     text = (root / 'src' / 'ai.cpp').read_text()
-    return sorted(set(re.findall(r'"(ai_zombie_[a-z0-9_]+)"', text)))
+    # Test46: the hellhound's BO1 dog animations too.
+    return sorted(set(re.findall(r'"((?:ai_zombie|zombie_dog)_[a-z0-9_]+)"', text)))
 
 
 def run(executable, zone=None, compiler='g++'):

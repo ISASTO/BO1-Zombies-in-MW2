@@ -81,14 +81,20 @@ inline constexpr const char* kAnnCarpenter="zmb_vox_ann_carpenter";
 inline constexpr const char* kAnnDogStart="zmb_vox_ann_dogstart";
 inline constexpr const char* kHeadGib="zmb_zombie_head_gib";
 inline constexpr const char* kLimbGib="zmb_death_gibs";
+// Test46: the powerup's hum (powerup_setup playloopsound), the hellhound's
+// arrival (dog_spawn_fx) and its trail loops (dog_fx_trail: fire or breath).
+inline constexpr const char* kPowerupLoop="zmb_spawn_powerup_loop";
+inline constexpr const char* kDogPrespawn="zmb_hellhound_prespawn";
+inline constexpr const char* kDogLoopFire="zmb_hellhound_loop_fire";
+inline constexpr const char* kDogLoopBreath="zmb_hellhound_loop_breath";
 } // namespace alias
-inline constexpr std::array<const char*,38> kRuntimeAliases={alias::kAmbience,alias::kSprint,alias::kAttack,alias::kBehind,alias::kDeath,
+inline constexpr std::array<const char*,42> kRuntimeAliases={alias::kAmbience,alias::kSprint,alias::kAttack,alias::kBehind,alias::kDeath,
     alias::kRise,alias::kSwing,alias::kDogBolt,alias::kDogSpawn,alias::kDogExplode,alias::kDogAmbient,alias::kDogClose,alias::kPowerupSpawn,
     alias::kPowerupGrab,alias::kMaxAmmo,alias::kInstaKill,alias::kNukeFlash,alias::kNuked,alias::kDogRoundStinger,alias::kRoundStart,
     alias::kRoundOver,alias::kDogRoundStart,alias::kDogRoundOver,alias::kGameOver,alias::kStepDefault,
     alias::kAmbienceBed,alias::kAmbienceOneShots[0],alias::kAmbienceOneShots[1],alias::kAmbienceOneShots[2],alias::kAmbienceOneShots[3],
     alias::kAnnMaxAmmo,alias::kAnnInstaKill,alias::kAnnDoublePoints,alias::kAnnNuke,alias::kAnnCarpenter,alias::kAnnDogStart,
-    alias::kHeadGib,alias::kLimbGib};
+    alias::kHeadGib,alias::kLimbGib,alias::kPowerupLoop,alias::kDogPrespawn,alias::kDogLoopFire,alias::kDogLoopBreath};
 // MW2 surface names (animscripts play "step_run_" + self.groundtype).
 inline constexpr std::array<const char*,31> kSurfaces={"asphalt","bark","brick","carpet","ceramic","cloth","concrete","cushion","default",
     "dirt","flesh","foliage","fruit","glass","grass","gravel","ice","metal","mud","paintedmetal","paper","plaster","plastic","rock",

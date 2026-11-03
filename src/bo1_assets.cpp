@@ -189,7 +189,9 @@ const std::vector<std::string>& WantedAnims() {
         "ai_zombie_attack_forward_v2","ai_zombie_walk_attack_v1","ai_zombie_walk_attack_v2","ai_zombie_walk_attack_v3",
         "ai_zombie_walk_attack_v4","ai_zombie_run_attack_v1","ai_zombie_run_attack_v2","ai_zombie_run_attack_v3",
         "ai_zombie_traverse_ground_v1_walk","ai_zombie_traverse_ground_v2_walk_alta","ai_zombie_traverse_ground_v1_run",
-        "ai_zombie_traverse_ground_climbout_fast"};
+        "ai_zombie_traverse_ground_climbout_fast",
+        // Test46: the hellhound.
+        "zombie_dog_run","zombie_dog_idle","zombie_dog_attackidle","zombie_dog_run_stop","zombie_dog_run_attack","zombie_dog_run_attack_low"};
     return names;
 }
 void StartLoad() {

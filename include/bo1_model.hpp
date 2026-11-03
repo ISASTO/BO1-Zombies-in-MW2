@@ -498,14 +498,25 @@ struct Texture {
     std::uint8_t levels=0;
     std::vector<std::uint8_t> data;      // largest mip first, as MW2's loadDef path uploads
 };
+// Test46: the uncompressed formats MW2's loadDef upload accepts (0x48e80:
+// A8R8G8B8/X8R8G8B8 4 bytes, A8L8 2, A8/L8 1), for effect textures.
+inline constexpr std::uint32_t kD3dA8R8G8B8=21,kD3dA8=28,kD3dL8=50,kD3dA8L8=51;
+inline bool Compressed(std::uint32_t format) {return format==kD3dDxt1 || format==kD3dDxt3 || format==kD3dDxt5;}
+inline std::size_t PixelBytes(std::uint32_t format) {
+    switch(format) {case kD3dA8R8G8B8: return 4;case kD3dA8L8: return 2;case kD3dA8: case kD3dL8: return 1;default: return 0;}
+}
 inline std::size_t BlockBytes(std::uint32_t format) {return format==kD3dDxt1?8:16;}
 inline std::size_t MipBytes(std::uint32_t format,unsigned w,unsigned h) {
+    if(!Compressed(format)) return static_cast<std::size_t>(std::max(1u,w))*std::max(1u,h)*PixelBytes(format);
     return static_cast<std::size_t>((std::max(1u,w)+3)/4)*((std::max(1u,h)+3)/4)*BlockBytes(format);
 }
 inline unsigned MipCount(unsigned w,unsigned h) {unsigned n=1;while(w>1 || h>1){w=std::max(1u,w/2);h=std::max(1u,h/2);++n;}return n;}
 
 // Black Ops IWI v13: "IWi" 13, format, flags, w, h, d, gamma, fileSizeForPicmip[8],
-// then the mips smallest first. Only DXT1/3/5 2D textures are accepted.
+// then the mips smallest first. DXT1/3/5 2D textures, and (Test46, effect
+// textures) the bitmap formats: RGBA (stored B,G,R,A = A8R8G8B8), RGB
+// (B,G,R; widened to A8R8G8B8 with alpha 255), luminance+alpha (A8L8),
+// luminance (L8) and alpha (A8). Wavelet-compressed images are refused.
 inline bool ParseIwi13(const std::uint8_t* p,std::size_t n,Texture& out,std::string* error=nullptr) {
     using detail::Fail;
     if(n<48 || std::memcmp(p,"IWi",3) || p[3]!=13) return Fail(error,"not an IWI v13 image");
@@ -513,20 +524,33 @@ inline bool ParseIwi13(const std::uint8_t* p,std::size_t n,Texture& out,std::str
     const auto w=Get<std::uint16_t>(p+6),h=Get<std::uint16_t>(p+8),d=Get<std::uint16_t>(p+10);
     if(flags&(4|8)) return Fail(error,"cube or volume image");
     if(d>1 || !w || !h || w>4096 || h>4096) return Fail(error,"bad image size");
-    switch(format) {case 0xb:out.format=kD3dDxt1;break;case 0xc:out.format=kD3dDxt3;break;case 0xd:out.format=kD3dDxt5;break;
-        default:return Fail(error,"unsupported image format "+std::to_string(format));}
+    bool rgb24=false;
+    switch(format) {
+        case 0xb:out.format=kD3dDxt1;break;case 0xc:out.format=kD3dDxt3;break;case 0xd:out.format=kD3dDxt5;break;
+        case 0x1:out.format=kD3dA8R8G8B8;break;case 0x2:out.format=kD3dA8R8G8B8;rgb24=true;break;
+        case 0x3:out.format=kD3dA8L8;break;case 0x4:out.format=kD3dL8;break;case 0x5:out.format=kD3dA8;break;
+        default:return Fail(error,"unsupported image format "+std::to_string(format));
+    }
     out.width=w;out.height=h;
     const unsigned levels=(flags&2)?1u:MipCount(w,h);
     out.levels=static_cast<std::uint8_t>(levels);
+    // Bytes of one mip as stored in the file (RGB is 3 bytes a pixel there).
+    auto stored=[&](unsigned level){
+        return rgb24?static_cast<std::size_t>(std::max(1u,static_cast<unsigned>(w)>>level))*std::max(1u,static_cast<unsigned>(h)>>level)*3
+                    :MipBytes(out.format,w>>level,h>>level);
+    };
     std::vector<std::size_t> offsets(levels);std::size_t at=48;
     for(int level=static_cast<int>(levels)-1;level>=0;--level) {
         offsets[static_cast<std::size_t>(level)]=at;
-        at+=MipBytes(out.format,w>>level,h>>level);
+        at+=stored(static_cast<unsigned>(level));
     }
     if(at>n) return Fail(error,"image is shorter than its mips");
-    out.data.clear();out.data.reserve(at-48);
-    for(unsigned level=0;level<levels;++level)
-        out.data.insert(out.data.end(),p+offsets[level],p+offsets[level]+MipBytes(out.format,w>>level,h>>level));
+    out.data.clear();out.data.reserve(rgb24?(at-48)/3*4:at-48);
+    for(unsigned level=0;level<levels;++level) {
+        const auto* mip=p+offsets[level];const auto bytes=stored(level);
+        if(!rgb24) {out.data.insert(out.data.end(),mip,mip+bytes);continue;}
+        for(std::size_t k=0;k+2<bytes;k+=3) {out.data.insert(out.data.end(),mip+k,mip+k+3);out.data.push_back(0xff);}
+    }
     return true;
 }
 
@@ -612,7 +636,22 @@ inline constexpr std::size_t kXFileBytes=40,kAssetListBytes=32,kAssetBytes=16,kM
     kSurfaceBytes=0x58,kRigidBytes=0x10,kTreeBytes=0x38,kCollSurfBytes=0x30,kBoneInfoBytes=0x1c,kMaterialBytes=0x78,
     kTextureDefBytes=0x10,kConstantBytes=0x20,kStateBitsBytes=8,kTechniqueSetBytes=0x198,kImageBytes=0x28,kLoadDefBytes=0x10;
 enum Block : int {Temp=0,Physical=1,Runtime=2,Virtual=3,Large=4,Callback=5,Vertex=6,Index=7,BlockCount=8};
-inline constexpr int kAssetXModel=4;
+inline constexpr int kAssetXModel=4,kAssetFx=30;
+// Test46: FxEffectDef (0x28) and FxElemDef (0x120) of the x64 loader
+// (Load_FxEffectDefPtr 0xdca10, Load_FxEffectDef 0xdc940, Load_FxElemDefArray
+// 0xdcbd0, Load_FxElemDefVisuals 0xdce70, Load_FxElemVisuals 0xdd0b0).
+inline constexpr std::size_t kEffectBytes=0x28,kElemBytes=0x120,kVelSampleBytes=96,kVisSampleBytes=48;
+inline constexpr std::size_t kElemType=0xb0,kElemVisualCount=0xb1,kElemVelCount=0xb2,kElemVisCount=0xb3,kElemVel=0xb8,kElemVis=0xc0,
+    kElemVisuals=0xc8,kElemImpact=0xe8,kElemDeath=0xf0,kElemEmitted=0xf8,kElemExtended=0x110;
+inline constexpr std::uint8_t kElemModel=7,kElemOmni=8,kElemSpot=9,kElemDecal=11;
+// MW2's own effect materials (gfx_* in common.ff): techniques 4-8 use state
+// bits 0, technique 44 state bits 1 (always 0x88128812/0xe49e492c); state
+// flags 0x13, camera region 2 (emissive).
+inline constexpr std::array<std::uint8_t,48> kEffectStateBitsEntry={
+    0xff,0xff,0xff,0xff,0x00,0x00,0x00,0x00,0x00,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,
+    0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,0x01,0xff,0xff,0xff};
+inline constexpr std::uint64_t kEffectSecondStateBits=0xe49e492c88128812ull;
+inline constexpr std::uint8_t kEffectStateFlags=0x13,kEffectCameraRegion=2,kSemanticColor=2;
 // Lit, normal-mapped, specular model technique set present in MW2's common.ff.
 inline constexpr const char* kTechniqueSet="mc_l_sm_r0c0n0s0";
 inline constexpr const char* kIdentityNormal=",$identitynormalmap";
@@ -667,10 +706,38 @@ struct ModelSpec {
     const Model* source=nullptr;
     std::vector<std::size_t> surfaceMaterial;    // index into the zone's materials, per surface
 };
+// Test46: an effect (FX) material: one colour map, an MW2 effect technique
+// set by name (',' reference to a loaded one), its constants (featherParms,
+// colorTint, sorted by name hash) and two state bits (the effect pass and
+// MW2's fixed second entry).
+struct EffectMaterialSpec {
+    std::string name,techniqueSet,image;         // image: zone image name (written once, then referenced)
+    std::uint8_t sortKey=0x30,atlasRows=1,atlasColumns=1,sampler=0xe2;
+    std::vector<std::array<std::uint8_t,32>> constants;
+    std::array<std::uint64_t,2> stateBits{};
+};
+// An MW2 x64 FxElemDef (0x120 bytes) whose pointer fields the writer sets:
+// velocity/visual-state samples when present, the materials (one: an
+// instance; more: an array), and the impact/death/emitted effect names.
+struct EffectElemSpec {
+    std::array<std::uint8_t,0x120> raw{};
+    std::vector<std::uint8_t> vel,vis;
+    std::vector<std::size_t> materials;          // indices into ZoneSpec::effectMaterials
+    std::string impact,death,emitted;
+};
+struct EffectSpec {
+    std::string name;
+    std::uint8_t flags=0;
+    std::int32_t totalSize=0,loopingLife=0;
+    std::array<std::int32_t,3> counts{};         // looping, one-shot, emission (elems in that order)
+    std::vector<EffectElemSpec> elems;
+};
 struct ZoneSpec {
     std::vector<MaterialSpec> materials;
     std::map<std::string,Texture> images;        // name -> texels (written once, then referenced)
     std::vector<ModelSpec> models;
+    std::vector<EffectMaterialSpec> effectMaterials;   // Test46
+    std::vector<EffectSpec> effects;                   // Test46, after the models; referenced effects first
 };
 struct ZoneResult {
     std::vector<std::uint8_t> stream;            // decompressed: XFile header onward
@@ -916,6 +983,80 @@ public:
         s_.pop();
         s_.pop();
     }
+    // Test46: Load_MaterialHandle (0xe0b30) for an effect material: the
+    // whole material the first time, a ',' reference afterwards.
+    void effectMaterial(std::size_t index) {
+        const auto& m=spec_.effectMaterials[index];
+        s_.push(mw2::Temp);s_.align(3);
+        std::uint8_t h[mw2::kMaterialBytes]{};
+        Put<std::uint64_t>(h,mw2::kInline);
+        const bool reference=effectMaterialsWritten_.count(index)!=0;
+        if(!reference) {
+            h[0x8]=0;h[0x9]=m.sortKey;h[0xa]=m.atlasRows;h[0xb]=m.atlasColumns;
+            std::memcpy(h+0x20,mw2::kEffectStateBitsEntry.data(),48);
+            h[0x50]=1;h[0x51]=static_cast<std::uint8_t>(m.constants.size());h[0x52]=2;h[0x53]=mw2::kEffectStateFlags;h[0x54]=mw2::kEffectCameraRegion;
+            Put<std::uint64_t>(h+0x58,mw2::kInline);Put<std::uint64_t>(h+0x60,mw2::kInline);
+            if(!m.constants.empty()) Put<std::uint64_t>(h+0x68,mw2::kInline);
+            Put<std::uint64_t>(h+0x70,mw2::kInline);
+        }
+        s_.read(h,sizeof(h));
+        s_.push(mw2::Virtual);
+        s_.string(reference?','+m.name:m.name);
+        if(!reference) {
+            techniqueSet(m.techniqueSet);
+            s_.align(3);
+            std::uint8_t t[mw2::kTextureDefBytes]{};
+            Put<std::uint32_t>(t,kHashColorMap);t[4]='c';t[5]='p';t[6]=m.sampler;t[7]=mw2::kSemanticColor;
+            Put<std::uint64_t>(t+8,mw2::kInline);
+            s_.read(t,sizeof(t));
+            semantic_=mw2::kSemanticColor;image(m.image);
+            if(!m.constants.empty()) {s_.align(15);for(const auto& c:m.constants) s_.read(c.data(),c.size());}
+            s_.align(3);
+            for(auto bits:m.stateBits) s_.read(&bits,8);
+            effectMaterialsWritten_.insert(index);
+        }
+        s_.pop();
+        s_.pop();
+    }
+    // Test46: Load_FxEffectDefPtr: header in temp, then (virtual) the name,
+    // the elem array and per elem its samples, visuals, effect names.
+    void effect(const EffectSpec& fx) {
+        s_.push(mw2::Temp);s_.align(3);
+        std::uint8_t h[mw2::kEffectBytes]{};
+        Put<std::uint64_t>(h,mw2::kInline);h[8]=fx.flags;
+        Put<std::int32_t>(h+0xc,fx.totalSize);Put<std::int32_t>(h+0x10,fx.loopingLife);
+        for(std::size_t k=0;k<3;++k) Put<std::int32_t>(h+0x14+4*k,fx.counts[k]);
+        if(!fx.elems.empty()) Put<std::uint64_t>(h+0x20,mw2::kInline);
+        s_.read(h,sizeof(h));
+        s_.push(mw2::Virtual);
+        s_.string(fx.name);
+        if(!fx.elems.empty()) {
+            s_.align(3);
+            for(const auto& e:fx.elems) {
+                auto raw=e.raw;
+                Put<std::uint64_t>(raw.data()+mw2::kElemVel,e.vel.empty()?0:mw2::kInline);
+                Put<std::uint64_t>(raw.data()+mw2::kElemVis,e.vis.empty()?0:mw2::kInline);
+                Put<std::uint64_t>(raw.data()+mw2::kElemVisuals,e.materials.empty()?0:mw2::kInline);
+                Put<std::uint64_t>(raw.data()+mw2::kElemImpact,e.impact.empty()?0:mw2::kInline);
+                Put<std::uint64_t>(raw.data()+mw2::kElemDeath,e.death.empty()?0:mw2::kInline);
+                Put<std::uint64_t>(raw.data()+mw2::kElemEmitted,e.emitted.empty()?0:mw2::kInline);
+                Put<std::uint64_t>(raw.data()+mw2::kElemExtended,0);
+                s_.read(raw.data(),raw.size());
+            }
+            for(const auto& e:fx.elems) {
+                if(!e.vel.empty()) {s_.align(3);s_.read(e.vel);}
+                if(!e.vis.empty()) {s_.align(3);s_.read(e.vis);}
+                if(e.materials.size()>1) {
+                    s_.align(3);
+                    for(std::size_t n=0;n<e.materials.size();++n) {const auto p=mw2::kInline;s_.read(&p,8);}
+                }
+                for(const auto i:e.materials) effectMaterial(i);
+                for(const auto* name:{&e.impact,&e.death,&e.emitted}) if(!name->empty()) s_.string(*name);
+            }
+        }
+        s_.pop();
+        s_.pop();
+    }
     std::size_t imageBytes=0;
 private:
     const ZoneSpec& spec_;
@@ -923,6 +1064,7 @@ private:
     std::map<std::string,std::uint16_t> index_;
     std::set<std::string> written_;
     std::map<std::size_t,bool> materialsWritten_;
+    std::set<std::size_t> effectMaterialsWritten_;
     std::uint8_t semantic_=0;
 };
 } // namespace detail
@@ -939,6 +1081,33 @@ inline bool BuildZone(const ZoneSpec& spec,ZoneResult& out,std::string* error=nu
     }
     for(const auto& mat:spec.materials) for(const auto* image:{&mat.color,&mat.normal,&mat.spec})
         if(image->empty() || ((*image)[0]!=',' && !spec.images.count(*image))) return Fail(error,"material "+mat.name+" lacks an image");
+    // Test46: effects. Every material and image named must exist, every
+    // effect named by another must come earlier (the loader looks it up by
+    // name while loading), and the elem counts must add up.
+    for(const auto& mat:spec.effectMaterials) {
+        if(mat.image.empty() || (mat.image[0]!=',' && !spec.images.count(mat.image))) return Fail(error,"effect material "+mat.name+" lacks an image");
+        if(mat.techniqueSet.empty() || mat.constants.size()>8) return Fail(error,"effect material "+mat.name+" is incomplete");
+    }
+    {
+        std::set<std::string> earlier;
+        for(const auto& fx:spec.effects) {
+            if(fx.name.empty() || earlier.count(fx.name)) return Fail(error,"effect name missing or repeated");
+            if(fx.counts[0]<0 || fx.counts[1]<0 || fx.counts[2]<0
+               || static_cast<std::size_t>(fx.counts[0])+static_cast<std::size_t>(fx.counts[1])+static_cast<std::size_t>(fx.counts[2])!=fx.elems.size())
+                return Fail(error,"effect "+fx.name+" elem counts differ");
+            for(const auto& e:fx.elems) {
+                for(const auto i:e.materials) if(i>=spec.effectMaterials.size()) return Fail(error,"effect "+fx.name+" names a missing material");
+                const auto type=e.raw[mw2::kElemType];
+                if(type==mw2::kElemDecal || type>12) return Fail(error,"effect "+fx.name+" has an unsupported elem type");
+                if(!e.materials.empty() && e.raw[mw2::kElemVisualCount]!=e.materials.size()) return Fail(error,"effect "+fx.name+" visual count differs");
+                if((e.vel.size()!=(e.vel.empty()?0:(e.raw[mw2::kElemVelCount]+1u)*mw2::kVelSampleBytes))
+                   || (e.vis.size()!=(e.vis.empty()?0:(e.raw[mw2::kElemVisCount]+1u)*mw2::kVisSampleBytes)))
+                    return Fail(error,"effect "+fx.name+" sample sizes differ");
+                for(const auto* ref:{&e.impact,&e.death,&e.emitted}) if(!ref->empty() && !earlier.count(*ref)) return Fail(error,"effect "+fx.name+" names "+*ref+" before it");
+            }
+            earlier.insert(fx.name);
+        }
+    }
     // Pass 1 collects the script strings (bone names) so the list can precede the assets.
     std::vector<std::string> strings;
     {
@@ -952,7 +1121,7 @@ inline bool BuildZone(const ZoneSpec& spec,ZoneResult& out,std::string* error=nu
     // XAssetList (read directly, outside the blocks).
     std::uint8_t list[mw2::kAssetListBytes]{};
     Put<std::uint32_t>(list,static_cast<std::uint32_t>(strings.size()));Put<std::uint64_t>(list+8,mw2::kInline);
-    Put<std::uint32_t>(list+16,static_cast<std::uint32_t>(spec.models.size()));Put<std::uint64_t>(list+24,mw2::kInline);
+    Put<std::uint32_t>(list+16,static_cast<std::uint32_t>(spec.models.size()+spec.effects.size()));Put<std::uint64_t>(list+24,mw2::kInline);
     s.bytes.insert(s.bytes.end(),list,list+sizeof(list));
     s.push(mw2::Virtual);                          // Load_XAssetList
     s.push(mw2::Virtual);                          // Load_ScriptStringList
@@ -963,11 +1132,12 @@ inline bool BuildZone(const ZoneSpec& spec,ZoneResult& out,std::string* error=nu
     s.pop();
     s.push(mw2::Virtual);
     s.align(3);
-    for(std::size_t n=0;n<spec.models.size();++n) {
-        std::uint8_t a[mw2::kAssetBytes]{};Put<std::int32_t>(a,mw2::kAssetXModel);Put<std::uint64_t>(a+8,mw2::kInline);
+    for(std::size_t n=0;n<spec.models.size()+spec.effects.size();++n) {
+        std::uint8_t a[mw2::kAssetBytes]{};Put<std::int32_t>(a,n<spec.models.size()?mw2::kAssetXModel:mw2::kAssetFx);Put<std::uint64_t>(a+8,mw2::kInline);
         s.read(a,sizeof(a));
     }
     for(const auto& m:spec.models) b.model(m);
+    for(const auto& fx:spec.effects) b.effect(fx);
     s.pop();
     if(s.depth()!=0 || b.strings.size()!=strings.size()) return Fail(error,"zone stream unbalanced");
     // XFile: size of what follows, external size, per-block sizes (+1 page of slack each).
@@ -977,7 +1147,7 @@ inline bool BuildZone(const ZoneSpec& spec,ZoneResult& out,std::string* error=nu
     Put<std::uint32_t>(out.stream.data(),static_cast<std::uint32_t>(s.bytes.size()));
     for(std::size_t n=0;n<mw2::BlockCount;++n) Put<std::uint32_t>(out.stream.data()+8+4*n,out.blockSize[n]);
     out.stream.insert(out.stream.end(),s.bytes.begin(),s.bytes.end());
-    out.scriptStrings=strings.size();out.assets=spec.models.size();out.imageBytes=b.imageBytes;
+    out.scriptStrings=strings.size();out.assets=spec.models.size()+spec.effects.size();out.imageBytes=b.imageBytes;
     return true;
 }
 

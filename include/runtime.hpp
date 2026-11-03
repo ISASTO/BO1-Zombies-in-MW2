@@ -88,7 +88,7 @@ bool FeatureAvailable(const Snapshot& snapshot, PlayerFeature feature);
 bool TogglePlayerFeature(PlayerFeature feature);
 bool AdjustPlayerFeature(PlayerFeature feature,int direction);
 void ResetPlayerFeatures();
-void UpdatePlayerFeatures(ULONGLONG now);
+void UpdatePlayerFeatures(ULONGLONG now,bool menuVisible=false);
 PlayerPreferences GetPlayerPreferences();
 bool ExtraAvailable(const Snapshot& snapshot,ExtraFeature feature);
 bool ToggleExtraFeature(ExtraFeature feature);
@@ -193,6 +193,12 @@ struct Overlay {
     ULONGLONG nextFovAttempt = 0;
     ULONGLONG nextSnapshotRead = 0;
     Snapshot displaySnapshot;
+    // Test46: one state block kept for the device (captured each drawn frame
+    // instead of created and released), and frame-time statistics per report.
+    IDirect3DStateBlock9* stateBlock = nullptr;
+    LARGE_INTEGER lastFrameAt{}, frameFrequency{};
+    unsigned framesSeen = 0, slowFrames20 = 0, slowFrames50 = 0, slowFrames100 = 0;
+    double longestFrameMs = 0, frameTotalMs = 0;
     void attach(IDirect3DDevice9* d, HWND w);
     void detach();
     void invalidate();

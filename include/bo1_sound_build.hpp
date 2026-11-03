@@ -26,6 +26,8 @@ struct WantedList {
     float volume=1.f;
     int maxRate=0,maxSeconds=0;
     bool mono=false;
+    // Test46: a looping BO1 alias kept looping (for playloopsound), not skipped.
+    bool keepLoop=false;
     const char* mw2Name() const {return rename?rename:name;}
 };
 inline constexpr WantedList kCommonLists[]={
@@ -56,6 +58,10 @@ inline constexpr WantedList kCommonLists[]={
     // torn off (the gib sound of BO1's death gibs).
     {"zmb_zombie_head_gib",mw2::kChannelEffects1},
     {"zmb_death_gibs",mw2::kChannelEffects1},
+    // Test46: looping sounds an entity plays (playloopsound).
+    {"zmb_spawn_powerup_loop",mw2::kChannelEffects1,false,nullptr,false,1.f,0,0,false,true},
+    {"zmb_hellhound_loop_fire",mw2::kChannelEffects1,false,nullptr,false,1.f,0,0,false,true},
+    {"zmb_hellhound_loop_breath",mw2::kChannelEffects1,false,nullptr,false,1.f,0,0,false,true},
 };
 inline constexpr WantedList kTheaterLists[]={
     {"mus_zombie_round_start",mw2::kChannelAuto2d},
@@ -192,7 +198,7 @@ inline unsigned AddBank(const Bank& bank,const std::uint8_t* raw,const WantedLis
             ZoneAliasList out;out.name=mwName;
             const Shrink shrink{w.mono,w.maxRate,w.maxSeconds};
             for(const auto& a:list.aliases) {
-                if(a.looping() && !w.loopAsOneShot) {++report.skippedAliases;continue;}
+                if(a.looping() && !w.loopAsOneShot && !w.keepLoop) {++report.skippedAliases;continue;}
                 std::optional<std::size_t> index;
                 const bool positional=a.positional() && w.channel!=mw2::kChannelAuto2d;
                 if(a.sound.kind==SoundRef::Kind::Loaded && a.sound.asset.dataInline) {
@@ -216,6 +222,7 @@ inline unsigned AddBank(const Bank& bank,const std::uint8_t* raw,const WantedLis
                 z.distMin=a.distMin();z.distMax=std::max(a.distMin()+1.f,a.distMax());
                 z.startDelay=a.startDelay();
                 z.flags=mw2::Flags(positional?w.channel:mw2::kChannelAuto2d);
+                if(a.looping() && w.keepLoop) z.flags|=mw2::kFlagLooping;
                 out.aliases.push_back(z);
             }
             if(out.aliases.empty()) {++report.missingLists;continue;}

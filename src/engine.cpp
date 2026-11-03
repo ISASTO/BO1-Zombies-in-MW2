@@ -260,8 +260,8 @@ WeaponFields ReadWeapon(unsigned index,bool requireTiming=true) {
     unsigned count=0; std::uintptr_t linked=0,name=0;
     if (!profile.supported || !profile.resolved || !profile.weaponResolved
         || !ReadValue(profile.weaponCount,count) || !count || count>=kWeaponCapacity || !index || index>count
-        || !ReadValue(profile.weaponTable+index*8,w.complete) || !w.complete || (w.complete&7)
-        || !ReadValue(profile.weaponDefTable+index*8,w.definition) || !w.definition || (w.definition&7)
+        || !ReadValue(profile.weaponTable+index*8,w.complete) || !w.complete || (w.complete&kZoneAssetAlignMask)
+        || !ReadValue(profile.weaponDefTable+index*8,w.definition) || !w.definition || (w.definition&kZoneAssetAlignMask)
         || !ReadValue(w.complete+kCompleteDefinition,linked) || linked!=w.definition
         || !ReadValue(w.complete,name) || !ReadString(name,w.name,sizeof(w.name)) || !w.name[0]
         || !ReadValue(w.complete+kWeaponFireTime,w.fireTime) || (requireTiming && (w.fireTime<1 || w.fireTime>10000))
@@ -276,8 +276,8 @@ WeaponCandidate ReadCandidateRaw(unsigned index) {
     std::uintptr_t models=0,model=0,name=0; char modelName[128]{};
     std::uint8_t noDual=255;
     if (!w.weapon.valid || !profile.inventoryResolved
-        || !ReadValue(w.weapon.definition+kGunModels,models) || !models || (models&7)
-        || !ReadValue(models,model) || !model || (model&7) || !ReadValue(model,name)
+        || !ReadValue(w.weapon.definition+kGunModels,models) || !models || (models&kZoneAssetAlignMask)
+        || !ReadValue(models,model) || !model || (model&kZoneAssetAlignMask) || !ReadValue(model,name)
         || !ReadString(name,modelName,sizeof(modelName)) || !modelName[0]
         || std::strcmp(modelName,"void")==0 || std::strcmp(modelName,"default_model")==0
         || std::strcmp(w.weapon.name,"defaultweapon")==0 || std::strstr(modelName,"invisible")
@@ -1259,10 +1259,13 @@ void ResetPlayerFeatures() {
     features.clearInvulnerability=true; features.clearSpeed=true; features.nextUpdate=0;
     Log("PLAYER_REQUEST RESET movement_protection=OFF saved_fov_unchanged=1");
 }
-void UpdatePlayerFeatures(ULONGLONG now) {
+void UpdatePlayerFeatures(ULONGLONG now,bool menuVisible) {
     std::lock_guard<std::mutex> lock(featuresMutex);
     if (now<features.nextUpdate) return;
-    features.nextUpdate=now+16;
+    const bool anyEnabled=std::any_of(features.preferences.enabled.begin(),features.preferences.enabled.end(),[](bool b){return b;})
+        || std::any_of(features.extra.enabled.begin(),features.extra.enabled.end(),[](bool b){return b;})
+        || features.clearInvulnerability || features.clearSustain || features.clearSpeed;
+    features.nextUpdate=now+FeatureUpdateInterval(anyEnabled,menuVisible);
     MeasureUpdate measure;
     auto s=ReadSnapshot();
     if (s.state!=LevelState::Ready) {

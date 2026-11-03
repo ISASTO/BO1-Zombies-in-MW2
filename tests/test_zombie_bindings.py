@@ -21,7 +21,8 @@ class ZombieBindingTableTests(unittest.TestCase):
 
     def test_builtin_list_matches_declarations(self):
         declared=self.builtins()
-        names=self.listed('kZombieBuiltins')+self.listed('kAnimBuiltins')+self.listed('kModelBuiltins')+self.listed('kSoundBuiltins')+self.listed('kWorldBuiltins')
+        names=self.listed('kZombieBuiltins')+self.listed('kAnimBuiltins')+self.listed('kModelBuiltins')+self.listed('kSoundBuiltins')+self.listed('kWorldBuiltins')\
+            +self.listed('kTest46Builtins')
         self.assertEqual(len(names),len(declared))
         self.assertEqual(len(set(names)),len(names))
         self.assertEqual(len(set(declared.values())),len(declared),'two builtins share one routine')
@@ -57,18 +58,20 @@ class SpecOpsMapTests(unittest.TestCase):
     def test_spec_ops_end_functions_are_the_mission_over_paths(self):
         text=(ROOT/'include'/'zombie_bindings.hpp').read_text()
         refs=re.findall(r'\{"(maps/[a-z_]+)","([a-z_]+)"\}',text)
+        # Test46: so_dialog_play (every Spec Ops radio line) is entered with OP_End too.
         self.assertEqual(refs,[('maps/_specialops','fade_challenge_out'),
-            ('maps/_specialops_code','specialops_mission_over_setup'),('maps/_specialops_code','failure_summary_display')])
+            ('maps/_specialops_code','specialops_mission_over_setup'),('maps/_specialops_code','failure_summary_display'),
+            ('maps/_specialops_code','so_dialog_play')])
 
 
 class AnimSlotTests(unittest.TestCase):
     def test_slots_use_wanted_bo1_anims_once_per_mw2_anim(self):
         ai=(ROOT/'src'/'ai.cpp').read_text()
-        slots=re.findall(r'\{"([a-z0-9_]+)","(ai_zombie_[a-z0-9_]+)",AnimRole::(\w+)\}',ai)
+        slots=re.findall(r'\{"([a-z0-9_]+)","((?:ai_zombie|zombie_dog)_[a-z0-9_]+)",AnimRole::(\w+)\}',ai)
         self.assertGreaterEqual(len(slots),30)
         mw2=[m for m,_,_ in slots]
         self.assertEqual(len(mw2),len(set(mw2)),'an MW2 anim is replaced twice')
-        wanted=set(re.findall(r'"(ai_zombie_[a-z0-9_]+)"',(ROOT/'src'/'bo1_assets.cpp').read_text()))
+        wanted=set(re.findall(r'"((?:ai_zombie|zombie_dog)_[a-z0-9_]+)"',(ROOT/'src'/'bo1_assets.cpp').read_text()))
         self.assertTrue({b for _,b,_ in slots}<=wanted,'a slot uses an anim the loader does not carve')
         roles={r for _,_,r in slots}
         enum=re.search(r'enum class AnimRole : int \{([^}]+)\}',ai)[1]
@@ -91,7 +94,7 @@ class AnimSlotTests(unittest.TestCase):
         if not path:self.skipTest('MW2_COMMON_DEC not set')
         raw=Path(path).read_bytes()
         ai=(ROOT/'src'/'ai.cpp').read_text()
-        for mw2,_,_ in re.findall(r'\{"([a-z0-9_]+)","(ai_zombie_[a-z0-9_]+)",AnimRole::(\w+)\}',ai):
+        for mw2,_,_ in re.findall(r'\{"([a-z0-9_]+)","((?:ai_zombie|zombie_dog)_[a-z0-9_]+)",AnimRole::(\w+)\}',ai):
             hits=[m.start()+1 for m in re.finditer(rb'[\x00\xff]'+re.escape(mw2.encode())+rb'\0',raw)]
             self.assertTrue(any(raw[h-136:h-128]==b'\xff'*8 for h in hits),f'{mw2} is not an XAnimParts in common.ff')
 
@@ -158,7 +161,9 @@ class ModelImportTests(unittest.TestCase):
         self.assertLess(setup.index('PinScriptStrings(args);'),setup.index('CallScriptThread('))
         dress=ai[ai.index('void DressZombie('):]
         self.assertLess(dress.index('PinScriptStrings({ScriptArg::String(kHelmetSwapNote)});'),dress.index('CallScriptThread('))
-        self.assertEqual(ai.count('CallScriptThread('),2)
+        self.assertEqual(ai.count('CallScriptThread('),3)   # Test46: DressHound moves the helmet too
+        hound=ai[ai.index('void DressHound(ZombieActor& z,const AiEntity& e,int time) {'):]
+        self.assertLess(hound.index('PinScriptStrings({ScriptArg::String(kHelmetSwapNote)});'),hound.index('CallScriptThread('))
         self.assertEqual(ai.count('CallScriptBuiltin('),1)
         self.assertIn('kScrAddStringType=7',self.bindings)
 
@@ -207,6 +212,8 @@ class BO1SoundTests(unittest.TestCase):
         exact={name for name,prefix in built if not prefix};prefixes=[name for name,prefix in built if prefix]
         # Test45: lists written under another MW2 name ({"bo1 name",channel,false,"mw2 name",...}).
         exact|=set(re.findall(r'\{"[a-z0-9_]+",mw2::kChannel\w+,false,"([a-z0-9_]+)"',self.build))
+        # Test46: looping lists kept looping ({"name",channel,false,nullptr,...,true}).
+        exact|=set(re.findall(r'\{"([a-z0-9_]+)",mw2::kChannel\w+,false,nullptr,[^}]*,true\}',self.build))
         for key,name in self.aliases().items():
             if key=='kStepPrefix':
                 self.assertIn(name,prefixes);continue
@@ -254,7 +261,9 @@ class BO1SoundTests(unittest.TestCase):
         for literal in ('"step_run_"','"generic_"','"gear_rattle"','"bodyfall_"'):self.assertIn(literal,classify)
         hook=self.body('void PlaySoundHook(')
         self.assertIn('sounds.zombieUntil[number]',hook)
-        self.assertIn('if(!z.dog) sounds.zombieUntil[',self.ai)
+        # Zombies and BO1 hellhounds (Test46), never MW2's own dogs.
+        self.assertIn('if(!z.dog || z.hound) sounds.zombieUntil[',self.ai)
+        self.assertIn('if(!nativeDog) sounds.zombieUntil[',self.ai)
 
 
 
@@ -284,7 +293,7 @@ class Test44Tests(unittest.TestCase):
         self.assertEqual(int(re.search(r'kLoadedSoundExpandedCount=(\d+)',self.bindings)[1]),4096)
 
     def test_spawns_prefer_walkable_points(self):
-        spawn=self.body('bool SpawnZombie(')
+        spawn=self.body('SpawnOutcome SpawnZombie(const bo1::SpawnRequest& request,const Snapshot& s,const AiScope& scope,int time) {')
         self.assertLess(spawn.index('NavBand('),spawn.index('SpawnPointBand('))
         self.assertIn('ZombieTemplate(t)',spawn)
         # Too few reachable spawners: walkable stand nodes join the band.
@@ -413,3 +422,101 @@ class Test45Tests(unittest.TestCase):
         spawn=self.body('WorldModel SpawnScriptModel(')
         self.assertIn('used+96>',spawn)
         self.assertIn('found!=1',spawn)
+
+
+class Test46Tests(unittest.TestCase):
+    """Test46: weapon options, the Spec Ops HUD/objectives/dialogue on
+    zombies levels, BO1 effects, powerup glow and hum, BO1 hellhounds."""
+    def setUp(self):
+        self.ai=(ROOT/'src'/'ai.cpp').read_text()
+        self.engine=(ROOT/'src'/'engine.cpp').read_text()
+        self.bindings=(ROOT/'include'/'zombie_bindings.hpp').read_text()
+        self.build=(ROOT/'include'/'bo1_sound_build.hpp').read_text()
+
+    def body(self,signature,end='\n}\n'):
+        start=self.ai.index(signature)
+        return self.ai[start:self.ai.index(end,start)]
+
+    def test_weapon_reads_accept_four_byte_aligned_assets(self):
+        read=self.engine[self.engine.index('w.complete'):self.engine.index('w.complete')+1200]
+        self.assertIn('kZoneAssetAlignMask',read)
+        self.assertNotRegex(read,r'w\.(complete|definition)&7')
+        self.assertIn('FeatureUpdateInterval(anyEnabled,menuVisible)',self.engine)
+
+    def test_spec_ops_hud_objectives_and_dialogue_only_on_zombies_levels(self):
+        prepare=self.body('void PrepareLevelScripts() {')
+        launch=prepare.index('if(!launch || !prep.bindings) return;')
+        self.assertLess(launch,prepare.index('SetLevelPatches(true)'))
+        self.assertLess(prepare.index('CheckSounds()'),prepare.index('MuteLevelDialogue()'))
+        restore=self.body('void RestoreLevelPrep(')
+        self.assertIn('SetLevelPatches(false);',restore)
+        self.assertIn('RestoreLevelDialogue();',restore)
+        self.assertIn('kSpecOpsDialogueFunctions',self.bindings)
+
+    def test_effects_are_registered_at_level_init_and_checked_before_use(self):
+        prepare=self.body('void PrepareLevelScripts() {')
+        self.assertLess(prepare.index('PrecacheModels()'),prepare.index('PrecacheEffects()'))
+        precache=self.body('unsigned PrecacheEffects() {')
+        self.assertIn('NOT_INITIALIZING',precache)
+        self.assertIn('kAssetTypeFx',precache)
+        on_tag=self.body('bool PlayFxOnTag(')
+        self.assertLess(on_tag.index('EntityHasTag(number,tag)'),on_tag.index('kBuiltinPlayFxOnTag'))
+        self.assertIn('kBuiltinStopFxOnTag',self.body('void StopFxOnTag('))
+        loop=self.body('bool PlayLoopSound(')
+        self.assertLess(loop.index('LoopAliasReady(alias)'),loop.index('kBuiltinPlayLoopSound'))
+        self.assertIn('kSndAliasLooping',self.body('bool LoopAliasReady('))
+        # Only valid ids reach playfx.
+        self.assertIn('if(!id ||',self.body('bool PlayFx(bo1fx::Effect e,const AiPoint& origin) {'))
+
+    def test_powerup_glow_hum_and_grab_flash(self):
+        spawn=self.body('void SpawnDropModel(ZombieDrop& drop,int time) {')
+        self.assertIn('bo1fx::Effect::PowerupOn',spawn)
+        self.assertIn('kPowerupLoop',spawn)
+        self.assertIn('bo1fx::Effect::PowerupGrab',self.body('void GrabPowerup('))
+        for loop in ('zmb_spawn_powerup_loop','zmb_hellhound_loop_fire','zmb_hellhound_loop_breath'):
+            self.assertRegex(self.build,r'\{"'+loop+r'",[^}]*,true\}')
+        self.assertIn('if(a.looping() && w.keepLoop) z.flags|=mw2::kFlagLooping;',self.build)
+
+    def test_effects_never_play_inside_the_damage_hook(self):
+        for signature in ('void QueueDrop(','bool ZombieDamage(','void QueueGib('):
+            body=self.body(signature)
+            for call in ('PlayFx(','PlayFxOnTag(','PlayLoopSound('):self.assertNotIn(call,body,f'{signature} {call}')
+
+    def test_zombies_rise_with_the_dirt_burst_and_billow(self):
+        rise=self.body('void StartRise(')
+        self.assertIn('bo1fx::Effect::RiseHandDirt',rise)
+        self.assertIn('PlayFxLater(bo1fx::Effect::RiseBodyDirt',rise)
+        self.assertIn('ServiceDelayedEffects(time);',self.body('void ServiceZombies(const Snapshot& s,const AiScope& scope,int time) {'))
+
+    def test_hellhounds_arrive_anywhere_with_the_bo1_sequence(self):
+        spawn=self.body('SpawnOutcome SpawnZombie(const bo1::SpawnRequest& request,const Snapshot& s,const AiScope& scope,int time) {')
+        self.assertIn('const bool hound=request.dogs && HoundsReady();',spawn)
+        self.assertIn('nativeDog?ai.dogPoints:',spawn)
+        self.assertIn('SpawnOutcome::Deferred',spawn)
+        service=self.body('void ServiceZombies(const Snapshot& s,const AiScope& scope,int time) {')
+        self.assertIn('if(outcome!=SpawnOutcome::Deferred)',service)
+        self.assertIn('ServiceHoundArrival(s,scope,time);',service)
+        begin=self.body('bool BeginHoundArrival(const bo1::SpawnRequest& request,const AiEntity& point,const AiEntity& chosen,float pathDistance,int time) {')
+        for part in ('DogLightningBuildup','kDogPrespawn','kHoundStrikeMs'):self.assertIn(part,begin)
+        arrive=self.body('void ServiceHoundArrival(')
+        for part in ('DogLightningSpawn','kDogBolt','kBuiltinEarthquake','CreateZombieActor(','zg.controller.confirm(a.request.ticket'):
+            self.assertIn(part,arrive)
+        self.assertLess(arrive.index('kBuiltinEarthquake'),arrive.index('CreateZombieActor('))
+        # Dog rounds no longer need MW2 dog spawners.
+        self.assertIn('if(!hounds && !zg.dogSpawners)',self.ai)
+        self.assertIn('ClearHoundArrival(levelAlive)',self.body('void ResetZombieGame(const char* reason,bool deleteActors) {'))
+
+    def test_hellhound_wears_the_wolf_crouched_with_its_effects(self):
+        dress=self.body('void DressHound(ZombieActor& z,const AiEntity& e,int time) {')
+        self.assertLess(dress.index('kActorAllowedStances,kStanceCrouch'),dress.index('kBuiltinSetModel'))
+        self.assertLess(dress.index('kBuiltinDetachAll'),dress.index('kBuiltinSetModel'))
+        for part in ('kWolfModel','DogEyes,e.number,"tag_eye"','DogFireTrail','DogAshTrail','kDogLoopFire','kDogLoopBreath'):self.assertIn(part,dress)
+        death=self.body('void HoundDeath(')
+        for part in ('StopFxOnTag(','kBuiltinStopLoopSound','DogExplosion','kBuiltinHide'):self.assertIn(part,death)
+        # Every leaf a hound needs is swapped, and only hounds crouch.
+        leaves=re.search(r'kHoundLeaves=\{([^}]+)\}',self.ai)[1]
+        for leaf in re.findall(r'"(\w+)"',leaves):self.assertRegex(self.ai,r'\{"'+leaf+r'","zombie_dog_\w+",AnimRole::')
+        melee=self.body('void ServiceMelee(')
+        self.assertIn('if(z.dog && !z.hound)return;',melee)
+        self.assertIn('AnimRole::DogAttack1',melee)
+        self.assertIn('z.hound?bo1::kDogMeleeDamage:bo1::kZombieMeleeDamage',self.body('void MeleeHit('))

@@ -19,7 +19,7 @@
 namespace mod::bo1models {
 namespace {
 // Bump when the generated zone changes so cached files are rebuilt.
-constexpr const char* kBuilderVersion="bo1mw2-models-3";   // Test45: powerups, dismemberment, HUD images
+constexpr const char* kBuilderVersion="bo1mw2-models-4";   // Test46: effects and the hellhound
 std::mutex mutex;
 std::condition_variable changed;
 Status status;
@@ -103,10 +103,13 @@ void Build() {
         if(!Replace(hudPath,pack.data(),pack.size())) Log("BO1_MODELS hud_write_failed=1");
         if(!Replace(manifestPath,manifest.data(),manifest.size())) Log("BO1_MODELS manifest_write_failed=1");
         result.state=State::Ready;result.bytes=file.size();
-        char summary[256];
-        std::snprintf(summary,sizeof(summary),"built models=%zu images=%zu image_bytes=%zu strings=%zu powerups=%d gibs=%d gib_pieces=%d extra_models=%zu hud_images=%zu/%zu",
+        char summary[384];
+        std::snprintf(summary,sizeof(summary),"built models=%zu images=%zu image_bytes=%zu strings=%zu powerups=%d gibs=%d gib_pieces=%d extra_models=%zu hud_images=%zu/%zu"
+            " hellhound=%d effects=%zu effect_elems=%zu effect_elems_dropped=%zu effect_materials=%zu effect_images=%zu",
             report.models,report.images,report.imageBytes,report.scriptStrings,report.powerups,report.gibs,report.gibPieces,report.extraModels,
-            hud.size(),bo1hud::kImages.size());
+            hud.size(),bo1hud::kImages.size(),report.wolf,report.effects,report.effectElems,report.effectDroppedElems,report.effectMaterials,report.effectImages);
+        // Test46: what the effect conversion left out (first 24 notes).
+        for(std::size_t n=0;n<report.effectNotes.size() && n<24;++n) notes+=" | fx "+report.effectNotes[n];
         result.detail=summary+notes;
     }();
     result.seconds=std::chrono::duration<double>(std::chrono::steady_clock::now()-begin).count();

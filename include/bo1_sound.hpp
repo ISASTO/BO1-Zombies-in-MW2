@@ -442,6 +442,7 @@ inline constexpr std::size_t kAliasListBytes=0x18,kAliasBytes=0x88,kSoundFileByt
 inline constexpr std::uint32_t kTypeLoaded=1u<<7;
 inline constexpr std::uint32_t kChannelAuto=3,kChannelAuto2d=10,kChannelBody=14,kChannelEffects1=19;
 inline constexpr std::uint32_t Flags(std::uint32_t channel) {return kTypeLoaded|(channel<<9);}
+inline constexpr std::uint32_t kFlagLooping=1u;   // Test46: playloopsound needs it
 inline constexpr const char* kDefaultCurve=",$default";
 // The default speaker map: {input channel, output speaker, level} per entry,
 // for mono -> stereo, mono -> 5.1, stereo -> stereo, stereo -> 5.1.

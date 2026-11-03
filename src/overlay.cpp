@@ -397,6 +397,7 @@ void Overlay::detach() {
 }
 void Overlay::invalidate() {
     InvalidateMpFeedback();
+    if(stateBlock){stateBlock->Release();stateBlock=nullptr;}   // before a device reset
     if(hitTexture){hitTexture->Release();hitTexture=nullptr;}hitAttempted=false;
     if (font) { font->Release(); font = nullptr; }
     fontAttempted = false;
@@ -406,6 +407,18 @@ void Overlay::invalidate() {
 }
 void Overlay::frame() {
     lastRenderThread = GetCurrentThreadId();
+    {   // Test46: frame times (one drawn EndScene per frame), reported with each heartbeat.
+        LARGE_INTEGER at{};QueryPerformanceCounter(&at);
+        if(!frameFrequency.QuadPart) QueryPerformanceFrequency(&frameFrequency);
+        if(lastFrameAt.QuadPart) {
+            const double ms=static_cast<double>(at.QuadPart-lastFrameAt.QuadPart)*1000.0/static_cast<double>(frameFrequency.QuadPart);
+            ++framesSeen;frameTotalMs+=ms;longestFrameMs=std::max(longestFrameMs,ms);
+            if(ms>=20.0) ++slowFrames20;
+            if(ms>=50.0) ++slowFrames50;
+            if(ms>=100.0) ++slowFrames100;
+        }
+        lastFrameAt=at;
+    }
     if (!settingsLoaded) { LoadFovPreference(menu.fov); settingsLoaded=true; }
     std::deque<Input> events;
     { std::lock_guard<std::mutex> lock(inputMutex); events.swap(inputQueue); }
@@ -504,7 +517,7 @@ void Overlay::frame() {
         visible = predicted.visible;
     }
     const ULONGLONG now = GetTickCount64();
-    UpdatePlayerFeatures(now);
+    UpdatePlayerFeatures(now,visible);
     if(!events.empty() || now>=nextSnapshotRead) {displaySnapshot=ReadSnapshot();nextSnapshotRead=now+50;}
     Snapshot s = displaySnapshot;
     UpdateAiControls(s,now,menu.visible && menu.page==Page::AI);
@@ -524,6 +537,9 @@ void Overlay::frame() {
         lastHeartbeat = now;
         Log("HEARTBEAT present=%u endscene=%u draws=%u inputs=%u resets=%u visible=%d render_thread=%lu",
             presents, endScenes, draws, inputs, resets, menu.visible, lastRenderThread);
+        Log("FRAME_PERF frames=%u average_ms=%.2f fps=%.0f slow_20ms=%u slow_50ms=%u slow_100ms=%u longest_ms=%.1f",framesSeen,
+            framesSeen?frameTotalMs/framesSeen:0.0,frameTotalMs>0?framesSeen*1000.0/frameTotalMs:0.0,slowFrames20,slowFrames50,slowFrames100,longestFrameMs);
+        framesSeen=slowFrames20=slowFrames50=slowFrames100=0;frameTotalMs=longestFrameMs=0;
         LogSnapshot();
         LogZombieRehearsal();
         LogZombieGame();
@@ -550,9 +566,9 @@ void Overlay::frame() {
     if(zombie.gameOverRound!=seenGameOver) { seenGameOver=zombie.gameOverRound; gameOverAt=now; }
     const bool showGameOver=zombie.gameOverRound>0 && !zombie.running && now-gameOverAt<10000 && s.state!=LevelState::NoLevel;
     if (!menu.visible && !menu.hud && !hitAlpha && !zombie.running && !showGameOver) return;
-    IDirect3DStateBlock9* state = nullptr;
-    if (FAILED(device->CreateStateBlock(D3DSBT_ALL, &state)) || !state) return;
-    if (FAILED(state->Capture())) { state->Release(); return; }
+    if (!stateBlock && (FAILED(device->CreateStateBlock(D3DSBT_ALL, &stateBlock)) || !stateBlock)) { stateBlock=nullptr; return; }
+    IDirect3DStateBlock9* state = stateBlock;
+    if (FAILED(state->Capture())) return;
     D3DVIEWPORT9 savedViewport{};
     D3DMATRIX world{}, view{}, projection{};
     const HRESULT viewportResult = device->GetViewport(&savedViewport);
@@ -561,9 +577,9 @@ void Overlay::frame() {
     const HRESULT projectionResult = device->GetTransform(D3DTS_PROJECTION, &projection);
     IDirect3DSurface9* target = nullptr;
     D3DSURFACE_DESC size{};
-    if (FAILED(device->GetRenderTarget(0, &target)) || !target) { state->Apply(); state->Release(); return; }
+    if (FAILED(device->GetRenderTarget(0, &target)) || !target) { state->Apply(); return; }
     HRESULT sizeResult = target->GetDesc(&size); target->Release();
-    if (FAILED(sizeResult) || !size.Width || !size.Height) { state->Apply(); state->Release(); return; }
+    if (FAILED(sizeResult) || !size.Width || !size.Height) { state->Apply(); return; }
     D3DVIEWPORT9 full{0,0,size.Width,size.Height,0,1}; device->SetViewport(&full);
     if ((menu.visible || menu.hud) && !font && !fontAttempted) BuildFont(*this);
     Configure(device);
@@ -757,8 +773,8 @@ void Overlay::frame() {
                     char sound[16];
                     if(zombie.soundLists) std::snprintf(sound,sizeof(sound),"S%d",zombie.soundLists);
                     else std::snprintf(sound,sizeof(sound),"S-%.8s",zombie.bo1Sounds);
-                    if(zombie.levelPrepared && zombie.modelsPrecached) std::snprintf(value,sizeof(value),"A%d/%d M%d P%d G%d %s",zombie.animSlotsApplied,
-                        zombie.animSlotsWanted,zombie.modelsPrecached,zombie.powerupModels,zombie.gibModels,sound);
+                    if(zombie.levelPrepared && zombie.modelsPrecached) std::snprintf(value,sizeof(value),"A%d/%d M%d P%d G%d H%d F%d %s",zombie.animSlotsApplied,
+                        zombie.animSlotsWanted,zombie.modelsPrecached,zombie.powerupModels,zombie.gibModels,zombie.hounds?1:0,zombie.effects,sound);
                     else if(zombie.levelPrepared) std::snprintf(value,sizeof(value),"A%d/%d M-%.8s %s SO%d",zombie.animSlotsApplied,zombie.animSlotsWanted,zombie.bo1Models,sound,zombie.specOpsGuards);
                     else std::snprintf(value,sizeof(value),"%.8s %d/%d M %.8s S %.8s",zombie.bo1Assets,zombie.bo1AnimsFound,zombie.bo1AnimsWanted,zombie.bo1Models,zombie.bo1Sounds);
                     status=value;
@@ -886,14 +902,14 @@ void Overlay::frame() {
                 "Loads the Spec Ops map, clears its AI, USP .45, BO1 rounds.",
                 "LEFT/RIGHT: Spec Ops map. ENTER loads it (also from main menu).",
                 "LEFT/RIGHT: 1-100. BO1 normal solo counts and health.",
-                "BO1 dog rounds; needs a map with dog spawners.",
+                "BO1 dog rounds: hellhounds on any map (H1 below).",
                 "REMOVE deletes Price, Soap etc. KEEP lets them fight.",
                 "Rounds, intro and 10 s break follow BO1 timings.",
                 "500 start, 10 per hit, 50-130 per kill (x2 doubles).",
                 "Alive now + still to spawn this round (24 at once).",
                 "Headshot kills give the 50 point bonus.",
                 "Kaboom, insta-kill, double points, max ammo.",
-                "BO1 anims (A), models (M), sounds (S) from your Black Ops install.",
+                "Black Ops: A anims M models P powerups G gibs H hounds F fx S sound",
                 "Logs round, points, powerups and native results."
             };
             footer=MenuText<Page::ZombieGame>(hints,menu.selected);
@@ -1005,7 +1021,6 @@ void Overlay::frame() {
     if (SUCCEEDED(viewResult)) device->SetTransform(D3DTS_VIEW,&view);
     if (SUCCEEDED(projectionResult)) device->SetTransform(D3DTS_PROJECTION,&projection);
     if (SUCCEEDED(viewportResult)) device->SetViewport(&savedViewport);
-    state->Release();
     ++draws;
     if (draws==1) Log("DRAW first overlay frame backbuffer=%ux%u font=%d menu_scale=%.2f panel=%.0fx%.0f visible_rows=%d",size.Width,size.Height,font!=nullptr,
         scale,660*scale,panelHeight*scale,menu.count());

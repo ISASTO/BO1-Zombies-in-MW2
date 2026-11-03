@@ -236,8 +236,11 @@ static void TestPipeline() {
     // Test45: the character's 6 models plus its 9 dismemberment models and 4
     // thrown pieces (no common_zombie zone: no powerups); the gore material's
     // textures are not in these archives (a dark red fallback image).
-    Check(report.models==6+13 && report.images==9 && !std::memcmp(ff.data(),"IWffu100",8),"pipeline fastfile");
-    Check(report.gibs && report.gibPieces && !report.powerups && report.extraModels==13 && report.extraFallbacks.size()==3,"pipeline dismemberment models");
+    // Test46: plus the hellhound (Kino's zombie wolf), whose 3 textures are
+    // not in these archives either (2 more images: its body and eyes).
+    Check(report.models==6+14 && report.images==11 && !std::memcmp(ff.data(),"IWffu100",8),"pipeline fastfile");
+    Check(report.gibs && report.gibPieces && !report.powerups && report.extraModels==14 && report.extraFallbacks.size()==6,"pipeline dismemberment models");
+    Check(report.wolf && !report.effects,"pipeline hellhound, no effects without common_zombie");
     std::printf("pipeline: %zu byte fastfile, %zu images (%zu bytes), notes=%zu\n",ff.size(),report.images,report.imageBytes,report.notes.size());
     // Every texture missing except colour maps -> still builds; no colour -> refused.
     const auto colours=MakeZip({{"images/c_ger_zombie_head1_c.iwi",dxt1(16),0},{"images/~-gzombie_eye.iwi",dxt1(16),0},

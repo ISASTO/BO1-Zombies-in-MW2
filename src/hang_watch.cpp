@@ -234,7 +234,11 @@ DWORD WINAPI Watch(void*) {
             if(driverNoted) Log("HANG_DRIVER_WAIT ended stalled_ms=%llu",static_cast<unsigned long long>(now-progress));
             lastServer=s;lastRender=r;progress=now;reported=false;driverNoted=false;continue;
         }
-        if(!armed.load() || reported || reports>=kMaxReports || now-progress<kHangMilliseconds || !ForegroundIsOurs()) continue;
+        // Test46: a stall counts only while MW2 is the foreground window. In
+        // Test45 the game sat in the background for minutes (alt-tab, device
+        // lost, frames stopped) and was "reported" the moment it came back.
+        if(!ForegroundIsOurs()) {progress=now;continue;}
+        if(!armed.load() || reported || reports>=kMaxReports || now-progress<kHangMilliseconds) continue;
         std::uint64_t rip=0;
         if(now-progress<kDriverWaitMilliseconds && DriverWait(mainThread.load(),rip)) {
             if(!driverNoted && driverWaits<16) {

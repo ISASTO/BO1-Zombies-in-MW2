@@ -25,6 +25,8 @@
 #include "hang_watch.hpp"
 #include "nav_graph.hpp"
 #include "asset_pools.hpp"
+#include "zombie_level_quiet.hpp"
+#include "bo1_fx.hpp"
 #include <atomic>
 #include <set>
 #include <string_view>
@@ -1365,6 +1367,12 @@ struct ZombieActor {
     // it lost its head or a limb already.
     const char* body=nullptr;const char* head=nullptr;
     bool headGibbed=false,gibbed=false;
+    // Test46: sunk below a floor (two checks in a row) -> lifted onto it.
+    int nextFloorCheck=0,sunkChecks=0;
+    // Test46: a BO1 hellhound (a human actor wearing the zombie wolf, held
+    // crouched for the dog animations); its eye glow and trail effects and
+    // its trail loop sound.
+    bool hound=false,houndDressed=false,houndFx=false,fireTrail=false;
 };
 struct ZombieDrop {
     bo1::Powerup type=bo1::Powerup::None; AiPoint origin{}; int spawned=0;
@@ -1402,7 +1410,7 @@ struct ZombieGameState {
     // Test45: GAME OVER -> main menu, the level gone, a pending launch that
     // saw a load, and the world models of dropped powerups.
     ULONGLONG menuAt=0,noLevelSince=0;bool pendingSawLoad=false;
-    unsigned dropModelsSpawned=0,dropModelFailures=0;
+    unsigned dropModelsSpawned=0,dropModelFailures=0,unstuck=0,wobbles=0;
     std::vector<std::pair<unsigned,std::uint32_t>> deleteModels;   // removed outside the service, deleted by it
 } zg;
 int ZombieRandom(int n) {
@@ -1461,7 +1469,8 @@ enum class AnimRole : int {Move,Idle,Death,
     RiseWalk,RiseWalk2,RiseRun,RiseSprint,                                   // _zombie_rise_anims
     Attack1,Attack2,Attack4,Attack6,AttackForward1,AttackForward2,             // _zombie_melee
     WalkAttack1,WalkAttack2,WalkAttack3,WalkAttack4,                            // _zombie_walk_melee
-    RunAttack1,RunAttack2,RunAttack3,Count};                                    // _zombie_run_melee
+    RunAttack1,RunAttack2,RunAttack3,                                          // _zombie_run_melee
+    DogAttack1,DogAttack2,Count};                                              // Test46: hellhound melee
 struct AnimSlot { const char* mw2; const char* bo1; AnimRole role; };
 // MW2 animscripts (animset.gsc, walk.gsc, run.gsc, stop.gsc, death.gsc):
 // walkers play walk_cqb_f, runners run_lowready_f, sprinters (enable_sprint)
@@ -1528,7 +1537,23 @@ inline constexpr AnimSlot kAnimSlots[]={
     {"traverse_stair_run","ai_zombie_walk_v1",AnimRole::Move},{"traverse_stair_run_down_01","ai_zombie_walk_v2",AnimRole::Move},
     {"traverse_stair_run_01","ai_zombie_run_v2",AnimRole::Move},{"traverse_stair_run_down","ai_zombie_run_v3",AnimRole::Move},
     {"walk_left","ai_zombie_walk_v1",AnimRole::Move},{"walk_right","ai_zombie_walk_v1",AnimRole::Move},
-    {"walk_backward","ai_zombie_walk_v2",AnimRole::Move}};
+    {"walk_backward","ai_zombie_walk_v2",AnimRole::Move},
+    // Test46: the BO1 hellhound. It is a human actor wearing the zombie wolf
+    // and held crouched (actor stance mask), so MW2's animscripts play their
+    // crouch leaves on it: the crouch run (run.gsc crouchrun, all four
+    // directions), the crouch idles (stop.gsc casual crouch idle and its
+    // transition, combat's exposed crouch idles) and the stance change. No
+    // zombie crouches. Its attacks use two crouch combat leaves a hound never
+    // plays itself (no weapon, ignoring everyone).
+    {"crouch_fastwalk_F","zombie_dog_run",AnimRole::Move},{"crouch_fastwalk_L","zombie_dog_run",AnimRole::Move},
+    {"crouch_fastwalk_R","zombie_dog_run",AnimRole::Move},{"crouch_fastwalk_B","zombie_dog_run",AnimRole::Move},
+    {"casual_crouch_idle","zombie_dog_idle",AnimRole::Idle},{"casual_crouch_idle_in","zombie_dog_run_stop",AnimRole::Idle},
+    {"exposed_crouch_idle_alert_v1","zombie_dog_attackidle",AnimRole::Idle},{"exposed_crouch_idle_alert_v2","zombie_dog_idle",AnimRole::Idle},
+    {"exposed_crouch_idle_alert_v3","zombie_dog_attackidle",AnimRole::Idle},{"exposed_stand_2_crouch","zombie_dog_run_stop",AnimRole::Idle},
+    {"exposed_crouch_shoot_auto_v2","zombie_dog_run_attack",AnimRole::DogAttack1},
+    {"exposed_crouch_reload","zombie_dog_run_attack_low",AnimRole::DogAttack2}};
+// The MW2 leaves a hellhound needs swapped before it can be used.
+inline constexpr std::array<const char*,3> kHoundLeaves={"crouch_fastwalk_F","casual_crouch_idle","exposed_crouch_shoot_auto_v2"};
 // level._zombie_melee / _zombie_walk_melee / _zombie_run_melee (_zombiemode.gsc).
 inline constexpr AnimRole kMeleeAnims[]={AnimRole::Attack2,AnimRole::Attack4,AnimRole::Attack6,AnimRole::Attack1,AnimRole::AttackForward1,AnimRole::AttackForward2};
 inline constexpr AnimRole kWalkMeleeAnims[]={AnimRole::WalkAttack1,AnimRole::WalkAttack2,AnimRole::WalkAttack3,AnimRole::WalkAttack4};
@@ -1574,7 +1599,29 @@ struct ModelPrep {
     // dismemberment models; what dismemberment did on this level.
     std::array<bool,4> powerups{};bool gibs=false,gibPieces=false;
     unsigned headGibs=0,limbGibs=0,gibFailures=0,piecesThrown=0;
+    // Test46: the hellhound model (bo1model::kWolfModel) precached.
+    bool wolf=false;unsigned houndsDressed=0,houndDressFailures=0;
 } models;
+// ---- Test46: BO1 effects (bo1_fx.hpp, in the model zone) ----
+struct EffectPrep {
+    bool bindings=false;            // G_EffectIndex, SL_FindString, SV_DObjGetBoneIndex verified
+    std::array<int,static_cast<std::size_t>(bo1fx::Effect::Count)> index{};   // effect configstring index, 0 when absent
+    unsigned precached=0,played=0,onTag=0,refused=0,loops=0;
+    struct Delayed {bo1fx::Effect effect;AiPoint origin;int at;};
+    std::vector<Delayed> delayed;   // effects due later (the rise billow)
+} effects;
+bool worldBindings=false,test46Bindings=false;
+// Test46: a hellhound needs its model precached and the MW2 crouch leaves
+// carrying the BO1 dog animations; without them dog rounds keep MW2's own
+// dogs (maps with dog spawners) as before.
+bool AnimSwapped(const char* mw2) {
+    return std::any_of(prep.applied.begin(),prep.applied.end(),[&](const auto& a){return a.mw2==mw2;});
+}
+bool HoundsReady() {
+    if(!models.wolf || !worldBindings || !test46Bindings) return false;
+    for(const auto* leaf:kHoundLeaves) if(!AnimSwapped(leaf)) return false;
+    return true;
+}
 // ---- Test43: BO1 zombie sounds ----
 struct SoundPrep {
     bool bindings=false,hookInstalled=false;
@@ -1678,7 +1725,6 @@ bool InstallPlaySoundHook() {
 // next level load, so campaign and Spec Ops music are untouched. The map's
 // ambience (ambientplay) is a different builtin and keeps playing.
 CodeEdit musicEdit;bool musicEditPlanned=false;
-bool worldBindings=false;
 void MusicPlayBlocked() {sounds.musicBlocked.fetch_add(1,std::memory_order_relaxed);}
 bool SetMusicBlock(bool block) {
     if(block==sounds.musicHookActive) return true;
@@ -1701,6 +1747,150 @@ bool SetMusicBlock(bool block) {
     if(changed) sounds.musicHookActive=block;
     Log("BO1_MUSIC block=%d changed=%d blocked_calls=%u",block,changed,sounds.musicBlocked.load());
     return changed;
+}
+// ---- Test46: a quiet zombies level (no Spec Ops HUD, objectives or dialogue) ----
+// Code patches that live only while a level launched for zombies is loaded
+// (installed while its scripts link, removed at the next level load), like
+// the music block above.
+struct LevelPatch {const char* name=nullptr;std::uintptr_t rva=0;std::array<std::uint8_t,16> prologue{};std::uintptr_t target=0;
+    CodeEdit edit;bool planned=false,refused=false,active=false;};
+std::vector<LevelPatch> levelPatches;
+struct QuietState {
+    std::atomic<unsigned> objectiveCalls{0},hudUpdates{0},hudElemsHidden{0};
+    unsigned patchesActive=0,patchesWanted=0,dialogueGuards=0;
+    unsigned aliasesMuted=0,aliasListsMuted=0,aliasListsSeen=0,restored=0,restoreSkipped=0;
+    struct Muted {std::uintptr_t list=0,alias=0;std::string name;float volMin=1.f,volMax=1.f;};
+    std::vector<Muted> muted;
+} quietLevel;
+void ObjectiveBlocked() {quietLevel.objectiveCalls.fetch_add(1,std::memory_order_relaxed);}
+// HudElem_UpdateClient(dest, clientNum) as MW2 does it, minus every script
+// hudelem: the client's array is cleared up to its first free entry.
+void HudElemUpdateHook(std::uint8_t* dest,unsigned clientNum) {
+    (void)clientNum;
+    quietLevel.hudUpdates.fetch_add(1,std::memory_order_relaxed);
+    const auto* elems=reinterpret_cast<const std::uint8_t*>(aiProfile.base+kHudElemsRva);
+    unsigned hidden=0;
+    for(std::size_t i=0;i<kHudElemCount;++i) {
+        std::int32_t type=0;std::memcpy(&type,elems+i*kGameHudElemBytes,4);
+        if(type) ++hidden;
+    }
+    if(hidden) quietLevel.hudElemsHidden.store(hidden,std::memory_order_relaxed);
+    for(std::size_t n=0;n<kHudElemCount;++n) {
+        auto* d=dest+(n+kHudElemDestFirst)*kHudElemBytes;
+        std::int32_t type=0;std::memcpy(&type,d,4);
+        if(!type) break;
+        std::memset(d,0,kHudElemBytes);
+    }
+}
+void PlanLevelPatches() {
+    if(!levelPatches.empty()) return;
+    LevelPatch hud;hud.name="hudelem_update_client";hud.rva=kHudElemUpdateClientRva;hud.prologue=kHudElemUpdateClientPrologue;
+    hud.target=reinterpret_cast<std::uintptr_t>(&HudElemUpdateHook);levelPatches.push_back(hud);
+    for(const auto& b:kObjectiveBuiltins) {
+        LevelPatch p;p.name=b.name;p.rva=b.rva;p.prologue=b.prologue;p.target=reinterpret_cast<std::uintptr_t>(&ObjectiveBlocked);
+        levelPatches.push_back(p);
+    }
+}
+unsigned SetLevelPatches(bool on) {
+    PlanLevelPatches();
+    unsigned active=0,refused=0;
+    for(auto& p:levelPatches) {
+        if(on && !p.planned && !p.refused) {
+            const auto at=aiProfile.base+p.rva;
+            std::array<std::uint8_t,16> observed{};
+            void* relay=nullptr;std::array<std::uint8_t,5> code{};
+            if((at&15) || !ReadAi(at,observed.data(),observed.size()) || observed!=p.prologue
+               || !(relay=Relay(at,p.target)) || !RelativeCall(at,reinterpret_cast<std::uintptr_t>(relay),code)) {
+                p.refused=true;Log("ZOMBIE_QUIET patch=%s refused=1 reason=%s",p.name,observed!=p.prologue?"PROLOGUE":"RELAY");
+            } else {
+                code[0]=0xe9;p.edit.at=at;p.edit.before=observed;p.edit.after=observed;
+                std::memcpy(p.edit.after.data(),code.data(),code.size());p.planned=true;
+            }
+        }
+        if(p.refused) {++refused;continue;}
+        if(p.planned && p.active!=on && ExchangeCode(p.edit,on)) p.active=on;
+        if(p.active) ++active;
+    }
+    quietLevel.patchesActive=active;quietLevel.patchesWanted=static_cast<unsigned>(levelPatches.size());
+    Log("ZOMBIE_QUIET patches=%d active=%u/%llu refused=%u",on,active,static_cast<unsigned long long>(levelPatches.size()),refused);
+    return active;
+}
+// Every sound alias list in the asset database (all loaded zones).
+template<class Visit> void ForEachSoundAliasList(Visit visit) {
+    const auto table=aiProfile.base+kAssetHashTableRva,pool=aiProfile.base+kAssetEntryPoolRva;
+    std::vector<std::uint16_t> buckets(kAssetHashBuckets);
+    if(!ReadAi(table,buckets.data(),buckets.size()*2)) return;
+    for(const auto first:buckets) {
+        unsigned guard=0;
+        for(std::uint16_t index=first;index && guard<4096;++guard) {
+            const auto entry=pool+static_cast<std::uintptr_t>(index)*kAssetEntryBytes;
+            std::int32_t type=0;std::uintptr_t header=0;std::uint16_t next=0;
+            if(!Value(entry,type) || !Value(entry+8,header) || !Value(entry+kAssetEntryNext,next)) break;
+            if(type==kAssetTypeSound && header) visit(header);
+            index=next;
+        }
+    }
+}
+std::string SoundFilePath(std::uintptr_t file) {
+    std::uint8_t type=0;std::uintptr_t a=0,b=0;char one[128]{},two[128]{};
+    if(!file || !Value(file,type) || !Value(file+8,a)) return {};
+    if(type==kSoundFileStreamed) {
+        Value(file+0x10,b);
+        if(a) CString(a,one,sizeof(one));
+        if(b) CString(b,two,sizeof(two));
+        return std::string(one)+"/"+two;
+    }
+    if(type==kSoundFileLoaded) {std::uintptr_t name=0;if(a && Value(a,name) && name) CString(name,one,sizeof(one));return one;}
+    return {};
+}
+// MW2's dialogue plays at volume 0 on a zombies level (zombie_level_quiet.hpp).
+void MuteLevelDialogue() {
+    quietLevel.muted.clear();quietLevel.aliasesMuted=quietLevel.aliasListsMuted=quietLevel.aliasListsSeen=0;
+    LARGE_INTEGER a{},b{},f{};QueryPerformanceCounter(&a);
+    ForEachSoundAliasList([&](std::uintptr_t list) {
+        ++quietLevel.aliasListsSeen;
+        std::uintptr_t namePtr=0,head=0;std::int32_t count=0;char name[128]{};
+        if(!Value(list,namePtr) || !namePtr || !CString(namePtr,name,sizeof(name)) || !Value(list+8,head) || !head
+           || !Value(list+kSndAliasListCount,count) || count<=0 || count>256) return;
+        if(SoundAvailable(name)) return;                          // a BO1 list of the generated zone
+        bool listMuted=false;
+        for(std::int32_t i=0;i<count;++i) {
+            const auto alias=head+static_cast<std::uintptr_t>(i)*kSndAliasBytes;
+            std::uintptr_t file=0;float volMin=0.f,volMax=0.f;
+            if(!Value(alias+kSndAliasSoundFile,file) || !Value(alias+kSndAliasVolMin,volMin) || !Value(alias+kSndAliasVolMax,volMax)) continue;
+            if(!quiet::Dialogue(name,SoundFilePath(file))) continue;
+            if((volMin==0.f && volMax==0.f) || !Writable(alias+kSndAliasVolMin) || !Writable(alias+kSndAliasVolMax)) continue;
+            quietLevel.muted.push_back({list,alias,name,volMin,volMax});
+            *reinterpret_cast<volatile float*>(alias+kSndAliasVolMin)=0.f;*reinterpret_cast<volatile float*>(alias+kSndAliasVolMax)=0.f;
+            ++quietLevel.aliasesMuted;listMuted=true;
+        }
+        if(listMuted) ++quietLevel.aliasListsMuted;
+    });
+    QueryPerformanceCounter(&b);QueryPerformanceFrequency(&f);
+    Log("ZOMBIE_QUIET dialogue_lists=%u/%u aliases_muted=%u scan_ms=%.1f",quietLevel.aliasListsMuted,quietLevel.aliasListsSeen,quietLevel.aliasesMuted,
+        static_cast<double>(b.QuadPart-a.QuadPart)*1000.0/static_cast<double>(f.QuadPart));
+}
+// Back to their volumes, but only aliases whose list is still the database's
+// entry of that name (an unloaded level zone's memory is never touched).
+void RestoreLevelDialogue() {
+    if(quietLevel.muted.empty()) return;
+    const auto find=reinterpret_cast<std::uintptr_t(*)(int,const char*)>(aiProfile.base+kDbFindXAssetEntryRva);
+    std::unordered_map<std::string,bool> live;
+    for(const auto& m:quietLevel.muted) {
+        auto it=live.find(m.name);
+        if(it==live.end()) {
+            const auto entry=find(kAssetTypeSound,m.name.c_str());
+            std::uintptr_t header=0;
+            it=live.emplace(m.name,entry && Value(entry+8,header) && header==m.list).first;
+        }
+        float volMin=1.f,volMax=1.f;
+        if(!it->second || !Value(m.alias+kSndAliasVolMin,volMin) || !Value(m.alias+kSndAliasVolMax,volMax) || volMin!=0.f || volMax!=0.f
+           || !Writable(m.alias+kSndAliasVolMin)) {++quietLevel.restoreSkipped;continue;}
+        *reinterpret_cast<volatile float*>(m.alias+kSndAliasVolMin)=m.volMin;*reinterpret_cast<volatile float*>(m.alias+kSndAliasVolMax)=m.volMax;
+        ++quietLevel.restored;
+    }
+    Log("ZOMBIE_QUIET dialogue_restored=%u skipped=%u",quietLevel.restored,quietLevel.restoreSkipped);
+    quietLevel.muted.clear();
 }
 // The alias lists of the generated zone that this level actually holds.
 unsigned CheckSounds() {
@@ -1762,6 +1952,8 @@ void RestoreLevelPrep(const char* reason) {
     prep.roleParts.fill(0);prep.roleAnim.fill(nullptr);prep.guards.clear();prep.prepared=false;prep.map.clear();
     prep.setup.fill(0);
     SetMusicBlock(false);
+    SetLevelPatches(false);     // Test46
+    RestoreLevelDialogue();
 }
 unsigned ApplySpecOpsGuards() {
     const auto base=aiProfile.base;
@@ -1769,7 +1961,9 @@ unsigned ApplySpecOpsGuards() {
     if(!Value(base+kScrProgramBufferRva,program) || !Value(base+kScrProgramSizeRva,size) || !program || !size) {Log("SO_GUARD program_buffer=UNAVAILABLE");return 0;}
     const auto handleOf=reinterpret_cast<GetFunctionHandleFn>(base+kScrGetFunctionHandleRva);
     unsigned applied=0;
-    for(const auto& f:kSpecOpsEndFunctions) {
+    std::vector<ScriptFunctionRef> functions(kSpecOpsEndFunctions.begin(),kSpecOpsEndFunctions.end());
+    functions.insert(functions.end(),kSpecOpsDialogueFunctions.begin(),kSpecOpsDialogueFunctions.end());   // Test46
+    for(const auto& f:functions) {
         const int handle=handleOf(f.file,f.function);
         if(handle<=0 || static_cast<std::uint32_t>(handle)>=size) {Log("SO_GUARD function=%s::%s present=0",f.file,f.function);continue;}
         const auto code=program+static_cast<std::uint32_t>(handle);
@@ -1848,6 +2042,7 @@ unsigned CaptureSetupFunctions() {
     return found;
 }
 unsigned PrecacheModels();
+unsigned PrecacheEffects();
 int CaptureHelmetSwap();
 void PrepareLevelScripts() {
     char map[96]{};bool launch=false;
@@ -1868,10 +2063,12 @@ void PrepareLevelScripts() {
     prep.map=map;
     ResetPinnedStrings(map);
     SetMusicBlock(true);   // Test45: no mission music on a zombies level
+    SetLevelPatches(true); // Test46: no Spec Ops HUD or objectives
     const auto guards=SpecOpsMapIndex(map)>=0?ApplySpecOpsGuards():0u;
     const auto anims=ApplyAnimSwaps();
     models.helmetSwap=prep.threads?CaptureHelmetSwap():0;
     const auto precached=PrecacheModels();
+    const auto fxPrecached=PrecacheEffects();   // Test46
     if(models.appended) {
         bo1models::GuardLoaded();                    // the zone loaded without an error
         if(!models.precached) bo1models::GuardUnused();   // nothing will wear the models on this level
@@ -1887,12 +2084,14 @@ void PrepareLevelScripts() {
             +SoundAvailable(bo1sounds::alias::kDogRoundOver)+SoundAvailable(bo1sounds::alias::kGameOver),sounds.hookInstalled);
     }
     sounds.active=sounds.appended && soundLists>0;
+    MuteLevelDialogue();   // Test46: no MW2 dialogue (after CheckSounds: BO1's own lists stay)
     // Test44: how full the (enlarged) loaded_sound pool is with this level.
     Log("ASSET_POOLS level=%s loaded_sound_in_use=%d capacity=%d expanded=%d",map,assetpools::LoadedSoundsInUse(),
         assetpools::GetStatus().applied?assetpools::GetStatus().loadedSoundCapacity:kLoadedSoundStockCount,assetpools::GetStatus().applied);
     prep.prepared=true;
-    Log("LEVEL_PREP map=%s so_guards=%u/%llu anims=%u bo1_models=%u zone_loaded=%d bo1_sounds=%u sound_zone_loaded=%d",map,guards,
-        static_cast<unsigned long long>(kSpecOpsEndFunctions.size()),anims,precached,models.appended,soundLists,sounds.appended);
+    Log("LEVEL_PREP map=%s so_guards=%u/%llu anims=%u bo1_models=%u zone_loaded=%d bo1_sounds=%u sound_zone_loaded=%d bo1_effects=%u hounds=%d",map,guards,
+        static_cast<unsigned long long>(kSpecOpsEndFunctions.size()+kSpecOpsDialogueFunctions.size()),anims,precached,models.appended,soundLists,sounds.appended,
+        fxPrecached,HoundsReady());
 }
 void LevelScriptsLoadedHook() {
     try {PrepareLevelScripts();}
@@ -2034,10 +2233,95 @@ unsigned PrecacheModels() {
             models.gibPieces=pieces;
         }
     }
-    Log("BO1_MODELS precache=%d bodies=%llu heads=%llu model_slots_free=%u helmet_swap=%d powerups=%d%d%d%d gibs=%d gib_pieces=%d",models.precached,
+    // Test46: the hellhound.
+    models.wolf=false;
+    if(models.precached && worldBindings && slotsLeft(1) && precache(bo1model::kWolfModel)) {models.wolf=true;++extra;}
+    Log("BO1_MODELS precache=%d bodies=%llu heads=%llu model_slots_free=%u helmet_swap=%d powerups=%d%d%d%d gibs=%d gib_pieces=%d hellhound=%d",models.precached,
         static_cast<unsigned long long>(models.bodies.size()),static_cast<unsigned long long>(models.heads.size()),free,models.helmetSwap!=0,
-        models.powerups[0],models.powerups[1],models.powerups[2],models.powerups[3],models.gibs,models.gibPieces);
+        models.powerups[0],models.powerups[1],models.powerups[2],models.powerups[3],models.gibs,models.gibPieces,models.wolf);
     return static_cast<unsigned>(models.bodies.size()+models.heads.size())+extra;
+}
+// Test46: register the converted effects (G_EffectIndex) while
+// level.initializing, after checking each is the real FxEffectDef from the
+// zone (DB entry, header name) and effect configstrings remain.
+using EffectIndexFn=int(*)(const char*);
+unsigned PrecacheEffects() {
+    effects.index.fill(0);effects.precached=0;effects.delayed.clear();
+    if(!models.appended || !effects.bindings) return 0;
+    const auto base=aiProfile.base;
+    int initializing=0;
+    if(!Value(base+kLevelInitializingRva,initializing) || !initializing) {Log("BO1_FX precache=0 reason=NOT_INITIALIZING");return 0;}
+    std::uint16_t empty=0;unsigned free=0;
+    if(!Value(base+kEmptyStringIdRva,empty)) return 0;
+    for(unsigned i=1;i<kMaxEffects;++i) {std::uint16_t v=0;if(Value(base+kConfigstringsRva+2*(kEffectConfigstringBase+i),v) && v==empty) ++free;}
+    if(free<bo1fx::kEffects.size()+24) {Log("BO1_FX precache=0 reason=EFFECT_SLOTS free=%u",free);return 0;}
+    const auto find=reinterpret_cast<FindAssetEntryFn>(base+kDbFindXAssetEntryRva);
+    const auto index=reinterpret_cast<EffectIndexFn>(base+kGEffectIndexRva);
+    for(std::size_t k=0;k<bo1fx::kEffects.size();++k) {
+        const char* name=bo1fx::kEffects[k];
+        const auto entry=find(kAssetTypeFx,name);
+        std::uintptr_t header=0,namePtr=0;char text[96]{};std::int32_t elems=0;
+        const auto length=std::strlen(name);
+        if(!entry || length>=sizeof(text) || !Value(entry+kAssetEntryHeader,header) || !header || !Value(header,namePtr) || !namePtr
+           || !ReadAi(namePtr,text,length+1) || std::strcmp(text,name) || !Value(header+0x14,elems)) {Log("BO1_FX effect=%s present=0",name);continue;}
+        const int id=index(name);
+        if(id>0 && id<static_cast<int>(kMaxEffects)) {effects.index[k]=id;++effects.precached;}
+    }
+    Log("BO1_FX precache=%u/%llu effect_slots_free=%u",effects.precached,static_cast<unsigned long long>(bo1fx::kEffects.size()),free);
+    return effects.precached;
+}
+int EffectId(bo1fx::Effect e) {return effects.index[static_cast<std::size_t>(e)];}
+// playfx(id, origin): fire-and-forget at a point.
+bool PlayFx(bo1fx::Effect e,const AiPoint& origin) {
+    const int id=EffectId(e);
+    if(!id || !worldBindings || !FinitePoint(origin)) return false;
+    if(Builtin(kBuiltinPlayFx,0,{ScriptArg::Int(id),ScriptArg::Vector(origin)})!=ScriptCallResult::Ok) {++effects.refused;return false;}
+    ++effects.played;return true;
+}
+void PlayFxLater(bo1fx::Effect e,const AiPoint& origin,int at) {
+    if(EffectId(e) && effects.delayed.size()<64) effects.delayed.push_back({e,origin,at});
+}
+void ServiceDelayedEffects(int time) {
+    for(std::size_t n=0;n<effects.delayed.size();) {
+        if(time<effects.delayed[n].at) {++n;continue;}
+        const auto d=effects.delayed[n];
+        effects.delayed.erase(effects.delayed.begin()+static_cast<std::ptrdiff_t>(n));
+        PlayFx(d.effect,d.origin);
+    }
+}
+// What playfxontag/stopfxontag would refuse with a script error: no model,
+// or a tag the model does not have (checked with the same natives).
+bool EntityHasTag(unsigned number,const char* tag) {
+    if(!effects.bindings || !number || number>=static_cast<unsigned>(kAiEntityCapacity)) return false;
+    const auto e=aiProfile.fixedPool+static_cast<std::uintptr_t>(number)*kAiEntityStride;
+    std::uint8_t inUse=0;std::uint16_t model=0;
+    if(!Value(e+kAiInUse,inUse) || inUse!=1 || !Value(e+kEntityModelIndex,model) || !model) return false;
+    using FindStringFn=unsigned(*)(const char*);using BoneIndexFn=int(*)(std::uintptr_t,unsigned);
+    const unsigned id=reinterpret_cast<FindStringFn>(aiProfile.base+kSlFindStringRva)(tag);
+    return id && reinterpret_cast<BoneIndexFn>(aiProfile.base+kDObjGetBoneIndexRva)(e,id)>=0;
+}
+bool PlayFxOnTag(bo1fx::Effect e,unsigned number,const char* tag) {
+    const int id=EffectId(e);
+    if(!id || !worldBindings || !EntityHasTag(number,tag)) {if(id)++effects.refused;return false;}
+    if(Builtin(kBuiltinPlayFxOnTag,0,{ScriptArg::Int(id),ScriptArg::Entity(number),ScriptArg::String(tag)})!=ScriptCallResult::Ok) {++effects.refused;return false;}
+    ++effects.onTag;return true;
+}
+void StopFxOnTag(bo1fx::Effect e,unsigned number,const char* tag) {
+    const int id=EffectId(e);
+    if(id && worldBindings && EntityHasTag(number,tag)) Builtin(kBuiltinStopFxOnTag,0,{ScriptArg::Int(id),ScriptArg::Entity(number),ScriptArg::String(tag)});
+}
+// playloopsound refuses a missing or non-looping alias list (script error).
+bool LoopAliasReady(const char* alias) {
+    if(!SoundAvailable(alias)) return false;
+    const auto entry=reinterpret_cast<FindAssetEntryFn>(aiProfile.base+kDbFindXAssetEntryRva)(kAssetTypeSound,alias);
+    std::uintptr_t list=0,head=0;std::uint32_t flags=0;
+    return entry && Value(entry+kAssetEntryHeader,list) && list && Value(list+kSndAliasListHead,head) && head
+        && Value(head+kSndAliasFlags,flags) && (flags&kSndAliasLooping);
+}
+bool PlayLoopSound(unsigned number,const char* alias) {
+    if(!worldBindings || !number || !LoopAliasReady(alias)) return false;
+    if(Builtin(kBuiltinPlayLoopSound,ScriptEntityRef(number),{ScriptArg::String(alias)})!=ScriptCallResult::Ok) return false;
+    ++effects.loops;return true;
 }
 int CaptureHelmetSwap() {
     const auto handleOf=reinterpret_cast<GetFunctionHandleFn>(aiProfile.base+kScrGetFunctionHandleRva);
@@ -2132,13 +2416,20 @@ void StartRise(ZombieActor& z,const AiEntity& e,const AiPoint& player,int time) 
     if(r!=ScriptCallResult::Ok) {Builtin(kBuiltinShow,ref,{});++zg.riseFailures;return;}
     z.risingUntil=time+AnimMilliseconds(role,3000)+150;z.showAt=time+bo1::kRiseShowMilliseconds;z.rose=true;++zg.rises;
     PlayZombieSound(e.address,bo1sounds::alias::kRise);   // the dirt of do_zombie_rise
+    // Test46: zombie_rise_burst_fx: the dirt burst, then 0.25 s later the
+    // billowing dust, both at the spot it climbs out of.
+    AiPoint burst=e.origin;burst[2]+=static_cast<float>(5+ZombieRandom(6));
+    PlayFx(bo1fx::Effect::RiseHandDirt,burst);
+    AiPoint billow=e.origin;billow[0]+=static_cast<float>(ZombieRandom(21)-10);billow[1]+=static_cast<float>(ZombieRandom(21)-10);
+    billow[2]+=static_cast<float>(5+ZombieRandom(6));
+    PlayFxLater(bo1fx::Effect::RiseBodyDirt,billow,time+250);
 }
 // zombie_spawn_init equivalents that MW2 keeps in script variables: no
 // weapon, no pain, arrivals, exits, long deaths, surprise, bullet or danger
 // reactions, no battle chatter; sprinters use the sprint animset.
 void RunZombieSetup(ZombieActor& z,const AiEntity& e) {
     z.scriptSetup=true;
-    if(z.dog || !prep.threads) return;
+    if((z.dog && !z.hound) || !prep.threads) return;
     unsigned ok=0;
     for(const auto f:{SetupFunction::GunRemove,SetupFunction::DisableArrivals,SetupFunction::DisableExits,SetupFunction::DisablePain,
         SetupFunction::DisableLongDeath,SetupFunction::DisableSurprise,SetupFunction::DisableWhizby,SetupFunction::DisableDangerReact,
@@ -2506,17 +2797,27 @@ bool ZombieTemplate(const AiEntity& e) {
     for(const char* word:{"drone","riotshield","riot_shield","civilian","juggernaut","hostage"}) if(name.find(word)!=std::string::npos) return false;
     return true;
 }
-bool SpawnZombie(const bo1::SpawnRequest& request,const Snapshot& s,const AiScope& scope,int time) {
+// Test46: a dog-round spawn is a BO1 hellhound (a zombie template wearing
+// the wolf, at a zombie spawn point) when HoundsReady(); otherwise MW2's own
+// dog from a dog spawner, as before. A hellhound's arrival takes 1.5 s
+// (dog_spawn_fx), so its request stays pending until the hound exists.
+enum class SpawnOutcome {Failed,Created,Deferred};
+bool CreateZombieActor(const bo1::SpawnRequest& request,const AiEntity& point,const AiEntity& chosen,float pathDistance,bool hound,
+                       const Snapshot& s,const AiScope& scope,int time);
+bool BeginHoundArrival(const bo1::SpawnRequest& request,const AiEntity& point,const AiEntity& chosen,float pathDistance,int time);
+SpawnOutcome SpawnZombie(const bo1::SpawnRequest& request,const Snapshot& s,const AiScope& scope,int time) {
     AiPoint player{};
-    if(!ReadAi(s.entity+kAiOrigin,player.data(),sizeof(player)) || !FinitePoint(player))return false;
-    const auto& source=request.dogs?ai.dogPoints:ai.enemies.empty()?ai.friends:ai.enemies;
+    if(!ReadAi(s.entity+kAiOrigin,player.data(),sizeof(player)) || !FinitePoint(player))return SpawnOutcome::Failed;
+    const bool hound=request.dogs && HoundsReady();
+    const bool nativeDog=request.dogs && !hound;
+    const auto& source=nativeDog?ai.dogPoints:ai.enemies.empty()?ai.friends:ai.enemies;
     std::vector<AiEntity> templates;
-    for(const auto& t:source) if(request.dogs || ZombieTemplate(t)) templates.push_back(t);
+    for(const auto& t:source) if(nativeDog || ZombieTemplate(t)) templates.push_back(t);
     if(templates.empty()) templates=source;
     if(templates.empty() || ZombieSpawnPoints().empty()) {
         static int lastLog=-100000;
         if(time-lastLog>5000) {lastLog=time;Log("ZOMBIE_SPAWN refused=%s dogs=%d",templates.empty()?"NO_TEMPLATE":"NO_SPAWN_POINT",request.dogs);}
-        return false;
+        return SpawnOutcome::Failed;
     }
     // level.enemy_spawns: campaign enemy spawn locations nearby the player,
     // by walking distance when the level's navigation graph is known.
@@ -2554,35 +2855,45 @@ bool SpawnZombie(const bo1::SpawnRequest& request,const Snapshot& s,const AiScop
     int previous=-1;
     for(int n=0;n<count;++n)if(band[n].number==zg.previousSpawner)previous=n;
     const auto pick=bo1::ChooseSpawner(count,previous,draw,ZombieRandom(count));
-    if(!pick)return false;
+    if(!pick)return SpawnOutcome::Failed;
     const auto point=band[*pick];
     const float pathDistance=static_cast<std::size_t>(*pick)<paths.size()?paths[static_cast<std::size_t>(*pick)]:-1.f;
     const auto& chosen=templates[static_cast<std::size_t>(ZombieRandom(static_cast<int>(templates.size())))];
+    if(hound) return BeginHoundArrival(request,point,chosen,pathDistance,time)?SpawnOutcome::Deferred:SpawnOutcome::Failed;
+    return CreateZombieActor(request,point,chosen,pathDistance,false,s,scope,time)?SpawnOutcome::Created:SpawnOutcome::Failed;
+}
+void DressHound(ZombieActor& z,const AiEntity& e,int time);
+bool CreateZombieActor(const bo1::SpawnRequest& request,const AiEntity& point,const AiEntity& chosen,float pathDistance,bool hound,
+                       const Snapshot& s,const AiScope& scope,int time) {
+    AiPoint player{};
+    if(!ReadAi(s.entity+kAiOrigin,player.data(),sizeof(player)) || !FinitePoint(player))return false;
+    const bool nativeDog=request.dogs && !hound;
     AiRequest spawn;spawn.operation=AiOperation::SpawnEnemy;spawn.source=AiIdentity::capture(chosen);
     AiIdentity created;
-    SpawnOptions options;options.center=&point.origin;options.zombie=true;options.dog=request.dogs;
-    options.bypassPause=true;options.setEnemy=request.dogs;options.created=&created;
+    SpawnOptions options;options.center=&point.origin;options.zombie=true;options.dog=nativeDog;
+    options.bypassPause=true;options.setEnemy=nativeDog;options.created=&created;
     SpawnOwned(spawn,s,scope,time,nullptr,&options);
     if(ai.status.lastResult!=AiRequestResult::Created || !created.address)return false;
     zg.previousSpawner=point.number;
     const auto e=Entity(created,scope.pool,false);
     if(!e.valid)return false;
-    const auto speed=request.dogs?bo1::MoveSpeed::Sprint:bo1::RunSpeed(bo1::ZombieMoveSpeed(request.round),ZombieRng());
-    ConfigureZombie(e,request.health,request.dogs,speed);
-    ZombieActor z;z.identity=created;z.ticket=request.ticket;z.dog=request.dogs;z.speed=speed;z.spawned=time;z.spawnPoint=point.number;
+    // A hound runs (MW2 has no crouched sprint; the dog run's own pace).
+    const auto speed=hound?bo1::MoveSpeed::Run:request.dogs?bo1::MoveSpeed::Sprint:bo1::RunSpeed(bo1::ZombieMoveSpeed(request.round),ZombieRng());
+    ConfigureZombie(e,request.health,nativeDog,speed);
+    ZombieActor z;z.identity=created;z.ticket=request.ticket;z.dog=request.dogs;z.hound=hound;z.speed=speed;z.spawned=time;z.spawnPoint=point.number;
     z.health=request.health;z.reconfigureAt=time+300;
     z.nextVocal=time+1000+ZombieRandom(3001);z.nextBehind=time+1000;
-    if(!z.dog) sounds.zombieUntil[e.number&(kAiEntityCapacity-1)].store(time+3000,std::memory_order_relaxed);
-    else {   // dog_spawn_fx: the lightning bolt, then the hound
+    if(!nativeDog) sounds.zombieUntil[e.number&(kAiEntityCapacity-1)].store(time+3000,std::memory_order_relaxed);
+    if(nativeDog) {   // dog_spawn_fx: the lightning bolt, then the hound
         PlayZombieSound(e.address,bo1sounds::alias::kDogBolt);
         PlayZombieSound(e.address,bo1sounds::alias::kDogSpawn);
     }
     z.nextRepath=time;z.failsafeAt=time+static_cast<int>(bo1::kFailsafeIntervalMilliseconds);z.failsafeOrigin=e.origin;
     zg.zombies.push_back(z);
-    DressZombie(zg.zombies.back(),e);
-    StartRise(zg.zombies.back(),e,player,time);
-    Log("ZOMBIE_SPAWN entity=%u round=%d health=%d speed=%s dog=%d point=%u distance=%.0f path=%.0f template=%s rise=%d alive=%d queued=%d",
-        e.number,request.round,request.health,bo1::MoveSpeedText(speed),request.dogs,point.number,
+    if(hound) DressHound(zg.zombies.back(),e,time);
+    else {DressZombie(zg.zombies.back(),e);StartRise(zg.zombies.back(),e,player,time);}
+    Log("ZOMBIE_SPAWN entity=%u round=%d health=%d speed=%s dog=%d hound=%d point=%u distance=%.0f path=%.0f template=%s rise=%d alive=%d queued=%d",
+        e.number,request.round,request.health,bo1::MoveSpeedText(speed),request.dogs,hound,point.number,
         std::sqrt(PointDistanceSquared(point.origin,player)),pathDistance,chosen.classname.c_str(),zg.zombies.back().rose,zg.controller.status().alive+1,zg.controller.status().queued-1);
     return true;
 }
@@ -2605,16 +2916,16 @@ void MeleeHit(ZombieActor& z,const AiEntity& e,const Snapshot& s,const AiPoint& 
         const float length=std::sqrt(dir[0]*dir[0]+dir[1]*dir[1]);
         if(length>0.f) {dir[0]/=length;dir[1]/=length;}
         AiPoint hit=player;hit[2]+=48.f;
-        PlayZombieSound(e.address,bo1sounds::alias::kSwing);
+        if(!z.hound) PlayZombieSound(e.address,bo1sounds::alias::kSwing);
         RecordNativeOperation("ZOMBIE_MELEE_BEGIN",e.number);
         reinterpret_cast<DamageFn>(aiProfile.damage)(s.entity,e.address,e.address,dir.data(),hit.data(),
-            bo1::kZombieMeleeDamage,0,kModMelee,-1,kHitTorsoUpper,0,0);
+            z.hound?bo1::kDogMeleeDamage:bo1::kZombieMeleeDamage,0,kModMelee,-1,kHitTorsoUpper,0,0);
         RecordNativeOperation("ZOMBIE_MELEE_END",e.number);
         ++zg.meleeHits;
-    } else {z.lastMiss=time;++zg.meleeMisses;PlayZombieSound(e.address,bo1sounds::alias::kSwing);}
+    } else {z.lastMiss=time;++zg.meleeMisses;if(!z.hound) PlayZombieSound(e.address,bo1sounds::alias::kSwing);}
 }
 void ServiceMelee(ZombieActor& z,const AiEntity& e,const Snapshot& s,const AiPoint& player,int playerHealth,int time) {
-    if(z.dog)return;   // MW2 dogs attack with their own native animscripts
+    if(z.dog && !z.hound)return;   // MW2 dogs attack with their own native animscripts
     const float distance=PointDistanceSquared(e.origin,player);
     if(z.attacking) {
         const int elapsed=time-z.attackStart;
@@ -2644,8 +2955,9 @@ void ServiceMelee(ZombieActor& z,const AiEntity& e,const Snapshot& s,const AiPoi
     inputs.pathClear=clear.valid && !clear.startSolid && clear.fraction>=1.f;
     if(bo1::CanMeleePlayer(inputs,bo1::MeleeCheck::Normal)!=bo1::MeleeDecision::Allowed) return;
     z.attacking=true;z.attackStart=time;z.nextFire=0;z.animatedAttack=false;
-    // zombie_melee: do_zombies_playvocals("attack") as the swing starts.
-    if(PlayZombieSound(e.address,bo1sounds::alias::kAttack)) z.talkingUntil=time+bo1sounds::kAttackMs;
+    // zombie_melee: do_zombies_playvocals("attack") as the swing starts (a
+    // hellhound snarls).
+    if(PlayZombieSound(e.address,z.hound?bo1sounds::alias::kDogClose:bo1sounds::alias::kAttack)) z.talkingUntil=time+bo1sounds::kAttackMs;
     z.fireMs[0]=static_cast<int>(bo1::kAttackFireMilliseconds);z.fireCount=1;z.attackEndMs=static_cast<int>(bo1::kAttackEndMilliseconds);
     const float yaw=YawDegrees(e.origin,player);
     // pick_zombie_melee_anim: _zombie_melee plus _zombie_walk_melee for
@@ -2653,9 +2965,12 @@ void ServiceMelee(ZombieActor& z,const AiEntity& e,const Snapshot& s,const AiPoi
     constexpr std::size_t kChoices=std::size(kMeleeAnims)+std::size(kWalkMeleeAnims);
     std::array<AnimRole,kChoices> choices{};std::array<std::uint32_t,kChoices> values{};std::size_t count=0;
     auto offer=[&](AnimRole role){if(const auto v=AnimValue(e,role)) {choices[count]=role;values[count]=*v;++count;}};
-    for(const auto r:kMeleeAnims) offer(r);
-    if(z.speed==bo1::MoveSpeed::Walk) {for(const auto r:kWalkMeleeAnims) offer(r);}
-    else for(const auto r:kRunMeleeAnims) offer(r);
+    if(z.hound) {offer(AnimRole::DogAttack1);offer(AnimRole::DogAttack2);}   // Test46: dog_melee anims
+    else {
+        for(const auto r:kMeleeAnims) offer(r);
+        if(z.speed==bo1::MoveSpeed::Walk) {for(const auto r:kWalkMeleeAnims) offer(r);}
+        else for(const auto r:kRunMeleeAnims) offer(r);
+    }
     if(count) {
         const auto pick=static_cast<std::size_t>(ZombieRandom(static_cast<int>(count)));
         const auto role=choices[pick];
@@ -2747,6 +3062,113 @@ void DeleteWorldModel(WorldModel& w) {
     if(w && EntityLive(w.number,w.use)) Builtin(kBuiltinDelete,ScriptEntityRef(w.number),{});
     w={};
 }
+// ---- Test46: BO1 hellhounds ----
+// dog_spawn_fx at a zombie spawn point: the lightning builds up with the
+// prespawn sound (on a script_origin there); 1.5 s later the bolt strikes
+// (bolt sound, the strike, Earthquake(0.5, 0.75, origin, 1000)) and the hound
+// is there: its spawn sound, eye glow on tag_eye, a fire trail (half of them,
+// dog_fire_trail_percent) or an ash trail, and that trail's loop sound.
+inline constexpr int kHoundStrikeMs=1500,kHoundOriginLifeMs=5000;
+struct HoundArrival {
+    bool active=false;bo1::SpawnRequest request;AiEntity point,source;float pathDistance=-1.f;int strikeAt=0;
+    WorldModel origin;
+};
+HoundArrival houndArrival;
+std::deque<std::pair<int,WorldModel>> houndOrigins;   // deleted once their sounds are done
+unsigned houndArrivals=0,houndStrikes=0,houndDeaths=0;
+WorldModel SpawnScriptOrigin(const AiPoint& origin) {
+    if(!worldBindings || !FinitePoint(origin)) return {};
+    std::vector<std::uint8_t> before(static_cast<std::size_t>(kAiEntityCapacity),0);
+    unsigned used=0;
+    for(unsigned n=0;n<static_cast<unsigned>(kAiEntityCapacity);++n) {
+        std::uint8_t v=0;if(Value(EntityAddress(n)+kAiInUse,v)) before[n]=v;
+        if(before[n]==1) ++used;
+    }
+    if(used+96>static_cast<unsigned>(kAiEntityCapacity)) return {};
+    if(Builtin(kBuiltinSpawn,0,{ScriptArg::String("script_origin"),ScriptArg::Vector(origin)})!=ScriptCallResult::Ok) return {};
+    WorldModel w;unsigned found=0;
+    for(unsigned n=1;n<static_cast<unsigned>(kAiEntityCapacity);++n) {
+        std::uint8_t v=0;
+        if(before[n]!=1 && Value(EntityAddress(n)+kAiInUse,v) && v==1) {w.number=n;++found;}
+    }
+    if(found!=1 || !Value(EntityAddress(w.number)+kAiUseCount,w.use)) return {};
+    return w;
+}
+bool BeginHoundArrival(const bo1::SpawnRequest& request,const AiEntity& point,const AiEntity& chosen,float pathDistance,int time) {
+    if(houndArrival.active) return false;
+    houndArrival.active=true;houndArrival.request=request;houndArrival.point=point;houndArrival.source=chosen;
+    houndArrival.pathDistance=pathDistance;houndArrival.strikeAt=time+kHoundStrikeMs;
+    houndArrival.origin=SpawnScriptOrigin(point.origin);
+    PlayFx(bo1fx::Effect::DogLightningBuildup,point.origin);
+    if(houndArrival.origin) PlayZombieSound(EntityAddress(houndArrival.origin.number),bo1sounds::alias::kDogPrespawn);
+    ++houndArrivals;
+    return true;
+}
+void ServiceHoundArrival(const Snapshot& s,const AiScope& scope,int time) {
+    while(!houndOrigins.empty() && (time>=houndOrigins.front().first || time<houndOrigins.front().first-2*kHoundOriginLifeMs)) {
+        DeleteWorldModel(houndOrigins.front().second);houndOrigins.pop_front();
+    }
+    if(!houndArrival.active || time<houndArrival.strikeAt) return;
+    auto a=houndArrival;houndArrival=HoundArrival{};
+    const auto epoch=ai.checkpointEpoch.load();
+    PlayFx(bo1fx::Effect::DogLightningSpawn,a.point.origin);
+    if(a.origin) {PlayZombieSound(EntityAddress(a.origin.number),bo1sounds::alias::kDogBolt);houndOrigins.push_back({time+kHoundOriginLifeMs,a.origin});}
+    if(test46Bindings) Builtin(kBuiltinEarthquake,0,{ScriptArg::Float(.5f),ScriptArg::Float(.75f),ScriptArg::Vector(a.point.origin),ScriptArg::Float(1000.f)});
+    ++houndStrikes;
+    const bool created=CreateZombieActor(a.request,a.point,a.source,a.pathDistance,true,s,scope,time);
+    if(epoch!=ai.checkpointEpoch || !zg.running) return;
+    zg.controller.confirm(a.request.ticket,created,time);
+    if(!created && ++zg.dogFailures>=3) {
+        Log("ZOMBIE_DOG_ROUND spawn_failed=3 remaining_cancelled=%d",zg.controller.status().queued);
+        zg.controller.cancelQueued();
+    }
+}
+void ClearHoundArrival(bool deleteOrigins) {
+    if(deleteOrigins) {
+        DeleteWorldModel(houndArrival.origin);
+        for(auto& o:houndOrigins) DeleteWorldModel(o.second);
+    }
+    houndArrival=HoundArrival{};houndOrigins.clear();
+}
+// The hellhound on a zombie template: the MW2 helmet off self.hatModel first
+// (helmetPop), every attachment removed, the wolf as its model, held crouched.
+void DressHound(ZombieActor& z,const AiEntity& e,int time) {
+    (void)time;
+    const auto ref=ScriptEntityRef(e.number);
+    if(models.helmetSwap && prep.threads) {
+        auto& p=*reinterpret_cast<volatile NativeScriptParameters*>(aiProfile.base+kScriptParametersRva);
+        PinScriptStrings({ScriptArg::String(kHelmetSwapNote)});
+        const auto r=CallScriptThread(p,scriptNatives,reinterpret_cast<ScriptExecEntThread>(aiProfile.base+kScrExecEntThreadNumRva),
+            reinterpret_cast<ScriptFreeThread>(aiProfile.base+kScrFreeThreadRva),e.number,models.helmetSwap,{ScriptArg::String(kHelmetSwapNote)});
+        if(r==ScriptCallResult::Ok) ++models.helmetSwaps;
+    }
+    SetField<int>(e.actor+kActorAllowedStances,kStanceCrouch);
+    if(Builtin(kBuiltinDetachAll,ref,{})!=ScriptCallResult::Ok || Builtin(kBuiltinSetModel,ref,{ScriptArg::String(bo1model::kWolfModel)})!=ScriptCallResult::Ok) {
+        if(++models.houndDressFailures<=8) Log("ZOMBIE_HOUND dress entity=%u failed=1",e.number);
+        return;
+    }
+    z.houndDressed=true;++models.houndsDressed;
+    PlayZombieSound(e.address,bo1sounds::alias::kDogSpawn);
+    PlayFxOnTag(bo1fx::Effect::DogEyes,e.number,"tag_eye");
+    z.fireTrail=ZombieRandom(100)<50;
+    PlayFxOnTag(z.fireTrail?bo1fx::Effect::DogFireTrail:bo1fx::Effect::DogAshTrail,e.number,"tag_origin");
+    PlayLoopSound(e.number,z.fireTrail?bo1sounds::alias::kDogLoopFire:bo1sounds::alias::kDogLoopBreath);
+    z.houndFx=true;
+}
+// dog_death: the burst of fire and ash where it stood, and the body gone.
+void HoundDeath(ZombieActor& z,const AiEntity& e) {
+    const auto ref=ScriptEntityRef(e.number);
+    if(z.houndFx) {
+        StopFxOnTag(bo1fx::Effect::DogEyes,e.number,"tag_eye");
+        StopFxOnTag(z.fireTrail?bo1fx::Effect::DogFireTrail:bo1fx::Effect::DogAshTrail,e.number,"tag_origin");
+        z.houndFx=false;
+    }
+    if(test46Bindings) Builtin(kBuiltinStopLoopSound,ref,{});
+    AiPoint burst=e.origin;burst[2]+=18.f;
+    PlayFx(bo1fx::Effect::DogExplosion,burst);
+    if(z.houndDressed) Builtin(kBuiltinHide,ref,{});
+    ++houndDeaths;
+}
 // The BO1 powerup model for a drop type (bo1model::kPowerupModels order:
 // ammo can, x2 icon, bomb, skull); none for the carpenter and fire sale.
 int PowerupModelIndex(bo1::Powerup type) {
@@ -2763,6 +3185,9 @@ void SpawnDropModel(ZombieDrop& drop,int time) {
     const auto w=SpawnScriptModel(drop.origin,bo1model::kPowerupModels[static_cast<std::size_t>(index)]);
     if(!w) return;
     drop.model=w.number;drop.modelUse=w.use;drop.nextWobble=time;drop.hidden=false;++zg.dropModelsSpawned;
+    // Test46: powerup_wobble's glow on the model and powerup_setup's hum.
+    PlayFxOnTag(bo1fx::Effect::PowerupOn,w.number,"tag_origin");
+    PlayLoopSound(w.number,bo1sounds::alias::kPowerupLoop);
 }
 void RemoveDropModel(ZombieDrop& drop) {
     WorldModel w{drop.model,drop.modelUse};
@@ -2788,7 +3213,8 @@ void ServiceDropModel(ZombieDrop& drop,int time) {
         if(ReadAi(EntityAddress(drop.model)+kEntityAngles,angles.data(),sizeof(angles)) && FinitePoint(angles)) yaw=angles[1];
         yaw+=static_cast<float>(std::clamp(ZombieRandom(360),60,300));
         const AiPoint to{static_cast<float>(-60+ZombieRandom(120)),yaw,static_cast<float>(-45+ZombieRandom(90))};
-        Builtin(kBuiltinRotateTo,ref,{ScriptArg::Vector(to),ScriptArg::Float(wait),ScriptArg::Float(wait*.5f),ScriptArg::Float(wait*.5f)});
+        if(Builtin(kBuiltinRotateTo,ref,{ScriptArg::Vector(to),ScriptArg::Float(wait),ScriptArg::Float(wait*.5f),ScriptArg::Float(wait*.5f)})==ScriptCallResult::Ok)
+            ++zg.wobbles;
         drop.nextWobble=time+static_cast<int>((wait-.1f)*1000.f*static_cast<float>(ZombieRandom(1001))/1000.f)+100;
     }
 }
@@ -2928,6 +3354,7 @@ void ClearGibs(bool deleteModels) {
 }
 void GrabPowerup(const ZombieDrop& drop,int time) {
     Log("ZOMBIE_POWERUP_GRAB type=%s age_ms=%d",bo1::PowerupText(drop.type),time-drop.spawned);
+    PlayFx(bo1fx::Effect::PowerupGrab,drop.origin);   // Test46: powerup_grab's flash
     ZombieEvent(bo1::PowerupText(drop.type),time);
     // Test45: BO1 shows no text for a powerup, the announcer names it; MW2's
     // centre print stays only where the announcer is missing.
@@ -3006,6 +3433,28 @@ void ServiceZombieVoice(ZombieActor& z,const AiEntity& e,const AiPoint& player,f
            && PlayZombieSound(e.address,bo1sounds::alias::kBehind)) {z.nextBehind=time+4000;z.talkingUntil=time+bo1sounds::kAmbienceMs;}
     }
 }
+// Test46: Terminal showed zombies inside the floor. Every 0.7 s a straight
+// trace down the zombie's own column, from 40 units above its feet: a
+// surface more than 10 units above the feet means its legs are in the floor.
+// Seen twice in a row (a traversal passes in under a second) it is lifted
+// onto that surface with forceteleport and logged (ZOMBIE_UNSTUCK).
+void CheckSunk(ZombieActor& z,const AiEntity& e,int time) {
+    z.nextFloorCheck=time+bo1::kSunkCheckMilliseconds;
+    if(!test46Bindings) return;
+    AiPoint start=e.origin,end=e.origin;start[2]+=bo1::kSunkTraceAbove;end[2]-=bo1::kSunkTraceBelow;
+    const auto t=WorldTrace(start,end);
+    if(!t.valid || t.allSolid) {z.sunkChecks=0;return;}
+    const float surface=start[2]-(start[2]-end[2])*t.fraction;
+    if(!bo1::SunkBelowFloor(t.startSolid,t.fraction,surface,e.origin[2])) {z.sunkChecks=0;return;}
+    if(++z.sunkChecks<2) return;
+    z.sunkChecks=0;
+    AiPoint to=e.origin;to[2]=surface+1.f;
+    AiPoint angles{};ReadAi(e.address+kEntityAngles,angles.data(),sizeof(angles));
+    const auto r=Builtin(kBuiltinForceTeleport,ScriptEntityRef(e.number),{ScriptArg::Vector(to),ScriptArg::Vector(angles)});
+    ++zg.unstuck;
+    if(zg.unstuck<=16) Log("ZOMBIE_UNSTUCK entity=%u map=%s at=%.1f,%.1f,%.1f floor=%.1f lifted=%.1f ok=%d",e.number,zg.map,
+        e.origin[0],e.origin[1],e.origin[2],surface,surface+1.f-e.origin[2],r==ScriptCallResult::Ok);
+}
 void ServiceZombieActors(const Snapshot& s,const AiScope& scope,const AiPoint& player,int playerHealth,int time) {
     const auto epoch=ai.checkpointEpoch.load();
     const auto& c=zg.controller.status();
@@ -3020,8 +3469,10 @@ void ServiceZombieActors(const Snapshot& s,const AiScope& scope,const AiPoint& p
         if(!SameAiAllocation(z.identity,raw) || raw.type!=kActorType || !e.valid || e.type!=kActorType || e.health<=0) {
             // The dying actor is still there: its BO1 death vocal (MW2's own
             // soldier death voice is dropped by the playsound hook).
-            if(SameAiAllocation(z.identity,raw) && e.valid && e.type==kActorType && e.health<=0)
+            if(SameAiAllocation(z.identity,raw) && e.valid && e.type==kActorType && e.health<=0) {
                 PlayZombieSound(e.address,z.dog?bo1sounds::alias::kDogExplode:bo1sounds::alias::kDeath);
+                if(z.hound) HoundDeath(z,e);   // Test46: the hellhound bursts
+            }
             if(z.dog) {zg.lastDogOrigin=z.lastOrigin;zg.lastDogKnown=true;}
             zg.controller.retire(z.ticket,bo1::Retirement::Killed);
             zg.zombies.erase(zg.zombies.begin()+static_cast<std::ptrdiff_t>(n));continue;
@@ -3041,13 +3492,14 @@ void ServiceZombieActors(const Snapshot& s,const AiScope& scope,const AiPoint& p
         // then the script-side setup once the actor's animscripts initialized.
         if(!z.reconfigured && time>=z.reconfigureAt) {
             z.reconfigured=true;
-            if(!z.damaged)ConfigureZombie(e,z.health,z.dog,z.speed);
+            if(!z.damaged)ConfigureZombie(e,z.health,z.dog && !z.hound,z.speed);
+            if(z.hound) SetField<int>(e.actor+kActorAllowedStances,kStanceCrouch);
             RunZombieSetup(z,e);
             if(epoch!=ai.checkpointEpoch)return;
         }
         // do_zombie_rise: no pursuit, attack or failsafe while climbing out.
         if(z.showAt>=0 && time>=z.showAt) {z.showAt=-1;Builtin(kBuiltinShow,ScriptEntityRef(e.number),{});}
-        if(!z.dog) sounds.zombieUntil[e.number&(kAiEntityCapacity-1)].store(time+3000,std::memory_order_relaxed);
+        if(!z.dog || z.hound) sounds.zombieUntil[e.number&(kAiEntityCapacity-1)].store(time+3000,std::memory_order_relaxed);
         if(time<z.risingUntil) {
             z.failsafeAt=time+static_cast<int>(bo1::kFailsafeIntervalMilliseconds);z.failsafeOrigin=e.origin;
             ++n;continue;
@@ -3064,7 +3516,7 @@ void ServiceZombieActors(const Snapshot& s,const AiScope& scope,const AiPoint& p
                 reinterpret_cast<GoalFn>(aiProfile.setGoal)(e.actor,player.data(),0);
             float radius=0.f;
             if(Value(e.actor+kActorGoalRadius,radius) && radius!=bo1::kZombieGoalRadius)SetFloat(e.actor+kActorGoalRadius,radius,bo1::kZombieGoalRadius);
-            if(!z.dog)SetField<std::uint8_t>(e.sentient+kSentientIgnoreAll,1);
+            if(!z.dog || z.hound)SetField<std::uint8_t>(e.sentient+kSentientIgnoreAll,1);
         }
         if(!z.sprintApplied && bo1::LastZombieSpeedUp(c.round,c.queued,c.alive) && z.speed==bo1::MoveSpeed::Walk) {
             z.sprintApplied=true;z.speed=bo1::MoveSpeed::Sprint;SetField<float>(e.actor+kActorWalkDist,0.f);
@@ -3072,8 +3524,9 @@ void ServiceZombieActors(const Snapshot& s,const AiScope& scope,const AiPoint& p
         }
         ServiceMelee(z,e,s,player,playerHealth,time);
         if(epoch!=ai.checkpointEpoch)return;
+        if(!z.attacking && time>=z.nextFloorCheck) {CheckSunk(z,e,time);if(epoch!=ai.checkpointEpoch)return;}
         // Test41: a zombie the engine finds no path for (rooftop spawners).
-        if(!z.dog) {
+        if(!z.dog || z.hound) {
             std::int8_t points=0;
             const bool hasPath=Value(e.actor+kActorPath+kPathPointCount,points) && points>0;
             const bool before=z.pathing;z.pathing=hasPath;
@@ -3138,6 +3591,7 @@ void ResetZombieGame(const char* reason,bool deleteActors) {
     if(levelAlive) {StopPlayerSounds();RemoveDropModels();}
     else zg.deleteModels.clear();
     ClearGibs(levelAlive);
+    ClearHoundArrival(levelAlive);effects.delayed.clear();   // Test46
     if(wasRunning && !std::strcmp(reason,"PLAYER_DIED") && PlayZombieSound(zg.playerEntity,bo1sounds::alias::kGameOver)) ++sounds.music;
     for(auto& until:sounds.zombieUntil) until.store(0,std::memory_order_relaxed);
     zg.controller.stop(bo1::StopReason::Manual);
@@ -3180,8 +3634,12 @@ void BeginZombies(const Snapshot& s,const AiScope& scope,int time) {
         // dog_round_tracker listens from the first "between_round_over".
         if(!zg.settings.hellhounds || round==zg.firstRound)return std::nullopt;
         if(!zg.dogs.beginRound(round,ZombieRng()))return std::nullopt;
-        if(!zg.dogSpawners) {Log("ZOMBIE_DOG_ROUND round=%d replaced=NO_DOG_SPAWNER_ON_MAP",round);return std::nullopt;}
-        Log("ZOMBIE_DOG_ROUND round=%d dog_round_count=%d dogs=%d health=%d next=%d",round,zg.dogs.count(),zg.dogs.total(),zg.dogs.health(),zg.dogs.next());
+        // Test46: BO1 hellhounds come to any map (zombie spawn points); MW2's
+        // own dogs only where the map has dog spawners.
+        const bool hounds=HoundsReady();
+        if(!hounds && !zg.dogSpawners) {Log("ZOMBIE_DOG_ROUND round=%d replaced=NO_HELLHOUNDS_NO_DOG_SPAWNER",round);return std::nullopt;}
+        Log("ZOMBIE_DOG_ROUND round=%d dog_round_count=%d dogs=%d health=%d next=%d hellhounds=%s",round,zg.dogs.count(),zg.dogs.total(),zg.dogs.health(),
+            zg.dogs.next(),hounds?"BO1":"MW2_DOGS");
         return zg.dogs.plan();
     });
     if(!zg.controller.start(zg.settings.startingRound,time)) {Log("ZOMBIE_START refused round=%d",zg.settings.startingRound);return;}
@@ -3197,6 +3655,38 @@ void BeginZombies(const Snapshot& s,const AiScope& scope,int time) {
         static_cast<unsigned long long>(prep.applied.size()),static_cast<unsigned long long>(prep.guards.size()),
         static_cast<unsigned long long>(ai.dogPoints.size()),static_cast<unsigned long long>(ai.enemyPoints.size()),
         static_cast<unsigned long long>(ai.enemies.size()));
+}
+// Test46: where a server frame's zombie work goes (logged as ZOMBIE_PERF
+// with each report, then reset): average and peak per section.
+enum class ZombiePerfSection : int {Total,Nav,Spawn,Actors,Gibs,Powerups,Count};
+inline constexpr const char* kZombiePerfNames[]={"total","nav","spawn","actors","gibs","powerups"};
+struct ZombiePerf {
+    struct Stat {unsigned long long count=0;double total=0,peak=0;};
+    std::array<Stat,static_cast<std::size_t>(ZombiePerfSection::Count)> stats{};
+    LARGE_INTEGER frequency{};
+    void add(ZombiePerfSection s,double us) {auto& t=stats[static_cast<std::size_t>(s)];++t.count;t.total+=us;t.peak=std::max(t.peak,us);}
+} zombiePerf;
+struct ZombiePerfScope {
+    ZombiePerfSection section;LARGE_INTEGER start{};
+    explicit ZombiePerfScope(ZombiePerfSection s):section(s) {
+        if(!zombiePerf.frequency.QuadPart) QueryPerformanceFrequency(&zombiePerf.frequency);
+        QueryPerformanceCounter(&start);
+    }
+    ~ZombiePerfScope() {
+        LARGE_INTEGER end{};QueryPerformanceCounter(&end);
+        zombiePerf.add(section,static_cast<double>(end.QuadPart-start.QuadPart)*1e6/static_cast<double>(zombiePerf.frequency.QuadPart));
+    }
+};
+void LogZombiePerf() {
+    std::string line="ZOMBIE_PERF";
+    char part[96];
+    for(std::size_t n=0;n<zombiePerf.stats.size();++n) {
+        const auto& t=zombiePerf.stats[n];
+        std::snprintf(part,sizeof(part)," %s=%llu/%.0f/%.0f",kZombiePerfNames[n],t.count,t.count?t.total/static_cast<double>(t.count):0.0,t.peak);
+        line+=part;
+    }
+    Log("%s (calls/average_us/peak_us)",line.c_str());
+    zombiePerf.stats={};
 }
 void ServiceZombies(const Snapshot& s,const AiScope& scope,int time) {
     hangwatch::SetArmed(zg.running);
@@ -3220,7 +3710,8 @@ void ServiceZombies(const Snapshot& s,const AiScope& scope,int time) {
     AiPoint player{};int playerHealth=0;
     if(!ReadAi(s.entity+kAiOrigin,player.data(),sizeof(player)) || !FinitePoint(player) || !Value(s.entity+kAiHealth,playerHealth))return;
     zg.playerEntity=s.entity;
-    ServiceNav(s,scope,player,time);
+    ZombiePerfScope totalScope(ZombiePerfSection::Total);
+    {ZombiePerfScope t(ZombiePerfSection::Nav);ServiceNav(s,scope,player,time);}
     if(!zg.loadout && time>=zg.loadoutAt) {
         zg.loadout=ApplyLoadout();
         if(!zg.loadout && ++zg.loadoutTries<20)zg.loadoutAt=time+250;
@@ -3256,21 +3747,29 @@ void ServiceZombies(const Snapshot& s,const AiScope& scope,int time) {
     if(c.phase==bo1::RoundPhase::Between && oldPhase!=bo1::RoundPhase::Between && oldRound==c.round
        && PlayZombieSound(s.entity,c.dogs?bo1sounds::alias::kDogRoundOver:bo1sounds::alias::kRoundOver)) ++sounds.music;
     if(request) {
-        const bool created=SpawnZombie(*request,s,scope,time);
-        zg.controller.confirm(request->ticket,created,time);
-        if(!created && request->dogs && ++zg.dogFailures>=3) {
-            Log("ZOMBIE_DOG_ROUND spawn_failed=3 remaining_cancelled=%d",zg.controller.status().queued);
-            zg.controller.cancelQueued();
+        ZombiePerfScope t(ZombiePerfSection::Spawn);
+        const auto outcome=SpawnZombie(*request,s,scope,time);
+        if(outcome!=SpawnOutcome::Deferred) {
+            const bool created=outcome==SpawnOutcome::Created;
+            zg.controller.confirm(request->ticket,created,time);
+            if(!created && request->dogs && ++zg.dogFailures>=3) {
+                Log("ZOMBIE_DOG_ROUND spawn_failed=3 remaining_cancelled=%d",zg.controller.status().queued);
+                zg.controller.cancelQueued();
+            }
         }
     }
-    ServiceZombieActors(s,scope,player,playerHealth,time);
+    // Test46: a hellhound whose lightning has struck (its request is confirmed then).
+    {ZombiePerfScope t(ZombiePerfSection::Spawn);ServiceHoundArrival(s,scope,time);}
     if(!zg.running)return;
-    ServiceGibs(time);
+    ServiceDelayedEffects(time);
+    {ZombiePerfScope t(ZombiePerfSection::Actors);ServiceZombieActors(s,scope,player,playerHealth,time);}
+    if(!zg.running)return;
+    {ZombiePerfScope t(ZombiePerfSection::Gibs);ServiceGibs(time);}
     // dog_round_aftermath: max ammo at the last hellhound.
     if(c.dogs && c.phase==bo1::RoundPhase::Between && oldPhase!=bo1::RoundPhase::Between) {
         QueueDrop(bo1::Powerup::MaxAmmo,zg.lastDogKnown?zg.lastDogOrigin:player,time);zg.lastDogKnown=false;
     }
-    ServicePowerups(player,time);
+    {ZombiePerfScope t(ZombiePerfSection::Powerups);ServicePowerups(player,time);}
     ServiceAmbience(time);
     if(!zg.controller.invariant()) {Log("ZOMBIE_INVARIANT_STOP");ResetZombieGame("INVARIANT",true);}
 }
@@ -3681,6 +4180,14 @@ void InitializeAiEngine(std::uintptr_t base,std::size_t size,std::uintptr_t text
         worldBindings=models.bindings && world==kWorldBuiltins.size() && bytesAt(kMusicPlayRva,kMusicPlayPrologue)
             && aiProfile.fixedPool==base+kEntityPoolRva && cbufReady;
         Log("ZOMBIE_WORLD bindings=%d builtins=%u/%llu",worldBindings,world,static_cast<unsigned long long>(kWorldBuiltins.size()));
+        // Test46: teleport, loop sounds, earthquakes and effects.
+        unsigned t46=0;
+        for(const auto& b:kTest46Builtins)if(worldBindings && MethodEntry(b.name,base+b.rva))++t46;
+        test46Bindings=worldBindings && t46==kTest46Builtins.size();
+        // Effects: G_EffectIndex (level init), and the tag check natives.
+        effects.bindings=test46Bindings && bytesAt(kGEffectIndexRva,kGEffectIndexPrologue) && bytesAt(kSlFindStringRva,kSlFindStringPrologue)
+            && bytesAt(kDObjGetBoneIndexRva,kDObjGetBoneIndexPrologue);
+        Log("ZOMBIE_TEST46 bindings=%d builtins=%u/%llu effects=%d",test46Bindings,t46,static_cast<unsigned long long>(kTest46Builtins.size()),effects.bindings);
     }
     InstallExpandedCapacity(base,aiProfile.resolved);
     // Installed after the capacity arena is placed (unchanged layout), before
@@ -3892,7 +4399,9 @@ ZombieGameStatus GetZombieGameStatus() {
     s.dogSpawners=!ai.dogPoints.empty();s.nextDogRound=zg.dogs.next();
     for(const auto& d:zg.drops) {
         if(s.dropCount>=static_cast<int>(s.drops.size()))break;
-        s.drops[static_cast<std::size_t>(s.dropCount++)]={d.type,d.origin,bo1::PowerupVisible(now-d.spawned),d.model!=0};
+        // Test46: a model still waiting for the service counts as a model, so
+        // the overlay's fallback marker never flashes before it appears.
+        s.drops[static_cast<std::size_t>(s.dropCount++)]={d.type,d.origin,bo1::PowerupVisible(now-d.spawned),d.model!=0 || d.wantModel};
     }
     std::snprintf(s.weapon,sizeof(s.weapon),"%s",zg.pistol.c_str());
     std::snprintf(s.event,sizeof(s.event),"%s",zg.event.c_str());s.eventAgeMs=now-zg.eventTime;
@@ -3912,6 +4421,7 @@ ZombieGameStatus GetZombieGameStatus() {
     s.zombiesDressed=models.dressed;
     s.powerupModels=static_cast<int>(std::count(models.powerups.begin(),models.powerups.end(),true));
     s.gibModels=models.gibs?static_cast<int>(bo1model::kGibModelNames.size()+(models.gibPieces?bo1model::kGibPieceNames.size():0)):0;
+    s.effects=static_cast<int>(effects.precached);s.hounds=HoundsReady();
     const auto soundStatus=bo1sounds::GetStatus();
     std::snprintf(s.bo1Sounds,sizeof(s.bo1Sounds),"%s",soundStatus.skipped?"SKIPPED":bo1sounds::StateText(soundStatus.state));
     s.soundLists=sounds.active?static_cast<int>(sounds.available.size()):0;
@@ -3950,10 +4460,20 @@ void LogZombieGame() {
         Log("ZOMBIE_AUDIO music_block=%d music_blocked=%u music_stops=%u ambience_bed_ms=%d beds=%u one_shots=%u announcer=%u dropped_gear=%u dropped_scrape=%u dropped_land=%u dropped_weapon=%u dropped_voice=%u dropped_other=%u dropped_step=%u",
             sounds.musicHookActive,sounds.musicBlocked.load(),sounds.musicStops,ambience.bedMs,sounds.ambienceBeds,sounds.ambienceOneShots,sounds.announcer,
             n(SS::Gear),n(SS::Scrape),n(SS::Land),n(SS::Weapon),n(SS::Voice),n(SS::Other),n(SS::Step));
-        Log("ZOMBIE_WORLD bindings=%d powerup_models=%d%d%d%d drop_models=%u drop_model_failures=%u gibs=%d gib_pieces=%d head_gibs=%u limb_gibs=%u pieces_thrown=%u gib_failures=%u bleeding=%llu pieces_live=%llu menu_pending=%d",
-            worldBindings,models.powerups[0],models.powerups[1],models.powerups[2],models.powerups[3],zg.dropModelsSpawned,zg.dropModelFailures,
+        Log("ZOMBIE_WORLD bindings=%d powerup_models=%d%d%d%d drop_models=%u drop_model_failures=%u wobbles=%u gibs=%d gib_pieces=%d head_gibs=%u limb_gibs=%u pieces_thrown=%u gib_failures=%u bleeding=%llu pieces_live=%llu menu_pending=%d",
+            worldBindings,models.powerups[0],models.powerups[1],models.powerups[2],models.powerups[3],zg.dropModelsSpawned,zg.dropModelFailures,zg.wobbles,
             models.gibs,models.gibPieces,models.headGibs,models.limbGibs,models.piecesThrown,models.gibFailures,
             static_cast<unsigned long long>(gibState.bleeding.size()),static_cast<unsigned long long>(gibState.pieces.size()),zg.menuAt!=0);
+        Log("ZOMBIE_QUIET patches_active=%u/%u objective_calls=%u hud_updates=%u script_hudelems_hidden=%u dialogue_aliases_muted=%u lists=%u/%u",
+            quietLevel.patchesActive,quietLevel.patchesWanted,quietLevel.objectiveCalls.load(),quietLevel.hudUpdates.load(),quietLevel.hudElemsHidden.load(),
+            quietLevel.aliasesMuted,quietLevel.aliasListsMuted,quietLevel.aliasListsSeen);
+        Log("ZOMBIE_FX bindings=%d precached=%u/%llu played=%u on_tag=%u refused=%u loop_sounds=%u delayed=%llu",effects.bindings,effects.precached,
+            static_cast<unsigned long long>(bo1fx::kEffects.size()),effects.played,effects.onTag,effects.refused,effects.loops,
+            static_cast<unsigned long long>(effects.delayed.size()));
+        Log("ZOMBIE_HOUNDS ready=%d wolf=%d leaves=%d arrivals=%u strikes=%u dressed=%u dress_failures=%u deaths=%u pending=%d",HoundsReady(),models.wolf,
+            static_cast<int>(std::count_if(kHoundLeaves.begin(),kHoundLeaves.end(),[](const char* l){return AnimSwapped(l);})),houndArrivals,houndStrikes,
+            models.houndsDressed,models.houndDressFailures,houndDeaths,houndArrival.active);
+        LogZombiePerf();
     }
     Log("ZOMBIE_STATE available=%d running=%d pending=%d map=%s round=%d phase=%s alive=%d queued=%d killed=%d dogs=%d points=%d total=%d kills=%u headshots=%u hits=%u melee_hits=%u melee_misses=%u drops=%llu double_points_ms=%d insta_kill_ms=%d campaign_removed=%u weapon=%s dog_spawners=%llu next_dog_round=%d",
         zombieBindingsReady,zg.running,zg.startWanted,zg.running?zg.map:zg.pendingMap.c_str(),c.round,bo1::PhaseText(c.phase),c.alive,c.queued,c.killed,c.dogs,

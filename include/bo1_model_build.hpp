@@ -6,6 +6,7 @@
 // supplies the archives; the native tests supply in-memory ones.
 #include "bo1_model.hpp"
 #include "bo1_extra_models.hpp"
+#include "bo1_fx.hpp"
 #include "zip_reader.hpp"
 #include <set>
 
@@ -20,9 +21,12 @@ struct BuildReport {
     unsigned textures=0;                         // BO1 textures found (character)
     std::vector<std::string> fallbacks,notes;
     // Test45: powerup models (common_zombie.ff) and dismemberment models.
-    bool powerups=false,gibs=false,gibPieces=false;
+    bool powerups=false,gibs=false,gibPieces=false,wolf=false;
     std::size_t extraModels=0;
     std::vector<std::string> extraFallbacks;
+    // Test46: effects (common_zombie.ff), see bo1_fx.hpp.
+    std::size_t effects=0,effectElems=0,effectDroppedElems=0,effectMaterials=0,effectImages=0;
+    std::vector<std::string> effectNotes;
 };
 
 // images/<name>.iwi from `archives` (ordered oldest to newest).
@@ -90,9 +94,20 @@ inline bool BuildCharacterFastFile(const std::uint8_t* raw,std::size_t size,cons
     auto gibs=CarveGibs(raw,size,strings->strings,c,&text);
     if(!gibs) report.notes.push_back("dismemberment: "+text);
     else if(!text.empty()) report.notes.push_back("dismemberment "+text);
+    // Test46: the hellhound (optional like the rest).
+    text.clear();
+    auto wolf=CarveWolf(raw,size,strings->strings,&text);
+    if(!wolf) report.notes.push_back("hellhound: "+text);
     const std::set<std::string> characterTextures=wanted;
-    const auto extra=ExtraTextures(powerups?&*powerups:nullptr,gibs?&*gibs:nullptr);
+    const auto extra=ExtraTextures(powerups?&*powerups:nullptr,gibs?&*gibs:nullptr,wolf?&*wolf:nullptr);
     wanted.insert(extra.begin(),extra.end());
+    // Test46: the effects' colour maps come from the same archives.
+    std::optional<bo1fx::Plan> effects;
+    if(common && commonSize) {
+        effects=bo1fx::PlanEffects(common,commonSize);
+        const auto images=effects->images();
+        wanted.insert(images.begin(),images.end());
+    }
     auto textures=ReadTextures(archives,wanted,report.notes);
     for(const auto& entry:textures) if(characterTextures.count(entry.first)) ++report.textures;
     // MW2 keeps gloss in the specular map's alpha.
@@ -105,10 +120,17 @@ inline bool BuildCharacterFastFile(const std::uint8_t* raw,std::size_t size,cons
     ZoneSpec zone;
     if(!CharacterSpec(c,textures,zone,&text,&report.fallbacks)) return Fail(error,text);
     ExtraReport extraReport;
-    if((powerups || gibs) && !ExtendZoneSpec(zone,powerups?&*powerups:nullptr,gibs?&*gibs:nullptr,textures,extraReport,&text))
+    if((powerups || gibs || wolf) && !ExtendZoneSpec(zone,powerups?&*powerups:nullptr,gibs?&*gibs:nullptr,textures,extraReport,&text,wolf?&*wolf:nullptr))
         return Fail(error,text);
-    report.powerups=extraReport.powerups;report.gibs=extraReport.gibs;report.gibPieces=extraReport.pieces;
+    report.powerups=extraReport.powerups;report.gibs=extraReport.gibs;report.gibPieces=extraReport.pieces;report.wolf=extraReport.wolf;
     report.extraModels=extraReport.models;report.extraFallbacks=extraReport.fallbacks;
+    if(effects) {
+        bo1fx::Report fx;
+        if(bo1fx::AppendEffects(*effects,textures,zone,fx,&text)) {
+            report.effects=fx.effects;report.effectElems=fx.elems;report.effectDroppedElems=fx.droppedElems;
+            report.effectMaterials=fx.materials;report.effectImages=fx.images;report.effectNotes=fx.notes;
+        } else report.notes.push_back("effects: "+text);
+    }
     ZoneResult built;
     if(!BuildZone(zone,built,&text)) return Fail(error,text);
     fastfile=FastFile(built);

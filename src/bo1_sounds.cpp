@@ -19,7 +19,7 @@
 namespace mod::bo1sounds {
 namespace {
 // Bump when the generated zone changes so cached files are rebuilt.
-constexpr const char* kBuilderVersion="bo1mw2-sounds-2";   // Test45: ambience, announcer, gib sounds
+constexpr const char* kBuilderVersion="bo1mw2-sounds-3";   // Test46: powerup and hellhound loops
 std::mutex mutex;
 std::condition_variable changed;
 Status status;

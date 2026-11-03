@@ -274,4 +274,98 @@ inline constexpr std::uintptr_t kEntityPoolRva=0xd9e070;
 // Disconnect to the main menu after GAME OVER ("disconnect" through the
 // command buffer, as the in-game menus do).
 inline constexpr const char* kDisconnectCommand="disconnect\n";
+
+// ---- Test46: no Spec Ops HUD, objectives or dialogue on a zombies level ----
+// HudElem_UpdateClient (0x16cf90, called per client from G_RunFrame's end
+// of frame, 0x17474f): copies every in-use game hudelem (g_hudelems,
+// 0xcf75d0, 256 x 0xac bytes: type at +0, client at +0xa8, 0x7ff = all) into
+// the client's hud array (dest + (n + 7) * 0xa8, 0xa8 bytes each) and clears
+// the rest of the array up to the first free entry. On a zombies level its
+// entry jumps to a copy that sends nothing: every Spec Ops timer, kill
+// counter, objective line, hint and fade (all script hudelems) stays off
+// screen. The zombies HUD is the overlay's.
+inline constexpr std::uintptr_t kHudElemUpdateClientRva=0x16cf90,kHudElemsRva=0xcf75d0;
+inline constexpr std::size_t kHudElemCount=256,kGameHudElemBytes=0xac,kHudElemBytes=0xa8,kHudElemClientOffset=0xa8,kHudElemDestFirst=7;
+inline constexpr int kHudElemAllClients=0x7ff;
+inline constexpr std::array<std::uint8_t,16> kHudElemUpdateClientPrologue={
+    0x48,0x89,0x5c,0x24,0x10,0x56,0x48,0x83,0xec,0x20,0x48,0x8b,0xf1,0x4c,0x8d,0x05};
+// The objective builtins (function table at 0x3c3190..0x3c32e0): on a
+// zombies level each returns at once, so no objective marker, compass star,
+// pause-menu objective or "objective updated" message appears.
+struct PatchedBuiltin { const char* name; std::uintptr_t rva; std::array<std::uint8_t,16> prologue; };
+inline constexpr std::array<PatchedBuiltin,12> kObjectiveBuiltins={{
+    {"objective_add",0x198de0,{0x48,0x8b,0xc4,0x41,0x55,0x41,0x57,0x48,0x81,0xec,0x58,0x08,0x00,0x00,0x48,0x89}},
+    {"objective_delete",0x199200,{0x40,0x53,0x48,0x83,0xec,0x20,0x33,0xc9,0xe8,0xc3,0x9e,0x08,0x00,0x8b,0xd8,0x83}},
+    {"objective_onentity",0x199240,{0x40,0x53,0x48,0x81,0xec,0x30,0x04,0x00,0x00,0x33,0xc9,0xe8,0x80,0x9e,0x08,0x00}},
+    {"objective_state",0x199340,{0xb9,0x01,0x00,0x00,0x00,0xe9,0x16,0x08,0x00,0x00,0xcc,0xcc,0xcc,0xcc,0xcc,0xcc}},
+    {"objective_string",0x199360,{0xb9,0x01,0x00,0x00,0x00,0xe9,0x66,0x09,0x00,0x00,0xcc,0xcc,0xcc,0xcc,0xcc,0xcc}},
+    {"objective_string_nomessage",0x199370,{0x33,0xc9,0xe9,0x59,0x09,0x00,0x00,0xcc,0xcc,0xcc,0xcc,0xcc,0xcc,0xcc,0xcc,0xcc}},
+    {"objective_icon",0x199380,{0x48,0x89,0x5c,0x24,0x08,0x48,0x89,0x6c,0x24,0x10,0x48,0x89,0x74,0x24,0x18,0x57}},
+    {"objective_position",0x199450,{0x40,0x53,0x48,0x81,0xec,0x30,0x04,0x00,0x00,0x33,0xc9,0xe8,0x70,0x9c,0x08,0x00}},
+    {"objective_additionalposition",0x199530,{0x48,0x89,0x5c,0x24,0x10,0x57,0x48,0x81,0xec,0x30,0x04,0x00,0x00,0x33,0xc9,0xe8}},
+    {"objective_current",0x199600,{0xb9,0x01,0x00,0x00,0x00,0xe9,0xf6,0x03,0x00,0x00,0xcc,0xcc,0xcc,0xcc,0xcc,0xcc}},
+    {"objective_ring",0x199770,{0x48,0x89,0x5c,0x24,0x08,0x57,0x48,0x81,0xec,0x20,0x04,0x00,0x00,0x33,0xc9,0xe8}},
+    {"objective_setpointertextoverride",0x199810,{0x48,0x89,0x5c,0x24,0x08,0x48,0x89,0x74,0x24,0x10,0x57,0x48,0x83,0xec,0x70,0x33}}}};
+// The Spec Ops dialogue entry (so_dialog_ready_up, _mission_success,
+// _time_low, _progress_update, _counter_update ... all end in it): entered
+// with OP_End like the end-of-mission functions.
+inline constexpr std::array<ScriptFunctionRef,1> kSpecOpsDialogueFunctions={{{"maps/_specialops_code","so_dialog_play"}}};
+// Dialogue everywhere else (radio lines, battle chatter, face/pain lines,
+// scripted level dialogue): MW2's dialogue files all live under
+// "voiceovers/" (streamed: SoundFile.dir; loaded: LoadedSound.name). Their
+// aliases play at volume 0 on a zombies level, so every script that waits for
+// a line's "sounddone" still gets it. The asset database: u16 hash table
+// db_hashTable[37000] at 0xa78720, entries g_assetEntryPool at 0xa8e860
+// (24 bytes: type at +0, header at +8, next entry index u16 at +0x12;
+// DB_FindXAssetEntry 0xef500). snd_alias_list_t: name, head, count (+0x10);
+// snd_alias_t (0x88): soundFile at +0x28, volMin/volMax at +0x34/+0x38;
+// SoundFile: type (1 loaded, 2 streamed), the loaded sound or dir at +8, the
+// streamed name at +0x10.
+inline constexpr std::uintptr_t kAssetHashTableRva=0xa78720,kAssetEntryPoolRva=0xa8e860;
+inline constexpr std::size_t kAssetHashBuckets=37000,kAssetEntryBytes=24,kAssetEntryNext=0x12;
+inline constexpr std::size_t kSndAliasBytes=0x88,kSndAliasSoundFile=0x28,kSndAliasVolMin=0x34,kSndAliasVolMax=0x38,kSndAliasListCount=0x10;
+inline constexpr int kSoundFileLoaded=1,kSoundFileStreamed=2;
+inline constexpr const char* kDialogueDirectory="voiceovers";
+// ---- Test46: more builtins (function table 0x3c1d18.., method tables) ----
+// forceteleport(origin, angles) on an actor (0x14d560, actor method table
+// 0x3377f8); playloopsound/stoploopsound on an entity; earthquake(scale,
+// duration, origin, radius); loadfx(name) (level init only) and
+// playfx(id, origin) / playfxontag(id, ent, tag) / stopfxontag.
+inline constexpr BuiltinBinding kBuiltinForceTeleport{"forceteleport",0x14d560};
+inline constexpr BuiltinBinding kBuiltinPlayLoopSound{"playloopsound",0x192180};
+inline constexpr BuiltinBinding kBuiltinStopLoopSound{"stoploopsound",0x18ade0};
+inline constexpr BuiltinBinding kBuiltinEarthquake{"earthquake",0x1870d0};
+inline constexpr BuiltinBinding kBuiltinLoadFx{"loadfx",0x18bf10};
+inline constexpr BuiltinBinding kBuiltinPlayFx{"playfx",0x18bf70};
+inline constexpr BuiltinBinding kBuiltinPlayFxOnTag{"playfxontag",0x18c220};
+inline constexpr BuiltinBinding kBuiltinStopFxOnTag{"stopfxontag",0x18c310};
+inline constexpr std::array<BuiltinBinding,8> kTest46Builtins={kBuiltinForceTeleport,kBuiltinPlayLoopSound,kBuiltinStopLoopSound,
+    kBuiltinEarthquake,kBuiltinLoadFx,kBuiltinPlayFx,kBuiltinPlayFxOnTag,kBuiltinStopFxOnTag};
+// ---- Test46: BO1 effects and hellhounds ----
+// G_EffectIndex(name) (0x19eff0): finds or, only while level.initializing,
+// adds the effect configstring 0xcb7 + index (index 1..255); the client
+// registers the effect by that name (our generated zone holds it).
+inline constexpr std::uintptr_t kGEffectIndexRva=0x19eff0;
+inline constexpr std::array<std::uint8_t,12> kGEffectIndexPrologue={0x48,0x89,0x6c,0x24,0x18,0x57,0x48,0x83,0xec,0x20,0x8b,0x2d};
+inline constexpr unsigned kEffectConfigstringBase=0xcb7,kMaxEffects=0x100;
+inline constexpr int kAssetTypeFx=30;
+// playfxontag/stopfxontag raise a script error (fatal from native code) for
+// an entity without a model (u16 model index at gentity+0x284) or a tag its
+// model lacks; both are checked first with the natives the builtin uses:
+// SL_FindString (0x21a3d0, 0 when the string does not exist) and
+// SV_DObjGetBoneIndex (0x231130, < 0 when the model has no such bone).
+inline constexpr std::uintptr_t kSlFindStringRva=0x21a3d0,kDObjGetBoneIndexRva=0x231130;
+inline constexpr std::array<std::uint8_t,12> kSlFindStringPrologue={0x40,0x56,0x57,0xb8,0x28,0x20,0x00,0x00,0xe8,0x23,0xef,0x09};
+inline constexpr std::array<std::uint8_t,12> kDObjGetBoneIndexPrologue={0x40,0x53,0x48,0x83,0xec,0x20,0x8b,0xda,0xe8,0xa3,0xdc,0xfc};
+inline constexpr std::size_t kEntityModelIndex=0x284;
+// allowedstances(...) (0x14d650) only sets the actor's stance mask
+// (actor+0xe38: 1 stand, 2 crouch, 4 prone). A hellhound is held crouched,
+// so MW2's animscripts pick their crouch locomotion, idle and stance-change
+// leaves, which carry the BO1 dog animations on a zombies level.
+inline constexpr std::size_t kActorAllowedStances=0xe38;
+inline constexpr int kStanceCrouch=2;
+// playloopsound refuses a list whose first alias is not looping (0x26ac30:
+// flags bit 0 at alias+0x50): checked before calling it.
+inline constexpr std::size_t kSndAliasListHead=0x8,kSndAliasFlags=0x50;
+inline constexpr std::uint32_t kSndAliasLooping=1;
 } // namespace mod

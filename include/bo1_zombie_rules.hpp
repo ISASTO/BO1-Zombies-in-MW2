@@ -92,7 +92,8 @@ template<class Notes> std::size_t AttackFireTimes(const Notes& notes,int lengthM
     if(lengthMs<=0) return 0;
     for(const auto& [name,time]:notes) {
         if(count>=limit) break;
-        if(name=="fire" && time>=0.f && time<=1.f) out[count++]=static_cast<int>(time*static_cast<float>(lengthMs));
+        // Test46: a hellhound's bite is its "dog_melee" notetrack.
+        if((name=="fire" || name=="dog_melee") && time>=0.f && time<=1.f) out[count++]=static_cast<int>(time*static_cast<float>(lengthMs));
     }
     std::sort(out,out+count);
     return count;
@@ -110,6 +111,18 @@ inline bool BreakOffAttack(int elapsedMs,float distanceSquared) {
 // spot, version 1 45 units; hide_pop shows the zombie after 0.5 s.
 inline float RiseDepth(int version) {return version==2?14.f:45.f;}
 inline constexpr int kRiseShowMilliseconds=500;
+
+// ---- Test46: a zombie sunk into the floor (seen on Terminal). A trace down
+// its own column from 40 units above its feet to 4 below: a surface more
+// than 10 units above the feet (or a start inside solid) means the legs are
+// in the floor. Not a BO1 rule; BO1's zones never let a zombie leave the
+// ground.
+inline constexpr int kSunkCheckMilliseconds=700;
+inline constexpr float kSunkTraceAbove=40.f,kSunkTraceBelow=4.f,kSunkMargin=10.f;
+inline bool SunkBelowFloor(bool startSolid,float fraction,float surfaceZ,float feetZ) {
+    if(startSolid) return false;              // inside geometry at mid-body: leave it to the failsafe
+    return fraction<1.f && surfaceZ>feetZ+kSunkMargin;
+}
 
 // ---- Failsafe: round_spawn_failsafe (_zombiemode.gsc)
 inline constexpr std::int64_t kFailsafeIntervalMilliseconds=30000;

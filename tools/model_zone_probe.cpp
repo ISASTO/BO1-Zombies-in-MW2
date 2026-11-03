@@ -14,6 +14,7 @@
 #include "script_call.hpp"
 #include "bo1_model.hpp"
 #include "bo1_extra_models.hpp"
+#include "bo1_fx.hpp"
 #include "../tests/bo1_model_synthetic.hpp"
 #include <sys/mman.h>
 #include <csetjmp>
@@ -37,6 +38,7 @@ constexpr std::uintptr_t kVersionError=0x1fb5f0,kComError=0x2906b0,kAllocZone=0x
 constexpr std::uintptr_t kAfterLoad1=0xdbaa0,kAfterLoad2=0xf0920;
 constexpr std::uintptr_t kAddXModel=0xf3810,kAddXModelSurfs=0xf38e0,kAddMaterial=0xf2af0,kAddTechniqueSet=0xf2c70,kAddImage=0xf25b0;
 constexpr std::uintptr_t kLoadTexture=0x23db0,kSlGetString=0x21a670;
+constexpr std::uintptr_t kAddFx=0xf21b0,kFindXAssetHeader=0xef5d0;   // Test46
 constexpr std::uintptr_t kProgressFlag=0x600e04,kStreamPositions=0xb697d0,kZoneHandle=0xb69434;
 
 void Check(bool ok,const std::string& message) {if(!ok)throw std::runtime_error(message);}
@@ -94,8 +96,9 @@ struct Asset {int type;std::string name;std::vector<std::uint8_t> header;bool pl
 std::vector<std::unique_ptr<Asset>> assets;
 std::map<std::pair<int,std::string>,Asset*> byName;
 std::size_t references=0;
-const std::map<int,std::size_t> kHeaderBytes={{4,mw2::kModelBytes},{3,mw2::kSurfsBytes},{5,mw2::kMaterialBytes},{9,mw2::kTechniqueSetBytes},{10,mw2::kImageBytes}};
-const std::map<int,std::size_t> kNameOffset={{4,0},{3,0},{5,0},{9,0},{10,0x20}};
+const std::map<int,std::size_t> kHeaderBytes={{4,mw2::kModelBytes},{3,mw2::kSurfsBytes},{5,mw2::kMaterialBytes},{9,mw2::kTechniqueSetBytes},{10,mw2::kImageBytes},
+    {30,mw2::kEffectBytes}};
+const std::map<int,std::size_t> kNameOffset={{4,0},{3,0},{5,0},{9,0},{10,0x20},{30,0}};
 template<int Type> void MOD_NATIVE_ABI Add(std::uint8_t** var) {
     const auto* header=*var;
     const char* name=*reinterpret_cast<const char* const*>(header+kNameOffset.at(Type));
@@ -114,6 +117,15 @@ template<int Type> void MOD_NATIVE_ABI Add(std::uint8_t** var) {
     *var=a->header.data();byName[{Type,text}]=a.get();assets.push_back(std::move(a));
 }
 
+// Test46: DB_FindXAssetHeader(type, name) for an effect named by another
+// (Load_FxEffectDefRef 0xf2270): it must already be registered.
+std::size_t effectLookups=0;
+void* MOD_NATIVE_ABI FindXAssetHeader(int type,const char* name) {
+    ++effectLookups;
+    const auto found=byName.find({type,name?name:""});
+    if(found==byName.end() || found->second->placeholder) {failure=std::string("asset looked up before it loaded: ")+(name?name:"?");return nullptr;}
+    return found->second->header.data();
+}
 // Texture upload: record what the engine would create.
 struct Upload {std::uint8_t levels;std::int32_t flags;std::uint32_t format,size;std::vector<std::uint8_t> data;std::uint16_t w,h,d;std::uint8_t mapType,semantic;};
 std::map<std::string,Upload> uploads;
@@ -255,9 +267,83 @@ void VerifyMaterials(const ZoneSpec& zone,Report& report) {
     for(const auto& [name,tex]:zone.images) {(void)tex;Check(uploads.count(name)==1,"image "+name+" not uploaded");++report.images;}
 }
 
+// Test46: effects and their materials, loaded by Load_FxEffectDefPtr and
+// everything under it (elem samples, visuals, material handles, names).
+struct EffectReport {std::size_t effects=0,elems=0,materials=0,arrays=0,lights=0,spawners=0,references=0;};
+EffectReport effectReport;
+void VerifyEffectMaterial(const EffectMaterialSpec& want,const std::uint8_t* h,const ZoneSpec& zone) {
+    const std::string where="effect material "+want.name+": ";
+    Check(h[8]==0 && h[9]==want.sortKey && h[10]==want.atlasRows && h[11]==want.atlasColumns && !std::memcmp(h+0x20,mw2::kEffectStateBitsEntry.data(),48),where+"info");
+    Check(h[0x50]==1 && h[0x51]==want.constants.size() && h[0x52]==2 && h[0x53]==mw2::kEffectStateFlags && h[0x54]==mw2::kEffectCameraRegion,where+"counts");
+    const auto technique=byName.find({9,want.techniqueSet});
+    Check(technique!=byName.end() && technique->second->placeholder && Ptr(h,0x58)==technique->second->header.data(),where+"technique set reference "+want.techniqueSet);
+    const auto* d=Ptr(h,0x60);
+    Check(At<std::uint32_t>(d,0)==kHashColorMap && d[4]=='c' && d[5]=='p' && d[6]==want.sampler && d[7]==mw2::kSemanticColor,where+"texture def");
+    const auto img=byName.find({10,want.image});
+    Check(img!=byName.end() && Ptr(d,8)==img->second->header.data(),where+"image "+want.image);
+    const auto& tex=zone.images.at(want.image);const auto up=uploads.find(want.image);
+    Check(up!=uploads.end() && up->second.format==tex.format && up->second.data==tex.data && up->second.semantic==mw2::kSemanticColor,where+"image upload");
+    const auto* c=Ptr(h,0x68);
+    Check(want.constants.empty()?!c:((reinterpret_cast<std::uintptr_t>(c)&15)==0),where+"constant table");
+    for(std::size_t n=0;n<want.constants.size();++n) Check(!std::memcmp(c+32*n,want.constants[n].data(),32),where+"constant "+std::to_string(n));
+    const auto* sb=Ptr(h,0x70);
+    Check(At<std::uint64_t>(sb,0)==want.stateBits[0] && At<std::uint64_t>(sb,8)==want.stateBits[1],where+"state bits");
+}
+void VerifyEffects(const ZoneSpec& zone) {
+    std::set<std::string> materialsSeen;
+    for(const auto& fx:zone.effects) {
+        const auto found=byName.find({30,fx.name});
+        Check(found!=byName.end() && !found->second->placeholder,"effect "+fx.name+" not registered");
+        const auto* h=found->second->header.data();
+        const std::string where="effect "+fx.name+": ";
+        Check(h[8]==fx.flags && At<std::int32_t>(h,0xc)==fx.totalSize && At<std::int32_t>(h,0x10)==fx.loopingLife,where+"header");
+        for(std::size_t k=0;k<3;++k) Check(At<std::int32_t>(h,0x14+4*k)==fx.counts[k],where+"counts");
+        const auto* elems=Ptr(h,0x20);
+        // DB_AllocStreamPos(3): 4-byte alignment.
+        Check(Within(elems,fx.elems.size()*mw2::kElemBytes,mw2::Virtual) && (reinterpret_cast<std::uintptr_t>(elems)&3)==0,where+"elem array");
+        for(std::size_t n=0;n<fx.elems.size();++n) {
+            const auto& want=fx.elems[n];const auto* e=elems+mw2::kElemBytes*n;
+            const std::string at=where+"elem "+std::to_string(n)+": ";
+            for(std::size_t b=0;b<mw2::kElemBytes;++b) {
+                const bool pointer=(b>=mw2::kElemVel && b<mw2::kElemVisuals+8) || (b>=mw2::kElemImpact && b<mw2::kElemEmitted+8) || (b>=mw2::kElemExtended && b<mw2::kElemExtended+8);
+                if(!pointer) Check(e[b]==want.raw[b],at+"byte "+std::to_string(b));
+            }
+            Check(want.vel.empty()?!Ptr(e,mw2::kElemVel):Same(Ptr(e,mw2::kElemVel),want.vel),at+"velocity samples");
+            Check(want.vis.empty()?!Ptr(e,mw2::kElemVis):Same(Ptr(e,mw2::kElemVis),want.vis),at+"visual samples");
+            Check(!Ptr(e,mw2::kElemExtended),at+"no extended def");
+            std::vector<const std::uint8_t*> visuals;
+            if(want.materials.size()>1) {
+                const auto* array=Ptr(e,mw2::kElemVisuals);
+                Check(Within(array,8*want.materials.size(),mw2::Virtual),at+"visual array");
+                for(std::size_t k=0;k<want.materials.size();++k) visuals.push_back(Ptr(array,8*k));
+                ++effectReport.arrays;
+            } else if(want.materials.size()==1) visuals.push_back(Ptr(e,mw2::kElemVisuals));
+            else {
+                Check(!Ptr(e,mw2::kElemVisuals),at+"no visuals");
+                if(e[mw2::kElemType]==mw2::kElemOmni || e[mw2::kElemType]==mw2::kElemSpot) ++effectReport.lights; else ++effectReport.spawners;
+            }
+            for(std::size_t k=0;k<visuals.size();++k) {
+                const auto& m=zone.effectMaterials[want.materials[k]];
+                const auto mat=byName.find({5,m.name});
+                Check(mat!=byName.end() && !mat->second->placeholder && visuals[k]==mat->second->header.data(),at+"material "+m.name);
+                if(materialsSeen.insert(m.name).second) {VerifyEffectMaterial(m,mat->second->header.data(),zone);++effectReport.materials;}
+            }
+            const std::pair<std::size_t,const std::string*> refs[]={{mw2::kElemImpact,&want.impact},{mw2::kElemDeath,&want.death},{mw2::kElemEmitted,&want.emitted}};
+            for(const auto& [offset,name]:refs) {
+                if(name->empty()) {Check(!Ptr(e,offset),at+"no effect reference");continue;}
+                const auto target=byName.find({30,*name});
+                Check(target!=byName.end() && Ptr(e,offset)==target->second->header.data(),at+"effect reference "+*name);
+                ++effectReport.references;
+            }
+            ++effectReport.elems;
+        }
+        ++effectReport.effects;
+    }
+}
+
 Report LoadAndVerify(const ZoneSpec& zone,const std::vector<std::uint8_t>& file) {
     // Fresh state for each zone.
-    assets.clear();byName.clear();uploads.clear();slStrings.assign(1,"");references=0;failure.clear();
+    assets.clear();byName.clear();uploads.clear();slStrings.assign(1,"");references=0;failure.clear();effectLookups=0;
     for(auto& b:blocks){if(b.data)munmap(b.data,b.mapped);b=Block{};}
     rawFile.assign(file.begin(),file.begin()+21);rawPos=0;
     // Inflate the stored zlib stream exactly as zlib would (stored blocks only).
@@ -289,6 +375,8 @@ Report LoadAndVerify(const ZoneSpec& zone,const std::vector<std::uint8_t>& file)
     Report report;
     VerifyMaterials(zone,report);
     for(const auto& m:zone.models) VerifyModel(m,zone,report);
+    effectReport=EffectReport{};
+    VerifyEffects(zone);
     return report;
 }
 } // namespace
@@ -313,6 +401,7 @@ int main(int argc,char** argv) {
         Jump(kAddMaterial,reinterpret_cast<void*>(&Add<5>));Jump(kAddTechniqueSet,reinterpret_cast<void*>(&Add<9>));
         Jump(kAddImage,reinterpret_cast<void*>(&Add<10>));Jump(kLoadTexture,reinterpret_cast<void*>(&LoadTexture));
         Jump(kSlGetString,reinterpret_cast<void*>(&SlGetString));
+        Jump(kAddFx,reinterpret_cast<void*>(&Add<30>));Jump(kFindXAssetHeader,reinterpret_cast<void*>(&FindXAssetHeader));
 
         std::string json="{";
         auto emit=[&](const char* tag,const Report& r,std::size_t fileBytes,const ZoneResult& z) {
@@ -324,14 +413,56 @@ int main(int argc,char** argv) {
                 z.blockSize[3],z.blockSize[4],z.blockSize[5],z.blockSize[6],z.blockSize[7]);
             json+=(json.size()>1?",":"");json+=buffer;
         };
-        // 1. The synthetic character (always).
+        auto emitEffects=[&](const char* tag) {
+            char buffer[320];
+            std::snprintf(buffer,sizeof(buffer),"\"%s\":{\"effects\":%zu,\"elems\":%zu,\"materials\":%zu,\"visual_arrays\":%zu,\"lights\":%zu,"
+                "\"spawner_elems\":%zu,\"effect_references\":%zu,\"effect_lookups\":%zu}",tag,effectReport.effects,effectReport.elems,
+                effectReport.materials,effectReport.arrays,effectReport.lights,effectReport.spawners,effectReport.references,effectLookups);
+            json+=",";json+=buffer;
+        };
+        // 1. The synthetic character (always), with two synthetic effects
+        // (Test46): a material array, a light, a reused material and a
+        // visual-less elem naming the first effect.
         synthetic::Scene scene;synthetic::Build(scene);
+        {
+            auto& sp=scene.spec;
+            sp.images["bo1fx_synthetic"]=synthetic::Dxt1(16,16,7);
+            EffectMaterialSpec add;add.name="bo1fx/synthetic_add";add.techniqueSet="effect_add";add.image="bo1fx_synthetic";add.sortKey=0x38;
+            add.atlasRows=2;add.atlasColumns=4;add.sampler=0xea;
+            std::array<std::uint8_t,32> tint{};Put<std::uint32_t>(tint.data(),mod::bo1fx::kHashColorTint);std::memcpy(tint.data()+4,"colorTint",9);
+            for(std::size_t k=0;k<4;++k) Put<float>(tint.data()+16+4*k,1.f);
+            std::array<std::uint8_t,32> feather{};Put<std::uint32_t>(feather.data(),mod::bo1fx::kHashFeatherParms);std::memcpy(feather.data()+4,"featherParms",12);
+            Put<float>(feather.data()+16,0.025f);Put<float>(feather.data()+20,40.f);
+            add.constants={tint};add.stateBits={0x0000000c19218922ull,mw2::kEffectSecondStateBits};
+            EffectMaterialSpec blend=add;blend.name="bo1fx/synthetic_blend";blend.techniqueSet="effect_zfeather_blend";blend.constants={feather,tint};
+            blend.stateBits[0]=0x0000000c19289165ull;
+            sp.effectMaterials={add,blend};
+            auto elem=[](std::uint8_t type,std::uint8_t vc,std::uint8_t vic,std::uint8_t vsic,std::uint8_t seed) {
+                EffectElemSpec e;for(std::size_t b=0;b<e.raw.size();++b) e.raw[b]=static_cast<std::uint8_t>(seed+b);
+                e.raw[mw2::kElemType]=type;e.raw[mw2::kElemVisualCount]=vc;e.raw[mw2::kElemVelCount]=vic;e.raw[mw2::kElemVisCount]=vsic;
+                for(std::size_t o=0x110;o<0x118;++o) e.raw[o]=0;
+                if(vic!=0xff) e.vel=synthetic::Bytes((vic+1u)*mw2::kVelSampleBytes,seed);
+                e.vis=synthetic::Bytes((vsic+1u)*mw2::kVisSampleBytes,static_cast<std::uint8_t>(seed+1));
+                return e;
+            };
+            EffectSpec a;a.name="synthetic/fx_a";a.flags=1;a.totalSize=1234;a.loopingLife=2000;a.counts={2,0,0};
+            auto a0=elem(0,2,1,2,3);a0.materials={0,1};
+            auto a1=elem(mw2::kElemOmni,1,0xff,1,9);a1.raw[mw2::kElemVelCount]=0;
+            a.elems={a0,a1};
+            EffectSpec b;b.name="synthetic/fx_b";b.counts={0,1,1};b.totalSize=99;
+            auto b0=elem(1,1,0,0,21);b0.materials={0};
+            auto b1=elem(mw2::kElemModel,0,0,0,33);b1.death="synthetic/fx_a";
+            b.elems={b0,b1};
+            sp.effects={a,b};
+        }
         ZoneResult z;std::string error;
         Check(BuildZone(scene.spec,z,&error),"BuildZone: "+error);
         const auto file=FastFile(z);
         const auto r=LoadAndVerify(scene.spec,file);
         Check(r.models==2 && r.collisionTrees==2 && references>=4,"synthetic coverage");
-        emit("synthetic",r,file.size(),z);
+        Check(effectReport.effects==2 && effectReport.arrays==1 && effectReport.lights==1 && effectReport.spawners==1 && effectReport.references==1
+            && effectReport.materials==2 && effectLookups==1,"synthetic effect coverage");
+        emit("synthetic",r,file.size(),z);emitEffects("synthetic_effects");
         // 2. Optionally, the real Kino character from a local decompressed zone.
         if(argc>2) {
             std::ifstream zin(argv[2],std::ios::binary);std::vector<std::uint8_t> raw((std::istreambuf_iterator<char>(zin)),{});
@@ -362,15 +493,26 @@ int main(int argc,char** argv) {
             }
             const auto gibs=CarveGibs(raw.data(),raw.size(),strings->strings,*c,&error);
             Check(!!gibs && gibs->piecesFound,"dismemberment: "+error);
-            for(const auto& n:ExtraTextures(powerups?&*powerups:nullptr,&*gibs)) tex[n]=synthetic::Dxt1(32,32,seed++);
+            const auto wolf=CarveWolf(raw.data(),raw.size(),strings->strings,&error);   // Test46
+            Check(!!wolf && wolf->model.numBones==58 && !wolf->skins.empty(),"hellhound: "+error);
+            for(const auto& n:ExtraTextures(powerups?&*powerups:nullptr,&*gibs,&*wolf)) tex[n]=synthetic::Dxt1(32,32,seed++);
+            // Test46: the effects (with a common_zombie zone), textures synthetic.
+            std::optional<mod::bo1fx::Plan> plan;
+            if(!common.empty()) {
+                plan=mod::bo1fx::PlanEffects(common.data(),common.size());
+                for(const auto& n:plan->images()) tex[n]=synthetic::Dxt1(32,32,seed++);
+            }
             ZoneSpec full;Check(CharacterSpec(*c,tex,full,&error),"spec: "+error);
             ExtraReport extra;
-            Check(ExtendZoneSpec(full,powerups?&*powerups:nullptr,&*gibs,tex,extra,&error),"extend: "+error);
+            Check(ExtendZoneSpec(full,powerups?&*powerups:nullptr,&*gibs,tex,extra,&error,&*wolf) && extra.wolf,"extend: "+error);
+            mod::bo1fx::Report fxReport;
+            if(plan) Check(mod::bo1fx::AppendEffects(*plan,tex,full,fxReport,&error) && fxReport.effects==mod::bo1fx::kEffects.size(),"effects: "+error);
             ZoneResult zf;Check(BuildZone(full,zf,&error),"BuildZone: "+error);
             const auto fff=FastFile(zf);
             const auto rf=LoadAndVerify(full,fff);
-            Check(rf.models==6+13+(powerups?4u:0u) && extra.pieces,"zombie zone coverage");
+            Check(rf.models==6+13+(powerups?4u:0u)+1 && extra.pieces,"zombie zone coverage");
             emit("zombie_zone",rf,fff.size(),zf);
+            if(plan) {Check(effectReport.effects==mod::bo1fx::kEffects.size() && effectReport.elems==fxReport.elems,"zombie zone effects");emitEffects("zombie_zone_effects");}
         }
         json+="}";
         std::puts(json.c_str());

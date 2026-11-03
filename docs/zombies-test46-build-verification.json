@@ -1,0 +1,283 @@
+{
+ "version": "0.1.45-zombies-test46",
+ "base_commit": "b97d8f8",
+ "executable_sha256": "fb7e8a987c371dea7b666091b0b9e2011c0cd9cd277b191ad453d11d557dd777",
+ "dll_sha256": "44367d6a2642e475b02d0687621f03cba6816054a14f1d33e3597e194777a62d",
+ "dll_bytes": 21432446,
+ "compiler": "xPack MinGW-w64 GCC 13.2.0 (posix threads, UCRT), RelWithDebInfo, static GCC/C++ runtime",
+ "pe_checks": {
+  "amd64_pe32_plus": true,
+  "exact_ten_exports": true,
+  "aslr_nx": true,
+  "no_gcc_runtime_dlls": true
+ },
+ "exports": [
+  "D3DPERF_BeginEvent",
+  "D3DPERF_EndEvent",
+  "D3DPERF_GetStatus",
+  "D3DPERF_QueryRepeatFrame",
+  "D3DPERF_SetMarker",
+  "D3DPERF_SetOptions",
+  "D3DPERF_SetRegion",
+  "DebugSetMute",
+  "Direct3DCreate9",
+  "Direct3DCreate9Ex"
+ ],
+ "imports": [
+  "advapi32.dll",
+  "bcrypt.dll",
+  "dbghelp.dll",
+  "gdi32.dll",
+  "kernel32.dll",
+  "user32.dll",
+  "winmm.dll",
+  "api-ms-win-crt-*-l1-1-0.dll (11 UCRT API sets)"
+ ],
+ "imports_added_since_test45": [],
+ "early_dllmain_native_edits_unchanged": true,
+ "third_party": {
+  "miniz": "tinfl inflate only, MIT, third_party/miniz (VERSION records the upstream commit)",
+  "wmadec": "C++ port of FFmpeg n7.1 WMA v2 decoder (wmadec.c, wma.c, wma_common.c and tables), LGPL 2.1 or later, third_party/wmadec; licence text and notice ship in the package docs"
+ },
+ "native_cxx_tests": {
+  "passed": 27,
+  "failed": 0,
+  "new": [
+   "test46_tests (the weapon definition alignment, the player-feature cadence, dialogue alias classification, the floor rule, the hellhound bite notetrack, IWI RGBA/RGB/LA/L/A formats, the effect conversion on a synthetic Black Ops zone; with the owner zones: all 10 effects converted and the hellhound carved)"
+  ]
+ },
+ "python_tests": {
+  "passed": 81,
+  "failed": 0,
+  "new": "Test46Tests: quiet map patches only on zombies levels and restored on the next load, dialogue muted by volume, effects registered while the level initializes and played only after the model/tag checks, powerup glow/hum/grab, hellhound arrival sequence and dressing, crouch-only hounds, loop flag kept in the sound build, alignment mask 3",
+  "locally_gated_passed": [
+   "test_mw2_slot_anims_exist_when_local_zone_is_available (owner's common.ff; every slot anim and the 3 hound leaves)",
+   "test_helmet_note_exists_in_local_mw2_scripts (owner's extracted MW2 scripts)",
+   "test_mw2_scripts_never_play_the_bo1_only_leaves_when_available (owner's extracted MW2 scripts)"
+  ]
+ },
+ "native_suites_and_audits_passed": [
+  "runtime",
+  "resources",
+  "iterator",
+  "animation",
+  "history",
+  "awareness",
+  "threat",
+  "crowd",
+  "fracture",
+  "glass_state",
+  "tables",
+  "layout",
+  "lifecycle",
+  "audit",
+  "consumers",
+  "script_vm",
+  "sweep",
+  "script_call",
+  "level_prep",
+  "bindings",
+  "script_parameters",
+  "capacity",
+  "fire_mode",
+  "owned_strings",
+  "model_zone",
+  "model_zone_kino",
+  "anim_delta",
+  "sound_zone",
+  "sound_zone_bo1",
+  "asset_pool"
+ ],
+ "native_suites_and_audits_failed": [],
+ "bindings_test46": {
+  "weapon_alignment": "DB_AllocStreamPos(3) (0xe45d7, 0xe4246)",
+  "hudelem_update": "0x16cf90",
+  "objective_builtins": {
+   "objective_add": "0x198de0",
+   "objective_delete": "0x199200",
+   "objective_onentity": "0x199240",
+   "objective_state": "0x199340",
+   "objective_string": "0x199360",
+   "objective_string_nomessage": "0x199370",
+   "objective_icon": "0x199380",
+   "objective_position": "0x199450",
+   "objective_additionalposition": "0x199530",
+   "objective_current": "0x199600",
+   "objective_ring": "0x199770",
+   "objective_setpointertextoverride": "0x199810"
+  },
+  "asset_hash": {
+   "table": "0xa78720",
+   "entries": "0xa8e860",
+   "buckets": 37000,
+   "entry_bytes": 24,
+   "next": "0x12"
+  },
+  "effect_index": "0x19eff0",
+  "effect_configstrings": "0xcb7+1..255",
+  "sl_find_string": "0x21a3d0",
+  "dobj_bone_index": "0x231130",
+  "allowed_stances": "actor+0xe38",
+  "loop_alias_flags": "list+8 -> alias+0x50 bit 0"
+ },
+ "model_zone_local_zombie_zone": {
+  "models": 24,
+  "surfaces": 196,
+  "materials": 8,
+  "images": 45,
+  "vertices": 67368,
+  "triangles": 82676,
+  "rigid_lists": 73,
+  "collision_trees": 73,
+  "references_resolved": 297,
+  "script_strings": 132,
+  "fastfile_bytes": 3426331,
+  "block_sizes": [
+   6080,
+   0,
+   0,
+   673600,
+   0,
+   0,
+   2159872,
+   501424
+  ]
+ },
+ "model_zone_local_effects": {
+  "effects": 10,
+  "elems": 83,
+  "materials": 35,
+  "visual_arrays": 10,
+  "lights": 6,
+  "spawner_elems": 0,
+  "effect_references": 0,
+  "effect_lookups": 0
+ },
+ "model_zone_synthetic_effects": {
+  "effects": 2,
+  "elems": 4,
+  "materials": 2,
+  "visual_arrays": 1,
+  "lights": 1,
+  "spawner_elems": 1,
+  "effect_references": 1,
+  "effect_lookups": 1
+ },
+ "model_zone_note": "the whole generated zombie zone (character, 9 dismemberment models, 4 thrown pieces, 4 powerups, the hellhound) and the 10 converted BO1 effects through the retail DB_LoadXFile and every XModel/Material/GfxImage/FxEffectDef loader",
+ "effect_loaders_executed": [
+  "0xdc940",
+  "0xdca10",
+  "0xdcbd0",
+  "0xdce70",
+  "0xdcfe0",
+  "0xdd0b0",
+  "0xf2270"
+ ],
+ "anim_delta_dog": [
+  {
+   "name": "zombie_dog_idle",
+   "frames": 92,
+   "root_motion": 0,
+   "trans": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "non_finite": 0,
+   "fault": "none"
+  },
+  {
+   "name": "zombie_dog_run",
+   "frames": 60,
+   "root_motion": 1,
+   "trans": [
+    724.29,
+    0.0,
+    0.0
+   ],
+   "non_finite": 0,
+   "fault": "none"
+  },
+  {
+   "name": "zombie_dog_run_attack",
+   "frames": 45,
+   "root_motion": 0,
+   "trans": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "non_finite": 0,
+   "fault": "none"
+  },
+  {
+   "name": "zombie_dog_run_attack_low",
+   "frames": 85,
+   "root_motion": 0,
+   "trans": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "non_finite": 0,
+   "fault": "none"
+  },
+  {
+   "name": "zombie_dog_run_stop",
+   "frames": 18,
+   "root_motion": 1,
+   "trans": [
+    70.64,
+    0.0,
+    0.0
+   ],
+   "non_finite": 0,
+   "fault": "none"
+  },
+  {
+   "name": "zombie_dog_attackidle",
+   "frames": 34,
+   "root_motion": 0,
+   "trans": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "non_finite": 0,
+   "fault": "none"
+  }
+ ],
+ "anim_delta_failures": 0,
+ "sound_zone_local_bo1": {
+  "alias_lists": 59,
+  "aliases": 271,
+  "loaded_sounds": 175,
+  "pcm_bytes": 37453824,
+  "speaker_maps": 271,
+  "references_resolved": 367,
+  "fastfile_bytes": 37659797,
+  "block_sizes": [
+   1855584,
+   0,
+   0,
+   150240,
+   0,
+   0,
+   0,
+   0
+  ],
+  "decode_failures": 0,
+  "skipped_aliases": 9,
+  "missing_lists": 9,
+  "streamed_missing": 7,
+  "audio_seconds": 330.2,
+  "looping_aliases": 3
+ },
+ "sound_zone_note": "the powerup hum and the hellhound fire/breath loops keep the looping flag; streamed files live in archives not copied here",
+ "installer_fixture": "pwsh 7.5.3 on Linux: Test45 installed with its caches and both guard markers; Test46 refuses to overwrite; Test46 Uninstall removes Test45 with every cache file; Test46 installed (Black Ops found, save backup before-test46-*, install.json 0.1.45-zombies-test46); CollectLogs includes both manifests and the sounds info; Test46 uninstalled keeping logs/backups/bo1_path.txt",
+ "bo1_inputs": {
+  "common_zombie.ff_sha256": "f812069ef2ff446b97051e75d6a5ee49687a8085218b8f79dc2d8237e543117e",
+  "zombie_theater.ff_sha256": "970db88bb5ae9aa1d3875cdbd55d43212f22ee55096ce251f596d4a38a776786",
+  "note": "owner's files, read at run time on the owner's PC, never shipped"
+ }
+}

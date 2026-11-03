@@ -1,7 +1,8 @@
 """Verify and execute the isolated exact-native Test40 model-zone probe.
 
 Builds a fastfile with include/bo1_model.hpp and loads it with the retail x64
-DB_LoadXFile and every XModel/Material/GfxImage loader under it (see
+DB_LoadXFile and every XModel/Material/GfxImage loader under it, and (Test46)
+the FxEffectDef loaders for the converted effects (see
 tools/model_zone_probe.cpp). Optionally also carves the Kino zombie from a
 local decompressed zombie_theater zone (--bo1-theater, never committed).
 """
@@ -54,6 +55,16 @@ EXECUTED = {
     0xe2090: '40 53 48 83 ec 20 48 8b 15 83 fe 59',   # Load_PhysPresetPtr
     0xe1ee0: '40 53 48 83 ec 20 48 8b 15 ab fc 59',   # Load_PhysCollmapPtr
     0xa650:  'c2 00 00 cc cc cc cc cc cc cc cc cc',   # image load action
+    # Test46: effects.
+    0xdca10: '40 53 48 83 ec 20 48 8b 15 73 57 5a',   # Load_FxEffectDefPtr
+    0xdc940: '48 83 ec 28 48 8b 15 dd 58 5a 00 41',   # Load_FxEffectDef
+    0xdcbd0: '48 89 5c 24 08 57 48 83 ec 20 8b fa',   # Load_FxElemDefArray
+    0xdce70: '48 89 5c 24 08 57 48 83 ec 20 48 8b',   # Load_FxElemDefVisuals
+    0xdd0b0: '48 83 ec 28 48 8b 05 65 51 5a 00 0f',   # Load_FxElemVisuals
+    0xdcfe0: '48 83 ec 28 48 8b 05 35 52 5a 00 0f',   # Load_FxElemExtendedDefPtr
+    0xe0b30: '40 53 48 83 ec 20 48 8b 15 2b 05 5a',   # Load_MaterialHandle
+    0xe7460: '48 83 ec 28 48 8b 15 05 a3 59 00 41',   # Load_XStringPtr
+    0xf2270: '40 53 48 83 ec 20 48 8b 11 48 8b d9',   # FxEffectDefRef name -> handle
 }
 # ...and of every routine it replaces (I/O, allocation, registration, upload).
 REPLACED = {
@@ -76,9 +87,11 @@ REPLACED = {
     0xf25b0: '40 53 48 83 ec 30 48 8b 01 48 8b d9',   # DB_AddXAsset(image)
     0x23db0: '40 53 57 48 83 ec 68 48 8b 05 e2 23',   # Load_Texture
     0x21a670: '48 c7 c0 ff ff ff ff 66 0f 1f 84 00',  # SL_GetString_
+    0xf21b0: '40 53 48 83 ec 30 48 8b 01 48 8b d9',   # DB_AddXAsset(fx)
+    0xef5d0: '48 89 5c 24 08 48 89 6c 24 10 48 89',   # DB_FindXAssetHeader (effect references)
 }
 # DB_AddXAsset wrappers pass these asset types to the core (0xf0570).
-WRAPPER_TYPES = {0xf3810: (0x65, 4), 0xf38e0: (0x65, 3), 0xf2af0: (0x65, 5), 0xf2c70: (0x65, 9), 0xf25b0: (0x65, 10)}
+WRAPPER_TYPES = {0xf3810: (0x65, 4), 0xf38e0: (0x65, 3), 0xf2af0: (0x65, 5), 0xf2c70: (0x65, 9), 0xf25b0: (0x65, 10), 0xf21b0: (0x65, 30)}
 
 
 def check_native(pe):
@@ -94,6 +107,10 @@ def check_native(pe):
         call = rva + at + 12
         if pe.get_data(call, 1) != b'\xe8' or call + 5 + struct.unpack('<i', pe.get_data(call + 1, 4))[0] != 0xf0570:
             raise ValueError(f'DB_AddXAsset wrapper {rva:#x} no longer calls the core')
+    # Test46: effect references are looked up as type 30 (fx) by name.
+    if pe.get_data(0xf2281, 5) != bytes.fromhex('b9 1e 00 00 00') or pe.get_data(0xf2286, 1) != b'\xe8' \
+            or 0xf2286 + 5 + struct.unpack('<i', pe.get_data(0xf2287, 4))[0] != 0xef5d0:
+        raise ValueError('FxEffectDefRef lookup differs')
     # Fastfile header: IWffu100 accepted, version 0x114, inflateInit_ with a zlib header.
     if pe.get_data(0xdb82a, 10) != bytes.fromhex('48 bd 49 57 66 66 75 31 30 30') or pe.get_data(0xdb85d, 7) != bytes.fromhex('41 81 f9 14 01 00 00'):
         raise ValueError('Fastfile magic/version check differs')

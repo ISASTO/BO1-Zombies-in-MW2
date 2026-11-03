@@ -82,7 +82,22 @@ inline constexpr std::size_t kWeaponType = 0x54;
 inline constexpr std::size_t kWeaponFireMode = 0x64;
 inline constexpr int kAutomaticFireMode=0,kSemiAutomaticFireMode=1;
 inline constexpr int kWeaponCapacity = 200;
+// Test46: zone assets are only 4-byte aligned. Load_WeaponCompleteDefPtr
+// (0xe4590) and Load_WeaponCompleteDef (0xe4230, the WeaponDef at +8) both
+// allocate with DB_AllocStreamPos(3), so about half of a level's weapons sit
+// on an address that is not a multiple of 8. Test45 and earlier rejected
+// those (ptr & 7): the weapon read as invalid and the weapon options showed
+// LOCKED whenever the player held one of them.
+inline constexpr std::uintptr_t kZoneAssetAlignMask = 3;
 inline constexpr float kDefaultGravityLiteral = 800.5f;
+// Test46: how often the render thread re-reads the player and weapon state.
+// Test45 did it every 16 ms whatever was enabled (about 2 ms a time with 24
+// zombies, peaks of 28-39 ms: frame hitches). With nothing enabled the menu
+// rows only need it a few times a second.
+inline constexpr unsigned long long kFeatureUpdateActiveMs=16,kFeatureUpdateMenuMs=50,kFeatureUpdateIdleMs=250;
+inline unsigned long long FeatureUpdateInterval(bool anyEnabled,bool menuVisible) {
+    return anyEnabled?kFeatureUpdateActiveMs:menuVisible?kFeatureUpdateMenuMs:kFeatureUpdateIdleMs;
+}
 inline bool ValidGravityLiteral(float value) {
     const float gravity=value-.5f;
     return gravity>=100.f && gravity<=1600.f && gravity==100.f*static_cast<int>(gravity/100.f);

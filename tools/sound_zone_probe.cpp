@@ -16,6 +16,7 @@
 // guards are checked, and the stream must be consumed exactly.
 #include "script_call.hpp"
 #include "bo1_sound_build.hpp"
+#include "bo1_sounds.hpp"
 #include <sys/mman.h>
 #include <csetjmp>
 #include <cstdio>
@@ -120,7 +121,7 @@ bool Within(const void* p,std::size_t n,int block) {
 }
 std::string Str(const std::uint8_t* p) {return p?reinterpret_cast<const char*>(p):"";}
 
-struct Report {std::size_t lists=0,aliases=0,sounds=0,pcmBytes=0,speakerMaps=0;};
+struct Report {std::size_t lists=0,aliases=0,sounds=0,pcmBytes=0,speakerMaps=0,loops=0;};
 
 void Verify(const SoundZoneSpec& spec,Report& report) {
     std::set<std::string> sounds;
@@ -139,7 +140,12 @@ void Verify(const SoundZoneSpec& spec,Report& report) {
             for(std::size_t o:{0x08,0x10,0x18,0x20}) Check(!Ptr(p,o),at+"unused string");
             Check(At<float>(p,0x34)==a.volMin && At<float>(p,0x38)==a.volMax && At<float>(p,0x3c)==a.pitchMin && At<float>(p,0x40)==a.pitchMax
                   && At<float>(p,0x44)==a.distMin && At<float>(p,0x48)==a.distMax,at+"volume/pitch/distance");
-            Check(At<std::uint32_t>(p,0x50)==a.flags && !(a.flags&1) && ((a.flags>>7)&3)==1,at+"flags");
+            // Test46: only the powerup hum and the two hellhound loops keep
+            // the looping flag (playloopsound needs it); every other alias is a one-shot.
+            namespace sa=mod::bo1sounds::alias;
+            const bool loop=l.name==sa::kPowerupLoop || l.name==sa::kDogLoopFire || l.name==sa::kDogLoopBreath;
+            Check(At<std::uint32_t>(p,0x50)==a.flags && ((a.flags&mw2::kFlagLooping)!=0)==loop && ((a.flags>>7)&3)==1,at+"flags");
+            if(loop) ++report.loops;
             Check(At<float>(p,0x54)==1.f && At<float>(p,0x58)==1.f && At<std::int32_t>(p,0x64)==a.startDelay,at+"probability/delay");
             // Sound file -> loaded sound asset.
             const auto* sf=Ptr(p,0x28);
@@ -296,9 +302,11 @@ int main(int argc,char** argv) {
             const auto file=mod::bo1model::FastFile(z.zone);
             const auto r=LoadAndVerify(spec,file);
             Check(r.lists==spec.lists.size() && r.lists>=40 && r.sounds==spec.sounds.size(),"zombie sound coverage");
-            char extra[256];
-            std::snprintf(extra,sizeof(extra),",\"decode_failures\":%u,\"skipped_aliases\":%u,\"missing_lists\":%u,\"streamed_missing\":%u,\"audio_seconds\":%.1f",
-                report.decodeFailures,report.skippedAliases,report.missingLists,report.streamedMissing,report.seconds10/10.0);
+            // Test46: the powerup hum and both hellhound loops, each with the looping flag.
+            Check(r.loops>=3,"looping aliases (powerup hum, hellhound fire and breath)");
+            char extra[320];
+            std::snprintf(extra,sizeof(extra),",\"decode_failures\":%u,\"skipped_aliases\":%u,\"missing_lists\":%u,\"streamed_missing\":%u,\"audio_seconds\":%.1f,\"looping_aliases\":%zu",
+                report.decodeFailures,report.skippedAliases,report.missingLists,report.streamedMissing,report.seconds10/10.0,r.loops);
             emit("zombie_sounds",r,file.size(),z.zone,extra);
         }
         json+="}";

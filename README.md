@@ -1,9 +1,35 @@
 # BO1 Zombies in MW2
 
 Incremental mod framework for **retail Modern Warfare 2 (2009), single player**.
-Current build: **0.1.44-zombies-test45**.
+Current build: **0.1.45-zombies-test46**.
 
-**Test45 does what the Test44 run asked for:**
+**Test46 does what the Test45 run asked for:**
+
+- **BO1's effects.** Ten effects are converted from the owner's
+  `common_zombie.ff` into MW2 effects at run time: the powerup glow and grab
+  flash, the hellhound's lightning, eyes, fire/ash trail and death burst, and
+  the dirt of a zombie climbing out. They use MW2's own effect shaders and the
+  BO1 textures from the owner's archives.
+- **BO1 hellhounds on every map.** Kino's wolf model and BO1's dog animations
+  on an MW2 actor, arriving at zombie spawn points with BO1's build-up,
+  lightning strike, sounds and screen shake. They bite at BO1's notetrack and
+  burst when they die. MW2 dog spawners are no longer needed.
+- **Powerups.** No name marker before the model appears; BO1's glow, hum loop
+  and grab flash.
+- **A quiet Spec Ops map.** No Spec Ops HUD (timers, kill counters,
+  objectives), no objective markers, no radio lines, and no MW2 dialogue or
+  battle chatter on a zombies map.
+- **LOCKED weapon options fixed.** MW2 allocates weapon definitions 4-byte
+  aligned; the reader demanded 8, so half of a level's weapons looked invalid.
+- **Performance.** Player-feature reads drop from every 16 ms to every 250 ms
+  when nothing is enabled, one D3D state block is reused, and frame and
+  zombie timings are logged.
+- **Zombies below the floor** (Terminal) are put back on it.
+
+See [Test46](docs/zombies-test46.md) and the
+[Test46 test instructions](docs/test46-testing-protocol.md).
+
+**Test45 did what the Test44 run asked for:**
 
 - **No soldier sounds.** Every sound MW2's animscripts play on a zombie is
   dropped, including the gear rattle of each running step. The exceptions:
@@ -183,9 +209,11 @@ bridge, 72 MiB GPU/CPU skinning buffers, guarded animated-record storage and
 16-bit handles remain active. Rendering and actor regressions are rerun.
 Windows missions and stable 256-actor retail gameplay require owner testing.
 
-Install the complete Test45 package (run its Uninstall.cmd first to remove
-Test44). Follow the [Test45 instructions](docs/test45-testing-protocol.md):
-Favela for a few rounds, the end of a game, and a later round. The
+Install the complete Test46 package (run its Uninstall.cmd first to remove
+Test45). Follow the [Test46 instructions](docs/test46-testing-protocol.md):
+Favela for a few rounds, a dog round on Gulag showers, and Terminal at round
+10. The [Test45 instructions](docs/test45-testing-protocol.md) cover the HUD,
+the end of a game and later rounds. The
 [Test44 instructions](docs/test44-testing-protocol.md) cover Terminal, Gulag
 showers and Contingency. The
 [Test43 instructions](docs/test43-testing-protocol.md) describe the sounds in

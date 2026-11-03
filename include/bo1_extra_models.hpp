@@ -291,6 +291,70 @@ inline std::optional<GibSet> CarveGibs(const std::uint8_t* raw,std::size_t size,
 // ------------------------------------------------------- zone spec
 // Image asset name for a BO1 texture: "bo1_" + the name with every
 // character outside [a-z0-9_] replaced (BO1 combined images carry ~ & $ -).
+// ------------------------------------------------------------ hellhound
+// Test46: Kino's hellhound (zombie_theater.ff): the zombie wolf, 58 bones
+// from tag_origin (j_mainroot, j_spine1-4, j_neck, j_head, tag_eye,
+// tag_mouth_fx...). Its model name is an alias, so it is found through its
+// first material (mc/mtl_zombie_wolf, inline). Surfaces: the body sheet, the
+// fur cards (alpha-tested in Black Ops; MW2's opaque model material would
+// draw them as solid sheets, so they are dropped) and the eyes (a plain
+// ember colour under the eye-glow effect).
+inline constexpr const char* kWolfModel="bo1_zombie_wolf";
+inline constexpr const char* kWolfMaterial="mc/mtl_zombie_wolf";
+inline constexpr const char* kWolfFurMaterial="mc/mtl_zombie_wolf_fur";
+inline constexpr const char* kWolfEyesMaterial="mc/mtl_nazi_hellhound_eyes";
+enum class WolfSkin : std::uint8_t {Body,Eyes,Drop};
+struct WolfSet {Model model;MaterialRef body;std::vector<WolfSkin> skins;};   // skins per surface after drops
+inline std::optional<WolfSet> CarveWolf(const std::uint8_t* raw,std::size_t size,const std::vector<std::string>& strings,std::string* error=nullptr) {
+    auto fail=[&](const std::string& text){if(error)*error=text;return std::optional<WolfSet>{};};
+    const std::string needle=std::string(kWolfMaterial)+'\0';
+    for(const auto* hit=std::search(raw,raw+size,needle.begin(),needle.end());hit!=raw+size;hit=std::search(hit+1,raw+size,needle.begin(),needle.end())) {
+        const auto materialAt=static_cast<std::size_t>(hit-raw);
+        // The model header comes before its materials (bone names, skeleton
+        // and surfaces in between): at most 2 MB back.
+        const std::size_t from=materialAt>(2u<<20)?materialAt-(2u<<20):0;
+        for(std::size_t at=materialAt;at-- >from;) {
+            if(at+t5::kModelBytes>=size || raw[at+8]!=0xff || raw[at+32]!=0xff || !detail::LooksLikeModel(raw+at)) continue;
+            Model m;ParseOptions options;options.allowPhysics=true;
+            if(!ParseModel(raw,size,at,strings,m,nullptr,options) || m.end<=materialAt || m.materials.empty()) continue;
+            if(m.materials[0].kind!=MaterialRef::Kind::Inline || m.materials[0].name!=kWolfMaterial) continue;
+            if(!m.hasBone("tag_origin") || !m.hasBone("j_mainroot") || !m.hasBone("tag_eye") || !m.hasBone("j_head")) continue;
+            // The inline slots, then every alias by its slot (alias = base + 4 * slot).
+            std::map<std::size_t,WolfSkin> inlineSlot;
+            for(std::size_t n=0;n<m.materials.size();++n) {
+                const auto& ref=m.materials[n];
+                if(ref.kind!=MaterialRef::Kind::Inline) continue;
+                if(ref.name==kWolfMaterial) inlineSlot[n]=WolfSkin::Body;
+                else if(ref.name==kWolfFurMaterial) inlineSlot[n]=WolfSkin::Drop;
+                else if(ref.name==kWolfEyesMaterial) inlineSlot[n]=WolfSkin::Eyes;
+                else return fail("hellhound: unexpected material "+ref.name);
+            }
+            std::uint32_t base=0;bool haveBase=false;
+            for(const auto& ref:m.materials) if(ref.kind==MaterialRef::Kind::Alias && (!haveBase || ref.alias<base)) {base=ref.alias;haveBase=true;}
+            WolfSet w;std::vector<bool> drop;
+            for(std::size_t n=0;n<m.materials.size();++n) {
+                const auto& ref=m.materials[n];
+                std::optional<WolfSkin> skin;
+                if(ref.kind==MaterialRef::Kind::Inline) skin=inlineSlot[n];
+                else if(ref.kind==MaterialRef::Kind::Alias && (ref.alias-base)%4==0) {
+                    const auto slot=static_cast<std::size_t>((ref.alias-base)/4);
+                    if(inlineSlot.count(slot) && slot<n) skin=inlineSlot[slot];
+                }
+                if(!skin) return fail("hellhound: unclassified material slot "+std::to_string(n));
+                drop.push_back(*skin==WolfSkin::Drop);
+                if(*skin!=WolfSkin::Drop) w.skins.push_back(*skin);
+            }
+            if(!WithoutSurfaces(m,drop,w.model,error)) return std::nullopt;
+            if(!(SkeletonError(w.model)<=kSkeletonTolerance)) return fail("hellhound: skeleton does not match its base pose");
+            w.model.name=kWolfModel;
+            w.body=m.materials[0];
+            return w;
+        }
+    }
+    return fail("hellhound model not found");
+}
+inline constexpr const char* kFallbackEmber="bo1_fallback_ember";
+
 inline std::string ExtraImageName(const std::string& source) {
     std::string n="bo1x_";
     for(const char ch:source) {
@@ -301,22 +365,23 @@ inline std::string ExtraImageName(const std::string& source) {
 }
 inline constexpr const char* kFallbackGore="bo1_fallback_gore";
 struct ExtraReport {
-    bool powerups=false,gibs=false,pieces=false;
+    bool powerups=false,gibs=false,pieces=false,wolf=false;
     std::size_t models=0;
     std::vector<std::string> fallbacks;  // textures the extra materials lack
 };
 // The textures the extra materials need from the archives.
-inline std::set<std::string> ExtraTextures(const PowerupSet* p,const GibSet* g) {
+inline std::set<std::string> ExtraTextures(const PowerupSet* p,const GibSet* g,const WolfSet* w=nullptr) {
     std::set<std::string> out;
     auto add=[&](const MaterialRef& m){for(const auto h:{kHashColorMap,kHashNormalMap,kHashSpecularMap}) {const auto n=ImageByHash(m,h);if(!n.empty()) out.insert(n);}};
     if(p) {add(p->gold);add(p->ammo);}
     if(g) add(g->gore);
+    if(w) add(w->body);
     return out;
 }
 // Appends the powerup and dismemberment materials and models to a spec built
 // by CharacterSpec (materials 0 body, 1 head skin, 2 eyes).
 inline bool ExtendZoneSpec(ZoneSpec& spec,const PowerupSet* p,const GibSet* g,const std::map<std::string,Texture>& textures,ExtraReport& report,
-                           std::string* error=nullptr) {
+                           std::string* error=nullptr,const WolfSet* w=nullptr) {
     if(spec.materials.size()!=3) return detail::Fail(error,"character materials missing");
     report=ExtraReport{};
     enum class Kind {Color,Normal,Specular};
@@ -377,6 +442,20 @@ inline bool ExtendZoneSpec(ZoneSpec& spec,const PowerupSet* p,const GibSet* g,co
             for(std::size_t k=0;k<kGibPieceNames.size();++k) add(kGibPieceNames[k],g->pieces[k]);
             report.pieces=true;
         }
+    }
+    if(w) {   // Test46: the hellhound
+        const auto body=material(w->body,"mc/bo1_mtl_zombie_wolf",kFallbackColor,{0.05f,0.9f,0.08f,2.f});
+        MaterialSpec eyes;eyes.name="mc/bo1_mtl_hellhound_eyes";
+        if(!spec.images.count(kFallbackEmber)) spec.images[kFallbackEmber]=SolidDxt5(4,0xfa60,0xff);   // ember orange
+        eyes.color=kFallbackEmber;eyes.normal=mw2::kIdentityNormal;
+        if(!spec.images.count(kFallbackSpecular)) spec.images[kFallbackSpecular]=SolidDxt5(4,0x2104,0x30);
+        eyes.spec=kFallbackSpecular;eyes.envMapParms={0.f,0.6f,0.05f,2.f};
+        spec.materials.push_back(std::move(eyes));
+        const auto eyesIndex=spec.materials.size()-1;
+        ModelSpec ms{kWolfModel,&w->model,{}};
+        for(const auto skin:w->skins) ms.surfaceMaterial.push_back(skin==WolfSkin::Eyes?eyesIndex:body);
+        spec.models.push_back(std::move(ms));++report.models;
+        report.wolf=true;
     }
     return true;
 }
