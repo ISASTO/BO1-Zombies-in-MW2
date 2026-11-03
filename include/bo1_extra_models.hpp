@@ -116,8 +116,14 @@ inline std::optional<PowerupSet> CarvePowerups(const std::uint8_t* raw,std::size
        || ammo.materials[1].kind!=MaterialRef::Kind::Alias) return fail("powerup ammo materials not recognised");
     p.gold=bomb.materials[0];p.ammo=ammo.materials[0];p.goldAlias=ammo.materials[1].alias;
     for(std::size_t k=0;k<p.models.size();++k) {
-        const auto& m=p.models[k];
-        if(m.numBones!=1 || m.numRootBones!=1) return fail(std::string(kPowerupModels[k])+": unexpected skeleton");
+        auto& m=p.models[k];
+        if(m.numBones!=1 || m.numRootBones!=1 || m.bones.size()!=1) return fail(std::string(kPowerupModels[k])+": unexpected skeleton");
+        // Test47: powerup_wobble plays the glow on "tag_origin". Only the skull's
+        // single bone is (unnamed, read as) tag_origin; the ammo can, x2 icon and
+        // bomb name theirs after the model ("zombie_ammocan", "x2_poly",
+        // "zombie_bomb"), so playfxontag found no tag and Test46 refused their
+        // glow. A lone root bone carries no animation: it is renamed.
+        m.bones[0]="tag_origin";
         for(const auto& ref:m.materials) {
             if(ref.kind==MaterialRef::Kind::Inline && ref.name==kGoldMaterial) p.surfaceMaterial[k].push_back(0);
             else if(ref.kind==MaterialRef::Kind::Inline && ref.name==kAmmoMaterial) p.surfaceMaterial[k].push_back(1);

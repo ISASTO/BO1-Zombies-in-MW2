@@ -11,6 +11,8 @@
 
 namespace mod {
 namespace {
+// Test47: the last F4 "Spawn Zombie" answer, shown on its row for 2 s.
+MenuZombieResult lastMenuZombie=MenuZombieResult::Added;ULONGLONG lastMenuZombieAt=0;
 std::mutex windowMutex;
 std::map<HWND, Overlay*> windows;
 LRESULT CALLBACK WindowProc(HWND window, UINT message, WPARAM wparam, LPARAM lparam) {
@@ -278,7 +280,7 @@ const char* Row(Page page, int n) {
     static constexpr const char* player[] = {"God Mode", "FOV settings", "Noclip", "Super Speed", "Super Jump", "Reset player toggles"};
     static constexpr const char* weapons[] = {"Give All (usable banks)", "Infinite Ammo", "No Reload", "Infinite Grenades (linked)", "Rapid Fire", "Explosive Bullets", "Force Dual Wield", "No Recoil", "Hitmarkers", "Make Semi-Auto Full-Auto", "Weapon info to log", "Reset weapon toggles"};
     static constexpr const char* world[] = {"World Speed", "Freeze AI", "Gravity", "Kill All Enemies", "Allow Friendly Fire", "Reset world toggles"};
-    static constexpr const char* ai[] = {"Spawn Enemy (nearest point)", "Spawn Friendly (near you)", "Enemy model", "Friendly model", "Pause AI spawning", "Freeze AI (linked)", "Invincible Spawned Friendlies", "Alive enemy / friendly", "Our spawned actors", "Remove our spawned actors", "AI info to log", "Engine actor slots"};
+    static constexpr const char* ai[] = {"Spawn Enemy (nearest point)", "Spawn Friendly (near you)", "Spawn Zombie (zombie mode)", "Enemy model", "Friendly model", "Pause AI spawning", "Freeze AI (linked)", "Invincible Spawned Friendlies", "Alive enemy / friendly", "Our spawned actors", "Remove our spawned actors", "AI info to log", "Engine actor slots"};
     static constexpr const char* zombies[] = {"Round rules preview", "Controller rehearsal", "Playable zombies"};
     static constexpr const char* diag[] = {"Status HUD", "Write State to Log"};
     static constexpr const char* rules[] = {"Preview round", "Total zombies", "Zombie health", "Simultaneous cap", "Spawn interval", "Between rounds"};
@@ -461,6 +463,7 @@ void Overlay::frame() {
         else if (action == Action::ResetWorld) ResetWorldFeatures();
         else if(action==Action::SpawnAiEnemy) RequestAiOperation(AiOperation::SpawnEnemy,ReadSnapshot());
         else if(action==Action::SpawnAiFriendly) RequestAiOperation(AiOperation::SpawnFriendly,ReadSnapshot());
+        else if(action==Action::SpawnZombie) {lastMenuZombie=RequestMenuZombie();lastMenuZombieAt=GetTickCount64();}
         else if(action==Action::KillAllEnemies) RequestAiOperation(AiOperation::KillEnemies,ReadSnapshot());
         else if(action==Action::RemoveSpawnedAi) RequestAiOperation(AiOperation::RemoveOwned,ReadSnapshot());
         else if(action==Action::PreviousEnemySpawner || action==Action::NextEnemySpawner)
@@ -706,7 +709,7 @@ void Overlay::frame() {
         } else if(menu.page==Page::AI) {
             std::snprintf(line,sizeof(line),"Native mission AI | %s | Recovering: %d",AiResultText(aiStatus.lastResult),aiStatus.recovering);
             text(40,121,kMuted,line,.7f);
-            const bool friendly=menu.selected==1 || menu.selected==3;
+            const bool friendly=menu.selected==1 || menu.selected==4;
             if(aiStatus.lastEntity)
                 std::snprintf(line,sizeof(line),"Last spawn #%u | %.0f units away | %d tries",aiStatus.lastEntity,aiStatus.lastSpawnDistance,aiStatus.placementAttempts);
             else if(friendly && aiStatus.friendlySpawners)
@@ -735,10 +738,10 @@ void Overlay::frame() {
             const float y=170.f+(n-first)*26.f;
             const bool selected=menu.selected==n;
             if (selected) { rect(34,y-1,640,24,D3DCOLOR_ARGB(255,49,57,32)); rect(34,y-1,3,24,kAccent); }
-            if(menu.page==Page::AI && (n==2 || n==3)) {
-                const char* name=n==2?aiStatus.enemyName.data():aiStatus.friendlyName.data();
-                if(n==2 && std::strncmp(name,"actor_enemy_",12)==0)name+=12;
-                std::snprintf(line,sizeof(line),"%s model: %.45s",n==2?"Enemy":"Friendly",name[0]?name:"None");
+            if(menu.page==Page::AI && (n==3 || n==4)) {
+                const char* name=n==3?aiStatus.enemyName.data():aiStatus.friendlyName.data();
+                if(n==3 && std::strncmp(name,"actor_enemy_",12)==0)name+=12;
+                std::snprintf(line,sizeof(line),"%s model: %.45s",n==3?"Enemy":"Friendly",name[0]?name:"None");
                 text(45,y+1,selected?kAccent:kText,line,.64f);
             } else text(45,y+1,selected?kAccent:kText,Row(menu.page,n));
             const char* status="PLANNED";
@@ -847,17 +850,28 @@ void Overlay::frame() {
                 else status="ENTER";
             }
             else if(menu.page==Page::AI) {
-                if(n==0 || n==1) status=!aiStatus.ready?"LOCKED":aiStatus.pending?"QUEUED":
-                    !(n==1?aiStatus.friendlySpawners:aiStatus.enemySpawners)?"NONE":(n==1 && !aiStatus.characterLoaded)?"NOT LOADED":aiStatus.spawnPaused?"PAUSED":aiStatus.engineActors>=NativeActorCapacity()?"ENGINE FULL":"ENTER";
-                else if(n==2) { std::snprintf(value,sizeof(value),"%d/%d",aiStatus.enemySpawner,aiStatus.enemySpawners); status=value; }
-                else if(n==3) { std::snprintf(value,sizeof(value),"%d/%d",aiStatus.friendlySpawner,aiStatus.friendlySpawners); status=value; }
-                else if(n==4) status=!aiStatus.ready?"LOCKED":aiStatus.spawnPaused?(aiStatus.pauseWanted?"ON":"NATIVE"):(aiStatus.pauseWanted?"WAIT":"OFF");
-                else if(n==5) status=!ExtraAvailable(s,ExtraFeature::FreezeAI)?"LOCKED":!s.ai.current?"ON":"OFF";
-                else if(n==6) status=!ExtraAvailable(s,ExtraFeature::InvincibleFriendlies)?"LOCKED":extraPreferences.wanted(ExtraFeature::InvincibleFriendlies)?"ON":"OFF";
-                else if(n==7) { std::snprintf(value,sizeof(value),"%d / %d",aiStatus.enemyAlive,aiStatus.friendlyAlive); status=aiStatus.ready?value:"UNKNOWN"; }
-                else if(n==8) { std::snprintf(value,sizeof(value),"%d",aiStatus.owned); status=value; }
-                else if(n==9) status=aiStatus.pending?"QUEUED":aiStatus.owned?"ENTER":"EMPTY";
-                else if(n==11) { std::snprintf(value,sizeof(value),"%d / %d",aiStatus.engineActors,NativeActorCapacity()); status=value; }
+                // Test47: zombies mode closes the campaign spawn gate; an ally
+                // from this page opens it for its own spawn, an enemy does not.
+                const bool gateClosed=aiStatus.spawnPaused && !(n==1 && zombie.running);
+                if(n==0 && zombie.running) status=!aiStatus.ready?"LOCKED":"ZOMBIES";
+                else if(n==0 || n==1) status=!aiStatus.ready?"LOCKED":aiStatus.pending?"QUEUED":
+                    !(n==1?aiStatus.friendlySpawners:aiStatus.enemySpawners)?"NONE":(n==1 && !aiStatus.characterLoaded)?"NOT LOADED":gateClosed?"PAUSED":aiStatus.engineActors>=NativeActorCapacity()?"ENGINE FULL":"ENTER";
+                else if(n==2) {
+                    if(now-lastMenuZombieAt<2000) status=lastMenuZombie==MenuZombieResult::Added?"ADDED":lastMenuZombie==MenuZombieResult::BetweenRounds?"NEXT ROUND":"OFF";
+                    else if(!zombie.running) status="OFF";
+                    else if(zombie.round.phase==bo1::RoundPhase::Between) status="NEXT ROUND";
+                    else if(zombie.menuZombies) {std::snprintf(value,sizeof(value),"ENTER (%u)",zombie.menuZombies);status=value;}
+                    else status="ENTER";
+                }
+                else if(n==3) { std::snprintf(value,sizeof(value),"%d/%d",aiStatus.enemySpawner,aiStatus.enemySpawners); status=value; }
+                else if(n==4) { std::snprintf(value,sizeof(value),"%d/%d",aiStatus.friendlySpawner,aiStatus.friendlySpawners); status=value; }
+                else if(n==5) status=!aiStatus.ready?"LOCKED":aiStatus.spawnPaused?(aiStatus.pauseWanted?"ON":"NATIVE"):(aiStatus.pauseWanted?"WAIT":"OFF");
+                else if(n==6) status=!ExtraAvailable(s,ExtraFeature::FreezeAI)?"LOCKED":!s.ai.current?"ON":"OFF";
+                else if(n==7) status=!ExtraAvailable(s,ExtraFeature::InvincibleFriendlies)?"LOCKED":extraPreferences.wanted(ExtraFeature::InvincibleFriendlies)?"ON":"OFF";
+                else if(n==8) { std::snprintf(value,sizeof(value),"%d / %d",aiStatus.enemyAlive,aiStatus.friendlyAlive); status=aiStatus.ready?value:"UNKNOWN"; }
+                else if(n==9) { std::snprintf(value,sizeof(value),"%d",aiStatus.owned); status=value; }
+                else if(n==10) status=aiStatus.pending?"QUEUED":aiStatus.owned?"ENTER":"EMPTY";
+                else if(n==12) { std::snprintf(value,sizeof(value),"%d / %d",aiStatus.engineActors,NativeActorCapacity()); status=value; }
                 else status="ENTER";
             }
             else if (menu.page==Page::View) {
@@ -986,6 +1000,7 @@ void Overlay::frame() {
             static constexpr const char* hints[]={
                 "Nearest point, clearance retries, then advance to you.",
                 "Clear nearby ground; ally follows and fights enemies.",
+                "Zombie mode: one more zombie this round (hound on dog rounds).",
                 "LEFT/RIGHT: model. Spawn point stays automatic.",
                 "LEFT/RIGHT: Soldier / Ghost / Price / Soap / Roach.",
                 "Native spawn gate; existing actors still think.",
@@ -998,14 +1013,17 @@ void Overlay::frame() {
                 "Shared actor pool; campaign NPCs also use these slots."
             };
             footer=MenuText<Page::AI>(hints,menu.selected);
-            if(menu.selected==3 && !aiStatus.characterLoaded)
+            if(menu.selected==4 && !aiStatus.characterLoaded)
                 footer="Character assets are not loaded in this mission; choose Soldier.";
-            else if(menu.selected==3 && aiStatus.friendlyFallback)
+            else if(menu.selected==4 && aiStatus.friendlyFallback)
                 footer="Soldier uses a loaded human model with native ally AI.";
             if((menu.selected==0 || menu.selected==1) && aiStatus.lastResult==AiRequestResult::NativeRefused)
                 footer="Native creation refused; see diagnostic log.";
             if((menu.selected==0 || menu.selected==1) && aiStatus.lastResult==AiRequestResult::NoClearPosition)
                 footer="No clear nearby ground; move or choose another model.";
+            if(menu.selected==0 && zombie.running) footer="Zombie mode keeps enemy spawns closed; use Spawn Zombie.";
+            if(menu.selected==2 && !zombie.running) footer="Start zombie mode first (ZOMBIE MODE > Playable zombies).";
+            if(menu.selected==1 && zombie.running) footer="Allies join the fight; they move with the zombie animations.";
             if(!aiStatus.resolved) footer="Exact native AI profile unavailable; see log.";
         }
         if (menu.page==Page::View) {

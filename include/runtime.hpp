@@ -140,6 +140,9 @@ bool ZombieModeAvailable();
 void RequestZombieStart(const ZombieSettings& settings,const char* map);
 void RequestZombieStop();
 void SetZombieHellhounds(bool enabled);
+// Test47: F4 AI page "Spawn Zombie": one more zombie in the round in progress.
+enum class MenuZombieResult {Added,NotRunning,BetweenRounds};
+MenuZombieResult RequestMenuZombie();
 bool LaunchZombieMap(const char* map,const ZombieSettings& settings);
 // Test39: relaunches the Spec Ops map after GAME OVER (called every frame).
 void TickZombieRelaunch(const Snapshot& s);

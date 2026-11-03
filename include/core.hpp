@@ -8,7 +8,7 @@
 #include "fov_preferences.hpp"
 
 namespace mod {
-inline constexpr const char* kVersion = "0.1.45-zombies-test46";
+inline constexpr const char* kVersion = "0.1.46-zombies-test47";
 inline constexpr const char* kExeSha256 = "fb7e8a987c371dea7b666091b0b9e2011c0cd9cd277b191ad453d11d557dd777";
 
 // -1 is a wildcard. Reject malformed patterns rather than matching everything.
@@ -292,7 +292,8 @@ enum class Page { Home, Player, Weapons, World, AI, Zombies, Diagnostics, Zombie
 inline constexpr int MenuRowCount(Page page) {
     switch(page) {
         case Page::Home: case Page::Player: case Page::World: case Page::ZombieRules: return 6;
-        case Page::Weapons: case Page::AI: return 12;
+        case Page::Weapons: return 12;
+        case Page::AI: return 13;   // Test47: Spawn Zombie
         case Page::Zombies: return 3;
         case Page::Diagnostics: return 2;
         case Page::View: return 5;
@@ -317,7 +318,7 @@ enum class Action { None, ToggleGod, ToggleHud, WriteSnapshot, WriteRoundPreview
     DecreaseTimeScale, IncreaseTimeScale, DecreaseGravity, IncreaseGravity,
     ToggleRehearsal, ChangeRehearsalRound, ToggleRehearsalAutoClear, ToggleRehearsalSpawning,
     KillRehearsalActor, ClearRehearsalActors, WriteRehearsal,
-    SpawnAiEnemy, SpawnAiFriendly, PreviousEnemySpawner, NextEnemySpawner, PreviousFriendlySpawner, NextFriendlySpawner,
+    SpawnAiEnemy, SpawnAiFriendly, SpawnZombie, PreviousEnemySpawner, NextEnemySpawner, PreviousFriendlySpawner, NextFriendlySpawner,
     ToggleAiSpawnPause, RemoveSpawnedAi, WriteAiState, KillAllEnemies,
     StartZombies, ChangeZombieMap, ChangeZombieRound, ToggleZombieHellhounds, ToggleZombieAllies, WriteZombieState };
 inline bool IsRehearsalAction(Action action) {
@@ -350,8 +351,8 @@ struct MenuState {
             if (page==Page::Player && selected==4) return right?Action::IncreaseJump:Action::DecreaseJump;
             if (page==Page::World && selected==0) return right?Action::IncreaseTimeScale:Action::DecreaseTimeScale;
             if (page==Page::World && selected==2) return right?Action::IncreaseGravity:Action::DecreaseGravity;
-            if(page==Page::AI && selected==2) return right?Action::NextEnemySpawner:Action::PreviousEnemySpawner;
-            if(page==Page::AI && selected==3) return right?Action::NextFriendlySpawner:Action::PreviousFriendlySpawner;
+            if(page==Page::AI && selected==3) return right?Action::NextEnemySpawner:Action::PreviousEnemySpawner;
+            if(page==Page::AI && selected==4) return right?Action::NextFriendlySpawner:Action::PreviousFriendlySpawner;
         }
         if (page == Page::View && selected == 0
             && (key == Input::Left || key == Input::Right || key == Input::Select))
@@ -420,11 +421,12 @@ struct MenuState {
             else if(page==Page::AI) {
                 if(selected==0) return Action::SpawnAiEnemy;
                 if(selected==1) return Action::SpawnAiFriendly;
-                if(selected==4) return Action::ToggleAiSpawnPause;
-                if(selected==5) return Action::ToggleFreezeAI;
-                if(selected==6) return Action::ToggleInvincibleFriendlies;
-                if(selected==9) return Action::RemoveSpawnedAi;
-                if(selected==10) return Action::WriteAiState;
+                if(selected==2) return Action::SpawnZombie;
+                if(selected==5) return Action::ToggleAiSpawnPause;
+                if(selected==6) return Action::ToggleFreezeAI;
+                if(selected==7) return Action::ToggleInvincibleFriendlies;
+                if(selected==10) return Action::RemoveSpawnedAi;
+                if(selected==11) return Action::WriteAiState;
             }
             else if (page == Page::View && selected == 1) return Action::SaveFov;
             else if (page == Page::View && selected == 2) return Action::ResetFov;

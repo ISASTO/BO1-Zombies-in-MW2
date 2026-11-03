@@ -1,9 +1,26 @@
 # BO1 Zombies in MW2
 
 Incremental mod framework for **retail Modern Warfare 2 (2009), single player**.
-Current build: **0.1.45-zombies-test46**.
+Current build: **0.1.46-zombies-test47**.
 
-**Test46 does what the Test45 run asked for:**
+**Test47 does what the Test46 run asked for:**
+
+- **Every powerup glows.** The glow plays on `tag_origin`, which only the
+  skull had. Each powerup model's single bone is now named `tag_origin`.
+- **Hellhounds bite instead of freezing.** Their bite sat on an additive MW2
+  leaf, so it played as a layer over the bind pose. It now uses a full-body
+  crouch leaf, and every hound leaf is checked against MW2's animtree. More
+  crouch leaves carry dog idles.
+- **Hound effects.** The eye glow sits on the wolf's eye bone and starts
+  after the model swap. A dying hound bursts and is deleted, along with its
+  fire.
+- **F4 → AI → Spawn Zombie** adds a zombie to the round in progress.
+  **Spawn Friendly** works in zombie mode.
+
+See [Test47](docs/zombies-test47.md) and the
+[Test47 test instructions](docs/test47-testing-protocol.md).
+
+**Test46 did what the Test45 run asked for:**
 
 - **BO1's effects.** Ten effects are converted from the owner's
   `common_zombie.ff` into MW2 effects at run time: the powerup glow and grab
@@ -209,10 +226,11 @@ bridge, 72 MiB GPU/CPU skinning buffers, guarded animated-record storage and
 16-bit handles remain active. Rendering and actor regressions are rerun.
 Windows missions and stable 256-actor retail gameplay require owner testing.
 
-Install the complete Test46 package (run its Uninstall.cmd first to remove
-Test45). Follow the [Test46 instructions](docs/test46-testing-protocol.md):
-Favela for a few rounds, a dog round on Gulag showers, and Terminal at round
-10. The [Test45 instructions](docs/test45-testing-protocol.md) cover the HUD,
+Install the complete Test47 package (run its Uninstall.cmd first to remove
+Test46). Follow the [Test47 instructions](docs/test47-testing-protocol.md):
+powerups on Favela, a dog round, and the AI page while zombies run. The
+[Test46 instructions](docs/test46-testing-protocol.md) cover the quiet map
+and Terminal. The [Test45 instructions](docs/test45-testing-protocol.md) cover the HUD,
 the end of a game and later rounds. The
 [Test44 instructions](docs/test44-testing-protocol.md) cover Terminal, Gulag
 showers and Contingency. The

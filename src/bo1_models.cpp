@@ -19,7 +19,7 @@
 namespace mod::bo1models {
 namespace {
 // Bump when the generated zone changes so cached files are rebuilt.
-constexpr const char* kBuilderVersion="bo1mw2-models-4";   // Test46: effects and the hellhound
+constexpr const char* kBuilderVersion="bo1mw2-models-5";   // Test46: effects and the hellhound; Test47: powerup bones named tag_origin
 std::mutex mutex;
 std::condition_variable changed;
 Status status;

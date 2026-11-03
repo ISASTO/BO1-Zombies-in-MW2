@@ -1039,6 +1039,7 @@ struct SpawnOptions {
 void SpawnOwned(const AiRequest& request,const Snapshot& s,const AiScope& scope,int time,const RecoveryAi* recovery=nullptr,const SpawnOptions* options=nullptr);
 void ServiceZombies(const Snapshot& s,const AiScope& scope,int time);
 void ResetZombieGame(const char* reason,bool deleteActors);
+bool ZombieGameRunning();
 void Service() {
     if(servicing || !nativePending.load(std::memory_order_acquire)) return;
     servicing=true;
@@ -1173,6 +1174,14 @@ void Service() {
         }
         ai.status.killed+=killed;Log("AI_KILL_ALL selected=%llu killed=%u",static_cast<unsigned long long>(targets.size()),killed);
         Finish(killed?AiRequestResult::Killed:AiRequestResult::NativeRefused);return;
+    }
+    // Test47: zombies mode keeps the native spawn gate closed for the
+    // campaign spawners (ai_disableSpawn); an ally spawned from the F4 AI
+    // page opens it for its one native call, as a zombie spawn does.
+    if(request->operation==AiOperation::SpawnFriendly && ZombieGameRunning()) {
+        SpawnOptions options;options.bypassPause=true;
+        Log("AI_SPAWN_FRIENDLY zombies=1 gate=BYPASS");
+        SpawnOwned(*request,s,scope,time,nullptr,&options);return;
     }
     SpawnOwned(*request,s,scope,time);
 }
@@ -1373,6 +1382,10 @@ struct ZombieActor {
     // crouched for the dog animations); its eye glow and trail effects and
     // its trail loop sound.
     bool hound=false,houndDressed=false,houndFx=false,fireTrail=false;
+    // Test47: the eye glow and trail start once the wolf model is in place
+    // (the effects are bolted by bone; started in the frame of setmodel they
+    // could land on the soldier skeleton's bone of that index).
+    int houndFxAt=-1;
 };
 struct ZombieDrop {
     bo1::Powerup type=bo1::Powerup::None; AiPoint origin{}; int spawned=0;
@@ -1398,6 +1411,7 @@ struct ZombieGameState {
     int lastDelta=0,deltaTime=-1000000,gameOverRound=0,lastTime=0;
     bool dogSpawners=false;
     AiPoint lastDogOrigin{};bool lastDogKnown=false;
+    unsigned menuZombies=0;   // Test47: added from the F4 AI page
     int readySince=-1;
     // Test39: the Spec Ops map this game was launched on, for GAME OVER relaunch.
     std::string launchedMap; ULONGLONG relaunchAt=0; ZombieSettings launchSettings;
@@ -1413,6 +1427,7 @@ struct ZombieGameState {
     unsigned dropModelsSpawned=0,dropModelFailures=0,unstuck=0,wobbles=0;
     std::vector<std::pair<unsigned,std::uint32_t>> deleteModels;   // removed outside the service, deleted by it
 } zg;
+bool ZombieGameRunning() {return zg.running;}
 int ZombieRandom(int n) {
     zg.random^=zg.random<<13;zg.random^=zg.random>>17;zg.random^=zg.random<<5;
     return n>0?static_cast<int>(zg.random%static_cast<std::uint32_t>(n)):0;
@@ -1542,18 +1557,28 @@ inline constexpr AnimSlot kAnimSlots[]={
     // and held crouched (actor stance mask), so MW2's animscripts play their
     // crouch leaves on it: the crouch run (run.gsc crouchrun, all four
     // directions), the crouch idles (stop.gsc casual crouch idle and its
-    // transition, combat's exposed crouch idles) and the stance change. No
-    // zombie crouches. Its attacks use two crouch combat leaves a hound never
-    // plays itself (no weapon, ignoring everyone).
+    // transition) and the stance change. No zombie crouches.
+    // Test47: only leaves under non-additive nodes of generic_human. Test46
+    // put the bite on exposed_crouch_shoot_auto_v2, which sits under
+    // add_fire : additive; played as an additive layer the dog stayed in its
+    // bind pose ("fully rigid") instead of biting. The exposed crouch alert
+    // idles (add_idle : additive) are gone for the same reason; the crouch
+    // aim base, the crouch turns and the crouch twitches carry dog idles so
+    // no human-only crouch leaf leaves the wolf in its bind pose. The bites use
+    // two crouch leaves a hound never plays itself (no grenades, no weapon).
     {"crouch_fastwalk_F","zombie_dog_run",AnimRole::Move},{"crouch_fastwalk_L","zombie_dog_run",AnimRole::Move},
     {"crouch_fastwalk_R","zombie_dog_run",AnimRole::Move},{"crouch_fastwalk_B","zombie_dog_run",AnimRole::Move},
     {"casual_crouch_idle","zombie_dog_idle",AnimRole::Idle},{"casual_crouch_idle_in","zombie_dog_run_stop",AnimRole::Idle},
-    {"exposed_crouch_idle_alert_v1","zombie_dog_attackidle",AnimRole::Idle},{"exposed_crouch_idle_alert_v2","zombie_dog_idle",AnimRole::Idle},
-    {"exposed_crouch_idle_alert_v3","zombie_dog_attackidle",AnimRole::Idle},{"exposed_stand_2_crouch","zombie_dog_run_stop",AnimRole::Idle},
-    {"exposed_crouch_shoot_auto_v2","zombie_dog_run_attack",AnimRole::DogAttack1},
+    {"exposed_stand_2_crouch","zombie_dog_run_stop",AnimRole::Idle},
+    {"exposed_crouch_aim_5","zombie_dog_attackidle",AnimRole::Idle},
+    {"exposed_crouch_turn_90_left","zombie_dog_idle",AnimRole::Idle},{"exposed_crouch_turn_90_right","zombie_dog_idle",AnimRole::Idle},
+    {"exposed_crouch_turn_180_left","zombie_dog_idle",AnimRole::Idle},{"exposed_crouch_turn_180_right","zombie_dog_idle",AnimRole::Idle},
+    {"casual_crouch_twitch","zombie_dog_idle",AnimRole::Idle},{"casual_crouch_point","zombie_dog_attackidle",AnimRole::Idle},
+    {"exposed_crouch_idle_twitch_v2","zombie_dog_idle",AnimRole::Idle},{"exposed_crouch_idle_twitch_v3","zombie_dog_attackidle",AnimRole::Idle},
+    {"crouch_grenade_throw","zombie_dog_run_attack",AnimRole::DogAttack1},
     {"exposed_crouch_reload","zombie_dog_run_attack_low",AnimRole::DogAttack2}};
 // The MW2 leaves a hellhound needs swapped before it can be used.
-inline constexpr std::array<const char*,3> kHoundLeaves={"crouch_fastwalk_F","casual_crouch_idle","exposed_crouch_shoot_auto_v2"};
+inline constexpr std::array<const char*,3> kHoundLeaves={"crouch_fastwalk_F","casual_crouch_idle","crouch_grenade_throw"};
 // level._zombie_melee / _zombie_walk_melee / _zombie_run_melee (_zombiemode.gsc).
 inline constexpr AnimRole kMeleeAnims[]={AnimRole::Attack2,AnimRole::Attack4,AnimRole::Attack6,AnimRole::Attack1,AnimRole::AttackForward1,AnimRole::AttackForward2};
 inline constexpr AnimRole kWalkMeleeAnims[]={AnimRole::WalkAttack1,AnimRole::WalkAttack2,AnimRole::WalkAttack3,AnimRole::WalkAttack4};
@@ -3069,13 +3094,15 @@ void DeleteWorldModel(WorldModel& w) {
 // is there: its spawn sound, eye glow on tag_eye, a fire trail (half of them,
 // dog_fire_trail_percent) or an ash trail, and that trail's loop sound.
 inline constexpr int kHoundStrikeMs=1500,kHoundOriginLifeMs=5000;
+inline constexpr int kHoundFxDelayMs=300;                // Test47
+inline constexpr const char* kHoundEyeTag="j_eyeball_le";  // Test47: dog_fx_eye_glow
 struct HoundArrival {
     bool active=false;bo1::SpawnRequest request;AiEntity point,source;float pathDistance=-1.f;int strikeAt=0;
     WorldModel origin;
 };
 HoundArrival houndArrival;
 std::deque<std::pair<int,WorldModel>> houndOrigins;   // deleted once their sounds are done
-unsigned houndArrivals=0,houndStrikes=0,houndDeaths=0;
+unsigned houndArrivals=0,houndStrikes=0,houndDeaths=0,houndsRemoved=0;
 WorldModel SpawnScriptOrigin(const AiPoint& origin) {
     if(!worldBindings || !FinitePoint(origin)) return {};
     std::vector<std::uint8_t> before(static_cast<std::size_t>(kAiEntityCapacity),0);
@@ -3133,7 +3160,6 @@ void ClearHoundArrival(bool deleteOrigins) {
 // The hellhound on a zombie template: the MW2 helmet off self.hatModel first
 // (helmetPop), every attachment removed, the wolf as its model, held crouched.
 void DressHound(ZombieActor& z,const AiEntity& e,int time) {
-    (void)time;
     const auto ref=ScriptEntityRef(e.number);
     if(models.helmetSwap && prep.threads) {
         auto& p=*reinterpret_cast<volatile NativeScriptParameters*>(aiProfile.base+kScriptParametersRva);
@@ -3149,25 +3175,43 @@ void DressHound(ZombieActor& z,const AiEntity& e,int time) {
     }
     z.houndDressed=true;++models.houndsDressed;
     PlayZombieSound(e.address,bo1sounds::alias::kDogSpawn);
-    PlayFxOnTag(bo1fx::Effect::DogEyes,e.number,"tag_eye");
     z.fireTrail=ZombieRandom(100)<50;
+    z.houndFxAt=time+kHoundFxDelayMs;
+}
+// dog_run_think: the eye glow (BO1 bolts it to J_EyeBall_LE through a
+// tag_origin model; the wolf has that bone) and the fire or ash trail on
+// tag_origin, with the trail's loop sound. Test47: started kHoundFxDelayMs
+// after the wolf model is set.
+void StartHoundFx(ZombieActor& z,const AiEntity& e) {
+    z.houndFxAt=-1;
+    if(!PlayFxOnTag(bo1fx::Effect::DogEyes,e.number,kHoundEyeTag)) PlayFxOnTag(bo1fx::Effect::DogEyes,e.number,"tag_eye");
     PlayFxOnTag(z.fireTrail?bo1fx::Effect::DogFireTrail:bo1fx::Effect::DogAshTrail,e.number,"tag_origin");
     PlayLoopSound(e.number,z.fireTrail?bo1sounds::alias::kDogLoopFire:bo1sounds::alias::kDogLoopBreath);
     z.houndFx=true;
 }
 // dog_death: the burst of fire and ash where it stood, and the body gone.
-void HoundDeath(ZombieActor& z,const AiEntity& e) {
+// Test47: BO1 deletes its eye and trail anchors and then the fire dog
+// itself ("self delete"). Hiding the dying actor (Test46) did not stop the
+// trail or the soldier death animation the wolf then played; the dying
+// hound is now deleted, which removes every effect bolted to it.
+void HoundDeath(ZombieActor& z,const AiEntity& e,int time) {
     const auto ref=ScriptEntityRef(e.number);
     if(z.houndFx) {
-        StopFxOnTag(bo1fx::Effect::DogEyes,e.number,"tag_eye");
+        StopFxOnTag(bo1fx::Effect::DogEyes,e.number,kHoundEyeTag);
         StopFxOnTag(z.fireTrail?bo1fx::Effect::DogFireTrail:bo1fx::Effect::DogAshTrail,e.number,"tag_origin");
         z.houndFx=false;
     }
     if(test46Bindings) Builtin(kBuiltinStopLoopSound,ref,{});
     AiPoint burst=e.origin;burst[2]+=18.f;
     PlayFx(bo1fx::Effect::DogExplosion,burst);
+    // dog_explode_fx: the explosion sound on its own entity (the hound goes).
+    if(auto o=SpawnScriptOrigin(burst)) {PlayZombieSound(EntityAddress(o.number),bo1sounds::alias::kDogExplode);houndOrigins.push_back({time+kHoundOriginLifeMs,o});}
+    else PlayZombieSound(e.address,bo1sounds::alias::kDogExplode);
     if(z.houndDressed) Builtin(kBuiltinHide,ref,{});
     ++houndDeaths;
+    const auto epoch=ai.checkpointEpoch.load();
+    const auto after=Entity(z.identity,ai.pool,false);
+    if(epoch==ai.checkpointEpoch && z.identity.matches(after) && after.type==kActorType) {DeleteActor(after);++houndsRemoved;}
 }
 // The BO1 powerup model for a drop type (bo1model::kPowerupModels order:
 // ammo can, x2 icon, bomb, skull); none for the carpenter and fire sale.
@@ -3470,8 +3514,8 @@ void ServiceZombieActors(const Snapshot& s,const AiScope& scope,const AiPoint& p
             // The dying actor is still there: its BO1 death vocal (MW2's own
             // soldier death voice is dropped by the playsound hook).
             if(SameAiAllocation(z.identity,raw) && e.valid && e.type==kActorType && e.health<=0) {
-                PlayZombieSound(e.address,z.dog?bo1sounds::alias::kDogExplode:bo1sounds::alias::kDeath);
-                if(z.hound) HoundDeath(z,e);   // Test46: the hellhound bursts
+                if(z.hound) HoundDeath(z,e,time);   // Test46: the hellhound bursts (Test47: and is removed)
+                else PlayZombieSound(e.address,z.dog?bo1sounds::alias::kDogExplode:bo1sounds::alias::kDeath);
             }
             if(z.dog) {zg.lastDogOrigin=z.lastOrigin;zg.lastDogKnown=true;}
             zg.controller.retire(z.ticket,bo1::Retirement::Killed);
@@ -3496,6 +3540,13 @@ void ServiceZombieActors(const Snapshot& s,const AiScope& scope,const AiPoint& p
             if(z.hound) SetField<int>(e.actor+kActorAllowedStances,kStanceCrouch);
             RunZombieSetup(z,e);
             if(epoch!=ai.checkpointEpoch)return;
+        }
+        // Test47: a hound stays crouched (scripts may widen the stance mask;
+        // a standing hound would play the zombie leaves) and its effects
+        // start once the wolf model is in place.
+        if(z.hound) {
+            SetField<int>(e.actor+kActorAllowedStances,kStanceCrouch);
+            if(z.houndDressed && z.houndFxAt>=0 && time>=z.houndFxAt) {StartHoundFx(z,e);if(epoch!=ai.checkpointEpoch)return;}
         }
         // do_zombie_rise: no pursuit, attack or failsafe while climbing out.
         if(z.showAt>=0 && time>=z.showAt) {z.showAt=-1;Builtin(kBuiltinShow,ScriptEntityRef(e.number),{});}
@@ -3617,7 +3668,7 @@ void ResetZombieGame(const char* reason,bool deleteActors) {
 void BeginZombies(const Snapshot& s,const AiScope& scope,int time) {
     zg.settings=zg.requested;zg.startWanted=false;
     zg.random=static_cast<std::uint32_t>(GetTickCount64()) | 1u;
-    zg.ledger={};zg.kills=zg.headshots=zg.hits=zg.campaignRemoved=zg.meleeHits=zg.meleeMisses=0;
+    zg.ledger={};zg.kills=zg.headshots=zg.hits=zg.campaignRemoved=zg.meleeHits=zg.meleeMisses=zg.menuZombies=0;
     zg.zombies.clear();zg.drops.clear();zg.doublePointsUntil=zg.instaKillUntil=0;zg.nukePointsAt=-1;
     ClearGibs(false);zg.dropModelsSpawned=zg.dropModelFailures=0;zg.deleteModels.clear();
     models.headGibs=models.limbGibs=models.gibFailures=models.piecesThrown=0;
@@ -4315,6 +4366,15 @@ void RequestZombieStop() {
     if(zg.running) {zg.stopWanted=true;nativePending.store(true,std::memory_order_release);}
     else if(zg.startWanted) {zg.startWanted=false;Log("ZOMBIE_REQUEST cancelled");}
 }
+MenuZombieResult RequestMenuZombie() {
+    std::lock_guard<std::recursive_mutex> lock(aiMutex);
+    if(!zg.running) {Log("ZOMBIE_MENU_SPAWN refused=NOT_RUNNING");return MenuZombieResult::NotRunning;}
+    if(!zg.controller.addQueued()) {Log("ZOMBIE_MENU_SPAWN refused=BETWEEN_ROUNDS round=%d",zg.controller.status().round);return MenuZombieResult::BetweenRounds;}
+    ++zg.menuZombies;nativePending.store(true,std::memory_order_release);
+    const auto& c=zg.controller.status();
+    Log("ZOMBIE_MENU_SPAWN added=%u round=%d total=%d queued=%d dogs=%d",zg.menuZombies,c.round,c.total,c.queued,c.dogs);
+    return MenuZombieResult::Added;
+}
 void SetZombieHellhounds(bool enabled) {
     std::lock_guard<std::recursive_mutex> lock(aiMutex);
     zg.requested.hellhounds=enabled;if(zg.running)zg.settings.hellhounds=enabled;
@@ -4421,7 +4481,7 @@ ZombieGameStatus GetZombieGameStatus() {
     s.zombiesDressed=models.dressed;
     s.powerupModels=static_cast<int>(std::count(models.powerups.begin(),models.powerups.end(),true));
     s.gibModels=models.gibs?static_cast<int>(bo1model::kGibModelNames.size()+(models.gibPieces?bo1model::kGibPieceNames.size():0)):0;
-    s.effects=static_cast<int>(effects.precached);s.hounds=HoundsReady();
+    s.effects=static_cast<int>(effects.precached);s.hounds=HoundsReady();s.menuZombies=zg.menuZombies;
     const auto soundStatus=bo1sounds::GetStatus();
     std::snprintf(s.bo1Sounds,sizeof(s.bo1Sounds),"%s",soundStatus.skipped?"SKIPPED":bo1sounds::StateText(soundStatus.state));
     s.soundLists=sounds.active?static_cast<int>(sounds.available.size()):0;
@@ -4470,9 +4530,9 @@ void LogZombieGame() {
         Log("ZOMBIE_FX bindings=%d precached=%u/%llu played=%u on_tag=%u refused=%u loop_sounds=%u delayed=%llu",effects.bindings,effects.precached,
             static_cast<unsigned long long>(bo1fx::kEffects.size()),effects.played,effects.onTag,effects.refused,effects.loops,
             static_cast<unsigned long long>(effects.delayed.size()));
-        Log("ZOMBIE_HOUNDS ready=%d wolf=%d leaves=%d arrivals=%u strikes=%u dressed=%u dress_failures=%u deaths=%u pending=%d",HoundsReady(),models.wolf,
+        Log("ZOMBIE_HOUNDS ready=%d wolf=%d leaves=%d arrivals=%u strikes=%u dressed=%u dress_failures=%u deaths=%u removed=%u pending=%d menu_zombies=%u",HoundsReady(),models.wolf,
             static_cast<int>(std::count_if(kHoundLeaves.begin(),kHoundLeaves.end(),[](const char* l){return AnimSwapped(l);})),houndArrivals,houndStrikes,
-            models.houndsDressed,models.houndDressFailures,houndDeaths,houndArrival.active);
+            models.houndsDressed,models.houndDressFailures,houndDeaths,houndsRemoved,houndArrival.active,zg.menuZombies);
         LogZombiePerf();
     }
     Log("ZOMBIE_STATE available=%d running=%d pending=%d map=%s round=%d phase=%s alive=%d queued=%d killed=%d dogs=%d points=%d total=%d kills=%u headshots=%u hits=%u melee_hits=%u melee_misses=%u drops=%llu double_points_ms=%d insta_kill_ms=%d campaign_removed=%u weapon=%s dog_spawners=%llu next_dog_round=%d",

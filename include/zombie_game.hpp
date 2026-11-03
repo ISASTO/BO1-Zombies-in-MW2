@@ -81,5 +81,7 @@ struct ZombieGameStatus {
     int powerupModels=0,gibModels=0;
     // Test46: BO1 effects registered and BO1 hellhounds ready on this level.
     int effects=0;bool hounds=false;
+    // Test47: zombies added from the F4 AI page this game.
+    unsigned menuZombies=0;
 };
 } // namespace mod

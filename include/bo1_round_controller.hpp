@@ -181,6 +181,16 @@ public:
         if(status_.phase==RoundPhase::Spawning) status_.phase=RoundPhase::Draining;
         return count;
     }
+    // Test47: the F4 AI page's "Spawn Zombie" adds one obligation to the
+    // round in progress; it spawns like the others (a hellhound on a dog
+    // round) and the round ends once it is killed too. Refused between
+    // rounds, when the next round's plan replaces the counts.
+    bool addQueued() {
+        if(status_.phase!=RoundPhase::Intro && status_.phase!=RoundPhase::Spawning && status_.phase!=RoundPhase::Draining) return false;
+        ++status_.total; ++status_.queued;
+        if(status_.phase==RoundPhase::Draining) status_.phase=RoundPhase::Spawning;
+        return true;
+    }
     int retireAll(Retirement reason) {
         int count=0;
         for(const auto slot:actors_) if(slot.sequence && retire(slot,reason)) ++count;

@@ -510,7 +510,10 @@ class Test46Tests(unittest.TestCase):
         dress=self.body('void DressHound(ZombieActor& z,const AiEntity& e,int time) {')
         self.assertLess(dress.index('kActorAllowedStances,kStanceCrouch'),dress.index('kBuiltinSetModel'))
         self.assertLess(dress.index('kBuiltinDetachAll'),dress.index('kBuiltinSetModel'))
-        for part in ('kWolfModel','DogEyes,e.number,"tag_eye"','DogFireTrail','DogAshTrail','kDogLoopFire','kDogLoopBreath'):self.assertIn(part,dress)
+        self.assertIn('kWolfModel',dress)
+        # Test47: the eyes and trail start in StartHoundFx, after the model swap.
+        fx=self.body('void StartHoundFx(')
+        for part in ('DogEyes,e.number,kHoundEyeTag','DogFireTrail','DogAshTrail','kDogLoopFire','kDogLoopBreath'):self.assertIn(part,fx)
         death=self.body('void HoundDeath(')
         for part in ('StopFxOnTag(','kBuiltinStopLoopSound','DogExplosion','kBuiltinHide'):self.assertIn(part,death)
         # Every leaf a hound needs is swapped, and only hounds crouch.
@@ -520,3 +523,78 @@ class Test46Tests(unittest.TestCase):
         self.assertIn('if(z.dog && !z.hound)return;',melee)
         self.assertIn('AnimRole::DogAttack1',melee)
         self.assertIn('z.hound?bo1::kDogMeleeDamage:bo1::kZombieMeleeDamage',self.body('void MeleeHit('))
+
+
+class Test47Tests(unittest.TestCase):
+    """Test47: powerup glow on every model, hound bites on non-additive
+    leaves, hound effects on the wolf's eye bone, dead hounds removed, the
+    F4 "Spawn Zombie" row and allies spawned during zombie mode."""
+    def setUp(self):
+        self.ai=(ROOT/'src'/'ai.cpp').read_text()
+        self.core=(ROOT/'include'/'core.hpp').read_text()
+        self.overlay=(ROOT/'src'/'overlay.cpp').read_text()
+        self.extra=(ROOT/'include'/'bo1_extra_models.hpp').read_text()
+        self.controller=(ROOT/'include'/'bo1_round_controller.hpp').read_text()
+
+    def body(self,signature,end='\n}\n'):
+        start=self.ai.index(signature)
+        return self.ai[start:self.ai.index(end,start)]
+
+    def test_every_powerup_model_has_tag_origin(self):
+        self.assertIn('m.bones[0]="tag_origin";',self.extra)
+        self.assertIn('kBuilderVersion="bo1mw2-models-5"',(ROOT/'src'/'bo1_models.cpp').read_text())
+        self.assertIn('PlayFxOnTag(bo1fx::Effect::PowerupOn,w.number,"tag_origin")',self.body('void SpawnDropModel(ZombieDrop& drop,int time) {'))
+
+    def test_hound_effects_start_after_the_wolf_on_its_eye(self):
+        dress=self.body('void DressHound(ZombieActor& z,const AiEntity& e,int time) {')
+        self.assertNotIn('PlayFxOnTag(',dress)
+        self.assertIn('z.houndFxAt=time+kHoundFxDelayMs;',dress)
+        self.assertIn('kHoundEyeTag="j_eyeball_le"',self.ai)
+        service=self.body('void ServiceZombieActors(')
+        self.assertIn('if(z.houndDressed && z.houndFxAt>=0 && time>=z.houndFxAt) {StartHoundFx(z,e);',service)
+        self.assertIn('SetField<int>(e.actor+kActorAllowedStances,kStanceCrouch);',service[:service.index('do_zombie_rise')])
+
+    def test_dead_hound_is_removed_with_its_effects(self):
+        death=self.body('void HoundDeath(ZombieActor& z,const AiEntity& e,int time) {')
+        self.assertIn('DeleteActor(after);',death)
+        self.assertLess(death.index('DogExplosion'),death.index('DeleteActor(after);'))
+        self.assertIn('SpawnScriptOrigin(burst)',death)
+        self.assertIn('if(z.hound) HoundDeath(z,e,time);',self.ai)
+
+    def test_hound_bites_are_not_additive_leaves(self):
+        slots=re.findall(r'\{"(\w+)","(zombie_dog_\w+)",AnimRole::(\w+)\}',self.ai)
+        names={m for m,_,_ in slots}
+        self.assertIn('crouch_grenade_throw',names)
+        for gone in ('exposed_crouch_shoot_auto_v2','exposed_crouch_idle_alert_v1','exposed_crouch_idle_alert_v2','exposed_crouch_idle_alert_v3'):
+            self.assertNotIn(gone,names)
+        import os,zlib
+        path=os.environ.get('MW2_COMMON_DEC')
+        if not path:self.skipTest('MW2_COMMON_DEC not set')
+        raw=Path(path).read_bytes()
+        name=b'animtrees/generic_human.atr\0'
+        at=raw.index(name)+len(name)
+        text=zlib.decompressobj().decompress(raw[at:at+400000]).decode('latin-1')
+        text=re.sub(r'//[^\n]*','',text)
+        stack=[];last=None;parents={}
+        for t in re.findall(r'\{|\}|[A-Za-z0-9_]+(?:\s*:\s*[A-Za-z]+)*',text):
+            if t=='{':stack.append(last)
+            elif t=='}':stack.pop()
+            else:
+                parts=[x.strip() for x in t.split(':')]
+                parents[parts[0].lower()]=[n for n in stack]+[(parts[0],parts[1:])]
+                last=(parts[0],parts[1:])
+        for mw2,_,role in slots:
+            chain=parents[mw2.lower()]
+            self.assertFalse(any('additive' in flags for _,flags in chain),f'{mw2} ({role}) sits under an additive node')
+
+    def test_spawn_zombie_row_and_allies_in_zombie_mode(self):
+        self.assertIn('case Page::AI: return 13;',self.core)
+        self.assertIn('if(selected==2) return Action::SpawnZombie;',self.core)
+        self.assertIn('lastMenuZombie=RequestMenuZombie();',self.overlay)
+        menu=self.body('MenuZombieResult RequestMenuZombie() {')
+        self.assertIn('zg.controller.addQueued()',menu)
+        self.assertIn('bool addQueued()',self.controller)
+        service=self.ai[self.ai.index('// Test47: zombies mode keeps the native spawn gate closed'):]
+        service=service[:service.index('SpawnOwned(*request,s,scope,time);')]
+        self.assertIn('AiOperation::SpawnFriendly && ZombieGameRunning()',service)
+        self.assertIn('options.bypassPause=true;',service)

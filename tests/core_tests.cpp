@@ -95,8 +95,9 @@ int main() {
     m.input(Input::Back);
     Check(m.page==Page::Home && m.selected==4, "second back returns to remembered home category");
     m.page=Page::AI; m.selected=0;
-    Check(m.count()==12 && m.input(Input::Select)==Action::SpawnAiEnemy,"native enemy request routing");
+    Check(m.count()==13 && m.input(Input::Select)==Action::SpawnAiEnemy,"native enemy request routing");
     m.input(Input::Down); Check(m.input(Input::Select)==Action::SpawnAiFriendly,"native friendly request routing");
+    m.input(Input::Down); Check(m.input(Input::Select)==Action::SpawnZombie,"Test47: spawn zombie routing");
     m.input(Input::Down); Check(m.input(Input::Right)==Action::NextEnemySpawner && m.input(Input::Left)==Action::PreviousEnemySpawner,"enemy template arrows");
     m.input(Input::Down); Check(m.input(Input::Right)==Action::NextFriendlySpawner,"friendly template arrows");
     m.input(Input::Down); Check(m.input(Input::Select)==Action::ToggleAiSpawnPause,"native spawn pause routing");
@@ -106,7 +107,8 @@ int main() {
     m.input(Input::Down); Check(m.input(Input::Select)==Action::None,"ownership count read-only");
     m.input(Input::Down); Check(m.input(Input::Select)==Action::RemoveSpawnedAi && m.firstVisibleRow()==0,"owned-only cleanup routing");
     m.input(Input::Down); Check(m.input(Input::Select)==Action::WriteAiState && m.firstVisibleRow()==0,"last AI diagnostics row accessible");
-    m.input(Input::Down); Check(m.input(Input::Select)==Action::None && m.firstVisibleRow()==0,"native engine capacity read-only row accessible");
+    m.input(Input::Down); Check(m.selected==12 && m.input(Input::Select)==Action::None && m.firstVisibleRow()==0,"native engine capacity read-only row accessible");
+    m.input(Input::Down); Check(m.selected==0,"AI page wraps after the capacity row");
     m.page=Page::Weapons;
     m.selected=1;Check(m.input(Input::Select)==Action::ToggleInfiniteAmmo,"ammo moved to weapons");
     m.selected=2;Check(m.input(Input::Select)==Action::ToggleNoReload,"reload moved to weapons");
